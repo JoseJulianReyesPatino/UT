@@ -18,12 +18,8 @@ interface ListaConcentradaFormData {
   materia: string;
   parcial: string;
   grupo: string;
-  totalAlumnos: string;
-  alumnosAprobados: string;
-  promedioGrupo: string;
   archivos: File[];
   docente: string;
-  autorizacion: boolean;
   nota: string;
 }
 
@@ -34,12 +30,8 @@ const initialFormData: ListaConcentradaFormData = {
   materia: "",
   parcial: "",
   grupo: "",
-  totalAlumnos: "",
-  alumnosAprobados: "",
-  promedioGrupo: "",
   archivos: [],
   docente: "",
-  autorizacion: false,
   nota: "",
 };
 
@@ -47,6 +39,7 @@ export default function ListaConcentradaPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<ListaConcentradaFormData>(initialFormData);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const calendarioUrl = new URL("../../../assets/Calendario25-26.pdf", import.meta.url).href;
 
   // Obtener carreras disponibles según el plan
   const carrerasDisponibles = useMemo(() => {
@@ -92,12 +85,8 @@ export default function ListaConcentradaPage() {
         formData.materia &&
         formData.parcial &&
         validarGrupo &&
-        formData.totalAlumnos.trim() &&
-        formData.alumnosAprobados.trim() &&
-        formData.promedioGrupo.trim() &&
         formData.archivos.length > 0 &&
-        formData.docente.trim() &&
-        formData.autorizacion
+        formData.docente.trim()
     );
   }, [formData]);
 
@@ -179,52 +168,28 @@ export default function ListaConcentradaPage() {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right">
-            <SheetHeader>
-              <SheetTitle>Seleccionar Plan</SheetTitle>
-            </SheetHeader>
-            <div className="space-y-3 mt-6">
-              <Button
-                variant={formData.plan === "nuevo-modelo" ? "default" : "outline"}
-                className="w-full justify-start"
-                onClick={() => {
-                  setFormData((current) => ({
-                    ...current,
-                    plan: "nuevo-modelo",
-                    carrera: "",
-                    cuatrimestre: "",
-                    materia: "",
-                  }));
-                  setSheetOpen(false);
-                }}
-              >
-                Plan Nuevo Modelo
-              </Button>
-              <Button
-                variant={formData.plan === "plan-normal" ? "default" : "outline"}
-                className="w-full justify-start"
-                onClick={() => {
-                  setFormData((current) => ({
-                    ...current,
-                    plan: "plan-normal",
-                    carrera: "",
-                    cuatrimestre: "",
-                    materia: "",
-                  }));
-                  setSheetOpen(false);
-                }}
-              >
-                Plan Normal
-              </Button>
-            </div>
-            {formData.plan && (
-              <div className="mt-6 p-3 bg-blue-50 rounded-lg text-sm">
-                <p className="font-medium">Plan seleccionado:</p>
-                <p>{formData.plan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}</p>
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Historial de archivos</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4">
+                {formData.archivos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {formData.archivos.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            )}
-          </SheetContent>
+            </SheetContent>
         </Sheet>
+      </div>
+
+      <div className="flex items-center justify-between p-3 bg-emerald-50 dark:bg-emerald-900/10 border-l-4 border-emerald-300 dark:border-emerald-300 rounded-md">
+        <p className="text-sm text-emerald-300 dark:text-emerald-200">Recordatorio: Se sube 3 días después de la aplicación de cada parcial.</p>
+        <Button variant="outline" size="sm" onClick={() => window.open(calendarioUrl, "_blank")}>Calendario</Button>
       </div>
 
       <Card>
@@ -233,15 +198,14 @@ export default function ListaConcentradaPage() {
           <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          {/* Plan actual */}
-          {formData.plan && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm">
-                <span className="font-medium">Plan actual:</span>{" "}
-                {formData.plan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
-              </p>
+          {/* Plan selection inside form */}
+          <div className="space-y-2">
+            <Label>Plan *</Label>
+            <div className="flex gap-2">
+              <Button variant={formData.plan === "nuevo-modelo" ? "default" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Nuevo Modelo</Button>
+              <Button variant={formData.plan === "plan-normal" ? "default" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Normal</Button>
             </div>
-          )}
+          </div>
 
           {/* Carrera */}
           <div className="space-y-2">
@@ -291,7 +255,7 @@ export default function ListaConcentradaPage() {
               <SelectContent>
                 {cuatrimestresDisponibles.map((cuatri) => (
                   <SelectItem key={cuatri} value={cuatri}>
-                    {cuatrimestresLabels[cuatri]}
+                    {cuatrimestresLabels[cuatri as keyof typeof cuatrimestresLabels]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -353,42 +317,7 @@ export default function ListaConcentradaPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            {/* Total de alumnos */}
-            <div className="space-y-2">
-              <Label>Total de alumnos *</Label>
-              <Input
-                type="number"
-                min="1"
-                value={formData.totalAlumnos}
-                onChange={(e) => setFormData((current) => ({ ...current, totalAlumnos: e.target.value }))}
-              />
-            </div>
-
-            {/* Alumnos aprobados */}
-            <div className="space-y-2">
-              <Label>Alumnos aprobados *</Label>
-              <Input
-                type="number"
-                min="0"
-                value={formData.alumnosAprobados}
-                onChange={(e) => setFormData((current) => ({ ...current, alumnosAprobados: e.target.value }))}
-              />
-            </div>
-
-            {/* Promedio del grupo */}
-            <div className="space-y-2">
-              <Label>Promedio del grupo *</Label>
-              <Input
-                type="number"
-                min="0"
-                max="10"
-                step="0.1"
-                value={formData.promedioGrupo}
-                onChange={(e) => setFormData((current) => ({ ...current, promedioGrupo: e.target.value }))}
-              />
-            </div>
-          </div>
+          {/* Campos de total/alumnos/promedio removidos por requerimiento */}
 
           {/* Archivos */}
           <div className="space-y-2">
@@ -461,23 +390,10 @@ export default function ListaConcentradaPage() {
             />
           </div>
 
-          {/* Autorización */}
+          {/* Declaración de autorización (texto estático) */}
           <div className="space-y-2">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm space-y-3">
-              <p className="font-medium">Declaración de autorización</p>
-              <p>
-                Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.
-              </p>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.autorizacion}
-                  onChange={(e) => setFormData((current) => ({ ...current, autorizacion: e.target.checked }))}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm font-medium">Autorizo el uso de esta información</span>
-              </label>
-            </div>
+            <p className="font-medium">Declaración de autorización</p>
+            <p className="text-sm">Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.</p>
           </div>
 
           {/* Nota (opcional) */}

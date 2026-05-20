@@ -5,8 +5,10 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { Calendar, Check, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Calendar, Check, ChevronLeft, FileText, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { ScrollArea } from "../../components/ui/scroll-area";
 
 type CycleStatus = "activo" | "cerrado";
 
@@ -35,7 +37,101 @@ type DocumentRecord = {
   documento: string;
   docente: string;
   carrera: string;
+  plan: string;
+  cuatrimestre: string;
+  materia: string;
+  parcial: string;
+  grupo: string;
+  tipo: "planeacion" | "instrumento-30-40" | "instrumento-60-70" | "lista-concentrada" | "asesoria" | "portafolio" | "acta-final";
 };
+
+type TutorDocumentRecord = {
+  id: number;
+  ciclo: string;
+  documento: string;
+  docente: string;
+  tipo: "carga-academica" | "reporte-bajas" | "concentrado-asesorias" | "acta-asistencia" | "ficha-tecnica";
+};
+
+type TutorDocumentType = TutorDocumentRecord["tipo"];
+
+const tutorDocumentTitles: Record<TutorDocumentType, string> = {
+  "carga-academica": "Carga académica",
+  "reporte-bajas": "Reporte de bajas",
+  "concentrado-asesorias": "Concentrado de asesorías y bajas",
+  "acta-asistencia": "Acta de asistencia grupal",
+  "ficha-tecnica": "Ficha técnica",
+};
+
+const getDocumentsModalTitle = (selectedDocumentType: "docentes" | "tutores" | null, selectedDocumentCategory: DocumentRecord["tipo"] | null, selectedTutorCategory: TutorDocumentType | null) => {
+  if (selectedDocumentType === "docentes") {
+    let title = "Documentos de Docentes";
+    if (selectedDocumentCategory) {
+      title = `${title} - ${selectedDocumentCategory}`;
+    }
+    return title;
+  }
+
+  if (selectedTutorCategory) {
+    return `Documentos de Tutores - ${tutorDocumentTitles[selectedTutorCategory]}`;
+  }
+
+  return "Documentos de Tutores";
+};
+
+type DocumentPreviewDialogProps = {
+  open: boolean;
+  document: DocumentRecord | TutorDocumentRecord | null;
+  onOpenChange: (open: boolean) => void;
+  onOpenPdf: () => void;
+};
+
+function DocumentPreviewDialog({ open, document, onOpenChange, onOpenPdf }: Readonly<DocumentPreviewDialogProps>) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[95vw] w-[95vw] max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Vista previa del documento</DialogTitle>
+          <DialogDescription>
+            Simulación de lectura del archivo PDF del documento seleccionado.
+          </DialogDescription>
+        </DialogHeader>
+        {document && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">{document.ciclo}</Badge>
+              {"plan" in document && <Badge variant="outline">{document.plan}</Badge>}
+              {"tipo" in document && <Badge variant="outline">{document.tipo.replaceAll("-", " ")}</Badge>}
+            </div>
+            <div className="rounded-lg border border-border bg-muted/30 p-4 md:p-6">
+              <div className="mx-auto flex min-h-[70vh] w-full max-w-[1100px] flex-col justify-between rounded-lg border border-border bg-background p-6 md:p-10 shadow-sm">
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Documento PDF</p>
+                    <h3 className="mt-2 text-2xl font-semibold md:text-3xl">{document.documento}</h3>
+                    <p className="text-base text-muted-foreground">{document.docente}</p>
+                  </div>
+                  <div className="grid gap-3 text-sm md:grid-cols-2 md:gap-4">
+                    <p><span className="font-medium">Ciclo:</span> {document.ciclo}</p>
+                    <p><span className="font-medium">Carrera:</span> {"carrera" in document ? document.carrera : "N/D"}</p>
+                    <p><span className="font-medium">Plan:</span> {"plan" in document ? document.plan : "N/D"}</p>
+                    <p><span className="font-medium">Tipo:</span> {"tipo" in document ? document.tipo.replaceAll("-", " ") : "N/D"}</p>
+                  </div>
+                </div>
+                <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  Esta es una vista previa simulada del PDF asociado al documento.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={onOpenPdf}>Abrir PDF</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const initialCycles: AcademicCycle[] = [
   {
@@ -68,18 +164,34 @@ const initialCycles: AcademicCycle[] = [
 ];
 
 const initialDocuments: DocumentRecord[] = [
-  { id: 1, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Planeación - Programación Web", docente: "Mtro. Juan Pérez", carrera: "Ingeniería en Sistemas" },
-  { id: 2, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Instrumento 60% - Programación Web", docente: "Dra. María González", carrera: "Ingeniería en Sistemas" },
-  { id: 3, ciclo: "Cuatrimestre Septiembre-Diciembre 2025", documento: "Lista Concentrada - Redes", docente: "Mtro. Carlos López", carrera: "Ingeniería en Redes" },
-  { id: 4, ciclo: "Cuatrimestre Mayo-Agosto 2025", documento: "Instrumento 30% - Redes", docente: "Mtro. Carlos López", carrera: "Ingeniería en Redes" },
+  { id: 1, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Planeación - Programación Web", docente: "Mtro. Juan Pérez", carrera: "Ingeniería en Sistemas", plan: "Plan Nuevo Modelo", cuatrimestre: "5", materia: "Programación Web", parcial: "Parcial 1", grupo: "ITIID-8", tipo: "planeacion" },
+  { id: 2, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Instrumento 60% - Programación Web", docente: "Dra. María González", carrera: "Ingeniería en Sistemas", plan: "Plan Nuevo Modelo", cuatrimestre: "8", materia: "Programación Web", parcial: "Parcial 2", grupo: "ITIID-8", tipo: "instrumento-60-70" },
+  { id: 3, ciclo: "Cuatrimestre Septiembre-Diciembre 2025", documento: "Lista Concentrada - Redes", docente: "Mtro. Carlos López", carrera: "Ingeniería en Redes", plan: "Plan Normal", cuatrimestre: "9", materia: "Redes de Computadoras", parcial: "Parcial 1", grupo: "ILI-9", tipo: "lista-concentrada" },
+  { id: 4, ciclo: "Cuatrimestre Mayo-Agosto 2025", documento: "Instrumento 30% - Redes", docente: "Mtro. Carlos López", carrera: "Ingeniería en Redes", plan: "Plan Normal", cuatrimestre: "7", materia: "Infraestructura", parcial: "Parcial 3", grupo: "IME-7", tipo: "instrumento-30-40" },
+  { id: 5, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Asesoría - Métodos de Investigación", docente: "Dra. Ana Martínez", carrera: "TSU Desarrollo Software", plan: "Plan Nuevo Modelo", cuatrimestre: "3", materia: "Métodos de Investigación", parcial: "Parcial 1", grupo: "DSM-3", tipo: "asesoria" },
+  { id: 6, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Portafolio Digital - Programación", docente: "Mtro. Roberto Silva", carrera: "TSU Automatización", plan: "Plan Nuevo Modelo", cuatrimestre: "5", materia: "Programación Estructurada", parcial: "Final", grupo: "AUT-5", tipo: "portafolio" },
+];
+
+const initialTutorDocuments: TutorDocumentRecord[] = [
+  { id: 101, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Carga Académica Q1 2026", docente: "Mtro. Juan Pérez", tipo: "carga-academica" },
+  { id: 102, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Reporte de Bajas Enero 2026", docente: "Dra. María González", tipo: "reporte-bajas" },
+  { id: 103, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Concentrado Asesorías y Bajas", docente: "Mtro. Carlos López", tipo: "concentrado-asesorias" },
+  { id: 104, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Acta Asistencia Grupal - Turno Matutino", docente: "Dra. Ana Martínez", tipo: "acta-asistencia" },
+  { id: 105, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Ficha Técnica Tutoría Virtual", docente: "Mtro. Roberto Silva", tipo: "ficha-tecnica" },
 ];
 
 export function CiclosEscolares() {
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showDocsDialog, setShowDocsDialog] = useState(false);
+  const [showDocTypeDialog, setShowDocTypeDialog] = useState(false);
+  const [showDocumentTypeSelector, setShowDocumentTypeSelector] = useState(false);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [selectedCycle, setSelectedCycle] = useState<AcademicCycle | null>(null);
+  const [selectedDocumentType, setSelectedDocumentType] = useState<"docentes" | "tutores" | null>(null);
+  const [selectedDocumentCategory, setSelectedDocumentCategory] = useState<DocumentRecord["tipo"] | null>(null);
+  const [selectedTutorCategory, setSelectedTutorCategory] = useState<TutorDocumentType | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<DocumentRecord | TutorDocumentRecord | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; type?: "close" | "activate"; ciclo?: AcademicCycle }>({ open: false });
   const [deleteConfirmationName, setDeleteConfirmationName] = useState("");
   const [newCycleForm, setNewCycleForm] = useState<CycleFormState>({
@@ -101,15 +213,27 @@ export function CiclosEscolares() {
 
   const [ciclos, setCiclos] = useState<AcademicCycle[]>(initialCycles);
   const [documents, setDocuments] = useState<DocumentRecord[]>(initialDocuments);
+  const [tutorDocuments] = useState<TutorDocumentRecord[]>(initialTutorDocuments);
+
+  const [filterPlan, setFilterPlan] = useState("all");
+  const [filterCarrera, setFilterCarrera] = useState("all");
+  const [filterCuatrimestre, setFilterCuatrimestre] = useState("all");
+  const [filterDocente, setFilterDocente] = useState("all");
+  const [filterParcial, setFilterParcial] = useState("all");
+  const [filterGrupo, setFilterGrupo] = useState("all");
+  const [filterTutorDocente, setFilterTutorDocente] = useState("all");
 
   const cycleDocumentCount = useMemo(
-    () => (cycleName: string) => documents.filter((document) => document.ciclo === cycleName).length,
-    [documents]
+    () => (cycleName: string) => documents.filter((document) => document.ciclo === cycleName).length + tutorDocuments.filter((document) => document.ciclo === cycleName).length,
+    [documents, tutorDocuments]
   );
 
   const openDocsForCycle = (ciclo: AcademicCycle) => {
     setSelectedCycle(ciclo);
-    setShowDocsDialog(true);
+    setSelectedDocumentType(null);
+    setSelectedDocumentCategory(null);
+    setSelectedTutorCategory(null);
+    setShowDocTypeDialog(true);
   };
 
   const openEditDialog = (ciclo: AcademicCycle) => {
@@ -232,9 +356,89 @@ export function CiclosEscolares() {
   };
 
   const closeDocs = () => {
-    setShowDocsDialog(false);
+    setShowDocTypeDialog(false);
+    setShowDocumentTypeSelector(false);
+    setShowDocumentsModal(false);
+    setSelectedDocumentType(null);
+    setSelectedDocumentCategory(null);
+    setSelectedTutorCategory(null);
     setSelectedCycle(null);
   };
+
+  const handleSelectDocType = (type: "docentes" | "tutores") => {
+    setSelectedDocumentType(type);
+    setShowDocTypeDialog(false);
+    if (type === "docentes") {
+      setShowDocumentTypeSelector(true);
+      return;
+    }
+
+    setSelectedTutorCategory(null);
+    setShowDocumentTypeSelector(true);
+  };
+
+  const handleSelectDocumentCategory = (category: DocumentRecord["tipo"]) => {
+    setSelectedDocumentCategory(category);
+    setShowDocumentTypeSelector(false);
+    setShowDocumentsModal(true);
+    setFilterPlan("all");
+    setFilterCarrera("all");
+    setFilterCuatrimestre("all");
+    setFilterDocente("all");
+    setFilterParcial("all");
+    setFilterGrupo("all");
+  };
+
+  const handleSelectTutorCategory = (category: TutorDocumentType) => {
+    setSelectedTutorCategory(category);
+    setShowDocumentTypeSelector(false);
+    setShowDocumentsModal(true);
+    setFilterTutorDocente("all");
+  };
+
+  const closeDocumentsModal = () => {
+    setShowDocumentsModal(false);
+    setSelectedDocumentType(null);
+    setSelectedDocumentCategory(null);
+  };
+
+  const openDocumentPreview = (document: DocumentRecord | TutorDocumentRecord) => {
+    setPreviewDocument(document);
+  };
+
+  const closeDocumentPreview = () => {
+    setPreviewDocument(null);
+  };
+
+  const plansAvailable = Array.from(new Set(documents.map((document) => document.plan)));
+  const carrerasAvailable = Array.from(new Set(documents.map((document) => document.carrera)));
+  const cuatrimestresAvailable = Array.from(new Set(documents.map((document) => document.cuatrimestre)));
+  const docentesAvailable = Array.from(new Set(documents.map((document) => document.docente)));
+  const parcialesAvailable = Array.from(new Set(documents.map((document) => document.parcial)));
+  const gruposAvailable = Array.from(new Set(documents.map((document) => document.grupo)));
+  const tutorDocentesAvailable = Array.from(new Set(tutorDocuments.map((document) => document.docente)));
+
+  const filteredDocuments = useMemo(
+    () => documents.filter((document) => (
+      (filterPlan === "all" || document.plan === filterPlan)
+      && (filterCarrera === "all" || document.carrera === filterCarrera)
+      && (filterCuatrimestre === "all" || document.cuatrimestre === filterCuatrimestre)
+      && (filterDocente === "all" || document.docente === filterDocente)
+      && (filterParcial === "all" || document.parcial === filterParcial)
+      && (filterGrupo === "all" || document.grupo === filterGrupo)
+    )),
+    [documents, filterPlan, filterCarrera, filterCuatrimestre, filterDocente, filterParcial, filterGrupo]
+  );
+
+  const filteredTutorDocuments = useMemo(
+    () => tutorDocuments.filter((document) => (
+      (selectedTutorCategory === null || document.tipo === selectedTutorCategory)
+      && (filterTutorDocente === "all" || document.docente === filterTutorDocente)
+    )),
+    [tutorDocuments, selectedTutorCategory, filterTutorDocente]
+  );
+
+  const documentsModalTitle = getDocumentsModalTitle(selectedDocumentType, selectedDocumentCategory, selectedTutorCategory);
 
   return (
     <div className="relative space-y-6 overflow-hidden">
@@ -336,7 +540,7 @@ export function CiclosEscolares() {
       </div>
 
       <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
-        <DialogContent className="border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-cyan-50/40 dark:border-emerald-900/50 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
+        <DialogContent className="border-emerald-200/70 bg-white dark:border-emerald-900/50 dark:bg-slate-950">
           <DialogHeader>
             <DialogTitle>Nuevo Ciclo Escolar</DialogTitle>
             <DialogDescription>Crea un nuevo período académico en el sistema</DialogDescription>
@@ -383,7 +587,7 @@ export function CiclosEscolares() {
       </Dialog>
 
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-cyan-50/40 dark:border-emerald-900/50 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
+        <DialogContent className="border-emerald-200/70 bg-white dark:border-emerald-900/50 dark:bg-slate-950">
           <DialogHeader>
             <DialogTitle>Editar Ciclo Escolar</DialogTitle>
             <DialogDescription>Actualiza la información del ciclo seleccionado.</DialogDescription>
@@ -456,31 +660,242 @@ export function CiclosEscolares() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showDocsDialog} onOpenChange={(open) => { if (!open) closeDocs(); }}>
-        <DialogContent className="max-w-4xl">
+      <Dialog open={showDocTypeDialog} onOpenChange={(open) => { if (!open) closeDocs(); }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Documentos - {selectedCycle?.nombre}</DialogTitle>
-            <DialogDescription>Documentos asociados al ciclo seleccionado.</DialogDescription>
+            <DialogTitle className="text-2xl">Seleccionar Tipo de Documentos</DialogTitle>
+            <DialogDescription className="text-base mt-2">¿Qué documentos deseas revisar para {selectedCycle?.nombre}?</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            {selectedCycle && (
-              <div className="space-y-3">
-                {documents.filter((document) => document.ciclo === selectedCycle.nombre).map((document) => (
-                  <div key={document.id} className="rounded-xl border border-border/70 bg-background/80 p-4 flex items-center justify-between shadow-sm dark:bg-slate-950/60">
-                    <div>
-                      <p className="font-medium text-foreground">{document.documento}</p>
-                      <p className="text-sm text-muted-foreground">{document.docente} • {document.carrera}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => toast("Abrir PDF - simulación")}>Ver PDF</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="grid gap-4 mt-6">
+            <Button
+              onClick={() => handleSelectDocType("docentes")}
+              className="justify-start h-28 text-left flex flex-col items-start p-5 border-2 rounded-lg transition-all hover:shadow-lg"
+              variant="outline"
+            >
+              <FileText className="h-6 w-6 mb-3" />
+              <span className="font-semibold text-lg">Documentos Docentes</span>
+              <span className="text-sm text-muted-foreground">Planeación, instrumentos, listas, asesorías y más.</span>
+            </Button>
+            <Button
+              onClick={() => handleSelectDocType("tutores")}
+              className="justify-start h-28 text-left flex flex-col items-start p-5 border-2 rounded-lg transition-all hover:shadow-lg"
+              variant="outline"
+            >
+              <FileText className="h-6 w-6 mb-3" />
+              <span className="font-semibold text-lg">Documentos Tutores</span>
+              <span className="text-sm text-muted-foreground">Carga académica, reportes, concentrados y fichas.</span>
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showDocumentTypeSelector} onOpenChange={(open) => { if (!open) closeDocs(); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader className="pb-2">
+            <div className="flex items-center gap-3 mb-2">
+              <Button
+                onClick={() => {
+                  setShowDocumentTypeSelector(false);
+                  setShowDocTypeDialog(true);
+                }}
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <DialogTitle className="text-2xl">{selectedDocumentType === "tutores" ? "Seleccionar Tipo de Tutoría" : "Seleccionar Tipo de Documento"}</DialogTitle>
+            </div>
+            <DialogDescription className="text-base ml-11">{selectedDocumentType === "tutores" ? "Elige el apartado de tutorías que deseas revisar" : "Elige el documento que deseas revisar"}</DialogDescription>
+          </DialogHeader>
+          {selectedDocumentType === "tutores" ? (
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
+              <Button onClick={() => handleSelectTutorCategory("carga-academica")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Carga académica</Button>
+              <Button onClick={() => handleSelectTutorCategory("reporte-bajas")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Reporte de bajas</Button>
+              <Button onClick={() => handleSelectTutorCategory("concentrado-asesorias")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Concentrado de asesorías y bajas</Button>
+              <Button onClick={() => handleSelectTutorCategory("acta-asistencia")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Acta de asistencia grupal</Button>
+              <Button onClick={() => handleSelectTutorCategory("ficha-tecnica")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Ficha técnica</Button>
+            </div>
+          ) : (
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
+              <Button onClick={() => handleSelectDocumentCategory("planeacion")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Planeación</Button>
+              <Button onClick={() => handleSelectDocumentCategory("instrumento-30-40")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 30/40%</Button>
+              <Button onClick={() => handleSelectDocumentCategory("instrumento-60-70")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 60/70%</Button>
+              <Button onClick={() => handleSelectDocumentCategory("lista-concentrada")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Lista Concentrada</Button>
+              <Button onClick={() => handleSelectDocumentCategory("asesoria")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Asesoría</Button>
+              <Button onClick={() => handleSelectDocumentCategory("portafolio")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Portafolio Digital</Button>
+              <Button onClick={() => handleSelectDocumentCategory("acta-final")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Acta Final</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDocumentsModal} onOpenChange={(open) => { if (!open) closeDocumentsModal(); }}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="pb-2">
+            <div className="flex items-center gap-3 mb-2">
+              <Button
+                onClick={() => {
+                  setShowDocumentsModal(false);
+                  setShowDocumentTypeSelector(true);
+                }}
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <DialogTitle className="text-2xl">{documentsModalTitle}</DialogTitle>
+                <DialogDescription className="text-base mt-1">{selectedCycle?.nombre}</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 pr-4">
+            {selectedDocumentType === "docentes" ? (
+              <>
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 py-4 border-b">
+                  <Select value={filterPlan} onValueChange={setFilterPlan}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Plan" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los planes</SelectItem>
+                      {plansAvailable.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterCarrera} onValueChange={setFilterCarrera}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Carrera" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las carreras</SelectItem>
+                      {carrerasAvailable.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Cuatrimestre" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los cuatrimestres</SelectItem>
+                      {cuatrimestresAvailable.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterDocente} onValueChange={setFilterDocente}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Docente" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los docentes</SelectItem>
+                      {docentesAvailable.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterParcial} onValueChange={setFilterParcial}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Parcial" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los parciales</SelectItem>
+                      {parcialesAvailable.map((parcial) => <SelectItem key={parcial} value={parcial}>{parcial}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterGrupo} onValueChange={setFilterGrupo}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Grupo" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los grupos</SelectItem>
+                      {gruposAvailable.map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 pt-4 pb-4">
+                  {filteredDocuments.length === 0 ? (
+                    <div className="flex items-center justify-center h-32 text-muted-foreground">No hay documentos que coincidan con los filtros</div>
+                  ) : (
+                    filteredDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        tabIndex={0}
+                        onClick={() => openDocumentPreview(doc)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openDocumentPreview(doc);
+                          }
+                        }}
+                        className="cursor-pointer p-3 border border-border/70 rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{doc.documento}</p>
+                            <p className="text-xs text-muted-foreground">{doc.docente} • {doc.carrera}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                              <Badge variant="outline" className="text-xs">Q{doc.cuatrimestre}</Badge>
+                              <Badge variant="outline" className="text-xs">{doc.grupo}</Badge>
+                              <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>
+                            </div>
+                          </div>
+                          <Button variant="outline" size="sm" className="shrink-0" onClick={(e) => { e.stopPropagation(); openDocumentPreview(doc); }}>Ver PDF</Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 py-4 border-b">
+                  <Select value={filterTutorDocente} onValueChange={setFilterTutorDocente}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Docente" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los docentes</SelectItem>
+                      {tutorDocentesAvailable.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 pt-4 pb-4">
+                  {filteredTutorDocuments.length === 0 ? (
+                    <div className="flex items-center justify-center h-32 text-muted-foreground">No hay documentos de tutores</div>
+                  ) : (
+                    filteredTutorDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        tabIndex={0}
+                        onClick={() => openDocumentPreview(doc)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openDocumentPreview(doc);
+                          }
+                        }}
+                        className="cursor-pointer p-3 border border-border/70 rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{doc.documento}</p>
+                            <p className="text-xs text-muted-foreground">{doc.docente}</p>
+                            <Badge variant="outline" className="text-xs mt-1">{doc.tipo.replaceAll("-", " ")}</Badge>
+                          </div>
+                          <Button variant="outline" size="sm" className="shrink-0" onClick={(e) => { e.stopPropagation(); openDocumentPreview(doc); }}>Ver PDF</Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </ScrollArea>
+
+          <DialogFooter className="border-t pt-4">
+            <Button variant="outline" onClick={closeDocumentsModal}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <DocumentPreviewDialog
+        open={Boolean(previewDocument)}
+        document={previewDocument}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDocumentPreview();
+          }
+        }}
+        onOpenPdf={() => toast("Abrir PDF - simulación")}
+      />
 
       <Dialog open={confirmDialog.open} onOpenChange={(open) => { if (!open) setConfirmDialog({ open: false }); }}>
         <DialogContent>

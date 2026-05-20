@@ -18,12 +18,8 @@ interface Instrumento3040FormData {
   materia: string;
   parcial: string;
   grupo: string;
-  criterios: string;
-  ponderacion: string;
-  fechaAplicacion: string;
   archivos: File[];
   docente: string;
-  autorizacion: boolean;
   nota: string;
 }
 
@@ -34,21 +30,19 @@ const initialFormData: Instrumento3040FormData = {
   materia: "",
   parcial: "",
   grupo: "",
-  criterios: "",
-  ponderacion: "",
-  fechaAplicacion: "",
   archivos: [],
   docente: "",
-  autorizacion: false,
   nota: "",
 };
-
-const ponderacionesOpciones = ["30%", "35%", "40%"];
 
 export default function Instrumento3040Page() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Instrumento3040FormData>(initialFormData);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const calendarioUrl = new URL("../../../assets/Calendario25-26.pdf", import.meta.url).href;
+
+  const getCuatrimestreLabel = (cuatrimestre: string) =>
+    cuatrimestresLabels[cuatrimestre as keyof typeof cuatrimestresLabels];
 
   const carrerasDisponibles = useMemo(() => {
     if (!formData.plan) return [];
@@ -85,12 +79,8 @@ export default function Instrumento3040Page() {
         formData.materia &&
         formData.parcial &&
         validarGrupo &&
-        formData.criterios.trim() &&
-        formData.ponderacion.trim() &&
-        formData.fechaAplicacion.trim() &&
         formData.archivos.length > 0 &&
-        formData.docente.trim() &&
-        formData.autorizacion
+        formData.docente.trim()
     );
   }, [formData]);
 
@@ -146,19 +136,38 @@ export default function Instrumento3040Page() {
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild><Button variant="outline" size="icon"><Menu className="h-5 w-5"/></Button></SheetTrigger>
           <SheetContent side="right">
-            <SheetHeader><SheetTitle>Seleccionar Plan</SheetTitle></SheetHeader>
-            <div className="space-y-3 mt-6">
-              <Button variant={formData.plan === "nuevo-modelo" ? "default" : "outline"} className="w-full" onClick={() => { setFormData((c) => ({ ...c, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" })); setSheetOpen(false); }}>Plan Nuevo Modelo</Button>
-              <Button variant={formData.plan === "plan-normal" ? "default" : "outline"} className="w-full" onClick={() => { setFormData((c) => ({ ...c, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" })); setSheetOpen(false); }}>Plan Normal</Button>
+            <SheetHeader><SheetTitle>Historial de archivos</SheetTitle></SheetHeader>
+            <div className="mt-4">
+              {formData.archivos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {formData.archivos.map((f, i) => (
+                    <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           </SheetContent>
         </Sheet>
       </div>
 
+      <div className="flex items-center justify-between p-3 bg-emerald-50 dark:bg-emerald-900/10 border-l-4 border-emerald-300 dark:border-emerald-300 rounded-md">
+        <p className="text-sm text-emerald-300 dark:text-emerald-200">Recordatorio: Se sube 3 días después de la aplicación de cada parcial.</p>
+        <Button variant="outline" size="sm" onClick={() => window.open(calendarioUrl, "_blank")}>Calendario</Button>
+      </div>
+
       <Card>
         <CardHeader><CardTitle>Formulario Instrumento 30/40</CardTitle><CardDescription>Los campos marcados con * son obligatorios.</CardDescription></CardHeader>
         <CardContent className="space-y-5">
-          {formData.plan && (<div className="p-3 bg-green-50 border border-green-200 rounded-lg"><p className="text-sm"><span className="font-medium">Plan actual:</span> {formData.plan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}</p></div>)}
+          {/* Plan selection inside form */}
+          <div className="space-y-2">
+            <Label>Plan *</Label>
+            <div className="flex gap-2">
+              <Button variant={formData.plan === "nuevo-modelo" ? "default" : "outline"} onClick={() => setFormData((c) => ({ ...c, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Nuevo Modelo</Button>
+              <Button variant={formData.plan === "plan-normal" ? "default" : "outline"} onClick={() => setFormData((c) => ({ ...c, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Normal</Button>
+            </div>
+          </div>
 
           <div className="space-y-2"><Label>Carrera *</Label>
             <Select value={formData.carrera} onValueChange={(v) => setFormData((c) => ({ ...c, carrera: v, cuatrimestre: "", materia: "" }))} disabled={!formData.plan}>
@@ -170,7 +179,7 @@ export default function Instrumento3040Page() {
           <div className="space-y-2"><Label>Cuatrimestre *</Label>
             <Select value={formData.cuatrimestre} onValueChange={(v) => setFormData((c) => ({ ...c, cuatrimestre: v as Cuatrimestre, materia: "" }))} disabled={!formData.carrera}>
               <SelectTrigger><SelectValue placeholder="Selecciona el cuatrimestre"/></SelectTrigger>
-              <SelectContent>{cuatrimestresDisponibles.map((q) => (<SelectItem key={q} value={q}>{cuatrimestresLabels[q]}</SelectItem>))}</SelectContent>
+              <SelectContent>{cuatrimestresDisponibles.map((q) => (<SelectItem key={q} value={q}>{getCuatrimestreLabel(q)}</SelectItem>))}</SelectContent>
             </Select>
           </div>
 
@@ -186,11 +195,6 @@ export default function Instrumento3040Page() {
           </div>
           <div className="space-y-2"><Label>Grupo *</Label><Input value={formData.grupo} onChange={(e) => setFormData((c)=>({...c, grupo: e.target.value.toUpperCase()}))} placeholder="Ej. JTH-01" maxLength={7}/><p className="text-xs text-muted-foreground">Formato: Ej. JTH-01</p></div></div>
 
-          <div className="space-y-2"><Label>Criterios evaluados *</Label><Textarea value={formData.criterios} onChange={(e)=>setFormData((c)=>({...c, criterios: e.target.value}))} rows={4} placeholder="Describe los criterios de evaluación"/></div>
-
-          <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Ponderación *</Label><Select value={formData.ponderacion} onValueChange={(v)=>setFormData((c)=>({...c, ponderacion: v}))}><SelectTrigger><SelectValue placeholder="Selecciona la ponderación"/></SelectTrigger><SelectContent>{ponderacionesOpciones.map((op)=> (<SelectItem key={op} value={op}>{op}</SelectItem>))}</SelectContent></Select></div>
-          <div className="space-y-2"><Label>Fecha de aplicación *</Label><Input type="date" value={formData.fechaAplicacion} onChange={(e)=>setFormData((c)=>({...c, fechaAplicacion: e.target.value}))}/></div></div>
-
           <div className="space-y-2">
             <Label>Instrumento en PDF *</Label>
             <p className="text-sm text-muted-foreground">Adjuntar el documento en formato PDF, con un límite de 2 MB por archivo. Se permite hasta tres archivos.</p>
@@ -205,7 +209,12 @@ export default function Instrumento3040Page() {
 
           <div className="space-y-2"><Label>Nombre del docente *</Label><Input value={formData.docente} onChange={(e)=>setFormData((c)=>({...c, docente: e.target.value}))} placeholder="Primer nombre y apellidos completos"/></div>
 
-          <div className="space-y-2"><div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm space-y-3"><p className="font-medium">Declaración de autorización</p><p>Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.</p><label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={formData.autorizacion} onChange={(e)=>setFormData((c)=>({...c, autorizacion: e.target.checked}))} className="h-4 w-4"/><span className="text-sm font-medium">Autorizo el uso de esta información</span></label></div></div>
+          <div className="space-y-2 text-sm">
+            <p className="font-medium">Declaración de autorización</p>
+            <p>
+              Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.
+            </p>
+          </div>
 
           <div className="space-y-2"><Label>Nota para administración (opcional)</Label><Textarea value={formData.nota} onChange={(e)=>setFormData((c)=>({...c, nota: e.target.value}))} placeholder="Agrega información adicional"/></div>
 

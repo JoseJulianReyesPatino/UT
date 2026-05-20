@@ -25,11 +25,11 @@ import { Sidebar } from "./components/Sidebar";
 
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
-import { Menu } from "lucide-react";
+import { Menu, Sun, Moon } from "lucide-react";
 
 function AppContent() {
   const { isAuthenticated, user } = useAuth();
-  const { theme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   const logoSrc = theme === "dark" ? "/src/assets/Logotipo UTSLRC-BLANCO.png" : "/src/assets/Logotipo  UTSLRC.png";
   const [currentView, setCurrentView] = useState("dashboard");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -118,6 +118,8 @@ function AppContent() {
           return <CiclosEscolares />;
         case "configuracion":
           return <Configuration />;
+        case "configuracion-cuenta":
+          return <Configuration initialTab="cuenta" />;
         default:
           return <AdminDashboard onNavigate={setCurrentView} />;
       }
@@ -162,6 +164,21 @@ function AppContent() {
           {renderContent()}
         </div>
       </main>
+
+      {currentView !== "configuracion" && currentView !== "configuracion-cuenta" && (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={toggleTheme}
+          aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+          title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+          className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
+      )}
+
       <Toaster />
     </div>
   );

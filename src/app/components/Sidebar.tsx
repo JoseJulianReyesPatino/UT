@@ -3,8 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { cn } from "../../lib/utils";
 import { Button } from "./ui/button";
-import { Avatar, AvatarFallback } from "./ui/avatar";
-import { ThemeToggle } from "./ThemeToggle";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   FileText,
   BarChart3,
@@ -33,12 +32,8 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const { currentView, onNavigate, mobileOpen, onMobileOpenChange } = props;
   const { user, logout } = useAuth();
   const { theme } = useTheme();
-  // collapsed: default to collapsed for hover-to-open UX
-  const [collapsed, setCollapsed] = useState(true);
-  const [hovered, setHovered] = useState(false);
-  // pinned open when user clicks the toggle button
-  const [pinnedOpen, setPinnedOpen] = useState(false);
-  const [hoverTimeout, setHoverTimeout] = useState<ReturnType<typeof window.setTimeout> | null>(null);
+  // Sidebar starts expanded for both admin and docente.
+  const [collapsed, setCollapsed] = useState(false);
   const logoSrc = theme === "dark" ? "/src/assets/Logotipo UTSLRC-BLANCO.png" : "/src/assets/Logotipo  UTSLRC.png";
 
   const docenteMenuItems = [
@@ -69,41 +64,22 @@ export function Sidebar(props: Readonly<SidebarProps>) {
 
   const menuItems = user?.role === "docente" ? docenteMenuItems : adminMenuItems;
 
-  // Cleanup hover timeout on unmount or state changes
-  React.useEffect(() => {
-    return () => {
-      if (hoverTimeout) clearTimeout(hoverTimeout);
-    };
-  }, [hoverTimeout]);
+  const isMenuItemActive = (itemId: string) => {
+    if (itemId === "documentos") {
+      return ["documentos", "documentos-revisados", "documentos-revisados-hoy"].includes(currentView);
+    }
+    return currentView === itemId;
+  };
 
   const renderContent = (isMobile = false) => {
-    const isCollapsedLocal = isMobile ? false : (!pinnedOpen && !hovered && collapsed);
+    const isCollapsedLocal = isMobile ? false : collapsed;
     const containerClass = cn(
       "relative h-full overflow-hidden flex flex-col border-r border-emerald-200/70 bg-gradient-to-b from-emerald-50 via-white to-cyan-50/60 text-sidebar-foreground shadow-[0_12px_40px_rgba(16,185,129,0.08)] transition-all duration-300 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900",
       isCollapsedLocal ? "w-16" : "w-64"
     );
 
     return (
-      <div 
-        className={containerClass} 
-        onMouseEnter={() => {
-          if (!isMobile && collapsed && !pinnedOpen) {
-            // only activate hover if collapsed and not sticky-open, with 300ms delay
-            const timeout = setTimeout(() => setHovered(true), 300);
-            setHoverTimeout(timeout);
-          }
-        }} 
-        onMouseLeave={() => {
-          if (!isMobile) {
-            // clear hover timeout and reset hover state
-            if (hoverTimeout) clearTimeout(hoverTimeout);
-            if (!pinnedOpen) {
-              setHovered(false);
-              setCollapsed(true);
-            }
-          }
-        }}
-      >
+      <div className={containerClass}>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-emerald-400/10 to-transparent dark:from-emerald-500/10" />
       <div className="p-4 border-b border-sidebar-border/70 bg-background/60 backdrop-blur-sm">
         <div className="relative flex items-center justify-end">
@@ -120,13 +96,10 @@ export function Sidebar(props: Readonly<SidebarProps>) {
             variant="ghost"
             size="icon"
             onClick={() => {
-                const nextPinnedState = !pinnedOpen;
-                setPinnedOpen(nextPinnedState);
-                setCollapsed(!nextPinnedState);
-                if (nextPinnedState) {
-                  setHovered(false);
-                }
+                setCollapsed((prev) => !prev);
             }}
+            aria-label={isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
+            title={isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
             className="h-8 w-8 rounded-full border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
           >
             <ChevronLeft className={cn("h-4 w-4 transition-transform", isCollapsedLocal && "rotate-180")} />
@@ -138,7 +111,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
         <nav className="space-y-1 px-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = currentView === item.id;
+            const isActive = isMenuItemActive(item.id);
             return (
               <button
                 key={item.id}
@@ -151,9 +124,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                   }
 
                   // desktop: selection keeps the sidebar open until the top toggle closes it
-                  setPinnedOpen(true);
                   setCollapsed(false);
-                  setHovered(false);
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
@@ -171,22 +142,18 @@ export function Sidebar(props: Readonly<SidebarProps>) {
       </div>
 
         <div className="p-4 border-t border-sidebar-border/70 space-y-3 bg-background/60 backdrop-blur-sm">
-        <div className="flex gap-2">
-          <ThemeToggle />
-          {!isCollapsedLocal && (
-            <Button
-              variant="ghost"
-              size="default"
-              className="flex-1 rounded-xl border border-emerald-200/70 bg-white/80 hover:bg-emerald-50 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:hover:bg-slate-800"
-              title="Cambiar tema"
-            >
-              {theme === "dark" ? "Modo Claro" : "Modo Oscuro"}
-            </Button>
-          )}
-        </div>
         {!isCollapsedLocal && (
-          <div className="flex items-center gap-3 px-3 py-3 rounded-2xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 to-cyan-50 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:to-slate-950">
+            <button
+              type="button"
+              onClick={() => {
+                const targetView = user?.role === "administrador" ? "configuracion-cuenta" : "perfil";
+                onNavigate(targetView);
+                if (isMobile && onMobileOpenChange) onMobileOpenChange(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 to-cyan-50 shadow-sm transition-colors hover:bg-emerald-100/70 dark:border-slate-700 dark:from-slate-900 dark:to-slate-950 dark:hover:bg-slate-800 text-left"
+            >
             <Avatar className="h-8 w-8 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
+                {user?.avatar && <AvatarImage src={user.avatar} alt={user.name} />}
               <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                 {user?.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
               </AvatarFallback>
@@ -195,7 +162,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               <p className="text-sm font-medium truncate text-foreground">{user?.name}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.role}</p>
             </div>
-          </div>
+            </button>
         )}
         <Button
           variant="ghost"
@@ -204,6 +171,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
             logout();
             if (onMobileOpenChange) onMobileOpenChange(false);
           }}
+          aria-label="Cerrar sesión"
           className="w-full shrink-0 justify-start rounded-xl border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
         >
           <LogOut className="h-5 w-5" />
@@ -221,7 +189,12 @@ export function Sidebar(props: Readonly<SidebarProps>) {
 
       {/* Mobile drawer */}
       <div className={cn("md:hidden fixed inset-0 z-40", mobileOpen ? "" : "hidden")}>
-        <div className="absolute inset-0 bg-black/40" onClick={() => onMobileOpenChange?.(false)} />
+        <button
+          type="button"
+          aria-label="Cerrar menú"
+          className="absolute inset-0 bg-black/40"
+          onClick={() => onMobileOpenChange?.(false)}
+        />
         <div className="absolute left-0 top-0 bottom-0 w-64">
           {renderContent(true)}
         </div>

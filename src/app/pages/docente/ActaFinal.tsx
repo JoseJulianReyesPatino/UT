@@ -2,14 +2,14 @@ import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
-import { Textarea } from "../../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Button } from "../../components/ui/button";
 import { Upload, FileText, Menu, X } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
+const calendarioPdf = new URL("../../../assets/Calendario25-26.pdf", import.meta.url).href;
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
-import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
+import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuatrimestre } from "../../data/curricula";
 import { getGroups } from "../../../lib/formConfig";
 
 interface ActaFinalFormData {
@@ -17,14 +17,9 @@ interface ActaFinalFormData {
   carrera: string;
   cuatrimestre: Cuatrimestre | "";
   materia: string;
-  parcial: string;
   grupo: string;
-  fechaCierre: string;
-  estatus: string;
-  observaciones: string;
   archivos: File[];
   docente: string;
-  autorizacion: boolean;
 }
 
 const initialFormData: ActaFinalFormData = {
@@ -32,14 +27,9 @@ const initialFormData: ActaFinalFormData = {
   carrera: "",
   cuatrimestre: "",
   materia: "",
-  parcial: "",
   grupo: "",
-  fechaCierre: "",
-  estatus: "",
-  observaciones: "",
   archivos: [],
   docente: "",
-  autorizacion: false,
 };
 
 export default function ActaFinalPage() {
@@ -89,13 +79,9 @@ export default function ActaFinalPage() {
       formData.carrera &&
       formData.cuatrimestre &&
       formData.materia &&
-      formData.parcial &&
       validarGrupo &&
-      formData.fechaCierre &&
-      formData.estatus &&
       formData.archivos.length > 0 &&
-      formData.docente.trim() &&
-      formData.autorizacion
+      formData.docente.trim()
     );
   }, [formData]);
 
@@ -143,6 +129,10 @@ export default function ActaFinalPage() {
     return `${count} archivo${plural} cargado${plural}`;
   };
 
+  const getCuatrimestreLabel = (k: string) => {
+    return cuatrimestresLabels[k as keyof typeof cuatrimestresLabels] ?? k;
+  };
+
   const getEspaciosLabel = () => {
     const espacios = 3 - formData.archivos.length;
     if (espacios === 0) return "Máximo alcanzado";
@@ -173,59 +163,37 @@ export default function ActaFinalPage() {
           <p className="text-muted-foreground">Captura y envía el acta final de cierre de asignatura.</p>
         </div>
 
-        {/* Menú de hamburguesa para seleccionar Plan */}
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right">
-            <SheetHeader>
-              <SheetTitle>Seleccionar Plan</SheetTitle>
-            </SheetHeader>
-            <div className="space-y-3 mt-6">
-              <Button
-                variant={formData.plan === "nuevo-modelo" ? "default" : "outline"}
-                className="w-full justify-start"
-                onClick={() => {
-                  setFormData((current) => ({
-                    ...current,
-                    plan: "nuevo-modelo",
-                    carrera: "",
-                    cuatrimestre: "",
-                    materia: "",
-                  }));
-                  setSheetOpen(false);
-                }}
-              >
-                Plan Nuevo Modelo
+        <div className="flex items-center gap-2">
+          {/* Menú de hamburguesa para seleccionar Plan */}
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Menu className="h-5 w-5" />
               </Button>
-              <Button
-                variant={formData.plan === "plan-normal" ? "default" : "outline"}
-                className="w-full justify-start"
-                onClick={() => {
-                  setFormData((current) => ({
-                    ...current,
-                    plan: "plan-normal",
-                    carrera: "",
-                    cuatrimestre: "",
-                    materia: "",
-                  }));
-                  setSheetOpen(false);
-                }}
-              >
-                Plan Normal
-              </Button>
-            </div>
-            {formData.plan && (
-              <div className="mt-6 p-3 bg-blue-50 rounded-lg text-sm">
-                <p className="font-medium">Plan seleccionado:</p>
-                <p>{formData.plan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}</p>
+            </SheetTrigger>
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Historial de archivos</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4">
+                {formData.archivos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {formData.archivos.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            )}
-          </SheetContent>
-        </Sheet>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/10 border-l-4 border-emerald-300 dark:border-emerald-300 rounded-md">
+        <p className="text-sm font-medium text-emerald-300 dark:text-emerald-200">Recordatorio: Se sube en el 3er parcial.</p>
+        <Button variant="outline" size="sm" onClick={() => window.open(calendarioPdf, '_blank')}>Calendario</Button>
       </div>
 
       <Card>
@@ -234,15 +202,14 @@ export default function ActaFinalPage() {
           <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          {/* Plan actual */}
-          {formData.plan && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm">
-                <span className="font-medium">Plan actual:</span>{" "}
-                {formData.plan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
-              </p>
+          {/* Plan selection inside form */}
+          <div className="space-y-2">
+            <Label>Plan *</Label>
+            <div className="flex gap-2">
+              <Button variant={formData.plan === "nuevo-modelo" ? "default" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Nuevo Modelo</Button>
+              <Button variant={formData.plan === "plan-normal" ? "default" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Normal</Button>
             </div>
-          )}
+          </div>
 
           {/* Carrera */}
           <div className="space-y-2">
@@ -292,7 +259,7 @@ export default function ActaFinalPage() {
               <SelectContent>
                 {cuatrimestresDisponibles.map((cuatri) => (
                   <SelectItem key={cuatri} value={cuatri}>
-                    {cuatrimestresLabels[cuatri]}
+                    {getCuatrimestreLabel(cuatri)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -320,30 +287,8 @@ export default function ActaFinalPage() {
             </Select>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* Parcial */}
-            <div className="space-y-2">
-              <Label>Parcial *</Label>
-              <Select
-                value={formData.parcial}
-                onValueChange={(value) => setFormData((current) => ({ ...current, parcial: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona el parcial" />
-                </SelectTrigger>
-                <SelectContent>
-                  {parciales.map((parcial) => (
-                    <SelectItem key={parcial} value={parcial}>
-                      {parcial}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Grupo */}
-            <div className="space-y-2">
-              <Label>Grupo *</Label>
+          <div className="space-y-2">
+            <Label>Grupo *</Label>
                       {(() => {
                         const groups = getGroups().filter((g) => {
                           // try to match by plan and cuatrimestre if available
@@ -381,46 +326,12 @@ export default function ActaFinalPage() {
                         );
                       })()}
             </div>
-          </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            {/* Fecha de cierre */}
-            <div className="space-y-2">
-              <Label>Fecha de cierre *</Label>
-              <Input
-                type="date"
-                value={formData.fechaCierre}
-                onChange={(e) => setFormData((current) => ({ ...current, fechaCierre: e.target.value }))}
-              />
-            </div>
-
-            {/* Estatus */}
-            <div className="space-y-2">
-              <Label>Estatus *</Label>
-              <Select
-                value={formData.estatus}
-                onValueChange={(value) => setFormData((current) => ({ ...current, estatus: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona el estatus" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Preliminar">Preliminar</SelectItem>
-                  <SelectItem value="Final">Final</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Espacio reservado: Fecha de cierre y Estatus eliminados por requerimiento */}
           </div>
 
-          {/* Observaciones */}
-          <div className="space-y-2">
-            <Label>Observaciones</Label>
-            <Textarea
-              value={formData.observaciones}
-              onChange={(e) => setFormData((current) => ({ ...current, observaciones: e.target.value }))}
-              placeholder="Notas o comentarios adicionales"
-            />
-          </div>
+          {/* Observaciones eliminadas por requerimiento */}
 
           {/* Archivos */}
           <div className="space-y-2">
@@ -490,23 +401,10 @@ export default function ActaFinalPage() {
             />
           </div>
 
-          {/* Autorización */}
+          {/* Declaración de autorización (texto estático) */}
           <div className="space-y-2">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm space-y-3">
-              <p className="font-medium">Declaración de autorización</p>
-              <p>
-                Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.
-              </p>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.autorizacion}
-                  onChange={(e) => setFormData((current) => ({ ...current, autorizacion: e.target.checked }))}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm font-medium">Autorizo el uso de esta información</span>
-              </label>
-            </div>
+            <p className="font-medium">Declaración de autorización</p>
+            <p className="text-sm">Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.</p>
           </div>
 
           <div className="flex gap-3 pt-4 border-t">

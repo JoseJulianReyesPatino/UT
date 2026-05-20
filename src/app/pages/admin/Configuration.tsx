@@ -6,8 +6,23 @@ import { Label } from "../../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { getFormConfig, getGroups, addFieldFor, removeFieldFor, addGroup, removeGroup, Group } from "../../../lib/formConfig";
+import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
+import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
+import { Sun, Moon } from "lucide-react";
+import { toast } from "sonner";
 
-export function Configuration() {
+type ConfigTab = "general" | "formularios" | "grupos" | "cuenta";
+
+interface ConfigurationProps {
+  initialTab?: ConfigTab;
+}
+
+export function Configuration(props: Readonly<ConfigurationProps>) {
+  const { initialTab = "general" } = props;
+  const { user, updateProfile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
   const [formConfig, setFormConfig] = useState(getFormConfig());
   const [groups, setGroups] = useState<Group[]>(getGroups());
 
@@ -19,10 +34,27 @@ export function Configuration() {
   const [cuatrimestre, setCuatrimestre] = useState(1);
   const [groupNumber, setGroupNumber] = useState(1);
 
+  const [profileName, setProfileName] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileArea, setProfileArea] = useState("");
+  const [profileAvatar, setProfileAvatar] = useState<string | undefined>(undefined);
+
   useEffect(() => {
     setFormConfig(getFormConfig());
     setGroups(getGroups());
   }, []);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (!user) return;
+    setProfileName(user.name ?? "");
+    setProfilePhone(user.phone ?? "");
+    setProfileArea(user.area ?? "");
+    setProfileAvatar(user.avatar);
+  }, [user]);
 
   const handleAddField = () => {
     if (!newField.trim()) return;
@@ -51,6 +83,43 @@ export function Configuration() {
     setGroups(getGroups());
   };
 
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      toast.error("Solo se permiten imágenes PNG, JPG o WEBP");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("La imagen no debe superar 2 MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : undefined;
+      setProfileAvatar(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = () => {
+    if (!profileName.trim()) {
+      toast.error("El nombre es obligatorio");
+      return;
+    }
+
+    updateProfile({
+      name: profileName.trim(),
+      phone: profilePhone.trim(),
+      area: profileArea.trim(),
+      avatar: profileAvatar,
+    });
+    toast.success("Configuración de cuenta actualizada");
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -58,12 +127,70 @@ export function Configuration() {
         <p className="text-muted-foreground">Ajustes globales y parámetros del sistema</p>
       </div>
 
-      <Tabs defaultValue="general">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ConfigTab)}>
         <TabsList>
           <TabsTrigger value="general">Generales</TabsTrigger>
           <TabsTrigger value="formularios">Formularios</TabsTrigger>
           <TabsTrigger value="grupos">Grupos</TabsTrigger>
+          <TabsTrigger value="cuenta">Cuenta</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="cuenta">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuración de tu Cuenta</CardTitle>
+              <CardDescription>Gestiona tu foto, datos básicos y preferencias visuales.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <Avatar className="h-20 w-20 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
+                  {profileAvatar && <AvatarImage src={profileAvatar} alt={profileName || "Usuario"} />}
+                  <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-xl">
+                    {(profileName || user?.name || "U").split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="space-y-2">
+                  <Label htmlFor="avatar">Foto de perfil</Label>
+                  <Input id="avatar" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} />
+                  <p className="text-xs text-muted-foreground">Formatos: PNG/JPG/WEBP. Tamaño máximo: 2MB.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nombre completo</Label>
+                  <Input value={profileName} onChange={(e) => setProfileName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Correo electrónico</Label>
+                  <Input value={user?.email ?? ""} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label>Teléfono</Label>
+                  <Input value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} placeholder="Ej. 6531234567" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Área / Departamento</Label>
+                  <Input value={profileArea} onChange={(e) => setProfileArea(e.target.value)} placeholder="Ej. Coordinación Académica" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tema de la aplicación</Label>
+                <div className="flex items-center gap-3">
+                  <Button type="button" variant="outline" onClick={toggleTheme} className="gap-2">
+                    {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                    {theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="success" onClick={handleSaveProfile}>Guardar configuración</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="general">
           <Card>

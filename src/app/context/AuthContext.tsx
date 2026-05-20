@@ -8,16 +8,36 @@ interface User {
   email: string;
   role: UserRole;
   avatar?: string;
+  phone?: string;
+  area?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  updateProfile: (updates: Partial<Pick<User, "name" | "avatar" | "phone" | "area">>) => void;
   isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const USER_PROFILE_STORAGE_KEY = "utslrc-user-profiles";
+
+const getStoredProfiles = (): Record<string, Partial<User>> => {
+  try {
+    const raw = localStorage.getItem(USER_PROFILE_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, Partial<User>>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const setStoredProfiles = (profiles: Record<string, Partial<User>>) => {
+  localStorage.setItem(USER_PROFILE_STORAGE_KEY, JSON.stringify(profiles));
+};
 
 export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
   const { children } = props;
@@ -40,15 +60,34 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
           role: "docente",
         };
     
-    setUser(mockUser);
+    const storedProfiles = getStoredProfiles();
+    const savedProfile = storedProfiles[email] ?? {};
+    setUser({ ...mockUser, ...savedProfile, email });
   };
 
   const logout = () => {
     setUser(null);
   };
 
+  const updateProfile = (updates: Partial<Pick<User, "name" | "avatar" | "phone" | "area">>) => {
+    setUser((currentUser) => {
+      if (!currentUser) return currentUser;
+      const nextUser = { ...currentUser, ...updates };
+      const storedProfiles = getStoredProfiles();
+      storedProfiles[currentUser.email] = {
+        ...storedProfiles[currentUser.email],
+        name: nextUser.name,
+        avatar: nextUser.avatar,
+        phone: nextUser.phone,
+        area: nextUser.area,
+      };
+      setStoredProfiles(storedProfiles);
+      return nextUser;
+    });
+  };
+
   const value = useMemo(
-    () => ({ user, login, logout, isAuthenticated: !!user }),
+    () => ({ user, login, logout, updateProfile, isAuthenticated: !!user }),
     [user]
   );
 

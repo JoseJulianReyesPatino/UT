@@ -6,7 +6,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Textarea } from "../components/ui/textarea";
-import { Paperclip, Search, Send, X } from "lucide-react";
+import { CornerUpLeft, Paperclip, Search, Send, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 type AttachmentItem = {
@@ -22,6 +22,11 @@ type ChatMessage = {
   timestamp: string;
   isOwn: boolean;
   attachments?: AttachmentItem[];
+  replyTo?: {
+    id: number;
+    sender: string;
+    content: string;
+  };
 };
 
 type Conversation = {
@@ -244,7 +249,10 @@ function ConversationRow({
   );
 }
 
-function MessageBubble({ message }: Readonly<{ message: ChatMessage }>) {
+function MessageBubble({
+  message,
+  onReply,
+}: Readonly<{ message: ChatMessage; onReply: (message: ChatMessage) => void }>) {
   return (
     <div className={cn("flex", message.isOwn ? "justify-end" : "justify-start")}> 
       <div
@@ -253,6 +261,19 @@ function MessageBubble({ message }: Readonly<{ message: ChatMessage }>) {
           message.isOwn ? "border-emerald-500/30 bg-emerald-500 text-white" : "border-border bg-background"
         )}
       >
+        {message.replyTo && (
+          <div
+            className={cn(
+              "mb-2 rounded-xl border-l-4 px-3 py-2 text-xs",
+              message.isOwn
+                ? "border-white/70 bg-white/15 text-white/90"
+                : "border-emerald-500/60 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
+            )}
+          >
+            <p className="font-semibold">{message.replyTo.sender}</p>
+            <p className="truncate">{message.replyTo.content}</p>
+          </div>
+        )}
         <p className={cn("text-xs font-medium", message.isOwn ? "text-white/80" : "text-muted-foreground")}>{message.sender}</p>
         <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
         {message.attachments && message.attachments.length > 0 && (
@@ -274,7 +295,20 @@ function MessageBubble({ message }: Readonly<{ message: ChatMessage }>) {
             ))}
           </div>
         )}
-        <p className={cn("mt-2 text-xs", message.isOwn ? "text-white/75" : "text-muted-foreground")}>{message.timestamp}</p>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className={cn("text-xs", message.isOwn ? "text-white/75" : "text-muted-foreground")}>{message.timestamp}</p>
+          <button
+            type="button"
+            onClick={() => onReply(message)}
+            className={cn(
+              "inline-flex items-center gap-1 text-xs transition-colors",
+              message.isOwn ? "text-white/85 hover:text-white" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <CornerUpLeft className="h-3.5 w-3.5" />
+            Responder
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -313,63 +347,81 @@ export function Messages(props: Readonly<{
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentItem[]>([]);
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
 
   // If another page requests opening a conversation with a document, create or open it
   const processInitialOpen = (detail: NonNullable<typeof initialOpen>) => {
     const { conversationId, recipientName, recipientRole, document } = detail;
+    const buildDocumentAttachment = (doc: { id: number; title: string }): AttachmentItem => ({
+      name: `${doc.title}.pdf`,
+      sizeLabel: "—",
+      typeLabel: "Documento PDF",
+    });
 
-    const loadAttachment = (doc: { id: number; title: string }) => {
-      const attachment: AttachmentItem = {
-        name: `${doc.title}.pdf`,
-        sizeLabel: "—",
-        typeLabel: "Documento PDF",
+    const appendDocumentToConversation = (conv: Conversation, doc: { id: number; title: string }): Conversation => {
+      const documentMessage: ChatMessage = {
+        id: Date.now(),
+        sender: "Tú",
+        content: `Te comparto el documento: ${doc.title}`,
+        timestamp: getTimeLabel(),
+        isOwn: true,
+        attachments: [buildDocumentAttachment(doc)],
       };
-      setPendingAttachments((cur) => [attachment, ...cur]);
-      setMessage("");
+
+      return {
+        ...conv,
+        messages: [...conv.messages, documentMessage],
+        lastMessage: documentMessage.content,
+        timestamp: "Ahora",
+      };
     };
 
     if (conversationId) {
-      const exists = conversations.find((c) => c.id === conversationId);
-      if (exists) {
-        setSelectedChat(conversationId);
-        if (document) loadAttachment(document);
-        onConsume?.();
-        return;
+      setSelectedChat(conversationId);
+      if (document) {
+        setConversations((current) =>
+          current.map((conversation) =>
+            conversation.id === conversationId ? appendDocumentToConversation(conversation, document) : conversation
+          )
+        );
       }
+      onConsume?.();
+      return;
     }
 
-    if (recipientName) {
-      const found = conversations.find((c) => c.name === recipientName);
+    if (!recipientName) return;
+
+    setConversations((current) => {
+      const found = current.find((conversation) => conversation.name === recipientName);
       if (found) {
         setSelectedChat(found.id);
-        if (document) loadAttachment(document);
-        onConsume?.();
-        return;
+        return document
+          ? current.map((conversation) =>
+              conversation.id === found.id ? appendDocumentToConversation(conversation, document) : conversation
+            )
+          : current;
       }
 
       const newId = Date.now();
       const initials = recipientName.split(" ").map((n) => n[0]).slice(0, 2).join("");
-      const newConversation: Conversation = {
+      const baseConversation: Conversation = {
         id: newId,
         name: recipientName,
         role: recipientRole || "Docente",
-        lastMessage: document ? `Documento: ${document.title}` : "Nuevo chat",
+        lastMessage: "Nuevo chat",
         timestamp: "Ahora",
         unread: 0,
         avatar: initials,
         status: "online",
-        messages: document
-          ? [
-              { id: Date.now() - 1, sender: recipientName, content: `Se enlaza el documento: ${document.title} (ID ${document.id})`, timestamp: getTimeLabel(), isOwn: false },
-            ]
-          : [],
+        messages: [],
       };
 
-      setConversations((c) => [newConversation, ...c]);
+      const newConversation = document ? appendDocumentToConversation(baseConversation, document) : baseConversation;
       setSelectedChat(newId);
-      if (document) loadAttachment(document);
-      onConsume?.();
-    }
+      return [newConversation, ...current];
+    });
+
+    onConsume?.();
   };
 
   React.useEffect(() => {
@@ -394,6 +446,7 @@ export function Messages(props: Readonly<{
 
   const handleConversationSelect = (conversationId: number) => {
     setSelectedChat(conversationId);
+    setReplyingTo(null);
     updateConversation(conversationId, (conversation) => ({ ...conversation, unread: 0 }));
   };
 
@@ -428,6 +481,13 @@ export function Messages(props: Readonly<{
       timestamp: getTimeLabel(),
       isOwn: true,
       attachments: pendingAttachments.length > 0 ? pendingAttachments : undefined,
+      replyTo: replyingTo
+        ? {
+            id: replyingTo.id,
+            sender: replyingTo.sender,
+            content: replyingTo.content,
+          }
+        : undefined,
     };
 
     setConversations((current) =>
@@ -445,6 +505,7 @@ export function Messages(props: Readonly<{
 
     setMessage("");
     setPendingAttachments([]);
+    setReplyingTo(null);
   };
 
   return (
@@ -513,13 +574,29 @@ export function Messages(props: Readonly<{
             <ScrollArea className="h-[500px] px-3 py-4 pr-2">
               <div className="space-y-4">
                 {activeConversation?.messages.map((messageItem) => (
-                  <MessageBubble key={messageItem.id} message={messageItem} />
+                  <MessageBubble key={messageItem.id} message={messageItem} onReply={setReplyingTo} />
                 ))}
               </div>
             </ScrollArea>
           </CardContent>
 
           <div className="border-t border-border/60 bg-background/90 p-3">
+            {replyingTo && (
+              <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
+                <div className="min-w-0">
+                  <p className="font-semibold text-emerald-800 dark:text-emerald-300">Respondiendo a {replyingTo.sender}</p>
+                  <p className="truncate text-emerald-700 dark:text-emerald-400">{replyingTo.content}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyingTo(null)}
+                  aria-label="Cancelar respuesta"
+                  className="rounded-full p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
             {pendingAttachments.length > 0 && <PendingAttachmentsBar attachments={pendingAttachments} onRemove={handleRemoveAttachment} />}
 
             <div className="space-y-2.5">

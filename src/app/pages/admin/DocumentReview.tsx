@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { FileText, Eye, ArrowLeftCircle } from "lucide-react";
+import { FileText, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
@@ -243,19 +243,6 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
 
   return (
     <div className="relative space-y-6 overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -top-24 -left-16 h-72 w-72 rounded-full bg-emerald-400/10 blur-3xl dark:bg-emerald-500/10" />
-        <div className="absolute top-16 right-0 h-56 w-56 rounded-full bg-amber-400/10 blur-3xl dark:bg-amber-500/10" />
-        <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl dark:bg-sky-500/10" />
-        <div className="absolute top-10 left-[14%] h-px w-44 rotate-12 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
-        <div className="absolute bottom-24 right-[18%] h-px w-36 -rotate-45 bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
-        <div className="absolute top-36 right-1/4 grid grid-cols-4 gap-2 opacity-30">
-          {Array.from({ length: 12 }, (_, index) => (
-            <span key={index} className="h-1.5 w-1.5 rounded-full bg-emerald-400/50" />
-          ))}
-        </div>
-      </div>
-
       <div>
         <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-cyan-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-cyan-300">Revisión de Documentos</h1>
         <p className="text-muted-foreground">
@@ -296,14 +283,14 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por docente" /></SelectTrigger>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Docente" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
                     <SelectItem value="Ingeniería en Sistemas">Ingeniería en Sistemas</SelectItem>
@@ -313,7 +300,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por apartado" /></SelectTrigger>
+                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
@@ -328,21 +315,24 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                   return (
                     <div
                       key={doc.id}
-                      tabIndex={0}
-                      onClick={() => setPreviewDocument(doc)}
-                      onKeyDown={(e) => { if ((e as React.KeyboardEvent).key === "Enter") setPreviewDocument(doc); }}
                       className="cursor-pointer flex flex-col gap-2 rounded-xl border border-border/70 bg-background/80 p-4 lg:flex-row lg:items-center lg:justify-between shadow-sm hover:border-emerald-300/60 hover:bg-emerald-50/40 transition-colors dark:bg-slate-950/60 dark:hover:bg-slate-900/70"
                     >
                       <div>
                         <p className="font-medium">{doc.documento}</p>
                         <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setPreviewDocument(doc)}>{doc.ciclo}</Badge>
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setPreviewDocument(doc)}>{doc.plan}</Badge>
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setPreviewDocument(doc)}>{doc.apartado}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
                         </div>
                       </div>
                           <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
+                              <Eye className="h-4 w-4 mr-1" />Ver PDF
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                              Enviar
+                            </Button>
                             {('returned' in doc) && (doc as any).returned && <Badge variant="destructive">Devuelto</Badge>}
                             <Badge variant={isReviewed ? "success" : "warning"}>{isReviewed ? "Revisado" : "Pendiente"}</Badge>
                           </div>
@@ -403,9 +393,6 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                 {filteredPendingDocuments.map((doc) => (
                   <div
                     key={doc.id}
-                    tabIndex={0}
-                    onClick={() => setPreviewDocument(doc)}
-                    onKeyDown={(e) => { if ((e as React.KeyboardEvent).key === "Enter") setPreviewDocument(doc); }}
                     className="cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors"
                   >
                     <div className="flex items-start gap-3 flex-1">
@@ -416,12 +403,12 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                         <p className="font-medium">{doc.documento}</p>
                         <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setPreviewDocument(doc)}>{doc.materia}</Badge>
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setPreviewDocument(doc)}>{doc.cuatrimestre}° Cuatri</Badge>
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setPreviewDocument(doc)}>Grupo {doc.grupo}</Badge>
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setPreviewDocument(doc)}>{doc.ciclo}</Badge>
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setPreviewDocument(doc)}>{doc.plan}</Badge>
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setPreviewDocument(doc)}>{doc.apartado}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.materia}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.cuatrimestre}° Cuatri</Badge>
+                          <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
                         </div>
                       </div>
                     </div>
@@ -432,8 +419,8 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                       <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleReviewDocument(doc.id); }}>
                         <Eye className="h-4 w-4 mr-1" />Revisar
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                        <ArrowLeftCircle className="h-5 w-5" />
+                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                        Enviar
                       </Button>
                       <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); handleReturnDocument(doc.id); }}>
                         Devolver
@@ -459,22 +446,27 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                     {docs.map((doc) => (
                       <div
                       key={doc.id}
-                      tabIndex={0}
-                      onClick={() => setPreviewDocument(doc)}
-                      onKeyDown={(e) => { if ((e as React.KeyboardEvent).key === "Enter") setPreviewDocument(doc); }}
                       className="cursor-pointer flex items-start justify-between gap-4 rounded-lg border border-border p-4"
                     >
                           <div>
                             <p className="font-medium">{doc.documento}</p>
                             <p className="text-sm text-muted-foreground">{doc.docente}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
-                              <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>{doc.carrera}</Badge>
-                              <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>{doc.ciclo}</Badge>
-                              <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>{doc.plan}</Badge>
-                              <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>{doc.apartado}</Badge>
+                              <Badge variant="outline" className="text-xs">{doc.carrera}</Badge>
+                              <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
+                              <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                              <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
                             </div>
                           </div>
-                          <Badge variant="success">Revisado</Badge>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
+                              <Eye className="h-4 w-4 mr-1" />Ver PDF
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                              Enviar
+                            </Button>
+                            <Badge variant="success">Revisado</Badge>
+                          </div>
                         </div>
                     ))}
                   </div>
@@ -500,22 +492,27 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                   reviewedTodayDocuments.map((doc) => (
                     <div
                       key={doc.id}
-                      tabIndex={0}
-                      onClick={() => setPreviewDocument(doc)}
-                      onKeyDown={(e) => { if ((e as React.KeyboardEvent).key === "Enter") setPreviewDocument(doc); }}
                       className="cursor-pointer flex items-start justify-between gap-4 rounded-lg border border-border p-4"
                     >
                       <div>
                         <p className="font-medium">{doc.documento}</p>
                         <p className="text-sm text-muted-foreground">{doc.docente}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>{doc.carrera}</Badge>
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>{doc.ciclo}</Badge>
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>{doc.plan}</Badge>
-                          <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>{doc.apartado}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.carrera}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                          <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
                         </div>
                       </div>
-                      <Badge variant="success">{doc.reviewedAt}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
+                          <Eye className="h-4 w-4 mr-1" />Ver PDF
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                          Enviar
+                        </Button>
+                        <Badge variant="success">{doc.reviewedAt}</Badge>
+                      </div>
                     </div>
                   ))
                 )}

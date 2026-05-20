@@ -1,21 +1,23 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent } from "../components/ui/card";
-import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon } from "lucide-react";
 import superiorImage from "../../assets/superior.png";
 import inferiorImage from "../../assets/inferior.png";
 
 export function Login() {
+  const THEME_TOGGLE_COOLDOWN_MS = 700;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const lastThemeToggleRef = useRef(0);
   const { login } = useAuth();
-  const { theme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
   const logoSrc = isDark ? "/src/assets/Logotipo UTSLRC-BLANCO.png" : "/src/assets/Logotipo  UTSLRC.png";
 
@@ -39,6 +41,15 @@ export function Login() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleThemeToggle = () => {
+    const now = Date.now();
+    if (now - lastThemeToggleRef.current < THEME_TOGGLE_COOLDOWN_MS) {
+      return;
+    }
+    lastThemeToggleRef.current = now;
+    toggleTheme();
   };
 
   return (
@@ -208,7 +219,7 @@ export function Login() {
           </div>
 
           {/* TARJETA DE LOGIN CON DECORACIONES */}
-          <Card className={`w-full max-w-md rounded-3xl backdrop-blur-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(59,191,130,0.18)] hover:border-[#3BBF82]/20 group ${cardSurface}`}>
+          <Card className={`w-full max-w-md rounded-3xl backdrop-blur-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(59,191,130,0.18)] hover:border-[#3BBF82]/20 group will-change-transform animate-in fade-in slide-in-from-bottom-1 duration-150 ${cardSurface}`}>
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3BBF82]/40 to-transparent opacity-60" />
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3BBF82]/20 to-transparent opacity-40" />
             <div className="absolute -top-20 -right-12 w-56 h-56 rounded-full bg-[#3BBF82]/5 blur-3xl pointer-events-none" />
@@ -314,6 +325,18 @@ export function Login() {
           </Card>
         </div>
       </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        onClick={handleThemeToggle}
+        aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+        title={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+        className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
+      >
+        {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      </Button>
     </div>
   );
 }

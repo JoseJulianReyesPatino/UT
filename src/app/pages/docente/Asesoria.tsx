@@ -2,7 +2,6 @@ import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
-import { Textarea } from "../../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Button } from "../../components/ui/button";
 import { Upload, FileText, Menu, X } from "lucide-react";
@@ -10,6 +9,7 @@ import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
+const calendarioPdf = new URL("../../../assets/Calendario25-26.pdf", import.meta.url).href;
 import { getGroups } from "../../../lib/formConfig";
 
 interface AsesoriaFormData {
@@ -19,13 +19,8 @@ interface AsesoriaFormData {
   materia: string;
   parcial: string;
   grupo: string;
-  tema: string;
-  fechaAsesoria: string;
-  horas: string;
-  acuerdos: string;
   archivos: File[];
   docente: string;
-  autorizacion: boolean;
 }
 
 const initialFormData: AsesoriaFormData = {
@@ -35,13 +30,8 @@ const initialFormData: AsesoriaFormData = {
   materia: "",
   parcial: "",
   grupo: "",
-  tema: "",
-  fechaAsesoria: "",
-  horas: "",
-  acuerdos: "",
   archivos: [],
   docente: "",
-  autorizacion: false,
 };
 
 export default function AsesoriaPage() {
@@ -70,7 +60,7 @@ export default function AsesoriaPage() {
     const carrera = plan[formData.carrera];
     
     if (!carrera) return [];
-    return Object.keys(carrera.cuatrimestres);
+    return Object.keys(carrera.cuatrimestres) as Array<keyof typeof cuatrimestresLabels>;
   }, [formData.carrera, formData.plan]);
 
   // Obtener materias disponibles según carrera y cuatrimestre
@@ -93,13 +83,8 @@ export default function AsesoriaPage() {
       formData.materia &&
       formData.parcial &&
       validarGrupo &&
-      formData.tema.trim() &&
-      formData.fechaAsesoria &&
-      formData.horas &&
-      Number(formData.horas) > 0 &&
       formData.archivos.length > 0 &&
-      formData.docente.trim() &&
-      formData.autorizacion
+      formData.docente.trim()
     );
   }, [formData]);
 
@@ -154,6 +139,10 @@ export default function AsesoriaPage() {
     return `${espacios} espacio${plural} disponible${plural}`;
   };
 
+  const getCuatrimestreLabel = (k: string) => {
+    return cuatrimestresLabels[k as keyof typeof cuatrimestresLabels] ?? String(k);
+  };
+
   const handleSubmit = async () => {
     if (!isValid) {
       toast.error("Completa todos los campos obligatorios");
@@ -177,59 +166,37 @@ export default function AsesoriaPage() {
           <p className="text-muted-foreground">Captura y envía el registro de asesorías académicas.</p>
         </div>
 
-        {/* Menú de hamburguesa para seleccionar Plan */}
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right">
-            <SheetHeader>
-              <SheetTitle>Seleccionar Plan</SheetTitle>
-            </SheetHeader>
-            <div className="space-y-3 mt-6">
-              <Button
-                variant={formData.plan === "nuevo-modelo" ? "default" : "outline"}
-                className="w-full justify-start"
-                onClick={() => {
-                  setFormData((current) => ({
-                    ...current,
-                    plan: "nuevo-modelo",
-                    carrera: "",
-                    cuatrimestre: "",
-                    materia: "",
-                  }));
-                  setSheetOpen(false);
-                }}
-              >
-                Plan Nuevo Modelo
+        <div className="flex items-center gap-2">
+          {/* Menú de hamburguesa para seleccionar Plan */}
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Menu className="h-5 w-5" />
               </Button>
-              <Button
-                variant={formData.plan === "plan-normal" ? "default" : "outline"}
-                className="w-full justify-start"
-                onClick={() => {
-                  setFormData((current) => ({
-                    ...current,
-                    plan: "plan-normal",
-                    carrera: "",
-                    cuatrimestre: "",
-                    materia: "",
-                  }));
-                  setSheetOpen(false);
-                }}
-              >
-                Plan Normal
-              </Button>
-            </div>
-            {formData.plan && (
-              <div className="mt-6 p-3 bg-blue-50 rounded-lg text-sm">
-                <p className="font-medium">Plan seleccionado:</p>
-                <p>{formData.plan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}</p>
+            </SheetTrigger>
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Historial de archivos</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4">
+                {formData.archivos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {formData.archivos.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            )}
-          </SheetContent>
-        </Sheet>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/10 border-l-4 border-emerald-300 dark:border-emerald-300 rounded-md">
+        <p className="text-sm font-medium text-emerald-300 dark:text-emerald-200">Recordatorio: Se sube 3 días después de la aplicación de cada parcial.</p>
+        <Button variant="outline" size="sm" onClick={() => window.open(calendarioPdf, '_blank')}>Calendario</Button>
       </div>
 
       <Card>
@@ -238,15 +205,14 @@ export default function AsesoriaPage() {
           <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          {/* Plan actual */}
-          {formData.plan && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm">
-                <span className="font-medium">Plan actual:</span>{" "}
-                {formData.plan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
-              </p>
+          {/* Plan selection inside form */}
+          <div className="space-y-2">
+            <Label>Plan *</Label>
+            <div className="flex gap-2">
+              <Button variant={formData.plan === "nuevo-modelo" ? "default" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Nuevo Modelo</Button>
+              <Button variant={formData.plan === "plan-normal" ? "default" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Normal</Button>
             </div>
-          )}
+          </div>
 
           {/* Carrera */}
           <div className="space-y-2">
@@ -296,7 +262,7 @@ export default function AsesoriaPage() {
               <SelectContent>
                 {cuatrimestresDisponibles.map((cuatri) => (
                   <SelectItem key={cuatri} value={cuatri}>
-                    {cuatrimestresLabels[cuatri]}
+                    {getCuatrimestreLabel(cuatri)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -386,50 +352,7 @@ export default function AsesoriaPage() {
             </div>
           </div>
 
-          {/* Tema */}
-          <div className="space-y-2">
-            <Label>Tema *</Label>
-            <Input
-              value={formData.tema}
-              onChange={(e) => setFormData((current) => ({ ...current, tema: e.target.value }))}
-              placeholder="Tema principal de la asesoría"
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* Fecha de asesoría */}
-            <div className="space-y-2">
-              <Label>Fecha de asesoría *</Label>
-              <Input
-                type="date"
-                value={formData.fechaAsesoria}
-                onChange={(e) => setFormData((current) => ({ ...current, fechaAsesoria: e.target.value }))}
-              />
-            </div>
-
-            {/* Horas */}
-            <div className="space-y-2">
-              <Label>Horas *</Label>
-              <Input
-                type="number"
-                min="1"
-                step="0.5"
-                value={formData.horas}
-                onChange={(e) => setFormData((current) => ({ ...current, horas: e.target.value }))}
-                placeholder="Ej. 2"
-              />
-            </div>
-          </div>
-
-          {/* Acuerdos */}
-          <div className="space-y-2">
-            <Label>Acuerdos</Label>
-            <Textarea
-              value={formData.acuerdos}
-              onChange={(e) => setFormData((current) => ({ ...current, acuerdos: e.target.value }))}
-              placeholder="Acuerdos y compromisos de seguimiento"
-            />
-          </div>
+          {/* Campos Tema, Fecha, Horas y Acuerdos eliminados por requerimiento */}
 
           {/* Archivos */}
           <div className="space-y-2">
@@ -499,23 +422,10 @@ export default function AsesoriaPage() {
             />
           </div>
 
-          {/* Autorización */}
+          {/* Declaración de autorización (texto estático) */}
           <div className="space-y-2">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm space-y-3">
-              <p className="font-medium">Declaración de autorización</p>
-              <p>
-                Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.
-              </p>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.autorizacion}
-                  onChange={(e) => setFormData((current) => ({ ...current, autorizacion: e.target.checked }))}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm font-medium">Autorizo el uso de esta información</span>
-              </label>
-            </div>
+            <p className="font-medium">Declaración de autorización</p>
+            <p className="text-sm">Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.</p>
           </div>
 
           <div className="flex gap-3 pt-4 border-t">

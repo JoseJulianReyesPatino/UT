@@ -1,101 +1,143 @@
 import React, { useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { Label } from "../../components/ui/label";
-import { Input } from "../../components/ui/input";
-import { Textarea } from "../../components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Button } from "../../components/ui/button";
-import { Upload, FileText, Menu, X } from "lucide-react";
-// PdfPreview removed: not used in this form
+import { ArrowLeft, ChevronRight, FileText, Upload, X } from "lucide-react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
-import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuatrimestre } from "../../data/curricula";
 
-interface TutoriasFormData {
-  plan: Plan | "";
-  carrera: string;
-  cuatrimestre: Cuatrimestre | "";
-  grupo: string;
-  tipoTutoria: string;
-  fechaTutoria: string;
-  estudiantes: number | "";
-  acuerdos: string;
-  archivos: File[];
-  docente: string;
-  autorizacion: boolean;
+import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Textarea } from "../../components/ui/textarea";
+import { PdfPreview } from "../../components/PdfPreview";
+
+type DocumentoTutorias =
+  | "carga-academica"
+  | "reporte-bajas"
+  | "concentrado-asesorias"
+  | "acta-asistencia-grupal"
+  | "ficha-tecnica";
+
+interface DocumentoConfig {
+  id: DocumentoTutorias;
+  boton: string;
+  titulo: string;
+  descripcion: string;
+  etiquetaCarga: string;
 }
 
+interface TutoriasFormData {
+  archivos: File[];
+  nota: string;
+  docente: string;
+}
+
+const documentTypes: DocumentoConfig[] = [
+  {
+    id: "carga-academica",
+    boton: "Carga Académica",
+    titulo: "CARGA ACADÉMICA",
+    descripcion: "Sube el archivo correspondiente para el registro de carga académica.",
+    etiquetaCarga: "Subir Carga Académica",
+  },
+  {
+    id: "reporte-bajas",
+    boton: "Reporte de Bajas",
+    titulo: "REPORTE DE BAJAS",
+    descripcion: "Adjunta el reporte de bajas en formato PDF.",
+    etiquetaCarga: "Subir Reporte De Bajas",
+  },
+  {
+    id: "concentrado-asesorias",
+    boton: "Concentrado de Asesorías",
+    titulo: "CONCENTRADO DE ASESORÍAS",
+    descripcion: "Carga el concentrado de asesorías para su revisión.",
+    etiquetaCarga: "Subir Concentrado De Asesorías",
+  },
+  {
+    id: "acta-asistencia-grupal",
+    boton: "Acta de Asistencia Grupal",
+    titulo: "ACTA DE ASISTENCIA GRUPAL",
+    descripcion: "Selecciona el acta de asistencia grupal en PDF.",
+    etiquetaCarga: "Subir Acta De Asistencia Grupal",
+  },
+  {
+    id: "ficha-tecnica",
+    boton: "Ficha Técnica",
+    titulo: "FICHA TÉCNICA",
+    descripcion: "Sube la ficha técnica para continuar con el proceso.",
+    etiquetaCarga: "Subir Ficha Técnica",
+  },
+];
+
 const initialFormData: TutoriasFormData = {
-  plan: "",
-  carrera: "",
-  cuatrimestre: "",
-  grupo: "",
-  tipoTutoria: "",
-  fechaTutoria: "",
-  estudiantes: "",
-  acuerdos: "",
   archivos: [],
+  nota: "",
   docente: "",
-  autorizacion: false,
 };
 
-const tipos = ["Académica", "Personal", "Grupal"];
-
 export default function TutoriasPage() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedType, setSelectedType] = useState<DocumentoTutorias | null>(null);
   const [formData, setFormData] = useState<TutoriasFormData>(initialFormData);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const carrerasDisponibles = useMemo(() => {
-    if (!formData.plan) return [];
-    if (formData.plan === "nuevo-modelo") {
-      const tsu = carrieras["nuevo-modelo"].tsu.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
-      const ing = carrieras["nuevo-modelo"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
-      return [...tsu, ...ing];
-    }
-    return carrieras["plan-normal"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
-  }, [formData.plan]);
+  const selectedConfig = useMemo(
+    () => documentTypes.find((type) => type.id === selectedType) ?? null,
+    [selectedType]
+  );
 
-  const cuatrimestresDisponibles = useMemo(() => {
-    if (!formData.carrera || !formData.plan) return [];
-    const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
-    const carrera = plan[formData.carrera];
-    if (!carrera) return [];
-    return Object.keys(carrera.cuatrimestres);
-  }, [formData.carrera, formData.plan]);
+  const isValid = useMemo(
+    () => Boolean(selectedType && formData.archivos.length > 0 && formData.docente.trim()),
+    [formData.archivos.length, formData.docente, selectedType]
+  );
 
-  const isValid = useMemo(() => {
-    const validarGrupo = /^[A-Z]{2,4}-\d{2}$/i.test(formData.grupo);
-    return Boolean(
-      formData.plan &&
-        formData.carrera &&
-        formData.cuatrimestre &&
-        validarGrupo &&
-        formData.tipoTutoria &&
-        formData.fechaTutoria &&
-        formData.estudiantes !== "" &&
-        formData.docente.trim() &&
-        formData.autorizacion
-    );
-  }, [formData]);
+  const handleSelectType = (type: DocumentoTutorias) => {
+    setFormData(initialFormData);
+    setSelectedType(type);
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
+
     const newFiles = Array.from(files);
     const totalFiles = formData.archivos.length + newFiles.length;
-    if (totalFiles > 3) { toast.error("Máximo 3 archivos permitidos"); return; }
-    for (let file of newFiles) {
-      if (file.size > 2 * 1024 * 1024) { toast.error(`${file.name} excede el límite de 2 MB`); return; }
-      if (file.type !== "application/pdf") { toast.error(`${file.name} debe ser un archivo PDF`); return; }
+
+    if (totalFiles > 3) {
+      toast.error("Máximo 3 archivos permitidos");
+      return;
     }
-    setFormData((c) => ({ ...c, archivos: [...c.archivos, ...newFiles] }));
+
+    for (const file of newFiles) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error(`${file.name} excede el límite de 2 MB`);
+        return;
+      }
+
+      if (file.type !== "application/pdf") {
+        toast.error(`${file.name} debe ser un archivo PDF`);
+        return;
+      }
+    }
+
+    setFormData((current) => ({
+      ...current,
+      archivos: [...current.archivos, ...newFiles],
+    }));
   };
 
-  const removeFile = (index: number) => setFormData((c) => ({ ...c, archivos: c.archivos.filter((_, i) => i !== index) }));
+  const removeFile = (index: number) => {
+    setFormData((current) => ({
+      ...current,
+      archivos: current.archivos.filter((_, currentIndex) => currentIndex !== index),
+    }));
+  };
+
+  const resetForm = () => {
+    setFormData(initialFormData);
+  };
 
   const getArchivosLabel = () => {
     if (formData.archivos.length === 0) return "Selecciona tus archivos PDF";
+
     const count = formData.archivos.length;
     const plural = count > 1 ? "s" : "";
     return `${count} archivo${plural} cargado${plural}`;
@@ -104,50 +146,162 @@ export default function TutoriasPage() {
   const getEspaciosLabel = () => {
     const espacios = 3 - formData.archivos.length;
     if (espacios === 0) return "Máximo alcanzado";
+
     const plural = espacios > 1 ? "s" : "";
     return `${espacios} espacio${plural} disponible${plural}`;
   };
 
-  const resetForm = () => setFormData(initialFormData);
   const handleSubmit = async () => {
-    if (!isValid) { toast.error("Completa todos los campos obligatorios"); return; }
-    setIsSubmitting(true); await new Promise((r) => setTimeout(r, 1000)); toast.success("Tutoría registrada correctamente"); setIsSubmitting(false); resetForm();
+    if (!isValid || !selectedConfig) {
+      toast.error("Completa todos los campos obligatorios");
+      return;
+    }
+
+    setIsSubmitting(true);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    toast.success(`${selectedConfig.titulo} enviada correctamente`);
+    setIsSubmitting(false);
+    resetForm();
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-start justify-between">
-        <div className="space-y-1"><h1 className="text-3xl font-bold">Tutorías</h1><p className="text-muted-foreground">Registra tus sesiones de tutoría.</p></div>
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}><SheetTrigger asChild><Button variant="outline" size="icon"><Menu className="h-5 w-5"/></Button></SheetTrigger><SheetContent side="right"><SheetHeader><SheetTitle>Seleccionar Plan</SheetTitle></SheetHeader><div className="space-y-3 mt-6"><Button variant={formData.plan === "nuevo-modelo" ? "default" : "outline"} className="w-full" onClick={() => { setFormData((c) => ({ ...c, plan: "nuevo-modelo", carrera: "", cuatrimestre: "" })); setSheetOpen(false); }}>Plan Nuevo Modelo</Button><Button variant={formData.plan === "plan-normal" ? "default" : "outline"} className="w-full" onClick={() => { setFormData((c) => ({ ...c, plan: "plan-normal", carrera: "", cuatrimestre: "" })); setSheetOpen(false); }}>Plan Normal</Button></div></SheetContent></Sheet>
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold">Tutorías</h1>
+        <p className="text-muted-foreground">Seleccione el tipo de archivo que desea subir.</p>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle>Formulario Tutorías</CardTitle><CardDescription>Los campos marcados con * son obligatorios.</CardDescription></CardHeader>
-        <CardContent className="space-y-5">
-          {formData.plan && (<div className="p-3 bg-green-50 border border-green-200 rounded-lg"><p className="text-sm"><span className="font-medium">Plan actual:</span> {formData.plan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}</p></div>)}
+      {selectedConfig === null ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Tipos de archivo</CardTitle>
+            <CardDescription>Elige una opción para abrir su formulario correspondiente.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {documentTypes.map((type) => (
+                <Button
+                  key={type.id}
+                  variant="outline"
+                  onClick={() => handleSelectType(type.id)}
+                  className="h-auto min-h-24 justify-between rounded-2xl border-border bg-background px-4 py-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+                >
+                  <span className="flex flex-col items-start gap-1 whitespace-normal pr-3">
+                    <span className="text-sm font-semibold leading-snug">{type.boton}</span>
+                    <span className="text-xs text-muted-foreground">Abrir formulario</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b bg-muted/30">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-2xl tracking-tight">{selectedConfig.titulo}</CardTitle>
+                <CardDescription>{selectedConfig.descripcion}</CardDescription>
+              </div>
+              <Button variant="outline" onClick={() => setSelectedType(null)} className="sm:self-start">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Cambiar tipo
+              </Button>
+            </div>
+          </CardHeader>
 
-          <div className="space-y-2"><Label>Carrera *</Label><Select value={formData.carrera} onValueChange={(v)=>setFormData((c)=>({...c, carrera: v, cuatrimestre: ""}))} disabled={!formData.plan}><SelectTrigger><SelectValue placeholder="Selecciona la carrera"/></SelectTrigger><SelectContent>{carrerasDisponibles.map((c)=> (<SelectItem key={c.codigo} value={c.codigo}>{c.nombre}</SelectItem>))}</SelectContent></Select></div>
+          <CardContent className="space-y-5 pt-6">
+            <div className="space-y-2 text-sm">
+              <p className="font-medium">Subir archivo</p>
+              <p className="text-muted-foreground">
+                Adjuntar el documento en formato PDF, con un límite de 2 MB por archivo. En caso de ser necesario, se permite la carga simultánea de hasta tres archivos.
+              </p>
+              <div className="rounded-2xl border border-dashed border-border p-6 text-center transition-colors hover:border-primary/40">
+                <input
+                  type="file"
+                  accept=".pdf"
+                  multiple
+                  className="hidden"
+                  id="tutorias-pdf-upload"
+                  onChange={handleFileChange}
+                  disabled={formData.archivos.length >= 3}
+                />
+                <label htmlFor="tutorias-pdf-upload" className="block cursor-pointer space-y-2">
+                  <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm font-medium">{selectedConfig.etiquetaCarga}: (Obligatorio)</p>
+                  <p className="text-xs text-muted-foreground">{getArchivosLabel()}</p>
+                  <p className="text-xs text-muted-foreground">{getEspaciosLabel()}</p>
+                </label>
+              </div>
 
-          <div className="space-y-2"><Label>Cuatrimestre *</Label><Select value={formData.cuatrimestre} onValueChange={(v)=>setFormData((c)=>({...c, cuatrimestre: v as Cuatrimestre}))} disabled={!formData.carrera}><SelectTrigger><SelectValue placeholder="Selecciona el cuatrimestre"/></SelectTrigger><SelectContent>{cuatrimestresDisponibles.map((q)=>(<SelectItem key={q} value={q}>{cuatrimestresLabels[q]}</SelectItem>))}</SelectContent></Select></div>
+              {formData.archivos.length > 0 && (
+                <div className="space-y-2">
+                  {formData.archivos.map((archivo, index) => (
+                    <div
+                      key={`${archivo.name}-${archivo.size}-${index}`}
+                      className="flex items-center justify-between rounded-lg border border-success/20 bg-success/10 p-3"
+                    >
+                      <div className="flex flex-1 items-center gap-2 text-sm">
+                        <FileText className="h-4 w-4 text-success" />
+                        <span className="font-medium">{archivo.name}</span>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => removeFile(index)} className="h-6 w-6 p-0">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-          <div className="space-y-2"><Label>Grupo *</Label><Input value={formData.grupo} onChange={(e)=>setFormData((c)=>({...c, grupo: e.target.value.toUpperCase()}))} placeholder="Ej. JTH-01" maxLength={7}/><p className="text-xs text-muted-foreground">Formato: Ej. JTH-01</p></div>
+              {formData.archivos.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  {formData.archivos.map((archivo, index) => (
+                    <PdfPreview
+                      key={`preview-${archivo.name}-${archivo.size}-${index}`}
+                      file={archivo}
+                      title={`Vista previa - ${archivo.name}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
 
-          <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Tipo de Tutoría *</Label><Select value={formData.tipoTutoria} onValueChange={(v)=>setFormData((c)=>({...c, tipoTutoria: v}))}><SelectTrigger><SelectValue placeholder="Selecciona el tipo"/></SelectTrigger><SelectContent>{tipos.map((t)=> (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent></Select></div>
-          <div className="space-y-2"><Label>Fecha *</Label><Input type="date" value={formData.fechaTutoria} onChange={(e)=>setFormData((c)=>({...c, fechaTutoria: e.target.value}))}/></div></div>
+            <div className="space-y-2">
+              <Label>Nota para administrador: (Opcional)</Label>
+              <Textarea
+                value={formData.nota}
+                onChange={(event) => setFormData((current) => ({ ...current, nota: event.target.value }))}
+                placeholder="Agrega una nota para revisión"
+              />
+            </div>
 
-          <div className="space-y-2"><Label>Estudiantes *</Label><Input type="number" min={1} value={formData.estudiantes} onChange={(e)=> setFormData((c)=>({...c, estudiantes: e.target.value === "" ? "" : Number(e.target.value)}))} placeholder="Número de estudiantes"/></div>
+            <div className="space-y-2">
+              <Label>Nombre del docente: (Obligatorio)</Label>
+              <Input
+                value={formData.docente}
+                onChange={(event) => setFormData((current) => ({ ...current, docente: event.target.value }))}
+                placeholder="Primer Nombre y Apellidos Completos"
+              />
+            </div>
 
-          <div className="space-y-2"><Label>Acuerdos y seguimiento</Label><Textarea value={formData.acuerdos} onChange={(e)=>setFormData((c)=>({...c, acuerdos: e.target.value}))} rows={4} placeholder="Anota acuerdos y fechas de seguimiento"/></div>
+            <div className="space-y-2 text-sm">
+              <p>
+                Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.
+              </p>
+            </div>
 
-          <div className="space-y-2"><Label>Archivos (opcional, PDFs)</Label><p className="text-sm text-muted-foreground">Máximo 3 archivos PDF, 2 MB cada uno.</p><div className="border-2 border-dashed border-border rounded-lg p-6 text-center"><input type="file" accept=".pdf" multiple className="hidden" id="tutorias-pdf-upload" onChange={handleFileChange} disabled={formData.archivos.length>=3}/><label htmlFor="tutorias-pdf-upload" className="cursor-pointer block space-y-2"><Upload className="h-8 w-8 mx-auto text-muted-foreground"/><p className="text-sm font-medium">{getArchivosLabel()}</p><p className="text-xs text-muted-foreground">{getEspaciosLabel()}</p></label></div>{formData.archivos.length>0 && (<div className="space-y-2">{formData.archivos.map((archivo,index)=>(<div key={`${archivo.name}-${archivo.size}-${index}`} className="p-3 bg-success/10 border border-success/20 rounded-lg flex items-center justify-between"><div className="flex items-center gap-2 text-sm flex-1"><FileText className="h-4 w-4 text-success"/><span className="font-medium">{archivo.name}</span></div><Button variant="ghost" size="sm" onClick={()=>removeFile(index)} className="h-6 w-6 p-0"><X className="h-4 w-4"/></Button></div>))}</div>)}</div>
-
-          <div className="space-y-2"><Label>Nombre del docente *</Label><Input value={formData.docente} onChange={(e)=>setFormData((c)=>({...c, docente: e.target.value}))} placeholder="Primer nombre y apellidos completos"/></div>
-
-          <div className="space-y-2"><div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm space-y-3"><p className="font-medium">Declaración de autorización</p><p>Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.</p><label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={formData.autorizacion} onChange={(e)=>setFormData((c)=>({...c, autorizacion: e.target.checked}))} className="h-4 w-4"/><span className="text-sm font-medium">Autorizo el uso de esta información</span></label></div></div>
-
-          <div className="flex gap-3 pt-4 border-t"><Button variant="outline" onClick={resetForm} disabled={isSubmitting}>Limpiar</Button><Button variant="success" onClick={handleSubmit} disabled={!isValid||isSubmitting}>{isSubmitting?"Enviando...":"Registrar tutoría"}</Button></div>
-        </CardContent>
-      </Card>
+            <div className="flex gap-3 pt-4 border-t">
+              <Button variant="outline" onClick={resetForm} disabled={isSubmitting}>
+                Limpiar
+              </Button>
+              <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="min-w-36">
+                {isSubmitting ? "Enviando..." : "Enviar"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
