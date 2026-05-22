@@ -11,6 +11,7 @@ import Tutores from "./pages/admin/Tutores";
 import CiclosEscolares from "./pages/admin/CiclosEscolares";
 import DocumentReview from "./pages/admin/DocumentReview";
 import Configuration from "./pages/admin/Configuration";
+import EstadiasAdmin from "./pages/admin/Estadias";
 import { Profile } from "./pages/docente/Profile";
 import PlaneacionPage from "./pages/docente/Planeacion";
 import Instrumento3040Page from "./pages/docente/Instrumento3040";
@@ -89,6 +90,16 @@ function AppContent() {
           return <EstadiasPage />;
         case "tutorias":
           return <TutoriasPage />;
+        case "tutorias-carga-academica":
+          return <TutoriasPage initialType="carga-academica" onNavigateHome={() => setCurrentView("tutorias")} />;
+        case "tutorias-reporte-bajas":
+          return <TutoriasPage initialType="reporte-bajas" onNavigateHome={() => setCurrentView("tutorias")} />;
+        case "tutorias-concentrado-asesorias":
+          return <TutoriasPage initialType="concentrado-asesorias" onNavigateHome={() => setCurrentView("tutorias")} />;
+        case "tutorias-acta-asistencia-grupal":
+          return <TutoriasPage initialType="acta-asistencia-grupal" onNavigateHome={() => setCurrentView("tutorias")} />;
+        case "tutorias-ficha-tecnica":
+          return <TutoriasPage initialType="ficha-tecnica" onNavigateHome={() => setCurrentView("tutorias")} />;
         case "historial":
           return <DocumentHistory />;
         case "mensajes":
@@ -116,6 +127,8 @@ function AppContent() {
           return <DocumentReview initialSection="hoy" />;
         case "ciclos":
           return <CiclosEscolares />;
+        case "estadias-admin":
+          return <EstadiasAdmin />;
         case "configuracion":
           return <Configuration />;
         case "configuracion-cuenta":

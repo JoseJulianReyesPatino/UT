@@ -7,6 +7,7 @@ import { FileText, Eye, ArrowLeftCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { carrieras } from "../../data/curricula";
 
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
 
@@ -38,6 +39,21 @@ type TutorReviewedDocument = {
 };
 
 type TutorDocumentItem = TutorPendingDocument | TutorReviewedDocument;
+
+type CareerOption = {
+  value: string;
+  label: string;
+};
+
+const careerOptions: CareerOption[] = Array.from(
+  new Map(
+    [
+      ...carrieras["nuevo-modelo"].tsu,
+      ...carrieras["nuevo-modelo"].ingenieria,
+      ...carrieras["plan-normal"].ingenieria,
+    ].map((career) => [career.nombre, { value: career.nombre, label: career.nombre }])
+  ).values()
+);
 
 const initialPending: TutorPendingDocument[] = [
   {
@@ -253,10 +269,9 @@ export default function Tutores() {
                   <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
-                    <SelectItem value="Ingeniería en Sistemas">Ingeniería en Sistemas</SelectItem>
-                    <SelectItem value="TSU Desarrollo Software">TSU Desarrollo Software</SelectItem>
-                    <SelectItem value="Ingeniería en Redes">Ingeniería en Redes</SelectItem>
-                    <SelectItem value="TSU Infraestructura">TSU Infraestructura</SelectItem>
+                    {careerOptions.map((career) => (
+                      <SelectItem key={career.value} value={career.value}>{career.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
@@ -327,10 +342,9 @@ export default function Tutores() {
                   <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
-                    <SelectItem value="Ingeniería en Sistemas">Ingeniería en Sistemas</SelectItem>
-                    <SelectItem value="TSU Desarrollo Software">TSU Desarrollo Software</SelectItem>
-                    <SelectItem value="Ingeniería en Redes">Ingeniería en Redes</SelectItem>
-                    <SelectItem value="TSU Infraestructura">TSU Infraestructura</SelectItem>
+                    {careerOptions.map((career) => (
+                      <SelectItem key={career.value} value={career.value}>{career.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>

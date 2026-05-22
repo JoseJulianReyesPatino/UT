@@ -3,19 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { FileText, Eye } from "lucide-react";
+import { ArrowLeftCircle, Eye, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { carrieras } from "../../data/curricula";
 
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
 
-interface DocumentReviewProps {
-  initialSection?: ReviewSection;
-}
-
-type PendingDocument = {
+type EstadiaPendingDocument = {
   id: number;
   ciclo: string;
   plan: string;
@@ -23,14 +18,12 @@ type PendingDocument = {
   documento: string;
   apartado: string;
   carrera: string;
-  materia: string;
-  cuatrimestre: string;
   grupo: string;
   fecha: string;
   returned?: boolean;
 };
 
-type ReviewedDocument = {
+type EstadiaReviewedDocument = {
   id: number;
   ciclo: string;
   plan: string;
@@ -42,67 +35,18 @@ type ReviewedDocument = {
   returned?: boolean;
 };
 
-type DocumentItem = PendingDocument | ReviewedDocument;
+type EstadiaDocumentItem = EstadiaPendingDocument | EstadiaReviewedDocument;
 
-type CareerFilterOption = {
-  value: string;
-  label: string;
-};
-
-type ApartadoFilterOption = {
-  value: string;
-  label: string;
-};
-
-const getCareerFilterOptions = (plan: string): CareerFilterOption[] => {
-  const nuevoModelo = [
-    ...carrieras["nuevo-modelo"].tsu,
-    ...carrieras["nuevo-modelo"].ingenieria,
-  ].map((career) => ({ value: career.nombre, label: career.nombre }));
-
-  const planNormal = carrieras["plan-normal"].ingenieria.map((career) => ({
-    value: career.nombre,
-    label: career.nombre,
-  }));
-
-  if (plan === "nuevo-modelo") {
-    return nuevoModelo;
-  }
-
-  if (plan === "plan-normal") {
-    return planNormal;
-  }
-
-  return [...nuevoModelo, ...planNormal];
-};
-
-const apartadoFilterOptions: ApartadoFilterOption[] = [
-  { value: "Planeación", label: "Planeación" },
-  { value: "Instrumento 30/40%", label: "Instrumento 30/40%" },
-  { value: "Instrumento 60/70%", label: "Instrumento 60/70%" },
-  { value: "Lista Concentrada", label: "Lista Concentrada" },
-  { value: "Asesoría", label: "Asesoría" },
-  { value: "Portafolio Digital Final", label: "Portafolio Digital Final" },
-  { value: "Acta Final", label: "Acta Final" },
-  { value: "Estadías", label: "Estadías" },
-  { value: "Carta de Presentación", label: "Carta de Presentación" },
-  { value: "Carta de Aceptación", label: "Carta de Aceptación" },
-  { value: "Carta de Terminación", label: "Carta de Terminación" },
-  { value: "Acta de Asistencia Grupal", label: "Acta de Asistencia Grupal" },
-];
-
-const initialPendingDocuments: PendingDocument[] = [
+const initialPending: EstadiaPendingDocument[] = [
   {
     id: 1,
     ciclo: "Ciclo Escolar 2026",
     plan: "Plan Nuevo Modelo",
     docente: "Mtro. Juan Pérez",
-    documento: "Planeación - Programación Web",
-    apartado: "Planeación",
-    carrera: "Ingeniería en Sistemas",
-    materia: "Programación Web",
-    cuatrimestre: "5",
-    grupo: "A",
+    documento: "Carta de presentación - Estadías Grupo A",
+    apartado: "Carta de Presentación",
+    carrera: "Ingeniería en Logística Internacional (ILI)",
+    grupo: "ILI-9",
     fecha: "2026-05-17",
   },
   {
@@ -110,155 +54,92 @@ const initialPendingDocuments: PendingDocument[] = [
     ciclo: "Ciclo Escolar 2026",
     plan: "Plan Nuevo Modelo",
     docente: "Dra. Ana Martínez",
-    documento: "Instrumento 30% - Base de Datos",
-    apartado: "Instrumento 30/40%",
-    carrera: "TSU Desarrollo Software",
-    materia: "Base de Datos",
-    cuatrimestre: "3",
-    grupo: "B",
+    documento: "Carta de aceptación - Estadías Grupo B",
+    apartado: "Carta de Aceptación",
+    carrera: "TSU en Desarrollo de Software Multiplataforma (DSM)",
+    grupo: "DSM-5",
     fecha: "2026-05-16",
   },
   {
     id: 3,
-    ciclo: "Ciclo Escolar 2025",
+    ciclo: "Ciclo Escolar 2026",
     plan: "Plan Normal",
     docente: "Mtro. Carlos López",
-    documento: "Lista Concentrada - Redes",
-    apartado: "Lista Concentrada",
-    carrera: "Ingeniería en Redes",
-    materia: "Redes de Computadoras",
-    cuatrimestre: "7",
-    grupo: "A",
+    documento: "Carta de terminación - Estadías Grupo C",
+    apartado: "Carta de Terminación",
+    carrera: "Ing. en Desarrollo y Gestión de Software PN (IDGS)",
+    grupo: "IDGS-10",
     fecha: "2026-05-15",
   },
   {
     id: 4,
-    ciclo: "Ciclo Escolar 2026",
+    ciclo: "Ciclo Escolar 2025",
     plan: "Plan Nuevo Modelo",
     docente: "Dra. María González",
-    documento: "Asesoría - Tutoría Grupal",
-    apartado: "Tutorías",
-    carrera: "Ingeniería en Sistemas",
-    materia: "Tutorías BIS",
-    cuatrimestre: "5",
-    grupo: "C",
+    documento: "Acta final - Estadías Grupo D",
+    apartado: "Acta Final",
+    carrera: "TSU en Mecatrónica (IM)",
+    grupo: "IM-5",
     fecha: "2026-05-14",
-    returned: false,
   },
 ];
 
-const initialReviewedDocuments: ReviewedDocument[] = [
+const initialReviewed: EstadiaReviewedDocument[] = [
   {
     id: 101,
     ciclo: "Ciclo Escolar 2026",
     plan: "Plan Nuevo Modelo",
-    docente: "Dra. María González",
-    documento: "Instrumento 60% - Programación Web",
-    apartado: "Instrumento 60/70%",
-    carrera: "Ingeniería en Sistemas",
-    reviewedAt: "2026-05-17 09:15",
-  },
-  {
-    id: 102,
-    ciclo: "Ciclo Escolar 2025",
-    plan: "Plan Normal",
     docente: "Mtro. Roberto Silva",
-    documento: "Planeación - Redes",
-    apartado: "Planeación",
-    carrera: "Ingeniería en Redes",
-    reviewedAt: "2026-05-17 10:05",
-  },
-  {
-    id: 103,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Nuevo Modelo",
-    docente: "Dra. Ana Martínez",
-    documento: "Lista Concentrada - Base de Datos",
-    apartado: "Lista Concentrada",
-    carrera: "TSU Desarrollo Software",
-    reviewedAt: "2026-05-16 16:40",
-  },
-  {
-    id: 104,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Normal",
-    docente: "Mtro. Carlos López",
-    documento: "Instrumento 30% - Redes",
-    apartado: "Instrumento 30/40%",
-    carrera: "Ingeniería en Redes",
-    reviewedAt: "2026-05-15 11:25",
-  },
-  {
-    id: 105,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Nuevo Modelo",
-    docente: "Dra. Laura Gómez",
-    documento: "Ficha Técnica - Tutorías",
-    apartado: "Tutorías",
-    carrera: "TSU Infraestructura",
-    reviewedAt: "2026-05-15 13:10",
+    documento: "Carta de presentación - Estadías",
+    apartado: "Carta de Presentación",
+    carrera: "TSU en Automatización (AUT)",
+    reviewedAt: "2026-05-17 09:15",
     returned: false,
   },
 ];
 
-export function DocumentReview({ initialSection = "all" }: Readonly<DocumentReviewProps>) {
-  const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>(initialPendingDocuments);
-  const [reviewedDocuments, setReviewedDocuments] = useState<ReviewedDocument[]>(initialReviewedDocuments);
+export default function Estadias() {
+  const [pendingDocuments, setPendingDocuments] = useState<EstadiaPendingDocument[]>(initialPending);
+  const [reviewedDocuments, setReviewedDocuments] = useState<EstadiaReviewedDocument[]>(initialReviewed);
   const [filterCiclo, setFilterCiclo] = useState("all");
   const [filterPlan, setFilterPlan] = useState("all");
-  const [filterCarrera, setFilterCarrera] = useState("all");
   const [filterDocente, setFilterDocente] = useState("all");
   const [filterApartado, setFilterApartado] = useState("all");
-  const [activeSection, setActiveSection] = useState<ReviewSection>(initialSection);
-  const [previewDocument, setPreviewDocument] = useState<DocumentItem | null>(null);
+  const [activeSection, setActiveSection] = useState<ReviewSection>("all");
+  const [previewDocument, setPreviewDocument] = useState<EstadiaDocumentItem | null>(null);
 
   const allDocuments = [...pendingDocuments, ...reviewedDocuments];
   const todayKey = new Date().toISOString().slice(0, 10);
 
-  const matchesFilters = (doc: { ciclo: string; plan: string; carrera: string; docente: string; apartado: string }) => {
+  const matchesFilters = (doc: { ciclo: string; plan: string; docente: string; apartado: string }) => {
     const matchesCiclo = filterCiclo === "all" || doc.ciclo === filterCiclo;
     const matchesPlan = filterPlan === "all" || doc.plan === filterPlan;
-    const matchesCarrera = filterCarrera === "all" || doc.carrera === filterCarrera;
     const matchesDocente = filterDocente === "all" || doc.docente === filterDocente;
     const matchesApartado = filterApartado === "all" || doc.apartado === filterApartado;
-    return matchesCiclo && matchesPlan && matchesCarrera && matchesDocente && matchesApartado;
+    return matchesCiclo && matchesPlan && matchesDocente && matchesApartado;
   };
 
-  const filteredPendingDocuments = pendingDocuments.filter(matchesFilters);
-  const filteredReviewedDocuments = reviewedDocuments.filter(matchesFilters);
-  const filteredAllDocuments = allDocuments.filter(matchesFilters);
-  const reviewedTodayDocuments = filteredReviewedDocuments.filter((doc) => doc.reviewedAt.startsWith(todayKey));
+  const filteredPending = pendingDocuments.filter(matchesFilters);
+  const filteredReviewed = reviewedDocuments.filter(matchesFilters);
+  const filteredAll = allDocuments.filter(matchesFilters);
+  const reviewedToday = filteredReviewed.filter((doc) => doc.reviewedAt.startsWith(todayKey));
 
   const reviewedByDate = useMemo(() => {
-    return filteredReviewedDocuments.reduce<Record<string, ReviewedDocument[]>>((groups, doc) => {
+    return filteredReviewed.reduce<Record<string, EstadiaReviewedDocument[]>>((groups, doc) => {
       const date = doc.reviewedAt.slice(0, 10);
       groups[date] = [...(groups[date] || []), doc];
       return groups;
     }, {});
-  }, [filteredReviewedDocuments]);
+  }, [filteredReviewed]);
 
   const ciclosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.ciclo)));
-  const docentesDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.docente)));
   const planesDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.plan)));
-  const carrerasDisponibles = useMemo(() => getCareerFilterOptions(filterPlan), [filterPlan]);
-
-  React.useEffect(() => {
-    if (filterCarrera === "all") {
-      return;
-    }
-
-    const carreraStillValid = carrerasDisponibles.some((carrera) => carrera.value === filterCarrera);
-    if (!carreraStillValid) {
-      setFilterCarrera("all");
-    }
-  }, [carrerasDisponibles, filterCarrera]);
+  const docentesDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.docente)));
+  const apartadosDisponibles = ["Carta de Presentación", "Carta de Aceptación", "Carta de Terminación", "Acta Final"];
 
   const handleReviewDocument = (documentId: number) => {
     const documentToReview = pendingDocuments.find((doc) => doc.id === documentId);
-
-    if (!documentToReview) {
-      return;
-    }
+    if (!documentToReview) return;
 
     const reviewedAt = new Date().toLocaleString("es-MX", {
       year: "numeric",
@@ -268,8 +149,8 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
       minute: "2-digit",
     });
 
-    setPendingDocuments((currentDocuments) => currentDocuments.filter((doc) => doc.id !== documentId));
-    setReviewedDocuments((currentDocuments) => [
+    setPendingDocuments((current) => current.filter((doc) => doc.id !== documentId));
+    setReviewedDocuments((current) => [
       {
         id: documentToReview.id,
         ciclo: documentToReview.ciclo,
@@ -280,45 +161,44 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
         carrera: documentToReview.carrera,
         reviewedAt,
       },
-      ...currentDocuments,
+      ...current,
     ]);
-    toast.success("Documento marcado como revisado");
+    toast.success("Documento de estadías marcado como revisado");
   };
 
   const handleReturnDocument = (documentId: number) => {
-    setPendingDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned: true } : d)));
-    setReviewedDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned: true } : d)));
+    setPendingDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true } : doc)));
+    setReviewedDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true } : doc)));
     toast.success("Documento marcado como devuelto");
   };
 
-  const handleShareToMessages = (doc: DocumentItem) => {
-    const recipientName = "docente" in doc ? doc.docente : (doc as any).docente;
-    globalThis.dispatchEvent(new CustomEvent("openMessagesConversation", { detail: { recipientName, recipientRole: "Docente", document: { id: doc.id, title: doc.documento } } }));
+  const handleShareToMessages = (doc: EstadiaDocumentItem) => {
+    globalThis.dispatchEvent(
+      new CustomEvent("openMessagesConversation", {
+        detail: {
+          recipientName: doc.docente,
+          recipientRole: "Docente",
+          document: { id: doc.id, title: doc.documento },
+        },
+      })
+    );
   };
 
-  const closePreview = () => {
-    setPreviewDocument(null);
-  };
+  const closePreview = () => setPreviewDocument(null);
 
   return (
     <div className="relative space-y-6 overflow-hidden">
       <div>
-        <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-cyan-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-cyan-300">Revisión de Documentos</h1>
-        <p className="text-muted-foreground">
-          Revisa y aprueba los documentos enviados por los docentes
-        </p>
+        <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-cyan-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-cyan-300">
+          Revisión de Estadías
+        </h1>
+        <p className="text-muted-foreground">Revisa y aprueba los documentos enviados por los docentes en el apartado de estadías</p>
       </div>
 
       <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
         <TabsList className="bg-gradient-to-r from-emerald-100 via-emerald-50 to-sky-100 p-1 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
-          <TabsTrigger value="all">
-            Todos
-            <Badge variant="outline" className="ml-2">{allDocuments.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="pendientes">
-            Pendientes
-            <Badge variant="warning" className="ml-2">{filteredPendingDocuments.length}</Badge>
-          </TabsTrigger>
+          <TabsTrigger value="all">Todos <Badge variant="outline" className="ml-2">{allDocuments.length}</Badge></TabsTrigger>
+          <TabsTrigger value="pendientes">Pendientes <Badge variant="warning" className="ml-2">{filteredPending.length}</Badge></TabsTrigger>
           <TabsTrigger value="revisados">Revisados</TabsTrigger>
           <TabsTrigger value="hoy">Revisados hoy</TabsTrigger>
         </TabsList>
@@ -334,7 +214,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                     {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={filterPlan} onValueChange={(value) => { setFilterPlan(value); setFilterCarrera("all"); }}>
+                <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
@@ -348,35 +228,21 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                     {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="carrera" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las carreras</SelectItem>
-                    {carrerasDisponibles.map((carrera) => (
-                      <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
                   <SelectTrigger className="w-[240px]"><SelectValue placeholder="Apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadoFilterOptions.map((apartado) => (
-                      <SelectItem key={apartado.value} value={apartado.value}>{apartado.label}</SelectItem>
-                    ))}
+                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {filteredAllDocuments.map((doc) => {
+                {filteredAll.map((doc) => {
                   const isReviewed = "reviewedAt" in doc;
                   return (
-                    <div
-                      key={doc.id}
-                      className="cursor-pointer flex flex-col gap-2 rounded-xl border border-border/70 bg-background/80 p-4 lg:flex-row lg:items-center lg:justify-between shadow-sm hover:border-emerald-300/60 hover:bg-emerald-50/40 transition-colors dark:bg-slate-950/60 dark:hover:bg-slate-900/70"
-                    >
+                    <div key={doc.id} className="cursor-pointer flex flex-col gap-2 rounded-xl border border-border/70 bg-background/80 p-4 lg:flex-row lg:items-center lg:justify-between shadow-sm hover:border-emerald-300/60 hover:bg-emerald-50/40 transition-colors dark:bg-slate-950/60 dark:hover:bg-slate-900/70">
                       <div>
                         <p className="font-medium">{doc.documento}</p>
                         <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
@@ -386,16 +252,16 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                           <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
                         </div>
                       </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
-                              <Eye className="h-4 w-4 mr-1" />Ver PDF
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                              Enviar
-                            </Button>
-                            {('returned' in doc) && (doc as any).returned && <Badge variant="destructive">Devuelto</Badge>}
-                            <Badge variant={isReviewed ? "success" : "warning"}>{isReviewed ? "Revisado" : "Pendiente"}</Badge>
-                          </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
+                          <Eye className="h-4 w-4 mr-1" />Ver PDF
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                          Enviar
+                        </Button>
+                        {('returned' in doc) && doc.returned && <Badge variant="destructive">Devuelto</Badge>}
+                        <Badge variant={isReviewed ? "success" : "warning"}>{isReviewed ? "Revisado" : "Pendiente"}</Badge>
+                      </div>
                     </div>
                   );
                 })}
@@ -415,7 +281,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                     {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={filterPlan} onValueChange={(value) => { setFilterPlan(value); setFilterCarrera("all"); }}>
+                <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
@@ -429,33 +295,19 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                     {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las carreras</SelectItem>
-                    {carrerasDisponibles.map((carrera) => (
-                      <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
                   <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadoFilterOptions.map((apartado) => (
-                      <SelectItem key={apartado.value} value={apartado.value}>{apartado.label}</SelectItem>
-                    ))}
+                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {filteredPendingDocuments.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors"
-                  >
+                {filteredPending.map((doc) => (
+                  <div key={doc.id} className="cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                     <div className="flex items-start gap-3 flex-1">
                       <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
                         <FileText className="h-6 w-6 text-muted-foreground" />
@@ -464,12 +316,10 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                         <p className="font-medium">{doc.documento}</p>
                         <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          <Badge variant="outline" className="text-xs">{doc.materia}</Badge>
-                          <Badge variant="outline" className="text-xs">{doc.cuatrimestre}° Cuatri</Badge>
-                          <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
                           <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
                           <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
                           <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
+                          <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
                         </div>
                       </div>
                     </div>
@@ -505,30 +355,27 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                 <CardContent>
                   <div className="space-y-3">
                     {docs.map((doc) => (
-                      <div
-                      key={doc.id}
-                      className="cursor-pointer flex items-start justify-between gap-4 rounded-lg border border-border p-4"
-                    >
-                          <div>
-                            <p className="font-medium">{doc.documento}</p>
-                            <p className="text-sm text-muted-foreground">{doc.docente}</p>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <Badge variant="outline" className="text-xs">{doc.carrera}</Badge>
-                              <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
-                              <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
-                              <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
-                              <Eye className="h-4 w-4 mr-1" />Ver PDF
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                              Enviar
-                            </Button>
-                            <Badge variant="success">Revisado</Badge>
+                      <div key={doc.id} className="cursor-pointer flex items-start justify-between gap-4 rounded-lg border border-border p-4">
+                        <div>
+                          <p className="font-medium">{doc.documento}</p>
+                          <p className="text-sm text-muted-foreground">{doc.docente}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge variant="outline" className="text-xs">{doc.carrera}</Badge>
+                            <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
+                            <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                            <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
+                            <Eye className="h-4 w-4 mr-1" />Ver PDF
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                            Enviar
+                          </Button>
+                          <Badge variant="success">Revisado</Badge>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </CardContent>
@@ -545,16 +392,13 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {reviewedTodayDocuments.length === 0 ? (
+                {reviewedToday.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
                     No hay documentos revisados hoy.
                   </div>
                 ) : (
-                  reviewedTodayDocuments.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="cursor-pointer flex items-start justify-between gap-4 rounded-lg border border-border p-4"
-                    >
+                  reviewedToday.map((doc) => (
+                    <div key={doc.id} className="cursor-pointer flex items-start justify-between gap-4 rounded-lg border border-border p-4">
                       <div>
                         <p className="font-medium">{doc.documento}</p>
                         <p className="text-sm text-muted-foreground">{doc.docente}</p>
@@ -583,17 +427,11 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
         </TabsContent>
       </Tabs>
 
-      <Dialog open={previewDocument !== null} onOpenChange={(open) => {
-        if (!open) {
-          closePreview();
-        }
-      }}>
+      <Dialog open={previewDocument !== null} onOpenChange={(open) => { if (!open) closePreview(); }}>
         <DialogContent className="max-w-[95vw] w-[95vw] max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Vista previa del documento</DialogTitle>
-            <DialogDescription>
-              Simulación de lectura del archivo PDF del documento seleccionado.
-            </DialogDescription>
+            <DialogDescription>Simulación de lectura del archivo PDF del documento seleccionado.</DialogDescription>
           </DialogHeader>
           {previewDocument && (
             <div className="space-y-4">
@@ -612,9 +450,9 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                     </div>
                     <div className="grid gap-3 text-sm md:grid-cols-2 md:gap-4">
                       <p><span className="font-medium">Carrera:</span> {previewDocument.carrera}</p>
-                      <p><span className="font-medium">Materia:</span> {"materia" in previewDocument ? previewDocument.materia : "N/D"}</p>
-                      <p><span className="font-medium">Cuatrímestre:</span> {"cuatrimestre" in previewDocument ? previewDocument.cuatrimestre : "N/D"}</p>
                       <p><span className="font-medium">Grupo:</span> {"grupo" in previewDocument ? previewDocument.grupo : "N/D"}</p>
+                      <p><span className="font-medium">Plan:</span> {previewDocument.plan}</p>
+                      <p><span className="font-medium">Apartado:</span> {previewDocument.apartado}</p>
                     </div>
                   </div>
                   <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
@@ -624,11 +462,13 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
               </div>
             </div>
           )}
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setPreviewDocument(null)}>Cerrar</Button>
+          </div>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }
 
-export default DocumentReview;
+export { EstadiaDocumentItem };

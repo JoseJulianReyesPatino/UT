@@ -19,6 +19,7 @@ import {
   History,
   User,
   LayoutDashboard,
+  FileArchive,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -56,6 +57,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
     { id: "docentes", label: "Gestión Usuarios", icon: Users },
     { id: "tutores", label: "Tutores", icon: CalendarDays },
+    { id: "estadias-admin", label: "Estadías", icon: FileArchive },
     { id: "documentos", label: "Documentos", icon: FileText },
     { id: "ciclos", label: "Ciclos Escolares", icon: CalendarDays },
     { id: "mensajes", label: "Mensajes", icon: MessageSquare },
@@ -67,6 +69,16 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const isMenuItemActive = (itemId: string) => {
     if (itemId === "documentos") {
       return ["documentos", "documentos-revisados", "documentos-revisados-hoy"].includes(currentView);
+    }
+    if (itemId === "tutorias") {
+      return [
+        "tutorias",
+        "tutorias-carga-academica",
+        "tutorias-reporte-bajas",
+        "tutorias-concentrado-asesorias",
+        "tutorias-acta-asistencia-grupal",
+        "tutorias-ficha-tecnica",
+      ].includes(currentView);
     }
     return currentView === itemId;
   };
@@ -113,29 +125,28 @@ export function Sidebar(props: Readonly<SidebarProps>) {
             const Icon = item.icon;
             const isActive = isMenuItemActive(item.id);
             return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onNavigate(item.id);
-                  // mobile: close drawer
-                  if (isMobile) {
-                    if (onMobileOpenChange) onMobileOpenChange(false);
-                    return;
-                  }
+              <div key={item.id} className="space-y-1">
+                <button
+                  onClick={() => {
+                    onNavigate(item.id);
+                    if (isMobile) {
+                      if (onMobileOpenChange) onMobileOpenChange(false);
+                      return;
+                    }
 
-                  // desktop: selection keeps the sidebar open until the top toggle closes it
-                  setCollapsed(false);
-                }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
-                  isActive
-                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
-                    : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300"
-                )}
-              >
-                <Icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
-                {!isCollapsedLocal && <span className="font-medium">{item.label}</span>}
-              </button>
+                    setCollapsed(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
+                    isActive
+                      ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
+                      : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300"
+                  )}
+                >
+                  <Icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
+                  {!isCollapsedLocal && <span className="font-medium">{item.label}</span>}
+                </button>
+              </div>
             );
           })}
         </nav>

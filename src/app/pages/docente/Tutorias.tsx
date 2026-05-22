@@ -30,6 +30,11 @@ interface TutoriasFormData {
   docente: string;
 }
 
+interface TutoriasPageProps {
+  initialType?: DocumentoTutorias | null;
+  onNavigateHome?: () => void;
+}
+
 const documentTypes: DocumentoConfig[] = [
   {
     id: "carga-academica",
@@ -74,10 +79,16 @@ const initialFormData: TutoriasFormData = {
   docente: "",
 };
 
-export default function TutoriasPage() {
-  const [selectedType, setSelectedType] = useState<DocumentoTutorias | null>(null);
+export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
+  const { initialType = null, onNavigateHome } = props;
+  const [selectedType, setSelectedType] = useState<DocumentoTutorias | null>(initialType);
   const [formData, setFormData] = useState<TutoriasFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    setSelectedType(initialType);
+    setFormData(initialFormData);
+  }, [initialType]);
 
   const selectedConfig = useMemo(
     () => documentTypes.find((type) => type.id === selectedType) ?? null,
@@ -220,7 +231,6 @@ export default function TutoriasPage() {
               <div className="rounded-2xl border border-dashed border-border p-6 text-center transition-colors hover:border-primary/40">
                 <input
                   type="file"
-                  accept=".pdf"
                   multiple
                   className="hidden"
                   id="tutorias-pdf-upload"
@@ -233,6 +243,23 @@ export default function TutoriasPage() {
                   <p className="text-xs text-muted-foreground">{getArchivosLabel()}</p>
                   <p className="text-xs text-muted-foreground">{getEspaciosLabel()}</p>
                 </label>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (onNavigateHome) {
+                      onNavigateHome();
+                      return;
+                    }
+                    setSelectedType(null);
+                  }}
+                  className="sm:self-start"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  {onNavigateHome ? "Volver a Tutorías" : "Cambiar tipo"}
+                </Button>
               </div>
 
               {formData.archivos.length > 0 && (

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -8,10 +8,12 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Calendar,
+  ChevronDown,
 } from "lucide-react";
 
 export function DocenteDashboard() {
   const manualDocenteUrl = new URL("../../../assets/Manual de Usuario del Docente.pdf", import.meta.url).href;
+  const [isIntroOpen, setIsIntroOpen] = useState(true);
 
   const stats = [
     {
@@ -95,29 +97,53 @@ export function DocenteDashboard() {
       </div>
 
       <Card>
-        <CardContent className="space-y-8 pt-8">
-          <div className="space-y-6 text-base leading-relaxed text-foreground/80">
+        <CardContent className="space-y-5 pt-8">
+          <div className="flex items-start justify-between gap-3">
             <div className="space-y-2">
               <h2 className="text-3xl font-bold text-foreground">Antes de comenzar:</h2>
-              <p>
-                Es fundamental leer la documentación proporcionada, ya que explica detalladamente el funcionamiento completo del sistema. Además, es necesario completar la configuración de su perfil antes de proceder con otras acciones.
-              </p>
+              {!isIntroOpen && (
+                <p className="text-sm text-muted-foreground">
+                  Haz clic en el caret para ver la documentación y las indicaciones iniciales.
+                </p>
+              )}
             </div>
 
-            <p>
-              Tiene permitido el acceso a todos los módulos disponibles en el menú de navegación para explorar las distintas funcionalidades, incluyendo la carga de archivos. Tenga en cuenta que algunos envíos están sujetos a fechas límite. En caso de que se cierre el plazo sin que haya subido los archivos requeridos, puede ponerse en contacto con el administrador del sistema.
-            </p>
-
-            <p>Gracias por su atención y colaboración.</p>
-          </div>
-
-          <div className="flex justify-end">
-            <Button asChild variant="outline" className="rounded-none border-[#00A86B] px-8 text-[#00A86B] hover:bg-[#00A86B]/5">
-              <a href={manualDocenteUrl} target="_blank" rel="noreferrer">
-                Manual Docente
-              </a>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsIntroOpen((current) => !current)}
+              aria-label={isIntroOpen ? "Contraer información" : "Expandir información"}
+              title={isIntroOpen ? "Contraer información" : "Expandir información"}
+              className="h-9 w-9 rounded-full border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isIntroOpen ? "rotate-180" : "rotate-0"}`} />
             </Button>
           </div>
+
+          {isIntroOpen && (
+            <div className="space-y-6 text-base leading-relaxed text-foreground/80">
+              <div className="space-y-2">
+                <p>
+                  Es fundamental leer la documentación proporcionada, ya que explica detalladamente el funcionamiento completo del sistema. Además, es necesario completar la configuración de su perfil antes de proceder con otras acciones.
+                </p>
+              </div>
+
+              <p>
+                Tiene permitido el acceso a todos los módulos disponibles en el menú de navegación para explorar las distintas funcionalidades, incluyendo la carga de archivos. Tenga en cuenta que algunos envíos están sujetos a fechas límite. En caso de que se cierre el plazo sin que haya subido los archivos requeridos, puede ponerse en contacto con el administrador del sistema.
+              </p>
+
+              <p>Gracias por su atención y colaboración.</p>
+
+              <div className="flex justify-end">
+                <Button asChild variant="outline" className="rounded-none border-[#00A86B] px-8 text-[#00A86B] hover:bg-[#00A86B]/5">
+                  <a href={manualDocenteUrl} target="_blank" rel="noreferrer">
+                    Manual Docente
+                  </a>
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
