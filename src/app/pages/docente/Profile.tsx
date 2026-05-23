@@ -1,16 +1,88 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
-import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
 import { useAuth } from "../../context/AuthContext";
-import { User, Mail, Shield, Calendar, Key } from "lucide-react";
+import { Calendar, Key, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 export function Profile() {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [avatarPreview, setAvatarPreview] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const [initialFirstName, ...restOfName] = user.name.trim().split(/\s+/);
+    setFirstName(initialFirstName ?? "");
+    setLastName(restOfName.join(" "));
+    setAvatarPreview(user.avatar);
+  }, [user]);
+
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecciona una imagen válida");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("La imagen no puede superar 2MB");
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setAvatarPreview(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveChanges = () => {
+    if (!user) return;
+
+    const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+
+    if (!fullName) {
+      toast.error("El nombre no puede quedar vacío");
+      return;
+    }
+
+    updateProfile({
+      name: fullName,
+      ...(avatarPreview !== user.avatar ? { avatar: avatarPreview } : {}),
+    });
+
+    toast.success("Perfil actualizado correctamente");
+  };
+
+  const handleCancelChanges = () => {
+    if (!user) return;
+
+    const [initialFirstName, ...restOfName] = user.name.trim().split(/\s+/);
+    setFirstName(initialFirstName ?? "");
+    setLastName(restOfName.join(" "));
+    setAvatarPreview(user.avatar);
+  };
+
+  const avatarInitials = [firstName, lastName]
+    .map((value) => value.trim().charAt(0))
+    .filter(Boolean)
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="space-y-6">
@@ -32,12 +104,27 @@ export function Profile() {
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
               <Avatar className="h-20 w-20">
+                <AvatarImage src={avatarPreview} alt={user?.name ?? "Foto de perfil"} />
                 <AvatarFallback className="bg-success/10 text-success text-xl">
-                  {user?.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                  {avatarInitials || "--"}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <Button variant="outline" size="sm">Cambiar Foto</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Cambiar Foto
+                </Button>
+                <Input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
                 <p className="text-xs text-muted-foreground mt-1">
                   JPG, PNG o GIF. Máximo 2MB
                 </p>
@@ -46,12 +133,20 @@ export function Profile() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Nombre Completo</Label>
-                <Input defaultValue={user?.name} />
+                <Label>Nombre</Label>
+                <Input
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  placeholder="Primer nombre"
+                />
               </div>
               <div className="space-y-2">
-                <Label>Correo Electrónico</Label>
-                <Input type="email" defaultValue={user?.email} disabled />
+                <Label>Apellido</Label>
+                <Input
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  placeholder="Apellidos completos"
+                />
               </div>
             </div>
 
@@ -70,11 +165,8 @@ export function Profile() {
             </div>
 
             <div className="pt-4 flex gap-2">
-              <Button variant="outline">Cancelar</Button>
-              <Button 
-                variant="success"
-                onClick={() => toast.success("Perfil actualizado correctamente")}
-              >
+              <Button variant="outline" onClick={handleCancelChanges}>Cancelar</Button>
+              <Button variant="success" onClick={handleSaveChanges}>
                 Guardar Cambios
               </Button>
             </div>
@@ -87,24 +179,6 @@ export function Profile() {
               <CardTitle>Información de Cuenta</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-3 text-sm">
-                <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                  <User className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="font-medium">ID de Usuario</p>
-                  <p className="text-muted-foreground">{user?.id}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 text-sm">
-                <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                  <Mail className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="font-medium">Email Verificado</p>
-                  <p className="text-success">Verificado ✓</p>
-                </div>
-              </div>
               <div className="flex items-center gap-3 text-sm">
                 <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
                   <Calendar className="h-4 w-4" />
@@ -126,10 +200,6 @@ export function Profile() {
                 <Key className="h-4 w-4 mr-2" />
                 Cambiar Contraseña
               </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <Shield className="h-4 w-4 mr-2" />
-                Verificación en Dos Pasos
-              </Button>
             </CardContent>
           </Card>
         </div>
@@ -148,15 +218,15 @@ export function Profile() {
                 <p className="text-2xl font-bold">45</p>
               </div>
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Aprobados</p>
+                <p className="text-sm text-muted-foreground">Revisados</p>
                 <p className="text-2xl font-bold text-success">42</p>
               </div>
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">En Revisión</p>
-                <p className="text-2xl font-bold text-warning">2</p>
+                <p className="text-2xl font-bold text-emerald-600">2</p>
               </div>
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Rechazados</p>
+                <p className="text-sm text-muted-foreground">Devueltos</p>
                 <p className="text-2xl font-bold text-destructive">1</p>
               </div>
             </div>

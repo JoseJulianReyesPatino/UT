@@ -58,6 +58,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     { id: "docentes", label: "Gestión Usuarios", icon: Users },
     { id: "tutores", label: "Tutores", icon: CalendarDays },
     { id: "estadias-admin", label: "Estadías", icon: FileArchive },
+    { id: "calendario", label: "Calendario", icon: CalendarDays },
     { id: "documentos", label: "Documentos", icon: FileText },
     { id: "ciclos", label: "Ciclos Escolares", icon: CalendarDays },
     { id: "mensajes", label: "Mensajes", icon: MessageSquare },

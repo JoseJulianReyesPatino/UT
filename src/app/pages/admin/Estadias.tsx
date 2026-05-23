@@ -189,14 +189,14 @@ export default function Estadias() {
   return (
     <div className="relative space-y-6 overflow-hidden">
       <div>
-        <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-cyan-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-cyan-300">
+        <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">
           Revisión de Estadías
         </h1>
         <p className="text-muted-foreground">Revisa y aprueba los documentos enviados por los docentes en el apartado de estadías</p>
       </div>
 
       <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
-        <TabsList className="bg-gradient-to-r from-emerald-100 via-emerald-50 to-sky-100 p-1 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+        <TabsList className="bg-gradient-to-r from-emerald-100 via-emerald-50 to-emerald-50 p-1 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
           <TabsTrigger value="all">Todos <Badge variant="outline" className="ml-2">{allDocuments.length}</Badge></TabsTrigger>
           <TabsTrigger value="pendientes">Pendientes <Badge variant="warning" className="ml-2">{filteredPending.length}</Badge></TabsTrigger>
           <TabsTrigger value="revisados">Revisados</TabsTrigger>
@@ -204,7 +204,7 @@ export default function Estadias() {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4 mt-6">
-          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-cyan-950/20">
+          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-emerald-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20">
             <CardHeader>
               <div className="flex flex-wrap items-center gap-4 pt-4">
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
@@ -271,7 +271,7 @@ export default function Estadias() {
         </TabsContent>
 
         <TabsContent value="pendientes" className="space-y-4 mt-6">
-          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-cyan-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
+          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20">
             <CardHeader>
               <div className="flex flex-wrap items-center gap-4">
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>

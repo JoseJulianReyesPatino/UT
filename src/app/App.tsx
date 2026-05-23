@@ -4,7 +4,7 @@ import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { Login } from "./pages/Login";
 import DocenteDashboard from "./pages/docente/DocenteDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import { DocumentHistory } from "./pages/DocumentHistory";
+import { DocumentHistory } from "./pages/docente/DocumentHistory";
 import { Messages } from "./pages/Messages";
 import DocenteManagement from "./pages/admin/DocenteManagement";
 import Tutores from "./pages/admin/Tutores";
@@ -12,6 +12,7 @@ import CiclosEscolares from "./pages/admin/CiclosEscolares";
 import DocumentReview from "./pages/admin/DocumentReview";
 import Configuration from "./pages/admin/Configuration";
 import EstadiasAdmin from "./pages/admin/Estadias";
+import CalendarioAdmin from "./pages/admin/Calendario";
 import { Profile } from "./pages/docente/Profile";
 import PlaneacionPage from "./pages/docente/Planeacion";
 import Instrumento3040Page from "./pages/docente/Instrumento3040";
@@ -129,6 +130,8 @@ function AppContent() {
           return <CiclosEscolares />;
         case "estadias-admin":
           return <EstadiasAdmin />;
+        case "calendario":
+          return <CalendarioAdmin />;
         case "configuracion":
           return <Configuration />;
         case "configuracion-cuenta":

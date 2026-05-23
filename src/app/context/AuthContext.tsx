@@ -49,7 +49,7 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     const mockUser: User = email.includes("admin")
       ? {
           id: "1",
-          name: "Mtra. María González",
+          name: "Esmeralda Torres",
           email: email,
           role: "administrador",
         }

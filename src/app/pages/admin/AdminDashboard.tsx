@@ -151,10 +151,10 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         description: "Por abrir y revisar",
         icon: Clock,
         trend: "Hoy llegaron 4",
-        color: "text-amber-700 dark:text-amber-300",
-        bgColor: "bg-amber-100/80 dark:bg-amber-950/40",
-        cardClass: "bg-gradient-to-br from-amber-50 via-white to-amber-100/70 border-amber-200/70 dark:from-amber-950/25 dark:via-slate-950 dark:to-amber-950/35 dark:border-amber-800/60",
-        accentClass: "from-amber-400/40 via-amber-300/20 to-transparent",
+        color: "text-slate-700 dark:text-slate-200",
+        bgColor: "bg-slate-100/80 dark:bg-slate-800/80",
+        cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70",
+        accentClass: "from-slate-400/35 via-slate-300/20 to-transparent",
         action: "documentos" as AdminView,
       },
       {
@@ -165,8 +165,8 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         trend: "+2 hoy",
         color: "text-emerald-700 dark:text-emerald-300",
         bgColor: "bg-emerald-100/70 dark:bg-emerald-950/40",
-        cardClass: "bg-gradient-to-br from-emerald-50 via-white to-cyan-50/80 border-emerald-200/70 dark:from-emerald-950/20 dark:via-slate-950 dark:to-cyan-950/25 dark:border-emerald-800/60",
-        accentClass: "from-emerald-400/35 via-cyan-300/20 to-transparent",
+        cardClass: "bg-gradient-to-br from-emerald-50 via-white to-emerald-50/80 border-emerald-200/70 dark:from-emerald-950/20 dark:via-slate-950 dark:to-emerald-950/25 dark:border-emerald-800/60",
+        accentClass: "from-emerald-400/35 via-emerald-300/20 to-transparent",
         action: "documentos-revisados" as AdminView,
       },
       {
@@ -177,8 +177,8 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         trend: "En curso",
         color: "text-slate-700 dark:text-slate-200",
         bgColor: "bg-slate-100/80 dark:bg-slate-800/80",
-        cardClass: "bg-gradient-to-br from-slate-50 via-white to-sky-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-sky-950/20 dark:border-slate-700/70",
-        accentClass: "from-sky-400/35 via-slate-300/20 to-transparent",
+        cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70",
+        accentClass: "from-slate-400/35 via-slate-300/20 to-transparent",
         action: "documentos-revisados-hoy" as AdminView,
       },
     ],
@@ -258,7 +258,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-sky-300">
+          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">
             Panel Administrativo
           </h1>
           <p className="text-muted-foreground">
@@ -310,7 +310,16 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
               {pendingDocuments.filter((doc) => !doc.revisado).map((doc) => (
                 <div
                   key={doc.id}
-                  className="flex items-center justify-between p-3 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors dark:bg-slate-950/60"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDocument(doc)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openDocument(doc);
+                    }
+                  }}
+                  className="flex items-center justify-between p-3 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors cursor-pointer dark:bg-slate-950/60"
                 >
                   <div className="flex items-center gap-3 flex-1">
                     <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center dark:bg-emerald-950/50 dark:text-emerald-300">
@@ -325,7 +334,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => openDocument(doc)}>
+                    <Button size="sm" variant="ghost" tabIndex={-1} className="pointer-events-none">
                       Abrir
                     </Button>
                   </div>
@@ -335,7 +344,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-sky-200/70 bg-gradient-to-br from-white via-sky-50/50 to-cyan-100/35 shadow-sm dark:border-sky-900/50 dark:from-slate-950 dark:via-sky-950/20 dark:to-cyan-950/20">
+        <Card className="overflow-hidden border-slate-200/70 bg-gradient-to-br from-white via-slate-50/50 to-emerald-100/35 shadow-sm dark:border-slate-900/50 dark:from-slate-950 dark:via-slate-950/20 dark:to-emerald-950/20">
           <CardHeader>
             <CardTitle className="text-foreground">Actividad Reciente</CardTitle>
             <CardDescription>Últimas acciones en el sistema</CardDescription>
@@ -353,7 +362,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
                       openActivity(activity);
                     }
                   }}
-                  className="w-full text-left flex items-start gap-3 rounded-xl p-3 border border-transparent hover:border-border/70 hover:bg-accent/60 transition-colors dark:hover:bg-slate-900/50"
+                  className="w-full text-left flex items-start gap-3 rounded-xl p-3 border border-transparent hover:border-border/70 hover:bg-accent/60 transition-colors cursor-pointer dark:hover:bg-slate-900/50"
                 >
                   <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 mt-2 shadow-[0_0_0_4px_rgba(16,185,129,0.15)] dark:shadow-[0_0_0_4px_rgba(16,185,129,0.08)]" />
                   <div className="flex-1">

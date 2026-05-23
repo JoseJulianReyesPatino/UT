@@ -55,7 +55,7 @@ export const PlanMenuSelector: React.FC<PlanSelectProps & { sheetOpen: boolean; 
         </SheetHeader>
         <div className="space-y-3 mt-6">
           <Button
-            variant={plan === "nuevo-modelo" ? "default" : "outline"}
+            variant={plan === "nuevo-modelo" ? "success" : "outline"}
             className="w-full justify-start"
             onClick={() => {
               onPlanChange("nuevo-modelo");
@@ -66,7 +66,7 @@ export const PlanMenuSelector: React.FC<PlanSelectProps & { sheetOpen: boolean; 
             Plan Nuevo Modelo
           </Button>
           <Button
-            variant={plan === "plan-normal" ? "default" : "outline"}
+            variant={plan === "plan-normal" ? "success" : "outline"}
             className="w-full justify-start"
             onClick={() => {
               onPlanChange("plan-normal");
@@ -78,7 +78,7 @@ export const PlanMenuSelector: React.FC<PlanSelectProps & { sheetOpen: boolean; 
           </Button>
         </div>
         {plan && (
-          <div className="mt-6 p-3 bg-blue-50 rounded-lg text-sm">
+          <div className="mt-6 p-3 bg-emerald-50 rounded-lg text-sm">
             <p className="font-medium">Plan seleccionado:</p>
             <p>{plan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}</p>
           </div>

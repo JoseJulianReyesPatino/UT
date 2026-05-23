@@ -22,8 +22,8 @@ export function DocenteDashboard() {
       description: "Por entregar esta semana",
       icon: Clock,
       trend: "+2 desde ayer",
-      color: "text-warning",
-      bgColor: "bg-warning/10",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
     },
     {
       title: "Documentos Aprobados",
@@ -40,8 +40,8 @@ export function DocenteDashboard() {
       description: "Esperando aprobación",
       icon: AlertCircle,
       trend: "Últimas 24h",
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
     },
     {
       title: "Total Materias",
@@ -187,7 +187,7 @@ export function DocenteDashboard() {
                   docStatusVariant = "success";
                   docStatusLabel = "Aprobado";
                 } else if (doc.status === "revision") {
-                  docStatusVariant = "warning";
+                  docStatusVariant = "outline";
                   docStatusLabel = "En revisión";
                 }
 

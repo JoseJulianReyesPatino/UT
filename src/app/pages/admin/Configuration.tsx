@@ -1,25 +1,53 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { getFormConfig, getGroups, addFieldFor, removeFieldFor, addGroup, removeGroup, Group } from "../../../lib/formConfig";
+import { getFormConfig, getGroups, addFieldFor, removeFieldFor, addGroup, removeGroup, saveGroups, Group } from "../../../lib/formConfig";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { Sun, Moon } from "lucide-react";
+import { CalendarDays, FileText, Grid2x2, Moon, Settings2, Search, Sun, Users } from "lucide-react";
 import { toast } from "sonner";
+import { carrieras } from "../../data/curricula";
 
-type ConfigTab = "general" | "formularios" | "grupos" | "cuenta";
+type ConfigTab = "formularios" | "grupos" | "cuenta";
 
 interface ConfigurationProps {
   initialTab?: ConfigTab;
 }
 
+type CareerOption = {
+  codigo: string;
+  nombre: string;
+  tipo: "TSU" | "Ingeniería";
+};
+
+const getCareerOptions = (selectedPlan: "nuevo-modelo" | "plan-normal"): CareerOption[] => {
+  if (selectedPlan === "nuevo-modelo") {
+    return [
+      ...carrieras["nuevo-modelo"].tsu.map((career) => ({ ...career, tipo: "TSU" as const })),
+      ...carrieras["nuevo-modelo"].ingenieria.map((career) => ({ ...career, tipo: "Ingeniería" as const })),
+    ];
+  }
+
+  return carrieras["plan-normal"].ingenieria.map((career) => ({ ...career, tipo: "Ingeniería" as const }));
+};
+
+const getCuatrimestresForCareer = (selectedPlan: "nuevo-modelo" | "plan-normal", careerType: "TSU" | "Ingeniería") => {
+  if (selectedPlan === "nuevo-modelo") {
+    return careerType === "TSU"
+      ? [0, 1, 2, 3, 4, 5, 6]
+      : [7, 8, 9, 10];
+  }
+
+  return careerType === "TSU" ? [] : [7, 8, 9, 10, 11];
+};
+
 export function Configuration(props: Readonly<ConfigurationProps>) {
-  const { initialTab = "general" } = props;
+  const { initialTab = "formularios" } = props;
   const { user, updateProfile } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
@@ -29,15 +57,47 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const [newField, setNewField] = useState("");
   const [newRole, setNewRole] = useState<"docente" | "tutor">("docente");
 
-  const [careerCode, setCareerCode] = useState("");
   const [plan, setPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
-  const [cuatrimestre, setCuatrimestre] = useState(1);
+  const [careerCode, setCareerCode] = useState("");
+  const [cuatrimestre, setCuatrimestre] = useState("");
   const [groupNumber, setGroupNumber] = useState(1);
 
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+  const [editingGroupPlan, setEditingGroupPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
+  const [editingGroupCareerCode, setEditingGroupCareerCode] = useState("");
+  const [editingGroupCuatrimestre, setEditingGroupCuatrimestre] = useState("");
+  const [editingGroupNumber, setEditingGroupNumber] = useState(1);
+  const [editingGroupOriginal, setEditingGroupOriginal] = useState<null | {
+    plan: "nuevo-modelo" | "plan-normal";
+    careerCode: string;
+    cuatrimestre: string;
+    groupNumber: number;
+  }>(null);
+
   const [profileName, setProfileName] = useState("");
+  const [profileFirstNames, setProfileFirstNames] = useState("");
+  const [profileLastNames, setProfileLastNames] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
   const [profileArea, setProfileArea] = useState("");
   const [profileAvatar, setProfileAvatar] = useState<string | undefined>(undefined);
+  const [groupSearch, setGroupSearch] = useState("");
+  const [groupViewPlan, setGroupViewPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
+
+  const [deleteTarget, setDeleteTarget] = useState<null | {
+    label: string;
+    description: string;
+    onConfirm: () => void;
+  }>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+
+  const navItems = useMemo(
+    () => [
+      { value: "formularios" as const, label: "Formularios", icon: FileText, description: "Campos y estructura" },
+      { value: "grupos" as const, label: "Grupos", icon: Users, description: "Carreras y cuatrimestres" },
+      { value: "cuenta" as const, label: "Cuenta", icon: Settings2, description: "Perfil y preferencias" },
+    ],
+    []
+  );
 
   useEffect(() => {
     setFormConfig(getFormConfig());
@@ -50,11 +110,98 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
   useEffect(() => {
     if (!user) return;
+    const nameParts = (user.name ?? "").trim().split(/\s+/).filter(Boolean);
+    if (nameParts.length <= 1) {
+      setProfileFirstNames(user.name ?? "");
+      setProfileLastNames("");
+    } else {
+      setProfileFirstNames(nameParts.slice(0, Math.max(1, nameParts.length - 2)).join(" "));
+      setProfileLastNames(nameParts.slice(Math.max(1, nameParts.length - 2)).join(" "));
+    }
     setProfileName(user.name ?? "");
     setProfilePhone(user.phone ?? "");
     setProfileArea(user.area ?? "");
     setProfileAvatar(user.avatar);
   }, [user]);
+
+  const careerOptions = getCareerOptions(plan);
+  const selectedCareer = careerOptions.find((career) => career.codigo === careerCode) ?? null;
+  const cuatrimestresDisponibles = selectedCareer ? getCuatrimestresForCareer(plan, selectedCareer.tipo) : [];
+  const currentGroupName = careerCode && cuatrimestre && groupNumber ? `${careerCode}${cuatrimestre}-${groupNumber}` : "N/D";
+  const editingCareerOptions = getCareerOptions(editingGroupPlan);
+  const editingSelectedCareer = editingCareerOptions.find((career) => career.codigo === editingGroupCareerCode) ?? null;
+  const editingCuatrimestresDisponibles = editingSelectedCareer ? getCuatrimestresForCareer(editingGroupPlan, editingSelectedCareer.tipo) : [];
+  const editingCurrentGroupName = editingGroupCareerCode && editingGroupCuatrimestre && editingGroupNumber
+    ? `${editingGroupCareerCode}${editingGroupCuatrimestre}-${editingGroupNumber}`
+    : "N/D";
+  const isEditingGroupDirty = Boolean(
+    editingGroupOriginal && (
+      editingGroupOriginal.plan !== editingGroupPlan ||
+      editingGroupOriginal.careerCode !== editingGroupCareerCode.trim().toUpperCase() ||
+      editingGroupOriginal.cuatrimestre !== editingGroupCuatrimestre ||
+      editingGroupOriginal.groupNumber !== Number(editingGroupNumber)
+    )
+  );
+  const filteredGroups = useMemo(
+    () => groups.filter((group) => {
+      const query = groupSearch.trim().toLowerCase();
+      if (!query) return true;
+      return [group.name, group.plan, String(group.cuatrimestre), String(group.groupNumber), group.careerCode]
+        .some((value) => value.toLowerCase().includes(query));
+    }),
+    [groups, groupSearch]
+  );
+  const selectedPlanGroups = useMemo(
+    () => filteredGroups.filter((group) => group.plan === groupViewPlan),
+    [filteredGroups, groupViewPlan]
+  );
+  const selectedPlanCareerGroups = useMemo(
+    () => getCareerOptions(groupViewPlan)
+      .map((career) => ({
+        career,
+        groups: selectedPlanGroups.filter((group) => group.careerCode === career.codigo),
+      }))
+      .filter((item) => item.groups.length > 0),
+    [groupViewPlan, selectedPlanGroups]
+  );
+
+  const [openCareer, setOpenCareer] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOpenCareer(null);
+  }, [groupViewPlan]);
+
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    setCareerCode("");
+    setCuatrimestre("");
+    setGroupNumber(1);
+  }, [plan]);
+
+  useEffect(() => {
+    if (!selectedCareer) {
+      setCuatrimestre("");
+      return;
+    }
+
+    if (!cuatrimestresDisponibles.includes(Number(cuatrimestre))) {
+      setCuatrimestre("");
+    }
+  }, [selectedCareer, cuatrimestresDisponibles, cuatrimestre]);
+
+  useEffect(() => {
+    if (!editingGroupId) return;
+
+    if (!editingSelectedCareer) {
+      setEditingGroupCuatrimestre("");
+      return;
+    }
+
+    if (!editingCuatrimestresDisponibles.includes(Number(editingGroupCuatrimestre))) {
+      setEditingGroupCuatrimestre("");
+    }
+  }, [editingGroupId, editingSelectedCareer, editingCuatrimestresDisponibles, editingGroupCuatrimestre]);
 
   const handleAddField = () => {
     if (!newField.trim()) return;
@@ -64,23 +211,94 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   };
 
   const handleRemoveField = (role: "docente" | "tutor", field: string) => {
-    removeFieldFor(role, field);
-    setFormConfig(getFormConfig());
+    setDeleteTarget({
+      label: field,
+      description: `Campo de ${role}`,
+      onConfirm: () => {
+        removeFieldFor(role, field);
+        setFormConfig(getFormConfig());
+      },
+    });
+    setDeleteConfirmation("");
   };
 
   const handleAddGroup = () => {
-    if (!careerCode.trim()) return;
-    addGroup({ careerCode: careerCode.toUpperCase(), plan, cuatrimestre: Number(cuatrimestre), groupNumber: Number(groupNumber) });
-    setGroups(getGroups());
-    // clear inputs
-    setCareerCode("");
-    setCuatrimestre(1);
-    setGroupNumber(1);
+    if (!careerCode.trim() || !cuatrimestre) return;
+    setIsLoading(true);
+    setTimeout(() => {
+      addGroup({ careerCode: careerCode.toUpperCase(), plan, cuatrimestre: Number(cuatrimestre), groupNumber: Number(groupNumber) });
+      setGroups(getGroups());
+      // clear inputs
+      setCareerCode("");
+      setCuatrimestre("");
+      setGroupNumber(1);
+      setIsLoading(false);
+      toast.success("Grupo creado");
+    }, 400);
+  };
+
+  const handleStartEditGroup = (group: Group) => {
+    setEditingGroupId(group.id);
+    setEditingGroupPlan(group.plan === "plan-normal" ? "plan-normal" : "nuevo-modelo");
+    setEditingGroupCareerCode(group.careerCode);
+    setEditingGroupCuatrimestre(String(group.cuatrimestre));
+    setEditingGroupNumber(group.groupNumber);
+    setEditingGroupOriginal({
+      plan: group.plan === "plan-normal" ? "plan-normal" : "nuevo-modelo",
+      careerCode: group.careerCode,
+      cuatrimestre: String(group.cuatrimestre),
+      groupNumber: group.groupNumber,
+    });
+  };
+
+  const clearEditingGroupState = () => {
+    setEditingGroupId(null);
+    setEditingGroupPlan("nuevo-modelo");
+    setEditingGroupCareerCode("");
+    setEditingGroupCuatrimestre("");
+    setEditingGroupNumber(1);
+    setEditingGroupOriginal(null);
+  };
+
+  const handleSaveGroupEdit = () => {
+    if (!editingGroupId || !editingGroupCareerCode.trim() || !editingGroupCuatrimestre) return;
+    setIsLoading(true);
+
+    setTimeout(() => {
+      const nextGroups = groups.map((group) => (
+        group.id === editingGroupId
+          ? {
+              ...group,
+              plan: editingGroupPlan,
+              careerCode: editingGroupCareerCode.trim().toUpperCase(),
+              cuatrimestre: Number(editingGroupCuatrimestre),
+              groupNumber: Number(editingGroupNumber),
+              name: `${editingGroupCareerCode.trim().toUpperCase()}${editingGroupCuatrimestre}-${editingGroupNumber}`,
+            }
+          : group
+      ));
+
+      setGroups(nextGroups);
+      saveGroups(nextGroups);
+      clearEditingGroupState();
+      setIsLoading(false);
+      toast.success("Grupo actualizado");
+    }, 400);
   };
 
   const handleRemoveGroup = (id: number) => {
-    removeGroup(id);
-    setGroups(getGroups());
+    const group = groups.find((item) => item.id === id);
+    if (!group) return;
+
+    setDeleteTarget({
+      label: group.name,
+      description: "Grupo",
+      onConfirm: () => {
+        removeGroup(id);
+        setGroups(getGroups());
+      },
+    });
+    setDeleteConfirmation("");
   };
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,13 +324,18 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   };
 
   const handleSaveProfile = () => {
-    if (!profileName.trim()) {
-      toast.error("El nombre es obligatorio");
+    const firstNames = profileFirstNames.trim();
+    const lastNames = profileLastNames.trim();
+
+    if (!firstNames || !lastNames) {
+      toast.error("Debes escribir nombres y apellidos");
       return;
     }
 
+    const fullName = `${firstNames} ${lastNames}`.trim();
+
     updateProfile({
-      name: profileName.trim(),
+      name: fullName,
       phone: profilePhone.trim(),
       area: profileArea.trim(),
       avatar: profileAvatar,
@@ -120,211 +343,525 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     toast.success("Configuración de cuenta actualizada");
   };
 
+  const shellClass = theme === "dark"
+    ? "bg-slate-950/80 text-slate-100"
+    : "bg-slate-50/90 text-slate-900";
+
+  const sidebarClass = theme === "dark"
+    ? "border-slate-800 bg-slate-950 text-white"
+    : "border-slate-200 bg-white text-slate-900 shadow-sm";
+
+  const sidebarCardClass = theme === "dark"
+    ? "border-b border-white/10 bg-gradient-to-b from-emerald-500/15 to-transparent"
+    : "border-b border-slate-200 bg-gradient-to-b from-emerald-50 to-white";
+
+  const sectionCardClass = theme === "dark"
+    ? "overflow-hidden border-slate-800 bg-slate-950 shadow-sm"
+    : "overflow-hidden border-slate-200 bg-white shadow-sm";
+
+  const sectionHeaderClass = theme === "dark"
+    ? "bg-gradient-to-r from-emerald-950/30 to-slate-950"
+    : "bg-gradient-to-r from-emerald-50 to-slate-50";
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1>Configuración del Sistema</h1>
-        <p className="text-muted-foreground">Ajustes globales y parámetros del sistema</p>
+    <div className={`space-y-8 pb-6 ${shellClass}`}>
+      <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Configuración del Sistema</h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Ajustes globales y parámetros del sistema</p>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <Grid2x2 className="h-4 w-4 text-emerald-500" />
+            Panel de administración
+          </div>
+        </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ConfigTab)}>
-        <TabsList>
-          <TabsTrigger value="general">Generales</TabsTrigger>
-          <TabsTrigger value="formularios">Formularios</TabsTrigger>
-          <TabsTrigger value="grupos">Grupos</TabsTrigger>
-          <TabsTrigger value="cuenta">Cuenta</TabsTrigger>
-        </TabsList>
+      <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <Card className={`${sidebarClass} shadow-xl`}>
+          <CardHeader className={sidebarCardClass}>
+            <CardTitle className={theme === "dark" ? "text-white" : "text-slate-900"}>Secciones</CardTitle>
+            <CardDescription className={theme === "dark" ? "text-slate-400" : "text-slate-500"}>Navega por la configuración</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 p-3">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.value;
 
-        <TabsContent value="cuenta">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuración de tu Cuenta</CardTitle>
-              <CardDescription>Gestiona tu foto, datos básicos y preferencias visuales.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <Avatar className="h-20 w-20 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
-                  {profileAvatar && <AvatarImage src={profileAvatar} alt={profileName || "Usuario"} />}
-                  <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-xl">
-                    {(profileName || user?.name || "U").split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="space-y-2">
-                  <Label htmlFor="avatar">Foto de perfil</Label>
-                  <Input id="avatar" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} />
-                  <p className="text-xs text-muted-foreground">Formatos: PNG/JPG/WEBP. Tamaño máximo: 2MB.</p>
-                </div>
-              </div>
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  disabled={Boolean(editingGroupId && item.value !== activeTab)}
+                  onClick={() => setActiveTab(item.value)}
+                  className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all ${
+                    isActive
+                      ? (theme === "dark"
+                          ? "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30"
+                          : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70")
+                      : (theme === "dark"
+                          ? "text-slate-300 hover:bg-white/5 hover:text-white"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")
+                  }`}
+                >
+                  <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${isActive ? (theme === "dark" ? "bg-emerald-400/15" : "bg-emerald-100") : (theme === "dark" ? "bg-white/5" : "bg-slate-100")}`}>
+                    <Icon className={`h-5 w-5 ${isActive ? (theme === "dark" ? "text-emerald-300" : "text-emerald-700") : (theme === "dark" ? "text-slate-300" : "text-slate-500")}`} />
+                  </span>
+                  <span className="flex-1">
+                    <span className="block text-sm font-semibold">{item.label}</span>
+                    <span className={`block text-xs ${theme === "dark" ? "text-slate-400" : "text-slate-500"}`}>{item.description}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </CardContent>
+        </Card>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nombre completo</Label>
-                  <Input value={profileName} onChange={(e) => setProfileName(e.target.value)} />
+        <div className="space-y-8">
+          {activeTab === "cuenta" && (
+            <Card className={sectionCardClass}>
+              <CardHeader className={sectionHeaderClass}>
+                <CardTitle>Configuración de tu Cuenta</CardTitle>
+                <CardDescription>Gestiona tu foto, datos básicos y preferencias visuales.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6 p-6">
+                <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-900/60">
+                  <Avatar className="h-20 w-20 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
+                    {profileAvatar && <AvatarImage src={profileAvatar} alt={profileFirstNames || "Usuario"} />}
+                    <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-xl">
+                      {(profileFirstNames || profileLastNames || user?.name || "U").split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="space-y-2">
+                    <Label htmlFor="avatar">Foto de perfil</Label>
+                    <Input id="avatar" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} />
+                    <p className="text-xs text-muted-foreground">Formatos: PNG/JPG/WEBP. Tamaño máximo: 2MB.</p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Correo electrónico</Label>
-                  <Input value={user?.email ?? ""} disabled />
-                </div>
-                <div className="space-y-2">
-                  <Label>Teléfono</Label>
-                  <Input value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} placeholder="Ej. 6531234567" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Área / Departamento</Label>
-                  <Input value={profileArea} onChange={(e) => setProfileArea(e.target.value)} placeholder="Ej. Coordinación Académica" />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Tema de la aplicación</Label>
-                <div className="flex items-center gap-3">
-                  <Button type="button" variant="outline" onClick={toggleTheme} className="gap-2">
-                    {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                    {theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-                  </Button>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Nombres</Label>
+                    <Input value={profileFirstNames} onChange={(e) => setProfileFirstNames(e.target.value)} placeholder="Ej. María Fernanda" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Apellidos</Label>
+                    <Input value={profileLastNames} onChange={(e) => setProfileLastNames(e.target.value)} placeholder="Ej. González López" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Correo electrónico</Label>
+                    <Input value={user?.email ?? ""} disabled />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Teléfono</Label>
+                    <Input value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} placeholder="Ej. 6531234567" />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Área / Departamento</Label>
+                    <Input value={profileArea} onChange={(e) => setProfileArea(e.target.value)} placeholder="Ej. Coordinación Académica" />
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex justify-end">
-                <Button variant="success" onClick={handleSaveProfile}>Guardar configuración</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                  <div className="space-y-3">
+                    <Label className="block">Tema de la aplicación</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={toggleTheme}
+                      className="w-fit gap-2 border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    >
+                      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                      {theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                    </Button>
+                  </div>
+                </div>
 
-        <TabsContent value="general">
-          <Card>
-            <CardHeader>
-              <CardTitle>Parámetros Generales</CardTitle>
-              <CardDescription>Configuración visible para administradores</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nombre de la Institución</Label>
-                  <Input defaultValue="Instituto Tecnológico Ejemplo" />
+                <div className="flex justify-end">
+                  <Button variant="success" onClick={handleSaveProfile}>Guardar configuración</Button>
                 </div>
-                <div className="space-y-2">
-                  <Label>Correo de Soporte</Label>
-                  <Input defaultValue="soporte@instituto.edu" />
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === "formularios" && (
+            <Card className={sectionCardClass}>
+              <CardHeader className={sectionHeaderClass}>
+                <CardTitle>Formularios</CardTitle>
+                <CardDescription>Administra los campos que ven docentes y tutores</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6 p-6">
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                    <h3 className="font-medium text-slate-900 dark:text-slate-100">Campos para Docentes</h3>
+                    <div className="mt-3 space-y-2">
+                      {formConfig.docenteFields.map((f) => (
+                        <div key={f} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200/60 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                          <div className="text-sm text-slate-700 dark:text-slate-200">{f}</div>
+                          <Button variant="ghost" size="sm" onClick={() => handleRemoveField("docente", f)}>Eliminar</Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                    <h3 className="font-medium text-slate-900 dark:text-slate-100">Campos para Tutores</h3>
+                    <div className="mt-3 space-y-2">
+                      {formConfig.tutorFields.map((f) => (
+                        <div key={f} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200/60 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                          <div className="text-sm text-slate-700 dark:text-slate-200">{f}</div>
+                          <Button variant="ghost" size="sm" onClick={() => handleRemoveField("tutor", f)}>Eliminar</Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Modo de Operación</Label>
-                  <Select>
+
+                <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 md:grid-cols-3 dark:border-slate-800 dark:bg-slate-900/60">
+                  <Select value={newRole} onValueChange={(v: any) => setNewRole(v)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar modo" />
+                      <SelectValue placeholder="Seleccionar rol" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="production">Producción</SelectItem>
-                      <SelectItem value="staging">Staging</SelectItem>
-                      <SelectItem value="development">Desarrollo</SelectItem>
+                      <SelectItem value="docente">Docente</SelectItem>
+                      <SelectItem value="tutor">Tutor</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Input placeholder="Nombre del campo" value={newField} onChange={(e) => setNewField(e.target.value)} />
+                  <Button onClick={handleAddField} variant="success">Agregar campo</Button>
                 </div>
-                <div className="space-y-2">
-                  <Label>Puerto del Servidor de Desarrollo</Label>
-                  <Input defaultValue="5173" />
-                </div>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <Button variant="outline" className="mr-2">Restablecer</Button>
-                <Button variant="success">Guardar</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </CardContent>
+            </Card>
+          )}
 
-        <TabsContent value="formularios">
-          <Card>
-            <CardHeader>
-              <CardTitle>Formularios</CardTitle>
-              <CardDescription>Administra los campos que ven docentes y tutores</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-medium">Campos para Docentes</h3>
-                  <div className="mt-3 space-y-2">
-                    {formConfig.docenteFields.map((f) => (
-                      <div key={f} className="flex items-center justify-between gap-2">
-                        <div className="text-sm">{f}</div>
-                        <Button variant="ghost" size="sm" onClick={() => handleRemoveField("docente", f)}>Eliminar</Button>
-                      </div>
-                    ))}
+          {activeTab === "grupos" && (
+            <Card className={sectionCardClass}>
+              <CardHeader className={sectionHeaderClass}>
+                <CardTitle>Grupos</CardTitle>
+                <CardDescription>Crear y administrar grupos que aparecerán en los formularios</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6 p-6">
+                <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 md:grid-cols-3 dark:border-slate-800 dark:bg-slate-900/60">
+                  <Select value={plan} onValueChange={(v: any) => setPlan(v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Plan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
+                      <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={careerCode} onValueChange={(value) => setCareerCode(value)} disabled={!plan}>
+                    <SelectTrigger className="min-w-0">
+                      <SelectValue placeholder="Carrera" className="min-w-0 flex-1 truncate" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {careerOptions.map((career) => (
+                        <SelectItem key={career.codigo} value={career.codigo} className="whitespace-normal py-2 pr-3">
+                          <span className="block max-w-[18rem] break-words leading-snug">{career.nombre}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={cuatrimestre} onValueChange={setCuatrimestre} disabled={!selectedCareer}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Cuatrimestre" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cuatrimestresDisponibles.map((number) => (
+                        <SelectItem key={number} value={String(number)}>
+                          {number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={String(groupNumber)} onValueChange={(value) => setGroupNumber(Number(value))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Asignación de número" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 20 }, (_, index) => index + 1).map((number) => (
+                        <SelectItem key={number} value={String(number)}>
+                          {number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex min-w-0 items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-950">
+                    <CalendarDays className="h-4 w-4 text-emerald-500" />
+                    <div className="min-w-0 truncate">Nombre generado: <strong className="ml-2 text-slate-900 dark:text-slate-100">{currentGroupName}</strong></div>
                   </div>
+                  <Button onClick={handleAddGroup} variant="success" disabled={!careerCode || !cuatrimestre}>Crear grupo</Button>
                 </div>
-                <div>
-                  <h3 className="font-medium">Campos para Tutores</h3>
-                  <div className="mt-3 space-y-2">
-                    {formConfig.tutorFields.map((f) => (
-                      <div key={f} className="flex items-center justify-between gap-2">
-                        <div className="text-sm">{f}</div>
-                        <Button variant="ghost" size="sm" onClick={() => handleRemoveField("tutor", f)}>Eliminar</Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
 
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Select value={newRole} onValueChange={(v: any) => setNewRole(v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar rol" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="docente">Docente</SelectItem>
-                    <SelectItem value="tutor">Tutor</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input placeholder="Nombre del campo" value={newField} onChange={(e) => setNewField(e.target.value)} />
-                <Button onClick={handleAddField} variant="success">Agregar campo</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="grupos">
-          <Card>
-            <CardHeader>
-              <CardTitle>Grupos</CardTitle>
-              <CardDescription>Crear y administrar grupos que aparecerán en los formularios</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Input placeholder="Nomenclatura carrera (ej. IDGS)" value={careerCode} onChange={(e) => setCareerCode(e.target.value.toUpperCase())} />
-                <Select value={plan} onValueChange={(v: any) => setPlan(v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Plan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
-                    <SelectItem value="plan-normal">Plan Normal</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input type="number" min={1} placeholder="Cuatrimestre (ej. 10)" value={String(cuatrimestre)} onChange={(e) => setCuatrimestre(Number(e.target.value))} />
-                <Input type="number" min={1} placeholder="Número de grupo (ej. 1)" value={String(groupNumber)} onChange={(e) => setGroupNumber(Number(e.target.value))} />
-                <div className="flex items-center gap-2 md:col-span-2">
-                  <div className="text-sm">Nombre generado: <strong className="ml-2">{careerCode ? `${careerCode}${cuatrimestre}-${groupNumber}` : "N/D"}</strong></div>
-                </div>
-                <Button onClick={handleAddGroup} variant="success">Crear grupo</Button>
-              </div>
-
-              <div className="mt-6 space-y-2">
-                {groups.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No hay grupos creados.</div>
-                ) : (
-                  groups.map((g) => (
-                    <div key={g.id} className="flex items-center justify-between gap-2">
-                      <div className="text-sm">{g.name} — {g.plan}</div>
-                      <Button variant="ghost" size="sm" onClick={() => handleRemoveGroup(g.id)}>Eliminar</Button>
+                <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <h3 className="font-medium text-slate-900 dark:text-slate-100">Grupos creados</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Selecciona un plan y verás sus carreras con los grupos creados.</p>
                     </div>
-                  ))
-                )}
+                    <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
+                      <div className="relative w-full md:w-64">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Input
+                          value={groupSearch}
+                          onChange={(event) => setGroupSearch(event.target.value)}
+                          placeholder="Buscar grupo"
+                          className="pl-9"
+                        />
+                      </div>
+                      <Select value={groupViewPlan} onValueChange={(value) => setGroupViewPlan(value as "nuevo-modelo" | "plan-normal")}>
+                        <SelectTrigger className="w-full md:w-64">
+                          <SelectValue placeholder="Ver plan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
+                          <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-4">
+                    {filteredGroups.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60">No hay grupos que coincidan con la búsqueda.</div>
+                    ) : (
+                      <>
+                        <div className="rounded-2xl border border-slate-200/70 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+                          <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 pb-3 dark:border-slate-800">
+                            <div>
+                              <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
+                                {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
+                              </h4>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{selectedPlanGroups.length} grupos en este plan</p>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{selectedPlanCareerGroups.length} carreras con grupos</p>
+                          </div>
+
+                          <div className="mt-4 space-y-3">
+                            {selectedPlanCareerGroups.length === 0 ? (
+                              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40">
+                                No hay grupos creados para este plan.
+                              </div>
+                            ) : (
+                              selectedPlanCareerGroups.map(({ career, groups: careerGroups }) => (
+                                <div key={career.codigo} className="rounded-2xl border border-slate-200/70 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
+                                  <button
+                                    type="button"
+                                    onClick={() => setOpenCareer(openCareer === career.codigo ? null : career.codigo)}
+                                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+                                    aria-expanded={openCareer === career.codigo}
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{career.nombre}</p>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400">{career.codigo} · {careerGroups.length} grupos creados</p>
+                                    </div>
+                                    <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                      {careerGroups.length}
+                                    </span>
+                                  </button>
+
+                                  {openCareer === career.codigo && (
+                                    <div className="space-y-2 border-t border-slate-200/70 p-3 dark:border-slate-800">
+                                      {careerGroups.map((g) => (
+                                        <div key={g.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/70 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                                          <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">
+                                            <p className="truncate font-medium">{g.name}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">Cuatrimestre {g.cuatrimestre} · Grupo {g.groupNumber}</p>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <Button variant="outline" size="sm" onClick={() => handleStartEditGroup(g)} disabled={Boolean(editingGroupId)}>
+                                              Editar
+                                            </Button>
+                                            <Button variant="ghost" size="sm" onClick={() => handleRemoveGroup(g.id)} disabled={Boolean(editingGroupId)}>
+                                              Eliminar
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteConfirmation("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar eliminación</DialogTitle>
+            <DialogDescription>
+              Escribe exactamente <strong>{deleteTarget?.label}</strong> para confirmar el borrado de {deleteTarget?.description?.toLowerCase()}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Texto de confirmación</Label>
+            <Input
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              placeholder={deleteTarget?.label ?? "Escribe aquí"}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteConfirmation("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!deleteTarget) return;
+                if (deleteConfirmation.trim() !== deleteTarget.label.trim()) {
+                  toast.error(`Debes escribir "${deleteTarget.label}" para confirmar`);
+                  return;
+                }
+                setIsLoading(true);
+                setTimeout(() => {
+                  deleteTarget.onConfirm();
+                  setDeleteTarget(null);
+                  setDeleteConfirmation("");
+                  setIsLoading(false);
+                  toast.success("Elemento eliminado");
+                }, 400);
+              }}
+              disabled={isLoading}
+            >
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(editingGroupId)}
+        onOpenChange={(open) => {
+          if (!open && !isEditingGroupDirty) {
+            clearEditingGroupState();
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar grupo</DialogTitle>
+            <DialogDescription>
+              Modifica los datos del grupo seleccionado. Si haces cambios, debes guardarlos antes de salir.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                Nombre final: <strong className="ml-1 text-slate-900 dark:text-slate-100">{editingCurrentGroupName}</strong>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              {isEditingGroupDirty ? (
+                <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">Hay cambios sin guardar. El modal permanecerá abierto hasta que guardes.</p>
+              ) : (
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">No hay cambios pendientes. Puedes cerrar este modal sin guardar.</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Select value={editingGroupPlan} onValueChange={(value) => setEditingGroupPlan(value as "nuevo-modelo" | "plan-normal")}>
+                <SelectTrigger className="min-w-0">
+                  <SelectValue placeholder="Plan" className="min-w-0 flex-1 truncate" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
+                  <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={editingGroupCareerCode} onValueChange={setEditingGroupCareerCode} disabled={!editingGroupPlan}>
+                <SelectTrigger className="min-w-0">
+                  <SelectValue placeholder="Carrera" className="min-w-0 flex-1 truncate" />
+                </SelectTrigger>
+                <SelectContent>
+                  {editingCareerOptions.map((career) => (
+                    <SelectItem key={career.codigo} value={career.codigo} className="whitespace-normal py-2 pr-3">
+                      <span className="block max-w-[18rem] break-words leading-snug">{career.nombre}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={editingGroupCuatrimestre} onValueChange={setEditingGroupCuatrimestre} disabled={!editingSelectedCareer}>
+                <SelectTrigger className="min-w-0">
+                  <SelectValue placeholder="Cuatrimestre" className="min-w-0 flex-1 truncate" />
+                </SelectTrigger>
+                <SelectContent>
+                  {editingCuatrimestresDisponibles.map((number) => (
+                    <SelectItem key={number} value={String(number)}>
+                      {number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={String(editingGroupNumber)} onValueChange={(value) => setEditingGroupNumber(Number(value))}>
+                <SelectTrigger className="min-w-0">
+                  <SelectValue placeholder="Número" className="min-w-0 flex-1 truncate" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 20 }, (_, index) => index + 1).map((number) => (
+                    <SelectItem key={number} value={String(number)}>
+                      {number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={clearEditingGroupState}
+              disabled={isEditingGroupDirty}
+            >
+              Cerrar
+            </Button>
+            <Button
+              variant="success"
+              onClick={handleSaveGroupEdit}
+              disabled={!editingGroupId || !editingGroupCareerCode.trim() || !editingGroupCuatrimestre}
+            >
+              Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {isLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative z-10 flex flex-col items-center gap-3 rounded-lg bg-white/90 p-6 shadow-lg dark:bg-slate-900/90">
+            <svg className="h-12 w-12 animate-spin text-emerald-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Procesando...</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

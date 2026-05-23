@@ -29,10 +29,10 @@ type NuevoDocenteForm = {
   telefono: string;
   email: string;
   fechaNacimiento: string;
-  password: string;
-  confirmPassword: string;
   roles?: { docente: boolean; tutor: boolean };
 };
+
+const DEFAULT_PASSWORD = "12345678";
 
 type StatusConfirmationDialogProps = {
   open: boolean;
@@ -184,8 +184,6 @@ const initialForm: NuevoDocenteForm = {
   telefono: "",
   email: "",
   fechaNacimiento: "",
-  password: "",
-  confirmPassword: "",
   roles: { docente: true, tutor: false },
 };
 
@@ -200,8 +198,6 @@ export function DocenteManagement() {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [statusConfirmationEmail, setStatusConfirmationEmail] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [docentes, setDocentes] = useState(initialDocentes);
   const [newDocente, setNewDocente] = useState<NuevoDocenteForm>(initialForm);
   const [selectedDocente, setSelectedDocente] = useState<Docente | null>(null);
@@ -209,9 +205,9 @@ export function DocenteManagement() {
 
   const resetForm = () => {
     setNewDocente(initialForm);
-    setShowPassword(false);
-    setShowConfirmPassword(false);
   };
+
+  const sanitizePhone = (value: string) => value.replace(/\D/g, "").slice(0, 10);
 
   const resetEditForm = () => {
     setSelectedDocente(null);
@@ -368,13 +364,7 @@ export function DocenteManagement() {
   };
 
   const hasRole = Boolean(newDocente.roles && (newDocente.roles.docente || newDocente.roles.tutor));
-  const canCreate =
-    newDocente.nombres.trim() &&
-    newDocente.apellidos.trim() &&
-    newDocente.email.trim() &&
-    newDocente.password.length >= 6 &&
-    newDocente.password === newDocente.confirmPassword &&
-    hasRole;
+  const canCreate = Boolean(newDocente.nombres.trim() && newDocente.apellidos.trim() && newDocente.email.trim() && hasRole);
 
   const handleCreateDocente = async () => {
     if (!newDocente.nombres.trim() || !newDocente.apellidos.trim()) {
@@ -384,16 +374,6 @@ export function DocenteManagement() {
 
     if (!newDocente.email.trim()) {
       toast.error("El correo electrónico es obligatorio");
-      return;
-    }
-
-    if (newDocente.password.length < 6) {
-      toast.error("La contraseña debe tener al menos 6 caracteres");
-      return;
-    }
-
-    if (newDocente.password !== newDocente.confirmPassword) {
-      toast.error("La contraseña y su confirmación no coinciden");
       return;
     }
 
@@ -413,12 +393,13 @@ export function DocenteManagement() {
       documentos: 0,
       status: "activo",
       avatar: getAvatar(newDocente.nombres, newDocente.apellidos),
+      // La contraseña simulada queda fija para los usuarios nuevos.
     };
 
     setDocentes((current) => [createdDocente, ...current]);
     toast.dismiss();
     toast.success("Docente creado correctamente", {
-      description: `${fullName} ya quedó registrado en el sistema de prueba.`,
+      description: `${fullName} ya quedó registrado. Contraseña temporal: ${DEFAULT_PASSWORD}`,
     });
     setIsCreating(false);
     setShowNewDialog(false);
@@ -440,7 +421,7 @@ export function DocenteManagement() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-cyan-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-cyan-300">Gestión de Usuarios</h1>
+          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">Gestión de Usuarios</h1>
           <p className="text-muted-foreground">
             Administra usuarios y permisos del sistema
           </p>
@@ -451,7 +432,7 @@ export function DocenteManagement() {
         </Button>
       </div>
 
-      <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-cyan-50/60 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-cyan-950/20">
+      <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-emerald-50/60 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20">
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <CardTitle>Usuarios Registrados</CardTitle>
@@ -471,34 +452,34 @@ export function DocenteManagement() {
             {filteredDocentes.map((docente) => (
               <div
                 key={docente.id}
-                className="flex items-center justify-between p-4 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors dark:bg-slate-950/60 dark:hover:bg-slate-900/70"
+                className="flex items-center justify-between p-4 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors dark:bg-slate-950/60 dark:hover:bg-slate-900/70 overflow-hidden"
               >
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-12 w-12">
+                <div className="flex items-center gap-4 min-w-0">
+                  <Avatar className="h-12 w-12 flex-shrink-0">
                     <AvatarFallback className="bg-success/10 text-success">
                       {docente.avatar}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <p className="font-medium">{docente.nombre}</p>
-                    <p className="text-sm text-muted-foreground">{docente.email}</p>
-                            <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                              <span>{docente.documentos} documentos enviados</span>
-                              <span>{(docente.roles || []).join(", ")}</span>
-                            </div>
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{docente.nombre}</p>
+                    <p className="text-sm text-muted-foreground truncate">{docente.email}</p>
+                    <div className="flex gap-4 mt-1 text-xs text-muted-foreground truncate">
+                      <span className="truncate">{docente.documentos} documentos enviados</span>
+                      <span className="truncate">{(docente.roles || []).join(", ")}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <Badge variant={docente.status === "activo" ? "success" : "outline"}>
                     {docente.status === "activo" ? "Activo" : "Inactivo"}
                   </Badge>
-                  <Button variant="ghost" size="icon" title="Editar" onClick={() => openEditDialog(docente)}>
+                  <Button variant="ghost" title="Editar" onClick={() => openEditDialog(docente)}>
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" title="Restablecer contraseña" onClick={() => openResetDialog(docente)}>
+                  <Button variant="ghost" title="Restablecer contraseña" onClick={() => openResetDialog(docente)}>
                     <Key className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" title="Cambiar estado" onClick={() => openStatusDialog(docente)}>
+                  <Button variant="ghost" title="Cambiar estado" onClick={() => openStatusDialog(docente)}>
                     {docente.status === "activo" ? (
                       <UserX className="h-4 w-4" />
                     ) : (
@@ -557,8 +538,11 @@ export function DocenteManagement() {
                 <Label>Número de teléfono (opcional)</Label>
                 <Input
                   value={editDocente.telefono}
-                  onChange={(e) => setEditDocente((current) => ({ ...current, telefono: e.target.value }))}
-                  placeholder="444 123 4567"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={10}
+                  onChange={(e) => setEditDocente((current) => ({ ...current, telefono: sanitizePhone(e.target.value) }))}
+                  placeholder="653 123 3445"
                 />
               </div>
               <div className="space-y-2">
@@ -682,11 +666,14 @@ export function DocenteManagement() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Número de teléfono (opcional)</Label>
+                <Label>Teléfono (opcional)</Label>
                 <Input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={newDocente.telefono}
-                  onChange={(e) => setNewDocente((current) => ({ ...current, telefono: e.target.value }))}
-                  placeholder="444 123 4567"
+                  onChange={(e) => setNewDocente((current) => ({ ...current, telefono: sanitizePhone(e.target.value) }))}
+                  placeholder="653 123 3445"
                 />
               </div>
               <div className="space-y-2">
@@ -708,28 +695,6 @@ export function DocenteManagement() {
                   value={newDocente.fechaNacimiento}
                   onChange={(e) => setNewDocente((current) => ({ ...current, fechaNacimiento: e.target.value }))}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Contraseña (obligatorio) *</Label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    value={newDocente.password}
-                    onChange={(e) => setNewDocente((current) => ({ ...current, password: e.target.value }))}
-                    placeholder="••••••••"
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                    onClick={() => setShowPassword((current) => !current)}
-                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
               </div>
             </div>
 
@@ -753,36 +718,7 @@ export function DocenteManagement() {
               </div>
               <p className="text-xs text-muted-foreground">Selecciona si el usuario será docente, tutor o ambos.</p>
             </div>
-
-            <div className="space-y-2">
-              <Label>Confirmar contraseña (obligatorio) *</Label>
-              <div className="relative">
-                <Input
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={newDocente.confirmPassword}
-                  onChange={(e) => setNewDocente((current) => ({ ...current, confirmPassword: e.target.value }))}
-                  placeholder="••••••••"
-                  className="pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                  onClick={() => setShowConfirmPassword((current) => !current)}
-                  aria-label={showConfirmPassword ? "Ocultar confirmación de contraseña" : "Mostrar confirmación de contraseña"}
-                >
-                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-              {newDocente.password && newDocente.confirmPassword && newDocente.password !== newDocente.confirmPassword && (
-                <p className="text-xs text-destructive">Las contraseñas no coinciden.</p>
-              )}
-            </div>
-
-            <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-              Al guardar, el docente se agregará a esta lista como parte de la simulación del panel admin.
-            </div>
+            
           </div>
           <DialogFooter>
             <Button

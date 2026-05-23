@@ -164,8 +164,8 @@ export default function Instrumento3040Page() {
           <div className="space-y-2">
             <Label>Plan *</Label>
             <div className="flex gap-2">
-              <Button variant={formData.plan === "nuevo-modelo" ? "default" : "outline"} onClick={() => setFormData((c) => ({ ...c, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Nuevo Modelo</Button>
-              <Button variant={formData.plan === "plan-normal" ? "default" : "outline"} onClick={() => setFormData((c) => ({ ...c, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Normal</Button>
+              <Button variant={formData.plan === "nuevo-modelo" ? "success" : "outline"} onClick={() => setFormData((c) => ({ ...c, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Nuevo Modelo</Button>
+              <Button variant={formData.plan === "plan-normal" ? "success" : "outline"} onClick={() => setFormData((c) => ({ ...c, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Normal</Button>
             </div>
           </div>
 

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { FileText, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
@@ -43,6 +43,11 @@ type ReviewedDocument = {
 };
 
 type DocumentItem = PendingDocument | ReviewedDocument;
+
+type PendingAction = {
+  type: "review" | "send" | "return";
+  document: DocumentItem;
+};
 
 type CareerFilterOption = {
   value: string;
@@ -211,6 +216,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
   const [filterApartado, setFilterApartado] = useState("all");
   const [activeSection, setActiveSection] = useState<ReviewSection>(initialSection);
   const [previewDocument, setPreviewDocument] = useState<DocumentItem | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
   const allDocuments = [...pendingDocuments, ...reviewedDocuments];
   const todayKey = new Date().toISOString().slice(0, 10);
@@ -300,17 +306,37 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
     setPreviewDocument(null);
   };
 
+  const confirmPendingAction = () => {
+    if (!pendingAction) return;
+
+    const { type, document } = pendingAction;
+    setPendingAction(null);
+
+    if (type === "review") {
+      handleReviewDocument(document.id);
+      return;
+    }
+
+    if (type === "send") {
+      handleShareToMessages(document);
+      toast.success("Documento enviado a mensajes");
+      return;
+    }
+
+    handleReturnDocument(document.id);
+  };
+
   return (
     <div className="relative space-y-6 overflow-hidden">
       <div>
-        <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-cyan-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-cyan-300">Revisión de Documentos</h1>
+        <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">Revisión de Documentos</h1>
         <p className="text-muted-foreground">
           Revisa y aprueba los documentos enviados por los docentes
         </p>
       </div>
 
       <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
-        <TabsList className="bg-gradient-to-r from-emerald-100 via-emerald-50 to-sky-100 p-1 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+        <TabsList className="bg-gradient-to-r from-emerald-100 via-emerald-50 to-emerald-50 p-1 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
           <TabsTrigger value="all">
             Todos
             <Badge variant="outline" className="ml-2">{allDocuments.length}</Badge>
@@ -324,7 +350,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
         </TabsList>
 
         <TabsContent value="all" className="space-y-4 mt-6">
-          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-cyan-950/20">
+          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-emerald-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20">
             <CardHeader>
               <div className="flex flex-wrap items-center gap-4 pt-4">
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
@@ -390,7 +416,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                             <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
                               <Eye className="h-4 w-4 mr-1" />Ver PDF
                             </Button>
-                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                                  <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
                               Enviar
                             </Button>
                             {('returned' in doc) && (doc as any).returned && <Badge variant="destructive">Devuelto</Badge>}
@@ -405,7 +431,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
         </TabsContent>
 
         <TabsContent value="pendientes" className="space-y-4 mt-6">
-          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-cyan-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
+          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20">
             <CardHeader>
               <div className="flex flex-wrap items-center gap-4">
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
@@ -477,13 +503,13 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                       <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
                         <Eye className="h-4 w-4 mr-1" />Ver PDF
                       </Button>
-                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleReviewDocument(doc.id); }}>
+                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "review", document: doc }); }}>
                         <Eye className="h-4 w-4 mr-1" />Revisar
                       </Button>
-                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
                         Enviar
                       </Button>
-                      <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); handleReturnDocument(doc.id); }}>
+                      <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }}>
                         Devolver
                       </Button>
                     </div>
@@ -523,7 +549,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                             <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
                               <Eye className="h-4 w-4 mr-1" />Ver PDF
                             </Button>
-                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
                               Enviar
                             </Button>
                             <Badge variant="success">Revisado</Badge>
@@ -569,7 +595,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
                           <Eye className="h-4 w-4 mr-1" />Ver PDF
                         </Button>
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
                           Enviar
                         </Button>
                         <Badge variant="success">{doc.reviewedAt}</Badge>
@@ -624,6 +650,31 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pendingAction !== null} onOpenChange={(open) => { if (!open) setPendingAction(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Estás seguro?</DialogTitle>
+            <DialogDescription>
+              {pendingAction?.type === "review" && `Vas a marcar como revisado: ${pendingAction.document.documento}`}
+              {pendingAction?.type === "send" && `Vas a enviar a mensajes: ${pendingAction.document.documento}`}
+              {pendingAction?.type === "return" && `Vas a devolver: ${pendingAction.document.documento}`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingAction(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant={pendingAction?.type === "return" ? "destructive" : "default"}
+              onClick={confirmPendingAction}
+              disabled={!pendingAction}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -455,7 +455,7 @@ export function CiclosEscolares() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-cyan-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-cyan-300">Ciclos Escolares</h1>
+          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">Ciclos Escolares</h1>
           <p className="text-muted-foreground">Administra los períodos académicos del sistema</p>
         </div>
         <Button variant="success" onClick={() => setShowNewDialog(true)} className="shadow-md shadow-emerald-500/20">
@@ -471,7 +471,7 @@ export function CiclosEscolares() {
           return (
             <Card
               key={ciclo.id}
-              className="overflow-hidden cursor-pointer border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-cyan-950/20"
+              className="overflow-hidden cursor-pointer border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-emerald-50/50 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20"
               tabIndex={0}
               onClick={() => openDocsForCycle(ciclo)}
               onKeyDown={(e) => {
@@ -638,7 +638,7 @@ export function CiclosEscolares() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100">
               <strong>Ciclo:</strong> {selectedCycle?.nombre}
               <br />
               <strong>Documentos asociados:</strong> {selectedCycle ? cycleDocumentCount(selectedCycle.nombre) : 0}
@@ -699,10 +699,10 @@ export function CiclosEscolares() {
                   setShowDocTypeDialog(true);
                 }}
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                size="sm"
+                className="h-8 w-auto"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-5 w-5 mr-2" />Atrás
               </Button>
               <DialogTitle className="text-2xl">{selectedDocumentType === "tutores" ? "Seleccionar Tipo de Tutoría" : "Seleccionar Tipo de Documento"}</DialogTitle>
             </div>
@@ -740,10 +740,10 @@ export function CiclosEscolares() {
                   setShowDocumentTypeSelector(true);
                 }}
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                size="sm"
+                className="h-8 w-auto"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-5 w-5 mr-2" />Atrás
               </Button>
               <div>
                 <DialogTitle className="text-2xl">{documentsModalTitle}</DialogTitle>

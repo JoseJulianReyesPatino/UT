@@ -147,8 +147,8 @@ export default function EstadiasPage() {
             <div className="space-y-2">
               <Label>Plan *</Label>
               <div className="flex gap-2">
-                <Button variant={formData.plan === "nuevo-modelo" ? "default" : "outline"} onClick={() => setFormData((c)=>({...c, plan: "nuevo-modelo", carrera: ""}))}>Plan Nuevo Modelo</Button>
-                <Button variant={formData.plan === "plan-normal" ? "default" : "outline"} onClick={() => setFormData((c)=>({...c, plan: "plan-normal", carrera: ""}))}>Plan Normal</Button>
+                <Button variant={formData.plan === "nuevo-modelo" ? "success" : "outline"} onClick={() => setFormData((c)=>({...c, plan: "nuevo-modelo", carrera: ""}))}>Plan Nuevo Modelo</Button>
+                <Button variant={formData.plan === "plan-normal" ? "success" : "outline"} onClick={() => setFormData((c)=>({...c, plan: "plan-normal", carrera: ""}))}>Plan Normal</Button>
               </div>
               {cuatrimestresTexto && <p className="text-xs text-muted-foreground mt-2">{cuatrimestresTexto}</p>}
             </div>
