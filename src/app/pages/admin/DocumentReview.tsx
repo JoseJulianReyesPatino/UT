@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { carrieras } from "../../data/curricula";
+import { ArrowLeftCircle, Check, MessageSquare, Undo2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
 
@@ -28,6 +30,8 @@ type PendingDocument = {
   grupo: string;
   fecha: string;
   returned?: boolean;
+  returnedAt?: string;
+  resubmittedAt?: string;
 };
 
 type ReviewedDocument = {
@@ -39,9 +43,11 @@ type ReviewedDocument = {
   apartado: string;
   carrera: string;
   reviewedAt: string;
+  fecha?: string;
   returned?: boolean;
+  returnedAt?: string;
+  resubmittedAt?: string;
 };
-
 type DocumentItem = PendingDocument | ReviewedDocument;
 
 type PendingAction = {
@@ -88,11 +94,6 @@ const apartadoFilterOptions: ApartadoFilterOption[] = [
   { value: "Lista Concentrada", label: "Lista Concentrada" },
   { value: "Asesoría", label: "Asesoría" },
   { value: "Portafolio Digital Final", label: "Portafolio Digital Final" },
-  { value: "Acta Final", label: "Acta Final" },
-  { value: "Estadías", label: "Estadías" },
-  { value: "Carta de Presentación", label: "Carta de Presentación" },
-  { value: "Carta de Aceptación", label: "Carta de Aceptación" },
-  { value: "Carta de Terminación", label: "Carta de Terminación" },
   { value: "Acta de Asistencia Grupal", label: "Acta de Asistencia Grupal" },
 ];
 
@@ -161,6 +162,9 @@ const initialReviewedDocuments: ReviewedDocument[] = [
     documento: "Instrumento 60% - Programación Web",
     apartado: "Instrumento 60/70%",
     carrera: "Ingeniería en Sistemas",
+    fecha: "2026-05-17 08:20",
+    returnedAt: "2026-05-17 08:55",
+    resubmittedAt: "2026-05-17 09:05",
     reviewedAt: "2026-05-17 09:15",
   },
   {
@@ -221,6 +225,95 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
   const allDocuments = [...pendingDocuments, ...reviewedDocuments];
   const todayKey = new Date().toISOString().slice(0, 10);
 
+  const formatDateOnlyFromKey = (dateKey: string) => {
+    try {
+      const d = new Date(dateKey + "T00:00:00");
+      if (Number.isNaN(d.getTime())) {
+        return dateKey;
+      }
+      return d.toLocaleDateString("es-MX", { year: "numeric", month: "2-digit", day: "2-digit" });
+    } catch {
+      return dateKey;
+    }
+  };
+
+  const formatSentFecha = (fecha?: string) => {
+    if (!fecha) return "";
+    if (fecha.includes("T") || fecha.includes(" ")) {
+      try {
+        const d = new Date(fecha.includes(" ") && !fecha.includes("T") ? fecha.replace(" ", "T") : fecha);
+        if (Number.isNaN(d.getTime())) {
+          return fecha;
+        }
+        const date = d.toLocaleDateString("es-MX", { year: "numeric", month: "2-digit", day: "2-digit" });
+        const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
+        return `${date} ${time}`;
+      } catch {
+        return fecha;
+      }
+    }
+
+    try {
+      const d = new Date(fecha + "T00:00:00");
+      if (Number.isNaN(d.getTime())) {
+        return fecha;
+      }
+      return d.toLocaleDateString("es-MX", { year: "numeric", month: "2-digit", day: "2-digit" });
+    } catch {
+      return fecha;
+    }
+  };
+
+  const formatTime12 = (value?: string) => {
+    if (!value) return "";
+    try {
+      const normalized = value.includes(" ") && !value.includes("T") ? value.replace(" ", "T") : value;
+      const d = new Date(normalized);
+      if (Number.isNaN(d.getTime())) {
+        return value;
+      }
+      return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
+    } catch {
+      return value;
+    }
+  };
+
+  const formatDateTimeFromIso = (value?: string) => {
+    if (!value) return "";
+    try {
+      const normalized = value.includes(" ") && !value.includes("T") ? value.replace(" ", "T") : value;
+      const d = new Date(normalized);
+      if (Number.isNaN(d.getTime())) {
+        return value;
+      }
+      const date = d.toLocaleDateString("es-MX", { year: "numeric", month: "2-digit", day: "2-digit" });
+      const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
+      return `${date} ${time}`;
+    } catch {
+      return value;
+    }
+  };
+
+  const formatDateTimeForStorage = (date = new Date()) => {
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const sectionCardClassName =
+    "overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20";
+
+  const documentRowClassName =
+    "cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border/70 bg-transparent shadow-sm transition-colors hover:bg-emerald-50/35 hover:border-emerald-300/60 dark:bg-transparent dark:hover:bg-slate-900/55 dark:hover:border-emerald-800/50";
+
+  const actionIconButtonClassName = "h-8";
+
+  const getDocumentStatusLabel = (doc: DocumentItem) => {
+    if ("resubmittedAt" in doc && doc.resubmittedAt) return "Reenviado";
+    if (doc.returned) return "Devuelto";
+    if ("reviewedAt" in doc) return "Revisado";
+    return "Pendiente";
+  };
+
   const matchesFilters = (doc: { ciclo: string; plan: string; carrera: string; docente: string; apartado: string }) => {
     const matchesCiclo = filterCiclo === "all" || doc.ciclo === filterCiclo;
     const matchesPlan = filterPlan === "all" || doc.plan === filterPlan;
@@ -266,13 +359,8 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
       return;
     }
 
-    const reviewedAt = new Date().toLocaleString("es-MX", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const reviewedAt = formatDateTimeForStorage();
+    const resubmittedAt = documentToReview.resubmittedAt ?? (documentToReview.returned ? reviewedAt : undefined);
 
     setPendingDocuments((currentDocuments) => currentDocuments.filter((doc) => doc.id !== documentId));
     setReviewedDocuments((currentDocuments) => [
@@ -285,6 +373,9 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
         apartado: documentToReview.apartado,
         carrera: documentToReview.carrera,
         reviewedAt,
+        fecha: documentToReview.fecha,
+        returnedAt: documentToReview.returnedAt,
+        resubmittedAt,
       },
       ...currentDocuments,
     ]);
@@ -292,8 +383,10 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
   };
 
   const handleReturnDocument = (documentId: number) => {
-    setPendingDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned: true } : d)));
-    setReviewedDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned: true } : d)));
+    const returnedAt = formatDateTimeForStorage();
+
+    setPendingDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned: true, returnedAt, resubmittedAt: undefined } : d)));
+    setReviewedDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned: true, returnedAt, resubmittedAt: undefined } : d)));
     toast.success("Documento marcado como devuelto");
   };
 
@@ -350,7 +443,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
         </TabsList>
 
         <TabsContent value="all" className="space-y-4 mt-6">
-          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-emerald-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20">
+          <Card className={sectionCardClassName}>
             <CardHeader>
               <div className="flex flex-wrap items-center gap-4 pt-4">
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
@@ -399,29 +492,50 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                 {filteredAllDocuments.map((doc) => {
                   const isReviewed = "reviewedAt" in doc;
                   return (
-                    <div
-                      key={doc.id}
-                      className="cursor-pointer flex flex-col gap-2 rounded-xl border border-border/70 bg-background/80 p-4 lg:flex-row lg:items-center lg:justify-between shadow-sm hover:border-emerald-300/60 hover:bg-emerald-50/40 transition-colors dark:bg-slate-950/60 dark:hover:bg-slate-900/70"
-                    >
-                      <div>
-                        <p className="font-medium">{doc.documento}</p>
-                        <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
-                          <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
-                          <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
+                    <div key={doc.id} className={documentRowClassName}>
+                      <div className="flex items-start gap-3 flex-1">
+                        <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <FileText className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium">{doc.documento}</p>
+                          <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
+                            <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                            <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
+                          </div>
+                          {'fecha' in doc && doc.fecha && (
+                            <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-xs text-muted-foreground">{formatTime12(doc.fecha)}</span> : null}</p>
+                          )}
+                          {'returnedAt' in doc && doc.returnedAt && (
+                            <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>
+                          )}
+                          {'resubmittedAt' in doc && doc.resubmittedAt && (
+                            <p className="mt-1 text-xs text-muted-foreground">Reenviado: {formatDateTimeFromIso(doc.resubmittedAt)}</p>
+                          )}
+                          {'reviewedAt' in doc && doc.reviewedAt && (
+                            <p className="mt-1 text-xs text-muted-foreground">Revisado: {formatDateTimeFromIso(doc.reviewedAt)}</p>
+                          )}
                         </div>
                       </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
-                              <Eye className="h-4 w-4 mr-1" />Ver PDF
+                      <div className="flex items-center gap-2 pointer-events-auto">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" className={actionIconButtonClassName} onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
+                              <Eye className="h-4 w-4" />
                             </Button>
-                                  <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                              Enviar
-                            </Button>
-                            {('returned' in doc) && (doc as any).returned && <Badge variant="destructive">Devuelto</Badge>}
-                            <Badge variant={isReviewed ? "success" : "warning"}>{isReviewed ? "Revisado" : "Pendiente"}</Badge>
-                          </div>
+                          </TooltipTrigger>
+                          <TooltipContent>Ver PDF</TooltipContent>
+                        </Tooltip>
+
+                        <Button variant="ghost" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                          <MessageSquare className="h-4 w-4" />
+                          <span className="text-sm">Enviar</span>
+                        </Button>
+
+                        <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "warning"}>{getDocumentStatusLabel(doc)}</Badge>
+                      </div>
                     </div>
                   );
                 })}
@@ -431,7 +545,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
         </TabsContent>
 
         <TabsContent value="pendientes" className="space-y-4 mt-6">
-          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20">
+          <Card className={sectionCardClassName}>
             <CardHeader>
               <div className="flex flex-wrap items-center gap-4">
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
@@ -478,10 +592,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
             <CardContent>
               <div className="space-y-3">
                 {filteredPendingDocuments.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors"
-                  >
+                  <div key={doc.id} className={documentRowClassName}>
                     <div className="flex items-start gap-3 flex-1">
                       <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
                         <FileText className="h-6 w-6 text-muted-foreground" />
@@ -497,20 +608,36 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                           <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
                           <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
                         </div>
+                        {doc.fecha && (
+                          <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-xs text-muted-foreground">{formatTime12(doc.fecha)}</span> : null}</p>
+                        )}
+                        {'returnedAt' in doc && doc.returnedAt && (
+                          <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>
+                        )}
+                        {'resubmittedAt' in doc && doc.resubmittedAt && (
+                          <p className="mt-1 text-xs text-muted-foreground">Reenviado: {formatDateTimeFromIso(doc.resubmittedAt)}</p>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
-                        <Eye className="h-4 w-4 mr-1" />Ver PDF
+                    <div className="flex items-center gap-2 pointer-events-auto">
+                      <Button variant="outline" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
+                        <Eye className="h-4 w-4" />
+                        <span className="text-sm">Ver</span>
                       </Button>
-                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "review", document: doc }); }}>
-                        <Eye className="h-4 w-4 mr-1" />Revisar
+
+                      <Button variant="outline" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "review", document: doc }); }} aria-label="Revisar documento">
+                        <Check className="h-4 w-4" />
+                        <span className="text-sm">Revisar</span>
                       </Button>
-                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                        Enviar
+
+                      <Button variant="ghost" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                        <MessageSquare className="h-4 w-4" />
+                        <span className="text-sm">Enviar</span>
                       </Button>
-                      <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }}>
-                        Devolver
+
+                      <Button variant="destructive" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} aria-label="Devolver documento">
+                        <Undo2 className="h-4 w-4" />
+                        <span className="text-sm">Devolver</span>
                       </Button>
                     </div>
                   </div>
@@ -521,21 +648,67 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
         </TabsContent>
 
         <TabsContent value="revisados" className="space-y-4 mt-6">
+          <Card className={sectionCardClassName}>
+            <CardHeader>
+              <div className="flex flex-wrap items-center gap-4 pt-4">
+                <Select value={filterCiclo} onValueChange={setFilterCiclo}>
+                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filtrar por ciclo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los ciclos</SelectItem>
+                    {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterPlan} onValueChange={setFilterPlan}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por plan" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los planes</SelectItem>
+                    {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterDocente} onValueChange={setFilterDocente}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Docente" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los docentes</SelectItem>
+                    {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las carreras</SelectItem>
+                    {carrerasDisponibles.map((carrera) => (
+                      <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filterApartado} onValueChange={setFilterApartado}>
+                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por apartado" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los apartados</SelectItem>
+                    {apartadoFilterOptions.map((apartado) => (
+                      <SelectItem key={apartado.value} value={apartado.value}>{apartado.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+          </Card>
           <div className="space-y-4">
             {Object.entries(reviewedByDate).map(([date, docs]) => (
-              <Card key={date}>
+              <Card key={date} className={sectionCardClassName}>
                 <CardHeader>
-                  <CardTitle>{date}</CardTitle>
+                  <CardTitle>{formatDateOnlyFromKey(date)}</CardTitle>
                   <CardDescription>{docs.length} documentos revisados</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {docs.map((doc) => (
-                      <div
-                      key={doc.id}
-                      className="cursor-pointer flex items-start justify-between gap-4 rounded-lg border border-border p-4"
-                    >
-                          <div>
+                      <div key={doc.id} className={documentRowClassName}>
+                          <div className="flex items-start gap-3 flex-1">
+                            <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                              <FileText className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <div className="flex-1 min-w-0">
                             <p className="font-medium">{doc.documento}</p>
                             <p className="text-sm text-muted-foreground">{doc.docente}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
@@ -544,15 +717,40 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                               <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
                               <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
                             </div>
+                            {'fecha' in doc && doc.fecha && (
+                              <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-xs text-muted-foreground">{formatTime12(doc.fecha)}</span> : null}</p>
+                            )}
+                            {'returnedAt' in doc && doc.returnedAt && (
+                              <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>
+                            )}
+                            {'resubmittedAt' in doc && doc.resubmittedAt && (
+                              <p className="mt-1 text-xs text-muted-foreground">Reenviado: {formatDateTimeFromIso(doc.resubmittedAt)}</p>
+                            )}
+                            {'reviewedAt' in doc && doc.reviewedAt && (
+                              <p className="mt-1 text-xs text-muted-foreground">Revisado: {formatDateTimeFromIso(doc.reviewedAt)}</p>
+                            )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
-                              <Eye className="h-4 w-4 mr-1" />Ver PDF
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                              Enviar
-                            </Button>
-                            <Badge variant="success">Revisado</Badge>
+                        </div>
+                          <div className="flex items-center gap-2 pointer-events-auto">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" size="icon" className={actionIconButtonClassName} onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Ver PDF</TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className={actionIconButtonClassName} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                                  <MessageSquare className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Enviar</TooltipContent>
+                            </Tooltip>
+
+                            <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "success"}>{getDocumentStatusLabel(doc)}</Badge>
                           </div>
                         </div>
                     ))}
@@ -564,10 +762,51 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
         </TabsContent>
 
         <TabsContent value="hoy" className="space-y-4 mt-6">
-          <Card>
+          <Card className={sectionCardClassName}>
             <CardHeader>
               <CardTitle>Revisados hoy</CardTitle>
               <CardDescription>Documentos abiertos por administración en el día</CardDescription>
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                <Select value={filterCiclo} onValueChange={setFilterCiclo}>
+                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filtrar por ciclo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los ciclos</SelectItem>
+                    {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterPlan} onValueChange={setFilterPlan}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por plan" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los planes</SelectItem>
+                    {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterDocente} onValueChange={setFilterDocente}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Docente" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los docentes</SelectItem>
+                    {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las carreras</SelectItem>
+                    {carrerasDisponibles.map((carrera) => (
+                      <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filterApartado} onValueChange={setFilterApartado}>
+                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por apartado" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los apartados</SelectItem>
+                    {apartadoFilterOptions.map((apartado) => (
+                      <SelectItem key={apartado.value} value={apartado.value}>{apartado.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -577,28 +816,48 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                   </div>
                 ) : (
                   reviewedTodayDocuments.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="cursor-pointer flex items-start justify-between gap-4 rounded-lg border border-border p-4"
-                    >
-                      <div>
-                        <p className="font-medium">{doc.documento}</p>
-                        <p className="text-sm text-muted-foreground">{doc.docente}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <Badge variant="outline" className="text-xs">{doc.carrera}</Badge>
-                          <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
-                          <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
-                          <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
+                    <div key={doc.id} className={documentRowClassName}>
+                      <div className="flex items-start gap-3 flex-1">
+                        <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <FileText className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium">{doc.documento}</p>
+                          <p className="text-sm text-muted-foreground">{doc.docente}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge variant="outline" className="text-xs">{doc.carrera}</Badge>
+                            <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
+                            <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                            <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
+                          </div>
+                          {'fecha' in doc && doc.fecha && (
+                            <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-xs text-muted-foreground">{formatTime12(doc.fecha)}</span> : null}</p>
+                          )}
+                          {'returnedAt' in doc && doc.returnedAt && (
+                            <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>
+                          )}
+                          {'resubmittedAt' in doc && doc.resubmittedAt && (
+                            <p className="mt-1 text-xs text-muted-foreground">Reenviado: {formatDateTimeFromIso(doc.resubmittedAt)}</p>
+                          )}
+                          <p className="mt-1 text-xs text-muted-foreground">Revisado: {formatDateTimeFromIso(doc.reviewedAt)}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}>
-                          <Eye className="h-4 w-4 mr-1" />Ver PDF
+                      <div className="flex items-center gap-2 pointer-events-auto">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" className={actionIconButtonClassName} onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Ver PDF</TooltipContent>
+                        </Tooltip>
+
+                        <Button variant="ghost" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
+                          <MessageSquare className="h-4 w-4" />
+                          <span className="text-sm">Enviar</span>
                         </Button>
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                          Enviar
-                        </Button>
-                        <Badge variant="success">{doc.reviewedAt}</Badge>
+
+                        <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "success"}>{getDocumentStatusLabel(doc)}</Badge>
                       </div>
                     </div>
                   ))

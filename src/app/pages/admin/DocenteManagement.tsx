@@ -475,9 +475,11 @@ export function DocenteManagement() {
                   </Badge>
                   <Button variant="ghost" title="Editar" onClick={() => openEditDialog(docente)}>
                     <Edit className="h-4 w-4" />
+                    <span className="ml-2 text-sm">Editar</span>
                   </Button>
                   <Button variant="ghost" title="Restablecer contraseña" onClick={() => openResetDialog(docente)}>
                     <Key className="h-4 w-4" />
+                    <span className="ml-2 text-sm">Restablecer</span>
                   </Button>
                   <Button variant="ghost" title="Cambiar estado" onClick={() => openStatusDialog(docente)}>
                     {docente.status === "activo" ? (
@@ -485,6 +487,7 @@ export function DocenteManagement() {
                     ) : (
                       <UserCheck className="h-4 w-4" />
                     )}
+                    <span className="ml-2 text-sm">{docente.status === "activo" ? "Dar baja" : "Dar alta"}</span>
                   </Button>
                 </div>
               </div>

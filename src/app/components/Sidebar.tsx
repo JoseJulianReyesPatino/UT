@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { cn } from "../../lib/utils";
 import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   FileText,
@@ -36,6 +37,8 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   // Sidebar starts expanded for both admin and docente.
   const [collapsed, setCollapsed] = useState(false);
   const logoSrc = theme === "dark" ? "/src/assets/Logotipo UTSLRC-BLANCO.png" : "/src/assets/Logotipo  UTSLRC.png";
+  const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
+  const [isAvatarOpen, setIsAvatarOpen] = useState(false);
 
   const docenteMenuItems = [
     { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
@@ -65,14 +68,18 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     { id: "configuracion", label: "Configuración", icon: Settings },
   ];
 
-  const menuItems = user?.role === "docente" ? docenteMenuItems : adminMenuItems;
+  const menuItems = user?.role === "administrador"
+    ? adminMenuItems
+    : canAccessTutorias
+    ? docenteMenuItems
+    : docenteMenuItems.filter((item) => item.id !== "tutorias");
 
   const isMenuItemActive = (itemId: string) => {
     if (itemId === "documentos") {
       return ["documentos", "documentos-revisados", "documentos-revisados-hoy"].includes(currentView);
     }
     if (itemId === "tutorias") {
-      return [
+      return canAccessTutorias && [
         "tutorias",
         "tutorias-carga-academica",
         "tutorias-reporte-bajas",
@@ -165,7 +172,19 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 to-cyan-50 shadow-sm transition-colors hover:bg-emerald-100/70 dark:border-slate-700 dark:from-slate-900 dark:to-slate-950 dark:hover:bg-slate-800 text-left"
             >
             <Avatar className="h-8 w-8 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
-                {user?.avatar && <AvatarImage src={user.avatar} alt={user.name} />}
+                {user?.avatar && (
+                  <AvatarImage
+                    src={user.avatar}
+                    alt={user.name}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsAvatarOpen(true);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer"
+                  />
+                )}
               <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                 {user?.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
               </AvatarFallback>
@@ -211,6 +230,24 @@ export function Sidebar(props: Readonly<SidebarProps>) {
           {renderContent(true)}
         </div>
       </div>
+      <Dialog open={isAvatarOpen} onOpenChange={setIsAvatarOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Foto de perfil</DialogTitle>
+            <DialogDescription>Vista previa de tu imagen de perfil</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-center">
+            {user?.avatar ? (
+              // eslint-disable-next-line jsx-a11y/img-redundant-alt
+              <img src={user.avatar} alt={`Foto de perfil de ${user?.name}`} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
+            ) : (
+              <div className="h-40 w-40 rounded-lg bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-2xl">
+                {user?.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

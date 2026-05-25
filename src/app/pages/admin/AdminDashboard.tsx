@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -185,13 +185,11 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     [pendingDocuments, reviewedDocuments]
   );
 
-  const handleReviewDocument = (documentId: number) => {
+  const handleReviewDocument = useCallback((documentId: number) => {
     const doc = pendingDocuments.find((item) => item.id === documentId);
     if (!doc) return;
 
-    setPendingDocuments((current) =>
-      current.map((item) => (item.id === documentId ? { ...item, revisado: true } : item))
-    );
+    setPendingDocuments((current) => current.map((item) => (item.id === documentId ? { ...item, revisado: true } : item)));
 
     setReviewedDocuments((current) => [
       {
@@ -201,7 +199,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         carrera: doc.carrera,
         tipo: doc.tipo,
         fecha: doc.fecha,
-        reviewedAt: "2026-05-17 11:20",
+        reviewedAt: new Date().toISOString(),
       },
       ...current,
     ]);
@@ -217,15 +215,117 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
       },
       ...current,
     ]);
-  };
+  }, [pendingDocuments]);
 
-  const openDocument = (doc: { id: number; docente: string; documento: string; carrera: string; tipo: string; fecha: string }) => {
+  const openDocument = useCallback((doc: { id: number; docente: string; documento: string; carrera: string; tipo: string; fecha: string }) => {
     setSelectedDocument(doc);
-  };
+  }, []);
 
-  const openActivity = (activity: { id: number; type: string; title: string; description: string; time: string; related: string }) => {
+  const openActivity = useCallback((activity: { id: number; type: string; title: string; description: string; time: string; related: string }) => {
     setSelectedActivity(activity);
-  };
+  }, []);
+
+  /* Small memoized presentational components to reduce re-renders */
+  const StatsGrid = React.memo(function StatsGrid({ stats, onNavigate }: { stats: any[]; onNavigate: (view: AdminView) => void }) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <button
+              key={stat.title}
+              type="button"
+              onClick={() => onNavigate(stat.action)}
+              className="text-left rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Card className={`h-full overflow-hidden border shadow-sm hover:shadow-md transition cursor-pointer ${stat.cardClass}`}>
+                <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-semibold text-foreground">{stat.title}</CardTitle>
+                  <div className={`h-10 w-10 rounded-xl ${stat.bgColor} flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5`}>
+                    <Icon className={`h-4 w-4 ${stat.color}`} aria-hidden />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-foreground">{stat.value}</div>
+                  <p className="text-xs text-foreground/70">{stat.description}</p>
+                  <p className={`text-xs mt-1 font-medium ${stat.color}`}>{stat.trend}</p>
+                </CardContent>
+              </Card>
+            </button>
+          );
+        })}
+      </div>
+    );
+  });
+
+  const PendingList = React.memo(function PendingList({ items, onOpen }: { items: typeof pendingDocuments; onOpen: (doc: any) => void }) {
+    return (
+      <div className="space-y-4">
+        {items.filter((doc) => !doc.revisado).map((doc) => (
+          <div
+            key={doc.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => onOpen(doc)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpen(doc);
+              }
+            }}
+            className="flex items-center justify-between p-3 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors cursor-pointer dark:bg-slate-950/60"
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center dark:bg-emerald-950/50 dark:text-emerald-300">
+                <FileText className="h-5 w-5 text-muted-foreground" aria-hidden />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm truncate text-foreground">{doc.documento}</p>
+                <p className="text-xs text-muted-foreground">{doc.docente}</p>
+                <Badge variant="outline" className="mt-2 text-[11px]">
+                  {doc.carrera}
+                </Badge>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="ghost" tabIndex={-1} className="pointer-events-none">
+                Abrir
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  });
+
+  const ActivityList = React.memo(function ActivityList({ items, onOpen }: { items: typeof recentActivity; onOpen: (a: any) => void }) {
+    return (
+      <div className="space-y-4">
+        {items.map((activity) => (
+          <button
+            key={activity.id}
+            type="button"
+            onClick={() => onOpen(activity)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpen(activity);
+              }
+            }}
+            className="w-full text-left flex items-start gap-3 rounded-xl p-3 border border-transparent hover:border-border/70 hover:bg-accent/60 transition-colors cursor-pointer dark:hover:bg-slate-900/50"
+          >
+            <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 mt-2 shadow-[0_0_0_4px_rgba(16,185,129,0.12)] dark:shadow-[0_0_0_4px_rgba(16,185,129,0.06)]" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">{activity.title}</p>
+              <p className="text-xs text-muted-foreground">{activity.description}</p>
+            </div>
+            <p className="text-xs text-muted-foreground whitespace-nowrap">{activity.time}</p>
+          </button>
+        ))}
+      </div>
+    );
+  });
 
   const openRelatedDocument = () => {
     if (!selectedActivity) return;
@@ -267,34 +367,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <button
-              key={stat.title}
-              type="button"
-              onClick={() => onNavigate(stat.action)}
-              className="text-left rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <Card className={`h-full overflow-hidden border shadow-sm hover:shadow-lg transition-all cursor-pointer ${stat.cardClass}`}>
-                <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-semibold text-foreground">{stat.title}</CardTitle>
-                  <div className={`h-10 w-10 rounded-xl ${stat.bgColor} flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5`}>
-                    <Icon className={`h-4 w-4 ${stat.color}`} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{stat.value}</div>
-                  <p className="text-xs text-foreground/70">{stat.description}</p>
-                  <p className={`text-xs mt-1 font-medium ${stat.color}`}>{stat.trend}</p>
-                </CardContent>
-              </Card>
-            </button>
-          );
-        })}
-      </div>
+      <StatsGrid stats={stats} onNavigate={onNavigate} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-emerald-100/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/20 dark:to-emerald-950/20">
@@ -306,41 +379,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
             <CardDescription>Requieren tu aprobación</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {pendingDocuments.filter((doc) => !doc.revisado).map((doc) => (
-                <div
-                  key={doc.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openDocument(doc)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openDocument(doc);
-                    }
-                  }}
-                  className="flex items-center justify-between p-3 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors cursor-pointer dark:bg-slate-950/60"
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center dark:bg-emerald-950/50 dark:text-emerald-300">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate text-foreground">{doc.documento}</p>
-                      <p className="text-xs text-muted-foreground">{doc.docente}</p>
-                      <Badge variant="outline" className="mt-2 text-[11px]">
-                        {doc.carrera}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant="ghost" tabIndex={-1} className="pointer-events-none">
-                      Abrir
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <PendingList items={pendingDocuments} onOpen={openDocument} />
           </CardContent>
         </Card>
 
@@ -350,31 +389,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
             <CardDescription>Últimas acciones en el sistema</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentActivity.map((activity) => (
-                <button
-                  key={activity.id}
-                  type="button"
-                  onClick={() => openActivity(activity)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openActivity(activity);
-                    }
-                  }}
-                  className="w-full text-left flex items-start gap-3 rounded-xl p-3 border border-transparent hover:border-border/70 hover:bg-accent/60 transition-colors cursor-pointer dark:hover:bg-slate-900/50"
-                >
-                  <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 mt-2 shadow-[0_0_0_4px_rgba(16,185,129,0.15)] dark:shadow-[0_0_0_4px_rgba(16,185,129,0.08)]" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground">{activity.title}</p>
-                    <p className="text-xs text-muted-foreground">{activity.description}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground whitespace-nowrap">
-                    {activity.time}
-                  </p>
-                </button>
-              ))}
-            </div>
+            <ActivityList items={recentActivity} onOpen={openActivity} />
           </CardContent>
         </Card>
       </div>

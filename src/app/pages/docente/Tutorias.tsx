@@ -245,23 +245,6 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
                 </label>
               </div>
 
-              <div className="flex justify-end pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (onNavigateHome) {
-                      onNavigateHome();
-                      return;
-                    }
-                    setSelectedType(null);
-                  }}
-                  className="sm:self-start"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  {onNavigateHome ? "Volver a Tutorías" : "Cambiar tipo"}
-                </Button>
-              </div>
-
               {formData.archivos.length > 0 && (
                 <div className="space-y-2">
                   {formData.archivos.map((archivo, index) => (

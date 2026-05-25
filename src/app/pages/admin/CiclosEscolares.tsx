@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Calendar, Check, ChevronLeft, FileText, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "../../components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 
 type CycleStatus = "activo" | "cerrado";
 
@@ -228,6 +229,22 @@ export function CiclosEscolares() {
     [documents, tutorDocuments]
   );
 
+  const getActiveCycle = () => ciclos.find((cycle) => cycle.status === "activo");
+
+  const setSingleActiveCycle = (targetCycleId: number, nextStatus: CycleStatus) => {
+    setCiclos((current) => current.map((cycle) => {
+      if (cycle.id === targetCycleId) {
+        return { ...cycle, status: nextStatus };
+      }
+
+      if (nextStatus === "activo") {
+        return { ...cycle, status: "cerrado" };
+      }
+
+      return cycle;
+    }));
+  };
+
   const openDocsForCycle = (ciclo: AcademicCycle) => {
     setSelectedCycle(ciclo);
     setSelectedDocumentType(null);
@@ -281,7 +298,13 @@ export function CiclosEscolares() {
       status: newCycleForm.status,
     };
 
-    setCiclos((current) => [newCycle, ...current]);
+    setCiclos((current) => {
+      const nextCycles = newCycle.status === "activo"
+        ? current.map((cycle) => ({ ...cycle, status: "cerrado" as CycleStatus }))
+        : current;
+
+      return [newCycle, ...nextCycles];
+    });
     toast.success("Ciclo escolar creado correctamente");
     setNewCycleForm({ nombre: "", anio: "2026", periodo: "", fechaInicio: "", fechaFin: "", status: "activo" });
     setShowNewDialog(false);
@@ -303,6 +326,15 @@ export function CiclosEscolares() {
 
     const previousName = selectedCycle.nombre;
     const updatedName = editCycleForm.nombre.trim();
+    const requestedStatus: CycleStatus = editCycleForm.status;
+
+    if (requestedStatus === "activo") {
+      const activeCycle = getActiveCycle();
+      if (activeCycle && activeCycle.id !== selectedCycle.id) {
+        toast.error(`Solo puede haber un ciclo activo. Primero cierra ${activeCycle.nombre}.`);
+        return;
+      }
+    }
 
     setCiclos((current) =>
       current.map((cycle) =>
@@ -314,7 +346,7 @@ export function CiclosEscolares() {
               periodo: editCycleForm.periodo.trim(),
               fechaInicio: editCycleForm.fechaInicio,
               fechaFin: editCycleForm.fechaFin,
-              status: editCycleForm.status,
+              status: requestedStatus,
             }
           : cycle
       )
@@ -346,10 +378,10 @@ export function CiclosEscolares() {
 
     const ciclo = confirmDialog.ciclo;
     if (confirmDialog.type === "close") {
-      setCiclos((current) => current.map((cycle) => (cycle.id === ciclo.id ? { ...cycle, status: "cerrado" } : cycle)));
+      setSingleActiveCycle(ciclo.id, "cerrado");
       toast.success(`Ciclo ${ciclo.nombre} cerrado correctamente`);
     } else {
-      setCiclos((current) => current.map((cycle) => (cycle.id === ciclo.id ? { ...cycle, status: "activo" } : cycle)));
+      setSingleActiveCycle(ciclo.id, "activo");
       toast.success(`Ciclo ${ciclo.nombre} activado correctamente`);
     }
     setConfirmDialog({ open: false });
@@ -509,27 +541,48 @@ export function CiclosEscolares() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 justify-end">
-                    <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openDocsForCycle(ciclo); }}>
-                      Ver Documentos
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openEditDialog(ciclo); }}>
-                      <Pencil className="h-4 w-4 mr-1" />
-                      Editar
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openDeleteDialog(ciclo); }}>
-                      <Lock className="h-4 w-4 mr-1" />
-                      Eliminar
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openDocsForCycle(ciclo); }} aria-label="Ver documentos">
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Ver documentos</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openEditDialog(ciclo); }} aria-label="Editar ciclo">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Editar</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openDeleteDialog(ciclo); }} aria-label="Eliminar ciclo">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Eliminar</TooltipContent>
+                    </Tooltip>
                     {ciclo.status === "activo" ? (
-                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); confirmAction("close", ciclo); }}>
-                        <X className="h-4 w-4 mr-1" />
-                        Cerrar Ciclo
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="outline" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); confirmAction("close", ciclo); }} aria-label="Cerrar ciclo">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Cerrar ciclo</TooltipContent>
+                      </Tooltip>
                     ) : (
-                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); confirmAction("activate", ciclo); }}>
-                        <Check className="h-4 w-4 mr-1" />
-                        Activar
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="outline" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); confirmAction("activate", ciclo); }} aria-label="Activar ciclo">
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Activar</TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
                 </div>

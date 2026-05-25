@@ -9,14 +9,13 @@ import { Upload, FileText, Menu, X } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
-import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
+import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuatrimestre } from "../../data/curricula";
 
 interface PlaneacionFormData {
   plan: Plan | "";
   carrera: string;
   cuatrimestre: Cuatrimestre | "";
   materia: string;
-  parcial: string;
   grupo: string;
   archivos: File[];
   docente: string;
@@ -29,7 +28,6 @@ const initialFormData: PlaneacionFormData = {
   carrera: "",
   cuatrimestre: "",
   materia: "",
-  parcial: "",
   grupo: "",
   archivos: [],
   docente: "",
@@ -85,7 +83,6 @@ export default function PlaneacionPage() {
       formData.carrera &&
       formData.cuatrimestre &&
       formData.materia &&
-      formData.parcial &&
       validarGrupo &&
       formData.archivos.length > 0 &&
       formData.docente.trim() &&
@@ -193,8 +190,8 @@ export default function PlaneacionPage() {
         </Sheet>
       </div>
 
-      <div className="flex items-center justify-between p-3 bg-emerald-50 dark:bg-emerald-900/10 border-l-4 border-emerald-400 dark:border-emerald-600 rounded-md">
-        <p className="text-sm text-emerald-800 dark:text-emerald-200">Recordatorio: Se sube dentro de las primeras 2 semanas de iniciado el cuatrimestre.</p>
+      <div className="flex items-center justify-between p-3 bg-emerald-50 dark:bg-emerald-900/10 border-l-4 border-emerald-300 dark:border-emerald-300 rounded-md">
+        <p className="text-sm font-medium text-black dark:text-white">Recordatorio: Se sube dentro de las primeras 2 semanas de iniciado el cuatrimestre.</p>
         <Button variant="outline" size="sm" onClick={() => window.open(calendarioUrl, "_blank")}>Calendario</Button>
       </div>
 
@@ -290,28 +287,8 @@ export default function PlaneacionPage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            {/* Parcial */}
-            <div className="space-y-2">
-              <Label>Parcial *</Label>
-              <Select
-                value={formData.parcial}
-                onValueChange={(value) => setFormData((current) => ({ ...current, parcial: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona el parcial" />
-                </SelectTrigger>
-                <SelectContent>
-                  {parciales.map((parcial) => (
-                    <SelectItem key={parcial} value={parcial}>
-                      {parcial}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Grupo */}
-            <div className="space-y-2">
+            <div className="space-y-2 sm:col-span-1">
               <Label>Grupo *</Label>
               <Input
                 value={formData.grupo}

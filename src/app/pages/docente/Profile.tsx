@@ -4,6 +4,7 @@ import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import { Badge } from "../../components/ui/badge";
 import { useAuth } from "../../context/AuthContext";
 import { Calendar, Key, Upload } from "lucide-react";
@@ -15,6 +16,7 @@ export function Profile() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [avatarPreview, setAvatarPreview] = useState<string | undefined>(undefined);
+  const [isAvatarOpen, setIsAvatarOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -83,6 +85,13 @@ export function Profile() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const roleLabel = user?.roles?.length && user.roles.length > 1
+    ? user.roles.map((role) => (role === "administrador" ? "Administrador" : role === "tutor" ? "Tutor" : "Docente")).join(" y ")
+    : user?.role === "administrador"
+    ? "Administrador"
+    : user?.role === "tutor"
+    ? "Tutor"
+    : "Docente";
 
   return (
     <div className="space-y-6">
@@ -104,10 +113,21 @@ export function Profile() {
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={avatarPreview} alt={user?.name ?? "Foto de perfil"} />
-                <AvatarFallback className="bg-success/10 text-success text-xl">
-                  {avatarInitials || "--"}
-                </AvatarFallback>
+                {avatarPreview ? (
+                  <AvatarImage
+                    src={avatarPreview}
+                    alt={user?.name ?? "Foto de perfil"}
+                    onClick={() => setIsAvatarOpen(true)}
+                    className="cursor-pointer"
+                  />
+                ) : (
+                  <AvatarFallback
+                    className="bg-success/10 text-success text-xl cursor-pointer"
+                    onClick={() => setIsAvatarOpen(true)}
+                  >
+                    {avatarInitials || "--"}
+                  </AvatarFallback>
+                )}
               </Avatar>
               <div>
                 <Button
@@ -154,12 +174,12 @@ export function Profile() {
               <Label>Rol</Label>
               <div className="flex items-center gap-2">
                 <Input 
-                  value={user?.role === "docente" ? "Docente" : "Administrador"} 
+                  value={roleLabel} 
                   disabled 
                   className="flex-1"
                 />
                 <Badge variant="outline">
-                  {user?.role === "docente" ? "Docente" : "Administrador"}
+                  {roleLabel}
                 </Badge>
               </div>
             </div>
@@ -172,6 +192,25 @@ export function Profile() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Avatar preview dialog */}
+        <Dialog open={isAvatarOpen} onOpenChange={setIsAvatarOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Foto de perfil</DialogTitle>
+              <DialogDescription>Vista previa de tu imagen de perfil</DialogDescription>
+            </DialogHeader>
+            <div className="mt-4 flex justify-center">
+              {avatarPreview ? (
+                <img src={avatarPreview} alt={`Foto de perfil de ${user?.name}`} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
+              ) : (
+                <div className="h-40 w-40 rounded-lg bg-success/10 flex items-center justify-center text-2xl">
+                  {avatarInitials || "--"}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="space-y-6">
           <Card>
@@ -205,7 +244,7 @@ export function Profile() {
         </div>
       </div>
 
-      {user?.role === "docente" && (
+      {user?.role !== "administrador" && (
         <Card>
           <CardHeader>
             <CardTitle>Estadísticas</CardTitle>

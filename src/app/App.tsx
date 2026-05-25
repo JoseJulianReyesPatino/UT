@@ -24,6 +24,7 @@ import ActaFinalPage from "./pages/docente/ActaFinal";
 import EstadiasPage from "./pages/docente/Estadias";
 import TutoriasPage from "./pages/docente/Tutorias";
 import { Sidebar } from "./components/Sidebar";
+import { FormAccessGuard } from "./components/FormAccessGuard";
 
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
@@ -37,6 +38,7 @@ function AppContent() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [deferredMessageOpen, setDeferredMessageOpen] = useState<null | { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string } }>(null);
+  const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -69,38 +71,48 @@ function AppContent() {
   }
 
   const renderContent = () => {
-    if (user?.role === "docente") {
+    if (user?.role !== "administrador") {
+      const wrapForm = (formId: Parameters<typeof FormAccessGuard>[0]["formId"], title: string, element: React.ReactNode) => (
+        <FormAccessGuard formId={formId} title={title}>
+          {element}
+        </FormAccessGuard>
+      );
+
+      if (!canAccessTutorias && currentView.startsWith("tutorias")) {
+        return <DocenteDashboard />;
+      }
+
       switch (currentView) {
         case "dashboard":
-          return <DocenteDashboard />;
+          return <DocenteDashboard onNavigate={setCurrentView} />;
         case "planeacion":
-          return <PlaneacionPage />;
+          return wrapForm("planeacion", "Planeación", <PlaneacionPage />);
         case "instrumento-30":
-          return <Instrumento3040Page />;
+          return wrapForm("instrumento-3040", "Instrumento 30/40%", <Instrumento3040Page />);
         case "instrumento-60":
-          return <Instrumento6070Page />;
+          return wrapForm("instrumento-6070", "Instrumento 60/70%", <Instrumento6070Page />);
         case "lista-concentrada":
-          return <ListaConcentradaPage />;
+          return wrapForm("lista-concentrada", "Lista Concentrada", <ListaConcentradaPage />);
         case "asesoria":
-          return <AsesoriaPage />;
+          return wrapForm("asesoria", "Asesoría", <AsesoriaPage />);
         case "portafolio":
-          return <PortafolioDigitalPage />;
+          return wrapForm("portafolio-digital", "Portafolio Digital", <PortafolioDigitalPage />);
         case "acta-final":
-          return <ActaFinalPage />;
+          return wrapForm("acta-final", "Acta Final", <ActaFinalPage />);
         case "estadias":
-          return <EstadiasPage />;
+          return wrapForm("estadias", "Estadías", <EstadiasPage />);
         case "tutorias":
-          return <TutoriasPage />;
+          return wrapForm("tutorias", "Tutorías", <TutoriasPage />);
         case "tutorias-carga-academica":
-          return <TutoriasPage initialType="carga-academica" onNavigateHome={() => setCurrentView("tutorias")} />;
+          return wrapForm("carga-academica", "Carga Académica", <TutoriasPage initialType="carga-academica" onNavigateHome={() => setCurrentView("tutorias")} />);
         case "tutorias-reporte-bajas":
-          return <TutoriasPage initialType="reporte-bajas" onNavigateHome={() => setCurrentView("tutorias")} />;
+          return wrapForm("reporte-bajas", "Reporte de Bajas", <TutoriasPage initialType="reporte-bajas" onNavigateHome={() => setCurrentView("tutorias")} />);
         case "tutorias-concentrado-asesorias":
-          return <TutoriasPage initialType="concentrado-asesorias" onNavigateHome={() => setCurrentView("tutorias")} />;
+          return wrapForm("concentrado-asesorias", "Concentrado de Asesorías", <TutoriasPage initialType="concentrado-asesorias" onNavigateHome={() => setCurrentView("tutorias")} />);
         case "tutorias-acta-asistencia-grupal":
-          return <TutoriasPage initialType="acta-asistencia-grupal" onNavigateHome={() => setCurrentView("tutorias")} />;
+          return wrapForm("acta-asistencia-grupal", "Acta de Asistencia Grupal", <TutoriasPage initialType="acta-asistencia-grupal" onNavigateHome={() => setCurrentView("tutorias")} />);
         case "tutorias-ficha-tecnica":
-          return <TutoriasPage initialType="ficha-tecnica" onNavigateHome={() => setCurrentView("tutorias")} />;
+          return wrapForm("ficha-tecnica", "Ficha Técnica", <TutoriasPage initialType="ficha-tecnica" onNavigateHome={() => setCurrentView("tutorias")} />);
         case "historial":
           return <DocumentHistory />;
         case "mensajes":
@@ -108,7 +120,7 @@ function AppContent() {
         case "perfil":
           return <Profile />;
         default:
-          return <DocenteDashboard />;
+          return <DocenteDashboard onNavigate={setCurrentView} />;
       }
     } else {
       switch (currentView) {

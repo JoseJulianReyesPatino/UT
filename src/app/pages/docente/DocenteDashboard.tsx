@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { StatsCard } from "../../components/StatsCard";
 import { 
   FileText, 
   Clock, 
@@ -11,7 +12,12 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-export function DocenteDashboard() {
+interface DocenteDashboardProps {
+  onNavigate?: (view: string) => void;
+}
+
+export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
+  const { onNavigate } = props;
   const manualDocenteUrl = new URL("../../../assets/Manual de Usuario del Docente.pdf", import.meta.url).href;
   const [isIntroOpen, setIsIntroOpen] = useState(true);
 
@@ -22,8 +28,11 @@ export function DocenteDashboard() {
       description: "Por entregar esta semana",
       icon: Clock,
       trend: "+2 desde ayer",
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-50",
+      color: "text-emerald-700 dark:text-emerald-300",
+      bgColor: "bg-emerald-100/80 dark:bg-emerald-950/40",
+      cardClass: "bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70 border-emerald-200/70 dark:from-emerald-950/25 dark:via-slate-950 dark:to-emerald-950/35 dark:border-emerald-800/60",
+      accentClass: "from-emerald-400/40 via-emerald-300/20 to-transparent",
+      action: "historial",
     },
     {
       title: "Documentos Aprobados",
@@ -31,8 +40,11 @@ export function DocenteDashboard() {
       description: "Este cuatrimestre",
       icon: CheckCircle2,
       trend: "+3 este mes",
-      color: "text-success",
-      bgColor: "bg-success/10",
+      color: "text-emerald-700 dark:text-emerald-300",
+      bgColor: "bg-emerald-100/80 dark:bg-emerald-950/40",
+      cardClass: "bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70 border-emerald-200/70 dark:from-emerald-950/25 dark:via-slate-950 dark:to-emerald-950/35 dark:border-emerald-800/60",
+      accentClass: "from-emerald-400/40 via-emerald-300/20 to-transparent",
+      action: "historial",
     },
     {
       title: "En Revisión",
@@ -40,17 +52,11 @@ export function DocenteDashboard() {
       description: "Esperando aprobación",
       icon: AlertCircle,
       trend: "Últimas 24h",
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-50",
-    },
-    {
-      title: "Total Materias",
-      value: "5",
-      description: "Cuatrimestre actual",
-      icon: FileText,
-      trend: "3 grupos",
-      color: "text-foreground",
-      bgColor: "bg-muted",
+      color: "text-slate-700 dark:text-slate-200",
+      bgColor: "bg-slate-100/80 dark:bg-slate-800/80",
+      cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70",
+      accentClass: "from-slate-400/35 via-slate-300/20 to-transparent",
+      action: "historial",
     },
   ];
 
@@ -150,30 +156,41 @@ export function DocenteDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
+          const handleClick = () => {
+            if (onNavigate && stat.action) onNavigate(stat.action);
+          };
+
           return (
-            <Card key={stat.title} className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                <div className={`h-8 w-8 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
-                  <Icon className={`h-4 w-4 ${stat.color}`} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground">{stat.description}</p>
-                <p className="text-xs text-success mt-1">{stat.trend}</p>
-              </CardContent>
-            </Card>
+            <button
+              key={stat.title}
+              type="button"
+              onClick={handleClick}
+              className="text-left rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <StatsCard
+                title={stat.title}
+                value={stat.value}
+                description={stat.description}
+                icon={Icon}
+                trend={stat.trend}
+                color={stat.color}
+                bgColor={stat.bgColor}
+                cardClass={stat.cardClass}
+                accentClass={stat.accentClass}
+              />
+            </button>
           );
         })}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-emerald-100/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/20 dark:to-emerald-950/20">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Documentos Recientes</CardTitle>
-              <Button variant="ghost" size="sm">Ver todos</Button>
+              <CardTitle className="text-foreground">Documentos Recientes</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => onNavigate?.("historial")}>
+                Ver todos
+              </Button>
             </div>
             <CardDescription>Últimos documentos enviados</CardDescription>
           </CardHeader>
@@ -194,14 +211,14 @@ export function DocenteDashboard() {
                 return (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
+                    className="flex items-center justify-between p-3 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors dark:bg-slate-950/60"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                      <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center dark:bg-emerald-950/50 dark:text-emerald-300">
                         <FileText className="h-5 w-5 text-muted-foreground" />
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{doc.name}</p>
+                        <p className="font-medium text-sm text-foreground">{doc.name}</p>
                         <p className="text-xs text-muted-foreground">{doc.materia}</p>
                       </div>
                     </div>
@@ -215,10 +232,10 @@ export function DocenteDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="overflow-hidden border-slate-200/70 bg-gradient-to-br from-white via-slate-50/50 to-emerald-100/35 shadow-sm dark:border-slate-900/50 dark:from-slate-950 dark:via-slate-950/20 dark:to-emerald-950/20">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Próximas Entregas</CardTitle>
+              <CardTitle className="text-foreground">Próximas Entregas</CardTitle>
               <Calendar className="h-5 w-5 text-muted-foreground" />
             </div>
             <CardDescription>Fechas límite importantes</CardDescription>
@@ -228,14 +245,14 @@ export function DocenteDashboard() {
               {proximasEntregas.map((entrega) => (
                 <div
                   key={entrega.titulo}
-                  className="flex items-center justify-between p-3 rounded-lg border border-border"
+                  className="flex items-center justify-between p-3 rounded-xl border border-border/70 bg-background/80 dark:bg-slate-950/60"
                 >
                   <div>
-                    <p className="font-medium text-sm">{entrega.titulo}</p>
+                    <p className="font-medium text-sm text-foreground">{entrega.titulo}</p>
                     <p className="text-xs text-muted-foreground">{entrega.fecha}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-success">{entrega.dias} días</p>
+                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">{entrega.dias} días</p>
                     <p className="text-xs text-muted-foreground">restantes</p>
                   </div>
                 </div>

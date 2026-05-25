@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, ReactNode, useMemo } from "react";
 
-type UserRole = "docente" | "administrador";
+type UserRole = "docente" | "tutor" | "administrador";
 
 interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
+  roles?: UserRole[];
   avatar?: string;
   phone?: string;
   area?: string;
@@ -45,24 +46,51 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
 
   const login = async (email: string, password: string) => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    
-    const mockUser: User = email.includes("admin")
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const mockUser: User = normalizedEmail === "docente1@universidad.edu" || normalizedEmail === "docente@universidad.edu"
+      ? {
+          id: "3",
+          name: "Mtro. Docente 1",
+          email: email,
+          role: "docente",
+          roles: ["docente"],
+        }
+      : normalizedEmail === "docente2@universidad.edu" || normalizedEmail === "tutor.docente@universidad.edu"
+      ? {
+          id: "3",
+          name: "Dra. Docente 2",
+          email: email,
+          role: "docente",
+          roles: ["docente", "tutor"],
+        }
+      : normalizedEmail.includes("admin")
       ? {
           id: "1",
           name: "Esmeralda Torres",
           email: email,
           role: "administrador",
+          roles: ["administrador"],
         }
-      : {
+      : normalizedEmail.includes("tutor")
+      ? {
           id: "2",
           name: "Mtro. Juan Pérez",
           email: email,
+          role: "tutor",
+          roles: ["tutor"],
+        }
+      : {
+          id: "3",
+          name: "Mtro. Juan Pérez",
+          email: email,
           role: "docente",
+          roles: ["docente"],
         };
     
     const storedProfiles = getStoredProfiles();
     const savedProfile = storedProfiles[email] ?? {};
-    setUser({ ...mockUser, ...savedProfile, email });
+    setUser({ ...mockUser, ...savedProfile, email, roles: savedProfile.roles ?? mockUser.roles });
   };
 
   const logout = () => {

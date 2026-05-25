@@ -258,59 +258,44 @@ function MessageBubble({
   onReply,
 }: Readonly<{ message: ChatMessage; onReply: (message: ChatMessage) => void }>) {
   return (
-    <div className={cn("flex", message.isOwn ? "justify-end" : "justify-start")}> 
+    <div className={cn("flex items-end", message.isOwn ? "justify-end" : "justify-start")}> 
+      {!message.isOwn && (
+        <div className="mr-2 mt-0.5 shrink-0">
+          <Avatar className="h-8 w-8 ring-1 ring-white/80 dark:ring-slate-900/50">
+            <AvatarFallback className="bg-success/10 text-success">{message.sender.split(" ").map(n=>n[0]).slice(0,2).join("")}</AvatarFallback>
+          </Avatar>
+        </div>
+      )}
+
       <div
         className={cn(
-          "max-w-[76%] rounded-[1.4rem] border px-4 py-3 shadow-sm",
+          "max-w-[78%] rounded-2xl px-4 py-3 shadow-sm relative",
           message.isOwn
-            ? "border-emerald-500/30 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-emerald-500/15"
-            : "border-border/80 bg-white/95 shadow-[0_6px_20px_rgba(15,23,42,0.06)] dark:bg-slate-950/80"
+            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white"
+            : "bg-white/95 border border-border/70 text-foreground dark:bg-slate-950/80"
         )}
+        title={message.timestamp}
       >
-        {message.replyTo && (
-          <div
-            className={cn(
-              "mb-2 rounded-xl border-l-4 px-3 py-2 text-xs",
-              message.isOwn
-                ? "border-white/70 bg-white/15 text-white/90"
-                : "border-emerald-500/60 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
-            )}
-          >
-            <p className="font-semibold">{message.replyTo.sender}</p>
-            <p className="truncate">{message.replyTo.content}</p>
-          </div>
-        )}
-        <p className={cn("text-xs font-medium", message.isOwn ? "text-white/80" : "text-muted-foreground")}>{message.sender}</p>
-        <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+        <div className="text-xs font-medium mb-1 text-foreground/70">{!message.isOwn && message.sender}</div>
+        <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
+
         {message.attachments && message.attachments.length > 0 && (
           <div className="mt-3 space-y-2">
             {message.attachments.map((attachment) => (
-              <div
-                key={`${message.id}-${attachment.name}`}
-                className={cn(
-                  "flex items-center gap-3 rounded-2xl border p-3 text-sm",
-                  message.isOwn ? "border-white/20 bg-white/10" : "border-border/70 bg-muted/40"
-                )}
-              >
-                <Paperclip className={cn("h-4 w-4", message.isOwn ? "text-white" : "text-muted-foreground")} />
+              <div key={`${message.id}-${attachment.name}`} className="flex items-center gap-3 rounded-lg border p-2 text-sm bg-muted/40">
+                <Paperclip className="h-4 w-4 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <p className={cn("truncate font-medium", message.isOwn ? "text-white" : "text-foreground")}>{attachment.name}</p>
-                  <p className={cn("text-xs", message.isOwn ? "text-white/80" : "text-muted-foreground")}>{attachment.typeLabel} • {attachment.sizeLabel}</p>
+                  <p className="truncate font-medium">{attachment.name}</p>
+                  <p className="text-xs text-muted-foreground">{attachment.typeLabel} • {attachment.sizeLabel}</p>
                 </div>
               </div>
             ))}
           </div>
         )}
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <p className={cn("text-xs", message.isOwn ? "text-white/75" : "text-muted-foreground")}>{message.timestamp}</p>
-          <button
-            type="button"
-            onClick={() => onReply(message)}
-            className={cn(
-              "inline-flex items-center gap-1 text-xs transition-colors",
-              message.isOwn ? "text-white/85 hover:text-white" : "text-muted-foreground hover:text-foreground"
-            )}
-          >
+
+        <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+          <span className="opacity-90">{message.timestamp}</span>
+          <button type="button" onClick={() => onReply(message)} className="inline-flex items-center gap-1">
             <CornerUpLeft className="h-3.5 w-3.5" />
             Responder
           </button>
@@ -349,14 +334,22 @@ export function Messages(props: Readonly<{
   const { initialOpen, onConsume } = props;
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [selectedChat, setSelectedChat] = useState<number>(initialConversations[0]?.id ?? 1);
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentItem[]>([]);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
-  const currentRoleLabel = user?.role === "docente" ? "Docente" : "Administrador";
-  const peerRoleLabel = currentRoleLabel === "Docente" ? "Administrador" : "Docente";
+  const [isTyping, setIsTyping] = useState(false);
+  const currentRoleLabel = user?.roles?.length && user.roles.length > 1
+    ? user.roles.map((role) => (role === "administrador" ? "Administrador" : role === "tutor" ? "Tutor" : "Docente")).join(" y ")
+    : user?.role === "administrador"
+    ? "Administrador"
+    : user?.role === "tutor"
+    ? "Tutor"
+    : "Docente";
+  const peerRoleLabel = currentRoleLabel === "Administrador" ? "Docente" : "Administrador";
 
   // If another page requests opening a conversation with a document, create or open it
   const processInitialOpen = (detail: NonNullable<typeof initialOpen>) => {
@@ -486,6 +479,16 @@ export function Messages(props: Readonly<{
     event.target.value = "";
   };
 
+  const addFiles = (files: File[]) => {
+    const attachments = files.map((file) => ({
+      name: file.name,
+      sizeLabel: formatSize(file.size),
+      typeLabel: file.type || "Archivo",
+    }));
+
+    setPendingAttachments((current) => [...current, ...attachments]);
+  };
+
   const handleSend = () => {
     const trimmedMessage = message.trim();
 
@@ -526,6 +529,26 @@ export function Messages(props: Readonly<{
     setMessage("");
     setPendingAttachments([]);
     setReplyingTo(null);
+    setIsTyping(false);
+  };
+
+  useEffect(() => {
+    // Auto-scroll to bottom when messages change or pending attachments change
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [activeConversation?.messages.length, pendingAttachments.length]);
+
+  // Typing indicator local handling
+  useEffect(() => {
+    if (!message) return;
+    setIsTyping(true);
+    const t = setTimeout(() => setIsTyping(false), 1200);
+    return () => clearTimeout(t);
+  }, [message]);
+
+  const handleDropFiles = (e: React.DragEvent) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    if (files.length > 0) addFiles(files as File[]);
   };
 
   return (
@@ -533,28 +556,17 @@ export function Messages(props: Readonly<{
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1>Mensajes</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">Comunicación directa entre administración y docentes, con seguimiento de mensajes y archivos adjuntos.</p>
+          <p className="max-w-2xl text-sm text-muted-foreground hidden sm:block">Mensajería interna: mensajes, archivos y seguimiento.</p>
         </div>
-        <Badge variant="outline" className="w-fit rounded-full px-3 py-1 text-xs">
-          {filteredConversations.length} conversaciones
-        </Badge>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
+        <Card className="hidden sm:flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
           <CardHeader className="space-y-4 border-b border-border/60 pb-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <CardTitle>Chats</CardTitle>
-                <CardDescription>Conversaciones permitidas para tu rol</CardDescription>
-              </div>
-              <div className="flex flex-wrap justify-end gap-2">
-                <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px]">
-                  Tu rol: {currentRoleLabel}
-                </Badge>
-                <Badge variant="outline" className="rounded-full px-2.5 py-1 text-[11px]">
-                  Chateas con: {peerRoleLabel}
-                </Badge>
+                <CardDescription className="hidden sm:block">Conversaciones recientes</CardDescription>
               </div>
             </div>
             <div className="relative">
@@ -679,7 +691,13 @@ export function Messages(props: Readonly<{
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" className="rounded-full border-emerald-200/70 bg-white/80 px-4 shadow-sm hover:bg-emerald-50" onClick={() => fileInputRef.current?.click()}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full border-emerald-200/70 bg-white/80 px-4 shadow-sm hover:bg-emerald-50 text-foreground dark:bg-slate-800/50 dark:border-emerald-900/40 dark:text-white dark:hover:bg-slate-800/70"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
                     <Paperclip className="h-4 w-4 mr-1" />
                     Adjuntar archivo
                   </Button>
