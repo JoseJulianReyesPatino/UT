@@ -13,6 +13,10 @@ export type FormId =
   | "planeacion"
   | "instrumento-3040"
   | "instrumento-6070"
+  | "instrumento-30-normal"
+  | "instrumento-40-nuevo"
+  | "instrumento-60-nuevo"
+  | "instrumento-70-normal"
   | "lista-concentrada"
   | "asesoria"
   | "portafolio-digital"
@@ -48,6 +52,10 @@ const DEFAULT_FORM_ACCESS: FormAccessConfig = {
   planeacion: { roles: ["docente"], dueAt: null },
   "instrumento-3040": { roles: ["docente"], dueAt: null },
   "instrumento-6070": { roles: ["docente"], dueAt: null },
+  "instrumento-30-normal": { roles: ["docente"], dueAt: null },
+  "instrumento-40-nuevo": { roles: ["docente"], dueAt: null },
+  "instrumento-60-nuevo": { roles: ["docente"], dueAt: null },
+  "instrumento-70-normal": { roles: ["docente"], dueAt: null },
   "lista-concentrada": { roles: ["docente"], dueAt: null },
   asesoria: { roles: ["docente"], dueAt: null },
   "portafolio-digital": { roles: ["docente"], dueAt: null },
@@ -74,6 +82,10 @@ const cloneDefaultFormAccess = (): FormAccessConfig => ({
   planeacion: { ...DEFAULT_FORM_ACCESS["planeacion"] },
   "instrumento-3040": { ...DEFAULT_FORM_ACCESS["instrumento-3040"] },
   "instrumento-6070": { ...DEFAULT_FORM_ACCESS["instrumento-6070"] },
+  "instrumento-30-normal": { ...DEFAULT_FORM_ACCESS["instrumento-30-normal"] },
+  "instrumento-40-nuevo": { ...DEFAULT_FORM_ACCESS["instrumento-40-nuevo"] },
+  "instrumento-60-nuevo": { ...DEFAULT_FORM_ACCESS["instrumento-60-nuevo"] },
+  "instrumento-70-normal": { ...DEFAULT_FORM_ACCESS["instrumento-70-normal"] },
   "lista-concentrada": { ...DEFAULT_FORM_ACCESS["lista-concentrada"] },
   asesoria: { ...DEFAULT_FORM_ACCESS.asesoria },
   "portafolio-digital": { ...DEFAULT_FORM_ACCESS["portafolio-digital"] },

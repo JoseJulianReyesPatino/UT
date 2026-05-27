@@ -43,7 +43,7 @@ type DocumentRecord = {
   materia: string;
   parcial: string;
   grupo: string;
-  tipo: "planeacion" | "instrumento-30-40" | "instrumento-60-70" | "lista-concentrada" | "asesoria" | "portafolio" | "acta-final";
+  tipo: "planeacion" | "instrumento-30" | "instrumento-40" | "instrumento-60" | "instrumento-70" | "instrumento-30-40" | "instrumento-60-70" | "lista-concentrada" | "asesoria" | "portafolio" | "acta-final";
 };
 
 type TutorDocumentRecord = {
@@ -52,6 +52,11 @@ type TutorDocumentRecord = {
   documento: string;
   docente: string;
   tipo: "carga-academica" | "reporte-bajas" | "concentrado-asesorias" | "acta-asistencia" | "ficha-tecnica";
+  cuatrimestre?: string;
+  grupo?: string;
+  parcial?: string;
+  carrera?: string;
+  plan?: string;
 };
 
 type TutorDocumentType = TutorDocumentRecord["tipo"];
@@ -166,19 +171,21 @@ const initialCycles: AcademicCycle[] = [
 
 const initialDocuments: DocumentRecord[] = [
   { id: 1, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Planeación - Programación Web", docente: "Mtro. Juan Pérez", carrera: "Ingeniería en Sistemas", plan: "Plan Nuevo Modelo", cuatrimestre: "5", materia: "Programación Web", parcial: "Parcial 1", grupo: "ITIID-8", tipo: "planeacion" },
-  { id: 2, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Instrumento 60% - Programación Web", docente: "Dra. María González", carrera: "Ingeniería en Sistemas", plan: "Plan Nuevo Modelo", cuatrimestre: "8", materia: "Programación Web", parcial: "Parcial 2", grupo: "ITIID-8", tipo: "instrumento-60-70" },
+  { id: 2, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Instrumento 60% - Programación Web", docente: "Dra. María González", carrera: "Ingeniería en Sistemas", plan: "Plan Nuevo Modelo", cuatrimestre: "8", materia: "Programación Web", parcial: "Parcial 2", grupo: "ITIID-8", tipo: "instrumento-60" },
   { id: 3, ciclo: "Cuatrimestre Septiembre-Diciembre 2025", documento: "Lista Concentrada - Redes", docente: "Mtro. Carlos López", carrera: "Ingeniería en Redes", plan: "Plan Normal", cuatrimestre: "9", materia: "Redes de Computadoras", parcial: "Parcial 1", grupo: "ILI-9", tipo: "lista-concentrada" },
-  { id: 4, ciclo: "Cuatrimestre Mayo-Agosto 2025", documento: "Instrumento 30% - Redes", docente: "Mtro. Carlos López", carrera: "Ingeniería en Redes", plan: "Plan Normal", cuatrimestre: "7", materia: "Infraestructura", parcial: "Parcial 3", grupo: "IME-7", tipo: "instrumento-30-40" },
-  { id: 5, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Asesoría - Métodos de Investigación", docente: "Dra. Ana Martínez", carrera: "TSU Desarrollo Software", plan: "Plan Nuevo Modelo", cuatrimestre: "3", materia: "Métodos de Investigación", parcial: "Parcial 1", grupo: "DSM-3", tipo: "asesoria" },
-  { id: 6, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Portafolio Digital - Programación", docente: "Mtro. Roberto Silva", carrera: "TSU Automatización", plan: "Plan Nuevo Modelo", cuatrimestre: "5", materia: "Programación Estructurada", parcial: "Final", grupo: "AUT-5", tipo: "portafolio" },
+  { id: 4, ciclo: "Cuatrimestre Mayo-Agosto 2025", documento: "Instrumento 30% - Redes", docente: "Mtro. Carlos López", carrera: "Ingeniería en Redes", plan: "Plan Normal", cuatrimestre: "7", materia: "Infraestructura", parcial: "Parcial 3", grupo: "IME-7", tipo: "instrumento-30" },
+  { id: 5, ciclo: "Cuatrimestre Mayo-Agosto 2025", documento: "Instrumento 40% - Bases", docente: "Dra. Ana Martínez", carrera: "TSU Desarrollo Software", plan: "Plan Nuevo Modelo", cuatrimestre: "4", materia: "Bases de Datos", parcial: "Parcial 2", grupo: "DSM-4", tipo: "instrumento-40" },
+  { id: 6, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Asesoría - Métodos de Investigación", docente: "Dra. Ana Martínez", carrera: "TSU Desarrollo Software", plan: "Plan Nuevo Modelo", cuatrimestre: "3", materia: "Métodos de Investigación", parcial: "Parcial 1", grupo: "DSM-3", tipo: "asesoria" },
+  { id: 7, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Instrumento 70% - Redes", docente: "Mtro. Juan Pérez", carrera: "Ingeniería en Redes", plan: "Plan Normal", cuatrimestre: "8", materia: "Redes de Computadoras", parcial: "Parcial 3", grupo: "IRE-8", tipo: "instrumento-70" },
+  { id: 8, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Portafolio Digital - Programación", docente: "Mtro. Roberto Silva", carrera: "TSU Automatización", plan: "Plan Nuevo Modelo", cuatrimestre: "5", materia: "Programación Estructurada", parcial: "Final", grupo: "AUT-5", tipo: "portafolio" },
 ];
 
 const initialTutorDocuments: TutorDocumentRecord[] = [
-  { id: 101, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Carga Académica Q1 2026", docente: "Mtro. Juan Pérez", tipo: "carga-academica" },
-  { id: 102, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Reporte de Bajas Enero 2026", docente: "Dra. María González", tipo: "reporte-bajas" },
-  { id: 103, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Concentrado Asesorías y Bajas", docente: "Mtro. Carlos López", tipo: "concentrado-asesorias" },
-  { id: 104, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Acta Asistencia Grupal - Turno Matutino", docente: "Dra. Ana Martínez", tipo: "acta-asistencia" },
-  { id: 105, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Ficha Técnica Tutoría Virtual", docente: "Mtro. Roberto Silva", tipo: "ficha-tecnica" },
+  { id: 101, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Carga Académica Q1 2026", docente: "Mtro. Juan Pérez", tipo: "carga-academica", cuatrimestre: "1", grupo: "A", parcial: "Parcial 1" },
+  { id: 102, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Reporte de Bajas Enero 2026", docente: "Dra. María González", tipo: "reporte-bajas", cuatrimestre: "1", grupo: "B", parcial: "Parcial 1" },
+  { id: 103, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Concentrado Asesorías y Bajas", docente: "Mtro. Carlos López", tipo: "concentrado-asesorias", cuatrimestre: "1", grupo: "C", parcial: "Parcial 2" },
+  { id: 104, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Acta Asistencia Grupal - Turno Matutino", docente: "Dra. Ana Martínez", tipo: "acta-asistencia", cuatrimestre: "1", grupo: "A", parcial: "Parcial 1" },
+  { id: 105, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Ficha Técnica Tutoría Virtual", docente: "Mtro. Roberto Silva", tipo: "ficha-tecnica", cuatrimestre: "1", grupo: "D", parcial: "Final" },
 ];
 
 export function CiclosEscolares() {
@@ -219,9 +226,6 @@ export function CiclosEscolares() {
   const [filterPlan, setFilterPlan] = useState("all");
   const [filterCarrera, setFilterCarrera] = useState("all");
   const [filterCuatrimestre, setFilterCuatrimestre] = useState("all");
-  const [filterDocente, setFilterDocente] = useState("all");
-  const [filterParcial, setFilterParcial] = useState("all");
-  const [filterGrupo, setFilterGrupo] = useState("all");
   const [filterTutorDocente, setFilterTutorDocente] = useState("all");
 
   const cycleDocumentCount = useMemo(
@@ -416,9 +420,6 @@ export function CiclosEscolares() {
     setFilterPlan("all");
     setFilterCarrera("all");
     setFilterCuatrimestre("all");
-    setFilterDocente("all");
-    setFilterParcial("all");
-    setFilterGrupo("all");
   };
 
   const handleSelectTutorCategory = (category: TutorDocumentType) => {
@@ -444,22 +445,30 @@ export function CiclosEscolares() {
 
   const plansAvailable = Array.from(new Set(documents.map((document) => document.plan)));
   const carrerasAvailable = Array.from(new Set(documents.map((document) => document.carrera)));
-  const cuatrimestresAvailable = Array.from(new Set(documents.map((document) => document.cuatrimestre)));
-  const docentesAvailable = Array.from(new Set(documents.map((document) => document.docente)));
-  const parcialesAvailable = Array.from(new Set(documents.map((document) => document.parcial)));
-  const gruposAvailable = Array.from(new Set(documents.map((document) => document.grupo)));
+  const cuatrimestresAvailable = useMemo(() => {
+    if (filterPlan === "Plan Normal") {
+      return ["6", "11"];
+    }
+    if (filterPlan === "Plan Nuevo Modelo") {
+      return ["6", "10"];
+    }
+    return ["6", "10", "11"];
+  }, [filterPlan]);
   const tutorDocentesAvailable = Array.from(new Set(tutorDocuments.map((document) => document.docente)));
+
+  React.useEffect(() => {
+    if (filterCuatrimestre !== "all" && !cuatrimestresAvailable.includes(filterCuatrimestre)) {
+      setFilterCuatrimestre("all");
+    }
+  }, [filterCuatrimestre, cuatrimestresAvailable]);
 
   const filteredDocuments = useMemo(
     () => documents.filter((document) => (
       (filterPlan === "all" || document.plan === filterPlan)
       && (filterCarrera === "all" || document.carrera === filterCarrera)
       && (filterCuatrimestre === "all" || document.cuatrimestre === filterCuatrimestre)
-      && (filterDocente === "all" || document.docente === filterDocente)
-      && (filterParcial === "all" || document.parcial === filterParcial)
-      && (filterGrupo === "all" || document.grupo === filterGrupo)
     )),
-    [documents, filterPlan, filterCarrera, filterCuatrimestre, filterDocente, filterParcial, filterGrupo]
+    [documents, filterPlan, filterCarrera, filterCuatrimestre]
   );
 
   const filteredTutorDocuments = useMemo(
@@ -772,8 +781,12 @@ export function CiclosEscolares() {
           ) : (
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
               <Button onClick={() => handleSelectDocumentCategory("planeacion")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Planeación</Button>
-              <Button onClick={() => handleSelectDocumentCategory("instrumento-30-40")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 30/40%</Button>
-              <Button onClick={() => handleSelectDocumentCategory("instrumento-60-70")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 60/70%</Button>
+              <Button onClick={() => handleSelectDocumentCategory("instrumento-30")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 30%</Button>
+              <Button onClick={() => handleSelectDocumentCategory("instrumento-40")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 40%</Button>
+              <Button onClick={() => handleSelectDocumentCategory("instrumento-60")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 60%</Button>
+              <Button onClick={() => handleSelectDocumentCategory("instrumento-70")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 70%</Button>
+              <Button onClick={() => handleSelectDocumentCategory("instrumento-30-40")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 30/40% (legacy)</Button>
+              <Button onClick={() => handleSelectDocumentCategory("instrumento-60-70")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 60/70% (legacy)</Button>
               <Button onClick={() => handleSelectDocumentCategory("lista-concentrada")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Lista Concentrada</Button>
               <Button onClick={() => handleSelectDocumentCategory("asesoria")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Asesoría</Button>
               <Button onClick={() => handleSelectDocumentCategory("portafolio")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Portafolio Digital</Button>
@@ -808,7 +821,7 @@ export function CiclosEscolares() {
           <ScrollArea className="flex-1 pr-4">
             {selectedDocumentType === "docentes" ? (
               <>
-                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 py-4 border-b">
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 py-4 border-b">
                   <Select value={filterPlan} onValueChange={setFilterPlan}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Plan" /></SelectTrigger>
                     <SelectContent>
@@ -828,27 +841,6 @@ export function CiclosEscolares() {
                     <SelectContent>
                       <SelectItem value="all">Todos los cuatrimestres</SelectItem>
                       {cuatrimestresAvailable.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Select value={filterDocente} onValueChange={setFilterDocente}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Docente" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los docentes</SelectItem>
-                      {docentesAvailable.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Select value={filterParcial} onValueChange={setFilterParcial}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Parcial" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los parciales</SelectItem>
-                      {parcialesAvailable.map((parcial) => <SelectItem key={parcial} value={parcial}>{parcial}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Select value={filterGrupo} onValueChange={setFilterGrupo}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Grupo" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los grupos</SelectItem>
-                      {gruposAvailable.map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -921,7 +913,12 @@ export function CiclosEscolares() {
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm truncate">{doc.documento}</p>
                             <p className="text-xs text-muted-foreground">{doc.docente}</p>
-                            <Badge variant="outline" className="text-xs mt-1">{doc.tipo.replaceAll("-", " ")}</Badge>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {doc.cuatrimestre && <Badge variant="outline" className="text-xs">Q{doc.cuatrimestre}</Badge>}
+                              {doc.grupo && <Badge variant="outline" className="text-xs">{doc.grupo}</Badge>}
+                              {doc.parcial && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
+                              <Badge variant="outline" className="text-xs">{doc.tipo.replaceAll("-", " ")}</Badge>
+                            </div>
                           </div>
                           <Button variant="outline" size="sm" className="shrink-0" onClick={(e) => { e.stopPropagation(); openDocumentPreview(doc); }}>Ver PDF</Button>
                         </div>

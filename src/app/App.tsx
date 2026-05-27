@@ -16,7 +16,9 @@ import CalendarioAdmin from "./pages/admin/Calendario";
 import { Profile } from "./pages/docente/Profile";
 import PlaneacionPage from "./pages/docente/Planeacion";
 import Instrumento3040Page from "./pages/docente/Instrumento3040";
+import Instrumento40Page from "./pages/docente/Instrumento40";
 import Instrumento6070Page from "./pages/docente/Instrumento6070";
+import Instrumento60Page from "./pages/docente/Instrumento60";
 import ListaConcentradaPage from "./pages/docente/ListaConcentrada";
 import AsesoriaPage from "./pages/docente/Asesoria";
 import PortafolioDigitalPage from "./pages/docente/PortafolioDigital";
@@ -87,10 +89,14 @@ function AppContent() {
           return <DocenteDashboard onNavigate={setCurrentView} />;
         case "planeacion":
           return wrapForm("planeacion", "Planeación", <PlaneacionPage />);
-        case "instrumento-30":
-          return wrapForm("instrumento-3040", "Instrumento 30/40%", <Instrumento3040Page />);
-        case "instrumento-60":
-          return wrapForm("instrumento-6070", "Instrumento 60/70%", <Instrumento6070Page />);
+        case "instrumento-30-normal":
+          return wrapForm("instrumento-30-normal", "Instrumento 30%", <Instrumento3040Page />);
+        case "instrumento-40-nuevo":
+          return wrapForm("instrumento-40-nuevo", "Instrumento 40%", <Instrumento40Page />);
+        case "instrumento-60-nuevo":
+          return wrapForm("instrumento-60-nuevo", "Instrumento 60%", <Instrumento60Page />);
+        case "instrumento-70-normal":
+          return wrapForm("instrumento-70-normal", "Instrumento 70%", <Instrumento6070Page />);
         case "lista-concentrada":
           return wrapForm("lista-concentrada", "Lista Concentrada", <ListaConcentradaPage />);
         case "asesoria":

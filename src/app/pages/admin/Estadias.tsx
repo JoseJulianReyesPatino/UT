@@ -15,6 +15,7 @@ type EstadiaPendingDocument = {
   id: number;
   ciclo: string;
   plan: string;
+  cuatrimestre: string;
   docente: string;
   documento: string;
   apartado: string;
@@ -30,6 +31,7 @@ type EstadiaReviewedDocument = {
   id: number;
   ciclo: string;
   plan: string;
+  cuatrimestre: string;
   docente: string;
   documento: string;
   apartado: string;
@@ -48,6 +50,7 @@ const initialPending: EstadiaPendingDocument[] = [
     id: 1,
     ciclo: "Ciclo Escolar 2026",
     plan: "Plan Nuevo Modelo",
+    cuatrimestre: "10",
     docente: "Mtro. Juan Pérez",
     documento: "Carta de presentación - Estadías Grupo A",
     apartado: "Carta de Presentación",
@@ -59,6 +62,7 @@ const initialPending: EstadiaPendingDocument[] = [
     id: 2,
     ciclo: "Ciclo Escolar 2026",
     plan: "Plan Nuevo Modelo",
+    cuatrimestre: "6",
     docente: "Dra. Ana Martínez",
     documento: "Carta de aceptación - Estadías Grupo B",
     apartado: "Carta de Aceptación",
@@ -70,6 +74,7 @@ const initialPending: EstadiaPendingDocument[] = [
     id: 3,
     ciclo: "Ciclo Escolar 2026",
     plan: "Plan Normal",
+    cuatrimestre: "11",
     docente: "Mtro. Carlos López",
     documento: "Carta de terminación - Estadías Grupo C",
     apartado: "Carta de Terminación",
@@ -81,6 +86,7 @@ const initialPending: EstadiaPendingDocument[] = [
     id: 4,
     ciclo: "Ciclo Escolar 2025",
     plan: "Plan Nuevo Modelo",
+    cuatrimestre: "6",
     docente: "Dra. María González",
     documento: "Acta final - Estadías Grupo D",
     apartado: "Acta Final",
@@ -95,6 +101,7 @@ const initialReviewed: EstadiaReviewedDocument[] = [
     id: 101,
     ciclo: "Ciclo Escolar 2026",
     plan: "Plan Nuevo Modelo",
+    cuatrimestre: "10",
     docente: "Mtro. Roberto Silva",
     documento: "Carta de presentación - Estadías",
     apartado: "Carta de Presentación",
@@ -112,6 +119,8 @@ export default function Estadias() {
   const [reviewedDocuments, setReviewedDocuments] = useState<EstadiaReviewedDocument[]>(initialReviewed);
   const [filterCiclo, setFilterCiclo] = useState("all");
   const [filterPlan, setFilterPlan] = useState("all");
+  const [filterCarrera, setFilterCarrera] = useState("all");
+  const [filterCuatrimestre, setFilterCuatrimestre] = useState("all");
   const [filterDocente, setFilterDocente] = useState("all");
   const [filterApartado, setFilterApartado] = useState("all");
   const [filterReturned, setFilterReturned] = useState("all");
@@ -194,9 +203,11 @@ export default function Estadias() {
     }`
   );
 
-  const matchesFilters = (doc: { ciclo: string; plan: string; docente: string; apartado: string; returned?: boolean }) => {
+  const matchesFilters = (doc: { ciclo: string; plan: string; carrera: string; cuatrimestre: string; docente: string; apartado: string; returned?: boolean }) => {
     const matchesCiclo = filterCiclo === "all" || doc.ciclo === filterCiclo;
     const matchesPlan = filterPlan === "all" || doc.plan === filterPlan;
+    const matchesCarrera = filterCarrera === "all" || doc.carrera === filterCarrera;
+    const matchesCuatrimestre = filterCuatrimestre === "all" || doc.cuatrimestre === filterCuatrimestre;
     const matchesDocente = filterDocente === "all" || doc.docente === filterDocente;
     const matchesApartado = filterApartado === "all" || doc.apartado === filterApartado;
     const isReturned = Boolean(doc.returned);
@@ -204,7 +215,7 @@ export default function Estadias() {
       filterReturned === "all" ||
       (filterReturned === "returned" && isReturned) ||
       (filterReturned === "not-returned" && !isReturned);
-    return matchesCiclo && matchesPlan && matchesDocente && matchesApartado && matchesReturned;
+    return matchesCiclo && matchesPlan && matchesCarrera && matchesCuatrimestre && matchesDocente && matchesApartado && matchesReturned;
   };
 
   const filteredPending = pendingDocuments.filter(matchesFilters);
@@ -222,8 +233,24 @@ export default function Estadias() {
 
   const ciclosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.ciclo)));
   const planesDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.plan)));
+  const carrerasDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.carrera)));
+  const cuatrimestresDisponibles = useMemo(() => {
+    if (filterPlan === "Plan Normal") {
+      return ["6", "11"];
+    }
+    if (filterPlan === "Plan Nuevo Modelo") {
+      return ["6", "10"];
+    }
+    return ["6", "10", "11"];
+  }, [filterPlan]);
   const docentesDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.docente)));
   const apartadosDisponibles = ["Carta de Presentación", "Carta de Aceptación", "Carta de Terminación", "Acta Final"];
+
+  React.useEffect(() => {
+    if (filterCuatrimestre !== "all" && !cuatrimestresDisponibles.includes(filterCuatrimestre)) {
+      setFilterCuatrimestre("all");
+    }
+  }, [filterCuatrimestre, cuatrimestresDisponibles]);
 
   const handleReviewDocument = (documentId: number) => {
     const documentToReview = pendingDocuments.find((doc) => doc.id === documentId);
@@ -238,6 +265,7 @@ export default function Estadias() {
         id: documentToReview.id,
         ciclo: documentToReview.ciclo,
         plan: documentToReview.plan,
+        cuatrimestre: documentToReview.cuatrimestre,
         docente: documentToReview.docente,
         documento: documentToReview.documento,
         apartado: documentToReview.apartado,
@@ -337,6 +365,20 @@ export default function Estadias() {
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
                     {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
+                  <SelectTrigger className="w-[260px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las carreras</SelectItem>
+                    {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los cuatrimestres</SelectItem>
+                    {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
@@ -442,6 +484,20 @@ export default function Estadias() {
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
                     {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
+                  <SelectTrigger className="w-[260px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las carreras</SelectItem>
+                    {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los cuatrimestres</SelectItem>
+                    {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
@@ -567,6 +623,20 @@ export default function Estadias() {
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
                     {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
+                  <SelectTrigger className="w-[260px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las carreras</SelectItem>
+                    {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los cuatrimestres</SelectItem>
+                    {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
@@ -715,6 +785,20 @@ export default function Estadias() {
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
                     {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
+                  <SelectTrigger className="w-[260px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las carreras</SelectItem>
+                    {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los cuatrimestres</SelectItem>
+                    {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>

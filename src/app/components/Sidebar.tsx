@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { cn } from "../../lib/utils";
@@ -21,6 +21,8 @@ import {
   User,
   LayoutDashboard,
   FileArchive,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -39,12 +41,37 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const logoSrc = theme === "dark" ? "/src/assets/Logotipo UTSLRC-BLANCO.png" : "/src/assets/Logotipo  UTSLRC.png";
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
+  const [instrumento3040Open, setInstrumento3040Open] = useState(true);
+  const [instrumento6070Open, setInstrumento6070Open] = useState(true);
+
+  const instrumento3040Children = useMemo(
+    () => [
+      { id: "instrumento-30-normal", label: "Instrumento 30%", description: "Plan Normal" },
+      { id: "instrumento-40-nuevo", label: "Instrumento 40%", description: "Plan Nuevo Modelo" },
+    ],
+    [],
+  );
+
+  const instrumento6070Children = useMemo(
+    () => [
+      { id: "instrumento-60-nuevo", label: "Instrumento 60%", description: "Plan Nuevo Modelo" },
+      { id: "instrumento-70-normal", label: "Instrumento 70%", description: "Plan Normal" },
+    ],
+    [],
+  );
+
+  useEffect(() => {
+    if (instrumento3040Children.some((item) => item.id === currentView)) {
+      setInstrumento3040Open(true);
+    }
+    if (instrumento6070Children.some((item) => item.id === currentView)) {
+      setInstrumento6070Open(true);
+    }
+  }, [currentView, instrumento3040Children, instrumento6070Children]);
 
   const docenteMenuItems = [
     { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
     { id: "planeacion", label: "Planeación", icon: FileText },
-    { id: "instrumento-30", label: "Instrumento 30/40%", icon: BarChart3 },
-    { id: "instrumento-60", label: "Instrumento 60/70%", icon: BarChart3 },
     { id: "lista-concentrada", label: "Lista Concentrada", icon: FileStack },
     { id: "asesoria", label: "Asesoría", icon: Users },
     { id: "portafolio", label: "Portafolio Digital", icon: FolderOpen },
@@ -73,6 +100,9 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     : canAccessTutorias
     ? docenteMenuItems
     : docenteMenuItems.filter((item) => item.id !== "tutorias");
+
+  const isInstrumento3040Active = instrumento3040Children.some((item) => item.id === currentView);
+  const isInstrumento6070Active = instrumento6070Children.some((item) => item.id === currentView);
 
   const isMenuItemActive = (itemId: string) => {
     if (itemId === "documentos") {
@@ -154,6 +184,108 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                   <Icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
                   {!isCollapsedLocal && <span className="font-medium">{item.label}</span>}
                 </button>
+
+                {!isCollapsedLocal && user?.role !== "administrador" && item.id === "planeacion" && (
+                  <div className="space-y-1 pl-4 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setInstrumento3040Open((value) => !value)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
+                        isInstrumento3040Active
+                          ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
+                          : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
+                      )}
+                    >
+                      <BarChart3 className={cn("h-5 w-5 shrink-0", isInstrumento3040Active ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
+                      <span className="font-medium flex-1">Instrumento 30/40%</span>
+                      {instrumento3040Open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+
+                    {instrumento3040Open && (
+                      <div className="space-y-1 pl-4">
+                        {instrumento3040Children.map((child) => {
+                          const isChildActive = currentView === child.id;
+                          return (
+                            <button
+                              key={child.id}
+                              type="button"
+                              onClick={() => {
+                                onNavigate(child.id);
+                                if (isMobile) {
+                                  onMobileOpenChange?.(false);
+                                  return;
+                                }
+                                setCollapsed(false);
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left text-sm",
+                                isChildActive
+                                  ? "bg-emerald-500/15 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-100"
+                                  : "text-slate-600 hover:bg-emerald-100/60 hover:text-emerald-800 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-emerald-200",
+                              )}
+                            >
+                              <ChevronRight className={cn("h-4 w-4 shrink-0", isChildActive ? "text-emerald-700 dark:text-emerald-200" : "text-emerald-500 dark:text-emerald-400")} />
+                              <div className="min-w-0 text-left">
+                                <div className="font-medium">{child.label}</div>
+                                <div className="text-xs opacity-80">{child.description}</div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setInstrumento6070Open((value) => !value)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
+                        isInstrumento6070Active
+                          ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
+                          : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
+                      )}
+                    >
+                      <BarChart3 className={cn("h-5 w-5 shrink-0", isInstrumento6070Active ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
+                      <span className="font-medium flex-1">Instrumento 60/70%</span>
+                      {instrumento6070Open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+
+                    {instrumento6070Open && (
+                      <div className="space-y-1 pl-4">
+                        {instrumento6070Children.map((child) => {
+                          const isChildActive = currentView === child.id;
+                          return (
+                            <button
+                              key={child.id}
+                              type="button"
+                              onClick={() => {
+                                onNavigate(child.id);
+                                if (isMobile) {
+                                  onMobileOpenChange?.(false);
+                                  return;
+                                }
+                                setCollapsed(false);
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left text-sm",
+                                isChildActive
+                                  ? "bg-emerald-500/15 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-100"
+                                  : "text-slate-600 hover:bg-emerald-100/60 hover:text-emerald-800 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-emerald-200",
+                              )}
+                            >
+                              <ChevronRight className={cn("h-4 w-4 shrink-0", isChildActive ? "text-emerald-700 dark:text-emerald-200" : "text-emerald-500 dark:text-emerald-400")} />
+                              <div className="min-w-0 text-left">
+                                <div className="font-medium">{child.label}</div>
+                                <div className="text-xs opacity-80">{child.description}</div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

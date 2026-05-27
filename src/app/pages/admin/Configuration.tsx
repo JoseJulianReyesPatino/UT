@@ -51,8 +51,10 @@ type FormSectionId = "docentes" | "tutorias" | "estadias";
 
 const FORM_DEFINITIONS: Array<{ id: FormId; title: string; description: string; section: FormSectionId }> = [
   { id: "planeacion", title: "Planeación", description: "Planeación académica", section: "docentes" },
-  { id: "instrumento-3040", title: "Instrumento 30/40%", description: "Evaluación intermedia", section: "docentes" },
-  { id: "instrumento-6070", title: "Instrumento 60/70%", description: "Evaluación final parcial", section: "docentes" },
+  { id: "instrumento-30-normal", title: "Instrumento 30%", description: "Evaluación intermedia - Plan Normal", section: "docentes" },
+  { id: "instrumento-40-nuevo", title: "Instrumento 40%", description: "Evaluación intermedia - Nuevo Modelo", section: "docentes" },
+  { id: "instrumento-60-nuevo", title: "Instrumento 60%", description: "Evaluación final parcial - Nuevo Modelo", section: "docentes" },
+  { id: "instrumento-70-normal", title: "Instrumento 70%", description: "Evaluación final parcial - Plan Normal", section: "docentes" },
   { id: "lista-concentrada", title: "Lista Concentrada", description: "Concentrado general", section: "docentes" },
   { id: "asesoria", title: "Asesoría", description: "Registro de asesorías", section: "docentes" },
   { id: "portafolio-digital", title: "Portafolio Digital", description: "Entrega de evidencias", section: "docentes" },

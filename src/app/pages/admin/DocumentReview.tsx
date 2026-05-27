@@ -28,6 +28,7 @@ type PendingDocument = {
   materia: string;
   cuatrimestre: string;
   grupo: string;
+  parcial?: string;
   fecha: string;
   returned?: boolean;
   returnedAt?: string;
@@ -42,6 +43,10 @@ type ReviewedDocument = {
   documento: string;
   apartado: string;
   carrera: string;
+  materia?: string;
+  cuatrimestre?: string;
+  grupo?: string;
+  parcial?: string;
   reviewedAt: string;
   fecha?: string;
   returned?: boolean;
@@ -63,6 +68,17 @@ type CareerFilterOption = {
 type ApartadoFilterOption = {
   value: string;
   label: string;
+};
+
+type DocumentFilterTarget = {
+  ciclo: string;
+  plan: string;
+  carrera: string;
+  docente: string;
+  apartado: string;
+  cuatrimestre?: string;
+  grupo?: string;
+  parcial?: string;
 };
 
 const getCareerFilterOptions = (plan: string): CareerFilterOption[] => {
@@ -89,8 +105,10 @@ const getCareerFilterOptions = (plan: string): CareerFilterOption[] => {
 
 const apartadoFilterOptions: ApartadoFilterOption[] = [
   { value: "Planeación", label: "Planeación" },
-  { value: "Instrumento 30/40%", label: "Instrumento 30/40%" },
-  { value: "Instrumento 60/70%", label: "Instrumento 60/70%" },
+  { value: "Instrumento 30%", label: "Instrumento 30%" },
+  { value: "Instrumento 40%", label: "Instrumento 40%" },
+  { value: "Instrumento 60%", label: "Instrumento 60%" },
+  { value: "Instrumento 70%", label: "Instrumento 70%" },
   { value: "Lista Concentrada", label: "Lista Concentrada" },
   { value: "Asesoría", label: "Asesoría" },
   { value: "Portafolio Digital Final", label: "Portafolio Digital Final" },
@@ -109,6 +127,7 @@ const initialPendingDocuments: PendingDocument[] = [
     materia: "Programación Web",
     cuatrimestre: "5",
     grupo: "A",
+    parcial: "Parcial 1",
     fecha: "2026-05-17",
   },
   {
@@ -117,11 +136,12 @@ const initialPendingDocuments: PendingDocument[] = [
     plan: "Plan Nuevo Modelo",
     docente: "Dra. Ana Martínez",
     documento: "Instrumento 30% - Base de Datos",
-    apartado: "Instrumento 30/40%",
+    apartado: "Instrumento 30%",
     carrera: "TSU Desarrollo Software",
     materia: "Base de Datos",
     cuatrimestre: "3",
     grupo: "B",
+    parcial: "Parcial 2",
     fecha: "2026-05-16",
   },
   {
@@ -135,6 +155,7 @@ const initialPendingDocuments: PendingDocument[] = [
     materia: "Redes de Computadoras",
     cuatrimestre: "7",
     grupo: "A",
+    parcial: "Parcial 1",
     fecha: "2026-05-15",
   },
   {
@@ -143,11 +164,27 @@ const initialPendingDocuments: PendingDocument[] = [
     plan: "Plan Nuevo Modelo",
     docente: "Dra. María González",
     documento: "Asesoría - Tutoría Grupal",
-    apartado: "Tutorías",
+    apartado: "Asesoría",
     carrera: "Ingeniería en Sistemas",
     materia: "Tutorías BIS",
     cuatrimestre: "5",
     grupo: "C",
+    parcial: "Parcial 2",
+    fecha: "2026-05-14",
+    returned: false,
+  },
+  {
+    id: 5,
+    ciclo: "Ciclo Escolar 2026",
+    plan: "Plan Nuevo Modelo",
+    docente: "Dra. María González",
+    documento: "Instrumento 40% - Programación Web",
+    apartado: "Instrumento 40%",
+    carrera: "Ingeniería en Sistemas",
+    materia: "Programación Web",
+    cuatrimestre: "5",
+    grupo: "C",
+    parcial: "Parcial 2",
     fecha: "2026-05-14",
     returned: false,
   },
@@ -160,8 +197,11 @@ const initialReviewedDocuments: ReviewedDocument[] = [
     plan: "Plan Nuevo Modelo",
     docente: "Dra. María González",
     documento: "Instrumento 60% - Programación Web",
-    apartado: "Instrumento 60/70%",
+    apartado: "Instrumento 60%",
     carrera: "Ingeniería en Sistemas",
+    cuatrimestre: "5",
+    grupo: "C",
+    parcial: "Parcial 2",
     fecha: "2026-05-17 08:20",
     returnedAt: "2026-05-17 08:55",
     resubmittedAt: "2026-05-17 09:05",
@@ -175,6 +215,9 @@ const initialReviewedDocuments: ReviewedDocument[] = [
     documento: "Planeación - Redes",
     apartado: "Planeación",
     carrera: "Ingeniería en Redes",
+    cuatrimestre: "7",
+    grupo: "A",
+    parcial: "Parcial 1",
     reviewedAt: "2026-05-17 10:05",
   },
   {
@@ -185,6 +228,9 @@ const initialReviewedDocuments: ReviewedDocument[] = [
     documento: "Lista Concentrada - Base de Datos",
     apartado: "Lista Concentrada",
     carrera: "TSU Desarrollo Software",
+    cuatrimestre: "3",
+    grupo: "B",
+    parcial: "Parcial 1",
     reviewedAt: "2026-05-16 16:40",
   },
   {
@@ -192,9 +238,12 @@ const initialReviewedDocuments: ReviewedDocument[] = [
     ciclo: "Ciclo Escolar 2026",
     plan: "Plan Normal",
     docente: "Mtro. Carlos López",
-    documento: "Instrumento 30% - Redes",
-    apartado: "Instrumento 30/40%",
+    documento: "Instrumento 70% - Redes",
+    apartado: "Instrumento 70%",
     carrera: "Ingeniería en Redes",
+    cuatrimestre: "8",
+    grupo: "A",
+    parcial: "Parcial 3",
     reviewedAt: "2026-05-15 11:25",
   },
   {
@@ -205,6 +254,9 @@ const initialReviewedDocuments: ReviewedDocument[] = [
     documento: "Ficha Técnica - Tutorías",
     apartado: "Tutorías",
     carrera: "TSU Infraestructura",
+    cuatrimestre: "3",
+    grupo: "D",
+    parcial: "Final",
     reviewedAt: "2026-05-15 13:10",
     returned: false,
   },
@@ -218,6 +270,9 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
   const [filterCarrera, setFilterCarrera] = useState("all");
   const [filterDocente, setFilterDocente] = useState("all");
   const [filterApartado, setFilterApartado] = useState("all");
+  const [filterCuatrimestre, setFilterCuatrimestre] = useState("all");
+  const [filterGrupo, setFilterGrupo] = useState("all");
+  const [filterParcial, setFilterParcial] = useState("all");
   const [activeSection, setActiveSection] = useState<ReviewSection>(initialSection);
   const [previewDocument, setPreviewDocument] = useState<DocumentItem | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -314,13 +369,16 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
     return "Pendiente";
   };
 
-  const matchesFilters = (doc: { ciclo: string; plan: string; carrera: string; docente: string; apartado: string }) => {
+  const matchesFilters = (doc: DocumentFilterTarget) => {
     const matchesCiclo = filterCiclo === "all" || doc.ciclo === filterCiclo;
     const matchesPlan = filterPlan === "all" || doc.plan === filterPlan;
     const matchesCarrera = filterCarrera === "all" || doc.carrera === filterCarrera;
     const matchesDocente = filterDocente === "all" || doc.docente === filterDocente;
     const matchesApartado = filterApartado === "all" || doc.apartado === filterApartado;
-    return matchesCiclo && matchesPlan && matchesCarrera && matchesDocente && matchesApartado;
+    const matchesCuatrimestre = filterCuatrimestre === "all" || doc.cuatrimestre === filterCuatrimestre;
+    const matchesGrupo = filterGrupo === "all" || doc.grupo === filterGrupo;
+    const matchesParcial = filterParcial === "all" || doc.parcial === filterParcial;
+    return matchesCiclo && matchesPlan && matchesCarrera && matchesDocente && matchesApartado && matchesCuatrimestre && matchesGrupo && matchesParcial;
   };
 
   const filteredPendingDocuments = pendingDocuments.filter(matchesFilters);
@@ -339,6 +397,9 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
   const ciclosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.ciclo)));
   const docentesDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.docente)));
   const planesDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.plan)));
+  const cuatrimestresDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.cuatrimestre).filter((value): value is string => Boolean(value))));
+  const gruposDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.grupo).filter((value): value is string => Boolean(value))));
+  const parcialesDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.parcial).filter((value): value is string => Boolean(value))));
   const carrerasDisponibles = useMemo(() => getCareerFilterOptions(filterPlan), [filterPlan]);
 
   React.useEffect(() => {
@@ -372,6 +433,10 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
         documento: documentToReview.documento,
         apartado: documentToReview.apartado,
         carrera: documentToReview.carrera,
+            materia: documentToReview.materia,
+            cuatrimestre: documentToReview.cuatrimestre,
+            grupo: documentToReview.grupo,
+            parcial: documentToReview.parcial,
         reviewedAt,
         fecha: documentToReview.fecha,
         returnedAt: documentToReview.returnedAt,
@@ -467,6 +532,27 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                     {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Cuatrimestre" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los cuatrimestres</SelectItem>
+                    {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterGrupo} onValueChange={setFilterGrupo}>
+                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Grupo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los grupos</SelectItem>
+                    {gruposDisponibles.map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterParcial} onValueChange={setFilterParcial}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Parcial" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los parciales</SelectItem>
+                    {parcialesDisponibles.map((parcial) => <SelectItem key={parcial} value={parcial}>{parcial}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
                   <SelectTrigger className="w-[220px]"><SelectValue placeholder="carrera" /></SelectTrigger>
                   <SelectContent>
@@ -503,6 +589,9 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                           <div className="mt-2 flex flex-wrap gap-2">
                             <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
                             <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                            {'cuatrimestre' in doc && doc.cuatrimestre && <Badge variant="outline" className="text-xs">Q{doc.cuatrimestre}</Badge>}
+                            {'grupo' in doc && doc.grupo && <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>}
+                            {'parcial' in doc && doc.parcial && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
                             <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
                           </div>
                           {'fecha' in doc && doc.fecha && (
@@ -569,6 +658,27 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                     {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los cuatrimestres</SelectItem>
+                    {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterGrupo} onValueChange={setFilterGrupo}>
+                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filtrar por grupo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los grupos</SelectItem>
+                    {gruposDisponibles.map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterParcial} onValueChange={setFilterParcial}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por parcial" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los parciales</SelectItem>
+                    {parcialesDisponibles.map((parcial) => <SelectItem key={parcial} value={parcial}>{parcial}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
                   <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
@@ -604,6 +714,7 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                           <Badge variant="outline" className="text-xs">{doc.materia}</Badge>
                           <Badge variant="outline" className="text-xs">{doc.cuatrimestre}° Cuatri</Badge>
                           <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
+                          {'parcial' in doc && doc.parcial && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
                           <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
                           <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
                           <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
@@ -672,6 +783,27 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                     {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Cuatrimestre" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los cuatrimestres</SelectItem>
+                    {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterGrupo} onValueChange={setFilterGrupo}>
+                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Grupo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los grupos</SelectItem>
+                    {gruposDisponibles.map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterParcial} onValueChange={setFilterParcial}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Parcial" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los parciales</SelectItem>
+                    {parcialesDisponibles.map((parcial) => <SelectItem key={parcial} value={parcial}>{parcial}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
                   <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
@@ -715,6 +847,9 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                               <Badge variant="outline" className="text-xs">{doc.carrera}</Badge>
                               <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
                               <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                              {'cuatrimestre' in doc && doc.cuatrimestre && <Badge variant="outline" className="text-xs">Q{doc.cuatrimestre}</Badge>}
+                              {'grupo' in doc && doc.grupo && <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>}
+                              {'parcial' in doc && doc.parcial && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
                               <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
                             </div>
                             {'fecha' in doc && doc.fecha && (
