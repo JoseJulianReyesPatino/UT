@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { Button } from "../components/ui/button";
@@ -11,6 +11,8 @@ import inferiorImage from "../../assets/inferior.png";
 
 export function Login() {
   const THEME_TOGGLE_COOLDOWN_MS = 700;
+  const topDots = Array.from({ length: 16 }, (_, index) => `login-dot-top-${index}`);
+  const bottomDots = Array.from({ length: 15 }, (_, index) => `login-dot-bottom-${index}`);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -38,6 +40,8 @@ export function Login() {
     setIsLoading(true);
     try {
       await login(email, password);
+    } catch {
+      // Mensaje visible se maneja globalmente desde AuthContext/App.
     } finally {
       setIsLoading(false);
     }
@@ -175,13 +179,13 @@ export function Login() {
 
             {/* Puntos decorativos extra - INDEPENDIENTES */}
             <div className="absolute top-[336px] right-[76px] grid grid-cols-4 gap-2 opacity-30 z-10">
-              {useMemo(() => Array.from({ length: 16 }, (_, i) => `login-dot-top-${i}`), []).map((id) => (
+              {topDots.map((id) => (
                 <div key={id} className="h-1.5 w-1.5 rounded-full bg-[#3BBF82]" />
               ))}
             </div>
 
             <div className="absolute top-[520px] right-[-190px] grid grid-cols-5 gap-2 opacity-25 z-10">
-              {useMemo(() => Array.from({ length: 15 }, (_, i) => `login-dot-bottom-${i}`), []).map((id) => (
+              {bottomDots.map((id) => (
                 <div key={id} className="h-1 w-1 rounded-full bg-[#3BBF82]" />
               ))}
             </div>
@@ -219,7 +223,7 @@ export function Login() {
           </div>
 
           {/* TARJETA DE LOGIN CON DECORACIONES */}
-          <Card className={`w-full max-w-md rounded-3xl backdrop-blur-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(59,191,130,0.18)] hover:border-[#3BBF82]/20 group will-change-transform animate-in fade-in slide-in-from-bottom-1 duration-150 ${cardSurface}`}>
+          <Card className={`w-full max-w-md rounded-3xl backdrop-blur-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(59,191,130,0.18)] hover:border-[#3BBF82]/20 group will-change-transform animate-in fade-in slide-in-from-bottom-1 ${cardSurface}`}>
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3BBF82]/40 to-transparent opacity-60" />
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3BBF82]/20 to-transparent opacity-40" />
             <div className="absolute -top-20 -right-12 w-56 h-56 rounded-full bg-[#3BBF82]/5 blur-3xl pointer-events-none" />

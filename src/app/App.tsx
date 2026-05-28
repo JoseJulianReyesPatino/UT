@@ -27,13 +27,14 @@ import EstadiasPage from "./pages/docente/Estadias";
 import TutoriasPage from "./pages/docente/Tutorias";
 import { Sidebar } from "./components/Sidebar";
 import { FormAccessGuard } from "./components/FormAccessGuard";
+import { Alert, AlertDescription } from "./components/ui/alert";
 
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
 import { Menu, Sun, Moon } from "lucide-react";
 
 function AppContent() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, notice } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const logoSrc = theme === "dark" ? "/src/assets/Logotipo UTSLRC-BLANCO.png" : "/src/assets/Logotipo  UTSLRC.png";
   const [currentView, setCurrentView] = useState("dashboard");
@@ -41,12 +42,30 @@ function AppContent() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [deferredMessageOpen, setDeferredMessageOpen] = useState<null | { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string } }>(null);
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
+  const noticeBanner = notice ? (
+    <div className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4 sm:top-6">
+      <Alert
+        variant={notice.type === "error" ? "destructive" : "default"}
+        className={`pointer-events-auto w-[min(100%,36rem)] rounded-2xl border px-5 py-4 shadow-[0_24px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl animate-in fade-in slide-in-from-top-4 zoom-in-95 duration-300 ${notice.type === "error"
+          ? "border-rose-300/80 bg-rose-50/95 text-rose-950 dark:border-rose-800/80 dark:bg-rose-950/90 dark:text-rose-50"
+          : "border-emerald-300/80 bg-emerald-50/95 text-emerald-950 dark:border-emerald-800/80 dark:bg-emerald-950/90 dark:text-emerald-50"
+        }`}
+      >
+        <AlertDescription className="text-center text-sm font-semibold tracking-wide">
+          {notice.message}
+        </AlertDescription>
+      </Alert>
+    </div>
+  ) : null;
 
   useEffect(() => {
     if (isAuthenticated) {
       setIsLoggingOut(false);
+      setCurrentView("dashboard");
     } else {
       setMobileSidebarOpen(false);
+      setDeferredMessageOpen(null);
+      setCurrentView("dashboard");
     }
   }, [isAuthenticated]);
 
@@ -66,9 +85,12 @@ function AppContent() {
 
   if (!isAuthenticated) {
     return (
-      <div className="animate-page-enter motion-reduce:animate-none">
-        <Login />
-      </div>
+      <>
+        {noticeBanner}
+        <div className="animate-page-enter motion-reduce:animate-none">
+          <Login />
+        </div>
+      </>
     );
   }
 
@@ -161,60 +183,63 @@ function AppContent() {
   };
 
   return (
-    <div className={`flex h-screen overflow-hidden bg-background ${isLoggingOut ? "animate-page-exit" : "animate-page-enter"} motion-reduce:animate-none`}>
-      <Sidebar
-        currentView={currentView}
-        onNavigate={(view) => {
-          setCurrentView(view);
-          setMobileSidebarOpen(false);
-        }}
-        mobileOpen={mobileSidebarOpen}
-        onMobileOpenChange={setMobileSidebarOpen}
-      />
-      <main className="flex-1 overflow-y-auto bg-gradient-to-br from-emerald-50 via-background to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950">
-        <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur md:hidden">
-          <div className="flex items-center justify-between px-4 py-3">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setMobileSidebarOpen(true)}
-              className="h-10 w-10"
-              aria-label="Abrir menú"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
+    <>
+      {noticeBanner}
+      <div className={`flex h-screen overflow-hidden bg-background ${isLoggingOut ? "animate-page-exit" : "animate-page-enter"} motion-reduce:animate-none`}>
+        <Sidebar
+          currentView={currentView}
+          onNavigate={(view) => {
+            setCurrentView(view);
+            setMobileSidebarOpen(false);
+          }}
+          mobileOpen={mobileSidebarOpen}
+          onMobileOpenChange={setMobileSidebarOpen}
+        />
+        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-emerald-50 via-background to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950">
+          <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur md:hidden">
+            <div className="flex items-center justify-between px-4 py-3">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setMobileSidebarOpen(true)}
+                className="h-10 w-10"
+                aria-label="Abrir menú"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
 
-            <img
-              src={logoSrc}
-              alt="Logo institucional"
-              className="h-8 w-auto object-contain"
-            />
+              <img
+                src={logoSrc}
+                alt="Logo institucional"
+                className="h-8 w-auto object-contain"
+              />
 
-            <div className="h-10 w-10" />
+              <div className="h-10 w-10" />
+            </div>
           </div>
-        </div>
-        <div className="container relative z-10 mx-auto max-w-7xl p-6 lg:p-8">
-          {renderContent()}
-        </div>
-      </main>
+          <div className="container relative z-10 mx-auto max-w-7xl p-6 lg:p-8">
+            {renderContent()}
+          </div>
+        </main>
 
-      {currentView !== "configuracion" && currentView !== "configuracion-cuenta" && (
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={toggleTheme}
-          aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-          title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-          className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
-        >
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
-      )}
+        {currentView !== "configuracion" && currentView !== "configuracion-cuenta" && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+        )}
 
-      <Toaster />
-    </div>
+        <Toaster />
+      </div>
+    </>
   );
 }
 

@@ -5,6 +5,7 @@ Sistema web moderno y profesional para la gestión académica universitaria, dis
 ## Características Principales
 
 ### Para Docentes
+
 - **Dashboard intuitivo** con resumen de actividad
 - **Formularios inteligentes** para subir documentos (paso a paso)
 - **Historial completo** de documentos enviados
@@ -19,6 +20,7 @@ Sistema web moderno y profesional para la gestión académica universitaria, dis
   - Estadías y Tutorías
 
 ### Para Administradores
+
 - **Panel de control** con métricas en tiempo real
 - **Gestión de docentes** (crear, editar, desactivar usuarios)
 - **Revisión de documentos** con sistema de aprobación/rechazo
@@ -30,11 +32,13 @@ Sistema web moderno y profesional para la gestión académica universitaria, dis
 ## Diseño UX/UI
 
 ### Identidad Visual
+
 - **Colores**: Negro profundo, blanco limpio, grises suaves, verde institucional (#16a34a)
 - **Estilo**: Minimalista, espacios amplios, diseño limpio
 - **Inspiración**: Notion, Linear, Stripe Dashboard, Google Classroom
 
 ### Componentes
+
 - Sidebar moderna y colapsable
 - Tarjetas (cards) elegantes
 - Formularios inteligentes y progresivos
@@ -47,12 +51,14 @@ Sistema web moderno y profesional para la gestión académica universitaria, dis
 ## Credenciales de Prueba
 
 ### Docente
+
 - **Email**: `docente@universidad.edu`
-- **Contraseña**: cualquier texto
+- **Contraseña**: `12345678`
 
 ### Administrador
-- **Email**: `admin@universidad.edu`
-- **Contraseña**: cualquier texto
+
+- **Email**: `esmeralda.rosas@utslrc.edu.mx`
+- **Contraseña**: `12345678`
 
 ## Tecnologías
 
@@ -96,25 +102,30 @@ src/
 ## Características Destacadas
 
 ### Formularios Inteligentes
+
 Los formularios se adaptan dinámicamente según las selecciones del usuario:
+
 1. Selección de tipo (TSU/Ingeniería) y plan
 2. Selección de carrera y cuatrimestre
 3. Materia, parcial y grupo
 4. Subida de archivo PDF con vista previa
 
 ### Sistema de Notificaciones
+
 - Confirmaciones de acciones
 - Alertas de errores
 - Notificaciones de éxito
 - Diseño moderno y no intrusivo
 
 ### Navegación Intuitiva
+
 - Sidebar con iconos claros
 - Estados activos visuales
 - Menús específicos por rol
 - Breadcrumbs contextuales
 
 ### Gestión de Estados
+
 - Estados vacíos elegantes
 - Skeletons para carga
 - Feedback visual inmediato
@@ -123,6 +134,7 @@ Los formularios se adaptan dinámicamente según las selecciones del usuario:
 ## Responsive Design
 
 El sistema está optimizado para:
+
 - **Desktop** (1920px+)
 - **Laptop** (1280px - 1920px)
 - **Tablet** (768px - 1280px)
