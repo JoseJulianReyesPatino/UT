@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useMemo } from "react";
-
+/**
+ * Definición de tipos para el contexto de autenticación, incluyendo el tipo de usuario y las funciones de login, logout y actualización de perfil.
+ */
 type UserRole = "docente" | "tutor" | "administrador";
 
 interface User {
