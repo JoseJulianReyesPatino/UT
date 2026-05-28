@@ -439,7 +439,7 @@ export default function Estadias() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 pointer-events-auto">
+                      <div className="flex flex-wrap items-center gap-2 pointer-events-auto">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
@@ -546,7 +546,7 @@ export default function Estadias() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
@@ -714,7 +714,7 @@ export default function Estadias() {
                               )}
                             </div>
                           </div>
-                          <div className="relative z-20 flex items-center gap-2 pointer-events-auto">
+                          <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
@@ -863,7 +863,7 @@ export default function Estadias() {
                           )}
                         </div>
                       </div>
-                      <div className="relative z-20 flex items-center gap-2 pointer-events-auto">
+                      <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">

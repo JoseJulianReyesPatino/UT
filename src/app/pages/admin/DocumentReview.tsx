@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { FileText, Eye } from "lucide-react";
 import { toast } from "sonner";
@@ -618,10 +619,15 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                           <TooltipContent>Ver PDF</TooltipContent>
                         </Tooltip>
 
-                        <Button variant="ghost" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                          <MessageSquare className="h-4 w-4" />
-                          <span className="text-sm">Enviar</span>
-                        </Button>
+                        <ResponsiveActionButton
+                          variant="ghost"
+                          size="sm"
+                          className={actionIconButtonClassName}
+                          label="Enviar"
+                          title={`Enviar a mensajes ${doc.docente}`}
+                          onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }}
+                          icon={<MessageSquare className="h-4 w-4" />}
+                        />
 
                         <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "warning"}>{getDocumentStatusLabel(doc)}</Badge>
                       </div>
@@ -731,25 +737,45 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                       </div>
                     </div>
                     <div className="flex items-center gap-2 pointer-events-auto">
-                      <Button variant="outline" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
-                        <Eye className="h-4 w-4" />
-                        <span className="text-sm">Ver</span>
-                      </Button>
+                      <ResponsiveActionButton
+                        variant="outline"
+                        size="sm"
+                        className={actionIconButtonClassName}
+                        label="Ver"
+                        title="Ver PDF"
+                        onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}
+                        icon={<Eye className="h-4 w-4" />}
+                      />
 
-                      <Button variant="outline" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "review", document: doc }); }} aria-label="Revisar documento">
-                        <Check className="h-4 w-4" />
-                        <span className="text-sm">Revisar</span>
-                      </Button>
+                      <ResponsiveActionButton
+                        variant="outline"
+                        size="sm"
+                        className={actionIconButtonClassName}
+                        label="Revisar"
+                        title="Revisar documento"
+                        onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "review", document: doc }); }}
+                        icon={<Check className="h-4 w-4" />}
+                      />
 
-                      <Button variant="ghost" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                        <MessageSquare className="h-4 w-4" />
-                        <span className="text-sm">Enviar</span>
-                      </Button>
+                      <ResponsiveActionButton
+                        variant="ghost"
+                        size="sm"
+                        className={actionIconButtonClassName}
+                        label="Enviar"
+                        title={`Enviar a mensajes ${doc.docente}`}
+                        onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }}
+                        icon={<MessageSquare className="h-4 w-4" />}
+                      />
 
-                      <Button variant="destructive" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} aria-label="Devolver documento">
-                        <Undo2 className="h-4 w-4" />
-                        <span className="text-sm">Devolver</span>
-                      </Button>
+                      <ResponsiveActionButton
+                        variant="destructive"
+                        size="sm"
+                        className={actionIconButtonClassName}
+                        label="Devolver"
+                        title="Devolver documento"
+                        onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }}
+                        icon={<Undo2 className="h-4 w-4" />}
+                      />
                     </div>
                   </div>
                 ))}
@@ -987,10 +1013,15 @@ export function DocumentReview({ initialSection = "all" }: Readonly<DocumentRevi
                           <TooltipContent>Ver PDF</TooltipContent>
                         </Tooltip>
 
-                        <Button variant="ghost" size="sm" className={`${actionIconButtonClassName} h-8 px-2 flex items-center gap-2`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                          <MessageSquare className="h-4 w-4" />
-                          <span className="text-sm">Enviar</span>
-                        </Button>
+                        <ResponsiveActionButton
+                          variant="ghost"
+                          size="sm"
+                          className={actionIconButtonClassName}
+                          label="Enviar"
+                          title={`Enviar a mensajes ${doc.docente}`}
+                          onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }}
+                          icon={<MessageSquare className="h-4 w-4" />}
+                        />
 
                         <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "success"}>{getDocumentStatusLabel(doc)}</Badge>
                       </div>

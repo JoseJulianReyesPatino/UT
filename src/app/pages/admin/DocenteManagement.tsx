@@ -7,6 +7,7 @@ import { Label } from "../../components/ui/label";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { UserPlus, Search, Edit, Key, UserCheck, UserX, Eye, EyeOff, ShieldAlert, Mail } from "lucide-react";
 import { toast } from "sonner";
 
@@ -452,43 +453,48 @@ export function DocenteManagement() {
             {filteredDocentes.map((docente) => (
               <div
                 key={docente.id}
-                className="flex items-center justify-between p-4 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors dark:bg-slate-950/60 dark:hover:bg-slate-900/70 overflow-hidden"
+                className="flex flex-col gap-4 p-4 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors dark:bg-slate-950/60 dark:hover:bg-slate-900/70 overflow-hidden sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex items-center gap-4 min-w-0">
+                <div className="flex items-center gap-4 min-w-0 flex-1">
                   <Avatar className="h-12 w-12 flex-shrink-0">
                     <AvatarFallback className="bg-success/10 text-success">
                       {docente.avatar}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <p className="font-medium truncate">{docente.nombre}</p>
-                    <p className="text-sm text-muted-foreground truncate">{docente.email}</p>
-                    <div className="flex gap-4 mt-1 text-xs text-muted-foreground truncate">
+                    <p className="font-medium break-words sm:truncate">{docente.nombre}</p>
+                    <p className="text-sm text-muted-foreground break-words sm:truncate">{docente.email}</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-muted-foreground">
                       <span className="truncate">{docente.documentos} documentos enviados</span>
                       <span className="truncate">{(docente.roles || []).join(", ")}</span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Badge variant={docente.status === "activo" ? "success" : "outline"}>
+                <div className="flex flex-wrap items-center gap-2 flex-shrink-0 sm:justify-end">
+                  <Badge variant={docente.status === "activo" ? "success" : "outline"} className="shrink-0">
                     {docente.status === "activo" ? "Activo" : "Inactivo"}
                   </Badge>
-                  <Button variant="ghost" title="Editar" onClick={() => openEditDialog(docente)}>
-                    <Edit className="h-4 w-4" />
-                    <span className="ml-2 text-sm">Editar</span>
-                  </Button>
-                  <Button variant="ghost" title="Restablecer contraseña" onClick={() => openResetDialog(docente)}>
-                    <Key className="h-4 w-4" />
-                    <span className="ml-2 text-sm">Restablecer</span>
-                  </Button>
-                  <Button variant="ghost" title="Cambiar estado" onClick={() => openStatusDialog(docente)}>
-                    {docente.status === "activo" ? (
-                      <UserX className="h-4 w-4" />
-                    ) : (
-                      <UserCheck className="h-4 w-4" />
-                    )}
-                    <span className="ml-2 text-sm">{docente.status === "activo" ? "Dar baja" : "Dar alta"}</span>
-                  </Button>
+                  <ResponsiveActionButton
+                    variant="ghost"
+                    label="Editar"
+                    title="Editar"
+                    onClick={() => openEditDialog(docente)}
+                    icon={<Edit className="h-4 w-4" />}
+                  />
+                  <ResponsiveActionButton
+                    variant="ghost"
+                    label="Restablecer"
+                    title="Restablecer contraseña"
+                    onClick={() => openResetDialog(docente)}
+                    icon={<Key className="h-4 w-4" />}
+                  />
+                  <ResponsiveActionButton
+                    variant="ghost"
+                    label={docente.status === "activo" ? "Dar baja" : "Dar alta"}
+                    title="Cambiar estado"
+                    onClick={() => openStatusDialog(docente)}
+                    icon={docente.status === "activo" ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                  />
                 </div>
               </div>
             ))}

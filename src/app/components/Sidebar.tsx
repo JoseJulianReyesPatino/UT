@@ -86,11 +86,11 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const adminMenuItems = [
     { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
     { id: "docentes", label: "Gestión Usuarios", icon: Users },
-    { id: "tutores", label: "Tutores", icon: CalendarDays },
+    { id: "tutores", label: "Tutores", icon: User },
     { id: "estadias-admin", label: "Estadías", icon: FileArchive },
     { id: "calendario", label: "Calendario", icon: CalendarDays },
     { id: "documentos", label: "Documentos", icon: FileText },
-    { id: "ciclos", label: "Ciclos Escolares", icon: CalendarDays },
+    { id: "ciclos", label: "Ciclos Escolares", icon: FileStack },
     { id: "mensajes", label: "Mensajes", icon: MessageSquare },
     { id: "configuracion", label: "Configuración", icon: Settings },
   ];

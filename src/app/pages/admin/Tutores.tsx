@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { FileText, Eye, MessageSquare, Check, Undo2 } from "lucide-react";
 import { toast } from "sonner";
@@ -457,56 +458,65 @@ export default function Tutores() {
                         </div>
                       </div>
                       <div className="relative z-20 flex items-center gap-2 pointer-events-auto">
-                        <Button variant="outline" size="sm" className="h-8 px-2 flex items-center gap-2 w-auto" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
-                          <Eye className="h-4 w-4" />
-                          <span className="text-sm">Ver</span>
-                        </Button>
+                        <ResponsiveActionButton
+                          variant="outline"
+                          size="sm"
+                          label="Ver"
+                          title="Ver PDF"
+                          onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}
+                          icon={<Eye className="h-4 w-4" />}
+                        />
 
                         {!isReviewed && (
-                        <Button variant="outline" size="sm" className="h-8 px-2 flex items-center gap-2 w-auto" onClick={(e) => { e.stopPropagation(); setReviewConfirmation(doc as TutorPendingDocument); }} aria-label="Revisar documento">
-                          <Check className="h-4 w-4" />
-                          <span className="text-sm">Revisar</span>
-                        </Button>
+                        <ResponsiveActionButton
+                          variant="outline"
+                          size="sm"
+                          label="Revisar"
+                          title="Revisar documento"
+                          onClick={(e) => { e.stopPropagation(); setReviewConfirmation(doc as TutorPendingDocument); }}
+                          icon={<Check className="h-4 w-4" />}
+                        />
                         )}
 
-                        <Button variant="ghost" size="sm" className="h-8 px-2 flex items-center gap-2 w-auto" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${'tutor' in doc ? doc.tutor : (doc as any).tutor}`}>
-                          <MessageSquare className="h-4 w-4" />
-                          <span className="text-sm">Enviar</span>
-                        </Button>
+                        <ResponsiveActionButton
+                          variant="ghost"
+                          size="sm"
+                          label="Enviar"
+                          title={`Enviar a mensajes ${'tutor' in doc ? doc.tutor : (doc as any).tutor}`}
+                          onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }}
+                          icon={<MessageSquare className="h-4 w-4" />}
+                        />
 
                         {doc.returned ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button
+                                <ResponsiveActionButton
                                   variant="outline"
                                   size="sm"
-                                  className="h-8 px-2 flex items-center gap-2 w-auto border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                                  label="Cancelar"
+                                  title="Cancelar devolución"
+                                  className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setReturnConfirmation({ type: "cancel-return", document: doc });
                                   }}
-                                  aria-label="Cancelar devolución"
-                                >
-                                  <Undo2 className="h-4 w-4" />
-                                  <span className="text-sm">Cancelar</span>
-                                </Button>
+                                  icon={<Undo2 className="h-4 w-4" />}
+                                />
                             </TooltipTrigger>
                             <TooltipContent>Cancelar devolución</TooltipContent>
                           </Tooltip>
                         ) : (
-                            <Button
+                            <ResponsiveActionButton
                               variant="destructive"
                               size="sm"
-                              className="h-8 px-2 flex items-center gap-2 w-auto"
+                              label="Devolver"
+                              title="Devolver documento"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setReturnConfirmation({ type: "return", document: doc });
                               }}
-                              aria-label="Devolver documento"
-                            >
-                              <Undo2 className="h-4 w-4" />
-                              <span className="text-sm">Devolver</span>
-                            </Button>
+                              icon={<Undo2 className="h-4 w-4" />}
+                            />
                         )}
 
                         <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "warning"}>
@@ -635,27 +645,30 @@ export default function Tutores() {
                         <TooltipContent>Revisar</TooltipContent>
                       </Tooltip>
 
-                        <Button variant="ghost" size="sm" className="h-8 px-2 flex items-center gap-2 w-auto" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${'tutor' in doc ? doc.tutor : (doc as any).tutor}`}>
-                          <MessageSquare className="h-4 w-4" />
-                          <span className="text-sm">Enviar</span>
-                        </Button>
+                        <ResponsiveActionButton
+                          variant="ghost"
+                          size="sm"
+                          label="Enviar"
+                          title={`Enviar a mensajes ${'tutor' in doc ? doc.tutor : (doc as any).tutor}`}
+                          onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }}
+                          icon={<MessageSquare className="h-4 w-4" />}
+                        />
 
                       {doc.returned ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button
+                            <ResponsiveActionButton
                               variant="outline"
                               size="sm"
-                              className="h-8 px-2 flex items-center gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                              label="Cancelar"
+                              title="Cancelar devolución"
+                              className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setReturnConfirmation({ type: "cancel-return", document: doc });
                               }}
-                              aria-label="Cancelar devolución"
-                            >
-                              <Undo2 className="h-4 w-4" />
-                              <span className="text-sm">Cancelar</span>
-                            </Button>
+                              icon={<Undo2 className="h-4 w-4" />}
+                            />
                           </TooltipTrigger>
                           <TooltipContent>Cancelar devolución</TooltipContent>
                         </Tooltip>
@@ -814,19 +827,17 @@ export default function Tutores() {
                               <TooltipContent>Cancelar devolución</TooltipContent>
                             </Tooltip>
                           ) : (
-                            <Button
+                            <ResponsiveActionButton
                               variant="destructive"
                               size="sm"
-                              className="h-8 px-2 flex items-center gap-2 w-auto"
+                              label="Devolver"
+                              title="Devolver documento"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setReturnConfirmation({ type: "return", document: doc });
                               }}
-                              aria-label="Devolver documento"
-                            >
-                              <Undo2 className="h-4 w-4" />
-                              <span className="text-sm">Devolver</span>
-                            </Button>
+                              icon={<Undo2 className="h-4 w-4" />}
+                            />
                           )}
 
                           <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "warning"}>{getDocumentStatusLabel(doc)}</Badge>

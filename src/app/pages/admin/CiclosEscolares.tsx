@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Calendar, Check, ChevronLeft, FileText, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "../../components/ui/scroll-area";
+import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 
 type CycleStatus = "activo" | "cerrado";
@@ -520,22 +521,22 @@ export function CiclosEscolares() {
               }}
             >
               <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <CardTitle>{ciclo.nombre}</CardTitle>
-                      <Badge variant={ciclo.status === "activo" ? "success" : "outline"}>{ciclo.status === "activo" ? "Activo" : "Cerrado"}</Badge>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CardTitle className="break-words">{ciclo.nombre}</CardTitle>
+                      <Badge variant={ciclo.status === "activo" ? "success" : "outline"} className="shrink-0">{ciclo.status === "activo" ? "Activo" : "Cerrado"}</Badge>
                     </div>
                     <CardDescription>
                       {ciclo.fechaInicio} — {ciclo.fechaFin}
                     </CardDescription>
                   </div>
-                  <Calendar className="h-5 w-5 text-muted-foreground" />
+                  <Calendar className="h-5 w-5 text-muted-foreground self-start" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex flex-wrap gap-6 text-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap gap-6 text-sm min-w-0">
                     <div>
                       <p className="text-muted-foreground">Año</p>
                       <p className="font-medium">{ciclo.anio}</p>
@@ -549,7 +550,7 @@ export function CiclosEscolares() {
                       <p className="font-medium">{documentsCount}</p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 justify-end">
+                  <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button variant="outline" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openDocsForCycle(ciclo); }} aria-label="Ver documentos">
@@ -873,7 +874,15 @@ export function CiclosEscolares() {
                               <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>
                             </div>
                           </div>
-                          <Button variant="outline" size="sm" className="shrink-0" onClick={(e) => { e.stopPropagation(); openDocumentPreview(doc); }}>Ver PDF</Button>
+                          <ResponsiveActionButton
+                            variant="outline"
+                            size="sm"
+                            label="Ver PDF"
+                            title="Ver documento"
+                            className="shrink-0"
+                            onClick={(e) => { e.stopPropagation(); openDocumentPreview(doc); }}
+                            icon={<FileText className="h-4 w-4" />}
+                          />
                         </div>
                       </div>
                     ))
@@ -920,7 +929,15 @@ export function CiclosEscolares() {
                               <Badge variant="outline" className="text-xs">{doc.tipo.replaceAll("-", " ")}</Badge>
                             </div>
                           </div>
-                          <Button variant="outline" size="sm" className="shrink-0" onClick={(e) => { e.stopPropagation(); openDocumentPreview(doc); }}>Ver PDF</Button>
+                          <ResponsiveActionButton
+                            variant="outline"
+                            size="sm"
+                            label="Ver PDF"
+                            title="Ver documento"
+                            className="shrink-0"
+                            onClick={(e) => { e.stopPropagation(); openDocumentPreview(doc); }}
+                            icon={<FileText className="h-4 w-4" />}
+                          />
                         </div>
                       </div>
                     ))
