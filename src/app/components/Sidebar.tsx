@@ -32,6 +32,193 @@ interface SidebarProps {
   onMobileOpenChange?: (open: boolean) => void;
 }
 
+type SidebarMenuItem = { id: string; label: string; icon: React.ElementType };
+
+type SidebarMenuItemButtonProps = {
+  item: SidebarMenuItem;
+  isActive: boolean;
+  isCollapsedLocal: boolean;
+  onSelect: () => void;
+};
+
+function SidebarMenuItemButton({ item, isActive, isCollapsedLocal, onSelect }: Readonly<SidebarMenuItemButtonProps>) {
+  const Icon = item.icon;
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
+        isActive
+          ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
+          : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
+      )}
+    >
+      <Icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
+      {!isCollapsedLocal && <span className="font-medium">{item.label}</span>}
+    </button>
+  );
+}
+
+type SidebarInstrumentSectionProps = {
+  currentView: string;
+  isCollapsedLocal: boolean;
+  isMobile?: boolean;
+  canAccessTutorias: boolean;
+  instrumento3040Children: Array<{ id: string; label: string; description: string }>;
+  instrumento6070Children: Array<{ id: string; label: string; description: string }>;
+  instrumento3040Open: boolean;
+  instrumento6070Open: boolean;
+  isInstrumento3040Active: boolean;
+  isInstrumento6070Active: boolean;
+  onNavigate: (viewId: string) => void;
+  onMobileOpenChange?: (open: boolean) => void;
+  onCloseCollapse: () => void;
+  onToggle3040: () => void;
+  onToggle6070: () => void;
+  
+};
+
+function SidebarInstrumentSection({
+  currentView,
+  isCollapsedLocal,
+  isMobile = false,
+  canAccessTutorias,
+  instrumento3040Children,
+  instrumento6070Children,
+  instrumento3040Open,
+  instrumento6070Open,
+  isInstrumento3040Active,
+  isInstrumento6070Active,
+  onNavigate,
+  onMobileOpenChange,
+  onCloseCollapse,
+  onToggle3040,
+  onToggle6070,
+ 
+}: Readonly<SidebarInstrumentSectionProps>) {
+  if (isCollapsedLocal || !canAccessTutorias) {
+    return null;
+  }
+
+  const handleChildSelect = (viewId: string) => {
+    onNavigate(viewId);
+    if (isMobile) {
+      onMobileOpenChange?.(false);
+      return;
+    }
+
+    onCloseCollapse();
+  };
+
+  return (
+    <div className="space-y-1 pt-1">
+      <button
+        type="button"
+        onClick={onToggle3040}
+        className={cn(
+          "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
+          isInstrumento3040Active
+            ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
+            : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
+        )}
+      >
+        <BarChart3 className={cn("h-5 w-5 shrink-0", isInstrumento3040Active ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
+        <span className="flex-1 whitespace-nowrap text-sm font-medium leading-none">Instrumento 30/40%</span>
+        {instrumento3040Open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        
+      </button>
+
+      {instrumento3040Open && (
+        <div className="ml-5 space-y-1 border-l border-emerald-200/70 pl-4 dark:border-slate-700">
+          
+          {instrumento3040Children.map((child) => {
+            const isChildActive = currentView === child.id;
+            return (
+              <button
+                key={child.id}
+                type="button"
+                onClick={() => handleChildSelect(child.id)}
+                className={cn(
+                  "group w-full flex items-start gap-2 rounded-lg px-2 py-2 text-left text-sm transition-all",
+                  isChildActive
+                    ? "bg-emerald-500/10 text-emerald-900 dark:bg-emerald-500/15 dark:text-emerald-100"
+                    : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-800 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-emerald-200",
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full transition-colors",
+                    isChildActive
+                      ? "bg-emerald-600 dark:bg-emerald-300"
+                      : "bg-emerald-300 group-hover:bg-emerald-500 dark:bg-slate-500 dark:group-hover:bg-emerald-300",
+                  )}
+                />
+                <div className="min-w-0 text-left">
+                  <div className="text-sm font-medium leading-tight">{child.label}</div>
+                  <div className="text-[11px] leading-tight opacity-75">{child.description}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onToggle6070}
+        className={cn(
+          "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
+          isInstrumento6070Active
+            ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
+            : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
+        )}
+      >
+        <BarChart3 className={cn("h-5 w-5 shrink-0", isInstrumento6070Active ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
+        <span className="flex-1 whitespace-nowrap text-sm font-medium leading-none">Instrumento 60/70%</span>
+        {instrumento6070Open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        
+      </button>
+
+      {instrumento6070Open && (
+        <div className="ml-5 space-y-1 border-l border-emerald-200/70 pl-4 dark:border-slate-700">
+          
+          {instrumento6070Children.map((child) => {
+            const isChildActive = currentView === child.id;
+            return (
+              <button
+                key={child.id}
+                type="button"
+                onClick={() => handleChildSelect(child.id)}
+                className={cn(
+                  "group w-full flex items-start gap-2 rounded-lg px-2 py-2 text-left text-sm transition-all",
+                  isChildActive
+                    ? "bg-emerald-500/10 text-emerald-900 dark:bg-emerald-500/15 dark:text-emerald-100"
+                    : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-800 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-emerald-200",
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full transition-colors",
+                    isChildActive
+                      ? "bg-emerald-600 dark:bg-emerald-300"
+                      : "bg-emerald-300 group-hover:bg-emerald-500 dark:bg-slate-500 dark:group-hover:bg-emerald-300",
+                  )}
+                />
+                <div className="min-w-0 text-left">
+                  <div className="text-sm font-medium leading-tight">{child.label}</div>
+                  <div className="text-[11px] leading-tight opacity-75">{child.description}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Sidebar(props: Readonly<SidebarProps>) {
   const { currentView, onNavigate, mobileOpen, onMobileOpenChange } = props;
   const { user, logout } = useAuth();
@@ -69,6 +256,35 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     }
   }, [currentView, instrumento3040Children, instrumento6070Children]);
 
+  const handleMenuItemClick = React.useCallback((itemId: string, isMobile = false) => {
+    onNavigate(itemId);
+    // Al navegar a cualquier otro apartado, el currentView cambiará y los
+    // padres se marcarán/desmarcarán según la nueva vista.
+    // Cerrar submenus de instrumentos cuando se navega a otro top-level
+    setInstrumento3040Open(false);
+    setInstrumento6070Open(false);
+    if (isMobile) {
+      onMobileOpenChange?.(false);
+      return;
+    }
+
+    setCollapsed(false);
+  }, [onMobileOpenChange, onNavigate]);
+
+  const handleInstrumento3040Click = React.useCallback(() => {
+    const nextOpen = !instrumento3040Open;
+    setInstrumento3040Open(nextOpen);
+    setInstrumento6070Open(false);
+    onNavigate("instrumento-3040");
+  }, [instrumento3040Open, onNavigate]);
+
+  const handleInstrumento6070Click = React.useCallback(() => {
+    const nextOpen = !instrumento6070Open;
+    setInstrumento6070Open(nextOpen);
+    setInstrumento3040Open(false);
+    onNavigate("instrumento-6070");
+  }, [instrumento6070Open, onNavigate]);
+
   const docenteMenuItems = [
     { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
     { id: "planeacion", label: "Planeación", icon: FileText },
@@ -95,14 +311,18 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     { id: "configuracion", label: "Configuración", icon: Settings },
   ];
 
-  const menuItems = user?.role === "administrador"
-    ? adminMenuItems
-    : canAccessTutorias
-    ? docenteMenuItems
-    : docenteMenuItems.filter((item) => item.id !== "tutorias");
+  let menuItems = adminMenuItems;
+  if (user?.role === "administrador") {
+    menuItems = adminMenuItems;
+  } else if (canAccessTutorias) {
+    menuItems = docenteMenuItems;
+  } else {
+    menuItems = docenteMenuItems.filter((item) => item.id !== "tutorias");
+  }
 
-  const isInstrumento3040Active = instrumento3040Children.some((item) => item.id === currentView);
-  const isInstrumento6070Active = instrumento6070Children.some((item) => item.id === currentView);
+  // Parent is active when the currentView is the parent id OR any of its children
+  const isInstrumento3040Active = currentView === "instrumento-3040" || instrumento3040Children.some((item) => item.id === currentView);
+  const isInstrumento6070Active = currentView === "instrumento-6070" || instrumento6070Children.some((item) => item.id === currentView);
 
   const isMenuItemActive = (itemId: string) => {
     if (itemId === "documentos") {
@@ -121,7 +341,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     return currentView === itemId;
   };
 
-  const renderContent = (isMobile = false) => {
+  const renderContent = (isMobile: boolean = false) => {
     const isCollapsedLocal = isMobile ? false : collapsed;
     const containerClass = cn(
       "relative h-full overflow-hidden flex flex-col border-r border-emerald-200/70 bg-gradient-to-b from-emerald-50 via-white to-cyan-50/60 text-sidebar-foreground shadow-[0_12px_40px_rgba(16,185,129,0.08)] transition-all duration-300 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900",
@@ -165,126 +385,37 @@ export function Sidebar(props: Readonly<SidebarProps>) {
             return (
               <div key={item.id} className="space-y-1">
                 <button
-                  onClick={() => {
-                    onNavigate(item.id);
-                    if (isMobile) {
-                      if (onMobileOpenChange) onMobileOpenChange(false);
-                      return;
-                    }
-
-                    setCollapsed(false);
-                  }}
+                  type="button"
+                  onClick={() => handleMenuItemClick(item.id, isMobile)}
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
                     isActive
                       ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
-                      : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300"
+                      : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
                   )}
                 >
                   <Icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
                   {!isCollapsedLocal && <span className="font-medium">{item.label}</span>}
                 </button>
 
-                {!isCollapsedLocal && user?.role !== "administrador" && item.id === "planeacion" && (
-                  <div className="space-y-1 pl-4 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setInstrumento3040Open((value) => !value)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
-                        isInstrumento3040Active
-                          ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
-                          : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
-                      )}
-                    >
-                      <BarChart3 className={cn("h-5 w-5 shrink-0", isInstrumento3040Active ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
-                      <span className="font-medium flex-1">Instrumento 30/40%</span>
-                      {instrumento3040Open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    </button>
-
-                    {instrumento3040Open && (
-                      <div className="space-y-1 pl-4">
-                        {instrumento3040Children.map((child) => {
-                          const isChildActive = currentView === child.id;
-                          return (
-                            <button
-                              key={child.id}
-                              type="button"
-                              onClick={() => {
-                                onNavigate(child.id);
-                                if (isMobile) {
-                                  onMobileOpenChange?.(false);
-                                  return;
-                                }
-                                setCollapsed(false);
-                              }}
-                              className={cn(
-                                "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left text-sm",
-                                isChildActive
-                                  ? "bg-emerald-500/15 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-100"
-                                  : "text-slate-600 hover:bg-emerald-100/60 hover:text-emerald-800 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-emerald-200",
-                              )}
-                            >
-                              <ChevronRight className={cn("h-4 w-4 shrink-0", isChildActive ? "text-emerald-700 dark:text-emerald-200" : "text-emerald-500 dark:text-emerald-400")} />
-                              <div className="min-w-0 text-left">
-                                <div className="font-medium">{child.label}</div>
-                                <div className="text-xs opacity-80">{child.description}</div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => setInstrumento6070Open((value) => !value)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
-                        isInstrumento6070Active
-                          ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
-                          : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
-                      )}
-                    >
-                      <BarChart3 className={cn("h-5 w-5 shrink-0", isInstrumento6070Active ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
-                      <span className="font-medium flex-1">Instrumento 60/70%</span>
-                      {instrumento6070Open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    </button>
-
-                    {instrumento6070Open && (
-                      <div className="space-y-1 pl-4">
-                        {instrumento6070Children.map((child) => {
-                          const isChildActive = currentView === child.id;
-                          return (
-                            <button
-                              key={child.id}
-                              type="button"
-                              onClick={() => {
-                                onNavigate(child.id);
-                                if (isMobile) {
-                                  onMobileOpenChange?.(false);
-                                  return;
-                                }
-                                setCollapsed(false);
-                              }}
-                              className={cn(
-                                "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left text-sm",
-                                isChildActive
-                                  ? "bg-emerald-500/15 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-100"
-                                  : "text-slate-600 hover:bg-emerald-100/60 hover:text-emerald-800 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-emerald-200",
-                              )}
-                            >
-                              <ChevronRight className={cn("h-4 w-4 shrink-0", isChildActive ? "text-emerald-700 dark:text-emerald-200" : "text-emerald-500 dark:text-emerald-400")} />
-                              <div className="min-w-0 text-left">
-                                <div className="font-medium">{child.label}</div>
-                                <div className="text-xs opacity-80">{child.description}</div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                {item.id === "planeacion" && (
+                  <SidebarInstrumentSection
+                    currentView={currentView}
+                    isCollapsedLocal={isCollapsedLocal}
+                    isMobile={isMobile}
+                    canAccessTutorias={user?.role !== "administrador"}
+                    instrumento3040Children={instrumento3040Children}
+                    instrumento6070Children={instrumento6070Children}
+                    instrumento3040Open={instrumento3040Open}
+                    instrumento6070Open={instrumento6070Open}
+                    isInstrumento3040Active={isInstrumento3040Active}
+                    isInstrumento6070Active={isInstrumento6070Active}
+                    onNavigate={onNavigate}
+                    onMobileOpenChange={onMobileOpenChange}
+                    onCloseCollapse={() => setCollapsed(false)}
+                    onToggle3040={handleInstrumento3040Click}
+                    onToggle6070={handleInstrumento6070Click}
+                  />
                 )}
               </div>
             );

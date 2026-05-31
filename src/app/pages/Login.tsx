@@ -101,7 +101,7 @@ export function Login() {
         {/* ===================================================== */}
         {/* COLUMNA IZQUIERDA - CONTENIDO VISUAL */}
         {/* ===================================================== */}
-        <div className="hidden lg:flex items-center justify-center px-12 xl:px-20 relative">
+        <div className="hidden lg:flex items-center justify-center px-8 xl:px-12 relative">
           {/* DECORACIONES SUPERIORES - Cuadrícula de puntos */}
           <div className="absolute top-10 right-8 h-1.5 w-1.5 rounded-full bg-[#3BBF82]/35 dark:bg-[#3BBF82]/50" />
           <div className="absolute top-18 right-20 h-1 w-1 rounded-full bg-[#3BBF82]/30 dark:bg-[#3BBF82]/45" />
@@ -130,7 +130,7 @@ export function Login() {
           {/* CONTENIDO PRINCIPAL */}
           <div className="max-w-2xl relative z-10 min-h-[560px] w-full">
             {/* LOGO - Bloque independiente */}
-            <div className="absolute left-0 top-[-45px]">
+            <div className="absolute left-0 top-[-56px]">
               <img
                 src={logoSrc}
                 alt="Logo Institucional"
@@ -139,7 +139,7 @@ export function Login() {
             </div>
 
             {/* TÍTULO - Bloque independiente */}
-            <div className="absolute left-0 top-21 max-w-[34rem]">
+            <div className="absolute left-0 top-16 max-w-[38rem]">
               <h1 className="text-[58px] lg:text-[64px] leading-[0.98] font-black tracking-tight text-slate-900 dark:text-slate-50 drop-shadow-sm">
                 <span className="whitespace-nowrap">Sistema de Gestión</span>
                 <span className="hidden lg:block text-[#3BBF82] dark:text-emerald-300">Académica Digital</span>
@@ -147,7 +147,7 @@ export function Login() {
             </div>
 
             {/* TEXTO - Bloque independiente */}
-            <div className="absolute left-0 top-[225px] max-w-[34rem]">
+            <div className="absolute left-0 top-[210px] max-w-[38rem]">
               <p className={`${isDark ? "text-slate-300" : "text-slate-600"} text-lg lg:text-xl leading-relaxed font-medium text-justify`}>
                 Esta plataforma digital facilita la transición hacia el uso eficiente de documentos
                 digitales, optimizando los flujos de trabajo de suma y documentación pertinentes en la
@@ -156,7 +156,7 @@ export function Login() {
             </div>
 
             {/* MASCOTA - Bloque independiente con efecto flotante */}
-            <div className="absolute right-[-220px] top-[320px] z-20">
+            <div className="absolute right-[-180px] top-[300px] z-20">
               <div className="relative w-80 h-80 xl:w-[24rem] xl:h-[24rem] flex items-center justify-center">
                 {/* Efecto de glow detrás del gallo */}
                 <div className="absolute inset-0 bg-gradient-to-br from-[#3BBF82]/10 to-[#3BBF82]/5 rounded-full blur-3xl" />
@@ -178,13 +178,13 @@ export function Login() {
             </div>
 
             {/* Puntos decorativos extra - INDEPENDIENTES */}
-            <div className="absolute top-[336px] right-[76px] grid grid-cols-4 gap-2 opacity-30 z-10">
+            <div className="absolute top-[336px] right-[128px] grid grid-cols-4 gap-2 opacity-30 z-10">
               {topDots.map((id) => (
                 <div key={id} className="h-1.5 w-1.5 rounded-full bg-[#3BBF82]" />
               ))}
             </div>
 
-            <div className="absolute top-[520px] right-[-190px] grid grid-cols-5 gap-2 opacity-25 z-10">
+            <div className="absolute top-[520px] right-[-150px] grid grid-cols-5 gap-2 opacity-25 z-10">
               {bottomDots.map((id) => (
                 <div key={id} className="h-1 w-1 rounded-full bg-[#3BBF82]" />
               ))}
@@ -344,5 +344,4 @@ export function Login() {
     </div>
   );
 }
-
 

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useMemo, useEffect, useRef } from "react";
-import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../lib/env";
+import { AUTH_TOKEN_STORAGE_KEY } from "../lib/env";
 import { apiFetch } from "../lib/api";
 
 type UserRole = "docente" | "tutor" | "administrador";
@@ -26,6 +26,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+type ApiRolePayload = string | { code?: string | null; name?: string | null };
+
 type ApiLoginResponse = {
   token: string;
   user: {
@@ -36,13 +38,46 @@ type ApiLoginResponse = {
     area?: string | null;
     avatar_url?: string | null;
     is_active?: boolean;
-    roles?: Array<UserRole | string>;
+    roles?: ApiRolePayload[];
   };
 };
 
-const normalizeRoles = (roles: Array<UserRole | string> | undefined): UserRole[] => {
-  const normalizedRoles = (roles ?? []).filter((role): role is UserRole => role === "docente" || role === "tutor" || role === "administrador");
-  return normalizedRoles.length > 0 ? normalizedRoles : ["docente"];
+const normalizeRoleToken = (role: ApiRolePayload): string => {
+  if (typeof role === "string") {
+    return role.toLowerCase();
+  }
+
+  const code = role?.code?.toLowerCase().trim();
+  if (code) return code;
+
+  const name = role?.name?.toLowerCase().trim();
+  return name ?? "";
+};
+
+const normalizeRoles = (
+  roles: ApiRolePayload[] | undefined,
+): UserRole[] => {
+  const result: UserRole[] = [];
+  (roles ?? []).forEach((r) => {
+    const s = normalizeRoleToken(r);
+    if (!s) return;
+
+    if (s.includes('admin') || s.includes('administrador')) {
+      if (!result.includes('administrador')) result.push('administrador');
+      return;
+    }
+
+    if (s.includes('tutor')) {
+      if (!result.includes('tutor')) result.push('tutor');
+      return;
+    }
+
+    if (s.includes('docente') || s.includes('teacher')) {
+      if (!result.includes('docente')) result.push('docente');
+    }
+  });
+
+  return result.length > 0 ? result : ['docente'];
 };
 
 const mapApiUser = (apiUser: ApiLoginResponse["user"]): User => {
