@@ -5,6 +5,7 @@ import { cn } from "../../lib/utils";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import apiFetch from "../lib/api";
 import {
   FileText,
   BarChart3,
@@ -33,6 +34,21 @@ interface SidebarProps {
 }
 
 type SidebarMenuItem = { id: string; label: string; icon: React.ElementType };
+
+function MessageBadge({ count, collapsed }: Readonly<{ count: number; collapsed: boolean }>) {
+  if (count <= 0) return null;
+
+  return (
+    <span
+      className={cn(
+        "absolute -top-1 -right-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold leading-none text-white shadow-md shadow-red-500/30",
+        collapsed && "-top-2 -right-2 min-w-6 px-2 text-[11px]",
+      )}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
 
 type SidebarMenuItemButtonProps = {
   item: SidebarMenuItem;
@@ -225,11 +241,46 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const { theme } = useTheme();
   // Sidebar starts expanded for both admin and docente.
   const [collapsed, setCollapsed] = useState(false);
-  const logoSrc = theme === "dark" ? "/src/assets/Logotipo UTSLRC-BLANCO.png" : "/src/assets/Logotipo  UTSLRC.png";
+  const logoSrc = theme === "dark" ? "/src/assets/LogotipoUTSLRC-BLANCO.png" : "/src/assets/LogotipoUTSLRC.png";
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [instrumento3040Open, setInstrumento3040Open] = useState(true);
   const [instrumento6070Open, setInstrumento6070Open] = useState(true);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUnreadMessagesCount = async () => {
+      if (!user) {
+        if (isMounted) setUnreadMessagesCount(0);
+        return;
+      }
+
+      try {
+        const payload = (await apiFetch('/conversations', { method: 'GET' })) as { data?: Array<{ unread?: number }> };
+        const totalUnread = (payload?.data ?? []).reduce((sum, conversation) => sum + Number(conversation.unread ?? 0), 0);
+        if (isMounted) setUnreadMessagesCount(totalUnread);
+      } catch {
+        if (isMounted) setUnreadMessagesCount(0);
+      }
+    };
+
+    void loadUnreadMessagesCount();
+
+    const handleMessagesUpdated = () => {
+      void loadUnreadMessagesCount();
+    };
+
+    window.addEventListener('ut-messages-updated', handleMessagesUpdated as EventListener);
+    const intervalId = window.setInterval(loadUnreadMessagesCount, 30000);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('ut-messages-updated', handleMessagesUpdated as EventListener);
+      window.clearInterval(intervalId);
+    };
+  }, [user]);
 
   const instrumento3040Children = useMemo(
     () => [
@@ -394,7 +445,10 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                       : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
                   )}
                 >
-                  <Icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
+                  <span className="relative flex shrink-0 items-center justify-center">
+                    <Icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
+                    {item.id === "mensajes" && <MessageBadge count={unreadMessagesCount} collapsed={isCollapsedLocal} />}
+                  </span>
                   {!isCollapsedLocal && <span className="font-medium">{item.label}</span>}
                 </button>
 

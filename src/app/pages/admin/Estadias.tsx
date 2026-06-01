@@ -203,6 +203,10 @@ export default function Estadias() {
     }`
   );
 
+  const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5";
+  const filterSelectTriggerClassName = "w-full text-[13px] leading-tight sm:text-sm";
+  const filterSelectValueClassName = "truncate";
+
   const matchesFilters = (doc: { ciclo: string; plan: string; carrera: string; cuatrimestre: string; docente: string; apartado: string; returned?: boolean }) => {
     const matchesCiclo = filterCiclo === "all" || doc.ciclo === filterCiclo;
     const matchesPlan = filterPlan === "all" || doc.plan === filterPlan;
@@ -342,61 +346,79 @@ export default function Estadias() {
       </div>
 
       <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
-        <TabsList className="bg-gradient-to-r from-emerald-100 via-emerald-50 to-emerald-50 p-1 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
-          <TabsTrigger value="all">Todos <Badge variant="outline" className="ml-2">{allDocuments.length}</Badge></TabsTrigger>
-          <TabsTrigger value="pendientes">Pendientes <Badge variant="warning" className="ml-2">{filteredPending.length}</Badge></TabsTrigger>
-          <TabsTrigger value="revisados">Revisados</TabsTrigger>
-          <TabsTrigger value="hoy">Revisados hoy</TabsTrigger>
+        <div className="sm:hidden mb-3">
+          <Select value={activeSection} onValueChange={(v) => setActiveSection(v as ReviewSection)}>
+            <SelectTrigger className="w-full"><SelectValue placeholder="Sección" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="pendientes">Pendientes</SelectItem>
+              <SelectItem value="revisados">Revisados</SelectItem>
+              <SelectItem value="hoy">Revisados hoy</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <TabsList className="hidden sm:flex w-full gap-2 p-1 px-2 bg-gradient-to-r from-emerald-100 via-emerald-50 to-emerald-50 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 flex-wrap">
+          <TabsTrigger value="all" className="px-3 py-2 text-sm">
+            Todos
+            <Badge variant="outline" className="ml-2">{allDocuments.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="pendientes" className="px-3 py-2 text-sm">
+            Pendientes
+            <Badge variant="warning" className="ml-2">{filteredPending.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="revisados" className="px-3 py-2 text-sm">Revisados</TabsTrigger>
+          <TabsTrigger value="hoy" className="px-3 py-2 text-sm">Revisados hoy</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4 mt-6">
           <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-emerald-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20">
             <CardHeader>
-              <div className="flex flex-wrap items-center gap-4 pt-4">
-                <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filtrar por ciclo" /></SelectTrigger>
+              <div className={filtersGridClassName}>
+                  <Select value={filterCiclo} onValueChange={setFilterCiclo}>
+                    <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
                     {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por plan" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
                     {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className="w-[260px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
                     {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los cuatrimestres</SelectItem>
                     {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Docente" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Docente" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los docentes</SelectItem>
                     {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Apartado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
                     {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los documentos</SelectItem>
                     <SelectItem value="returned">Solo devueltos</SelectItem>
@@ -471,51 +493,51 @@ export default function Estadias() {
         <TabsContent value="pendientes" className="space-y-4 mt-6">
           <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20">
             <CardHeader>
-              <div className="flex flex-wrap items-center gap-4">
+              <div className={filtersGridClassName}>
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filtrar por ciclo" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
                     {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por plan" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
                     {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className="w-[260px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
                     {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los cuatrimestres</SelectItem>
                     {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por docente" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por docente" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los docentes</SelectItem>
                     {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por apartado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
                     {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los documentos</SelectItem>
                     <SelectItem value="returned">Solo devueltos</SelectItem>
@@ -610,51 +632,51 @@ export default function Estadias() {
         <TabsContent value="revisados" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader>
-              <div className="flex flex-wrap items-center gap-4 pt-4">
+              <div className={filtersGridClassName}>
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filtrar por ciclo" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
                     {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por plan" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
                     {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className="w-[260px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
                     {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los cuatrimestres</SelectItem>
                     {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por docente" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por docente" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los docentes</SelectItem>
                     {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por apartado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
                     {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los documentos</SelectItem>
                     <SelectItem value="returned">Solo devueltos</SelectItem>
@@ -772,51 +794,51 @@ export default function Estadias() {
             <CardHeader>
               <CardTitle>Revisados hoy</CardTitle>
               <CardDescription>Documentos abiertos por administración en el día</CardDescription>
-              <div className="mt-4 flex flex-wrap items-center gap-4">
+              <div className={filtersGridClassName}>
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filtrar por ciclo" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
                     {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por plan" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
                     {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className="w-[260px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
                     {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los cuatrimestres</SelectItem>
                     {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por docente" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por docente" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los docentes</SelectItem>
                     {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por apartado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
                     {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los documentos</SelectItem>
                     <SelectItem value="returned">Solo devueltos</SelectItem>

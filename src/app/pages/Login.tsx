@@ -21,7 +21,7 @@ export function Login() {
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
-  const logoSrc = isDark ? "/src/assets/Logotipo UTSLRC-BLANCO.png" : "/src/assets/Logotipo  UTSLRC.png";
+  const logoSrc = isDark ? "/src/assets/LogotipoUTSLRC-BLANCO.png" : "/src/assets/LogotipoUTSLRC.png";
 
   const pageBackground = isDark
     ? "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950"
@@ -166,7 +166,7 @@ export function Login() {
                 
                 {/* Imagen del gallo */}
                 <img
-                  src="/src/assets/mascota.png"
+                  src="/src/assets/mascota3.png"
                   alt="Mascota institucional"
                   className="relative z-10 h-full w-full object-contain drop-shadow-2xl transition-transform duration-300 hover:scale-110 origin-center -translate-y-12"
                 />
@@ -235,7 +235,7 @@ export function Login() {
 
               {/* Versión Mobile */}
               <div className="lg:hidden text-center mb-8">
-                <h1 className={`${titleText} text-2xl font-bold mt-4`}>Sistema Académico</h1>
+                <img src={logoSrc} alt="Logo Institucional" className="mx-auto h-12 w-auto" />
               </div>
 
               {/* Versión Desktop */}
@@ -246,7 +246,10 @@ export function Login() {
                     Bienvenido
                   </p>
                 </div>
-                <p className={`${helperText} mt-2`}>Accede al sistema universitario</p>
+                <p className={`${helperText} mt-2 text-center`}>
+                  <span className="lg:hidden">Accede al sistema de gestión académica digital</span>
+                  <span className="hidden lg:inline">Accede a tu plataforma académica institucional</span>
+                </p>
               </div>
 
               <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-8 dark:via-slate-700" />
@@ -261,7 +264,7 @@ export function Login() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="primernombre.primerapellido@utslrc.mx"
+                      placeholder="Ingresa tu correo institucional"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required

@@ -11,6 +11,7 @@ import { PdfPreview } from "../../components/PdfPreview";
 import { carrieras, cuatrimestresLabels, parciales, planNormal, planNuevoModelo, type Cuatrimestre, type Plan } from "../../data/curricula";
 import { Upload, FileText, Menu, X } from "lucide-react";
 import { toast } from "sonner";
+import { getCalendarFileUrl } from "../../lib/calendar";
 
 interface InstrumentoFormPageProps {
   title: string;
@@ -52,7 +53,7 @@ export function InstrumentoFormPage(props: Readonly<InstrumentoFormPageProps>) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<InstrumentoFormData>(() => buildInitialFormData(plan));
   const [sheetOpen, setSheetOpen] = useState(false);
-  const calendarioUrl = new URL("../../../assets/Calendario25-26.pdf", import.meta.url).href;
+  const calendarioUrl = getCalendarFileUrl();
 
   const carrerasDisponibles = useMemo(() => {
     if (formData.plan === "nuevo-modelo") {

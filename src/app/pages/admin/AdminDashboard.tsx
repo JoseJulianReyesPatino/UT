@@ -1,8 +1,11 @@
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import apiFetch from "../../lib/api";
+import { toast } from "sonner";
 import { 
   Users,
   FileText,
@@ -17,101 +20,159 @@ interface AdminDashboardProps {
   onNavigate: (view: AdminView) => void;
 }
 
+type PendingDocument = {
+  id: number;
+  docente: string;
+  documento: string;
+  carrera: string;
+  tipo: string;
+  fecha: string;
+  revisado: boolean;
+  submittedAt: string;
+};
+
+type ReviewedDocument = {
+  id: number;
+  docente: string;
+  documento: string;
+  carrera: string;
+  tipo: string;
+  fecha: string;
+  reviewedAt: string;
+  reviewedAtIso: string;
+};
+
+type ActivityItem = {
+  id: number;
+  type: "review" | "upload";
+  title: string;
+  description: string;
+  time: string;
+  related: string;
+};
+
+type ApiDocument = {
+  id: number;
+  title?: string;
+  form_title?: string;
+  apartado_label?: string | null;
+  carrera_label?: string | null;
+  uploaded_by_name?: string;
+  submitted_at?: string;
+  reviewed_at?: string | null;
+  status?: string;
+};
+
+type ApiUserRole = string | { code?: string | null };
+type ApiUser = {
+  roles?: ApiUserRole[];
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return "-";
+  const parsed = new Date(value.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return parsed.toLocaleDateString("es-MX");
+};
+
+const formatRelativeTime = (value?: string | null) => {
+  if (!value) return "Sin fecha";
+  const parsed = new Date(value.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return "Sin fecha";
+
+  const diffMs = Date.now() - parsed.getTime();
+  const diffMin = Math.max(1, Math.floor(diffMs / 60000));
+
+  if (diffMin < 60) return `Hace ${diffMin} min`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `Hace ${diffHours} h`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `Hace ${diffDays} día${diffDays === 1 ? "" : "s"}`;
+};
+
+const isToday = (value?: string | null) => {
+  if (!value) return false;
+  const parsed = new Date(value.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return false;
+  const now = new Date();
+  return (
+    parsed.getFullYear() === now.getFullYear()
+    && parsed.getMonth() === now.getMonth()
+    && parsed.getDate() === now.getDate()
+  );
+};
+
+const mapPendingDocument = (doc: ApiDocument): PendingDocument => ({
+  id: Number(doc.id),
+  docente: doc.uploaded_by_name ?? "Docente",
+  documento: doc.title ?? "Documento sin título",
+  carrera: doc.carrera_label ?? "Sin carrera",
+  tipo: doc.apartado_label ?? doc.form_title ?? "Documento",
+  fecha: formatDate(doc.submitted_at),
+  revisado: false,
+  submittedAt: doc.submitted_at ?? "",
+});
+
+const mapReviewedDocument = (doc: ApiDocument): ReviewedDocument => {
+  const reviewedAtIso = doc.reviewed_at ?? doc.submitted_at ?? "";
+  return {
+    id: Number(doc.id),
+    docente: doc.uploaded_by_name ?? "Docente",
+    documento: doc.title ?? "Documento sin título",
+    carrera: doc.carrera_label ?? "Sin carrera",
+    tipo: doc.apartado_label ?? doc.form_title ?? "Documento",
+    fecha: formatDate(doc.submitted_at),
+    reviewedAt: formatDate(reviewedAtIso),
+    reviewedAtIso,
+  };
+};
+
+const isDocenteRole = (role: ApiUserRole) => {
+  if (typeof role === "string") {
+    const normalized = role.toLowerCase();
+    return normalized.includes("docente") || normalized.includes("tutor");
+  }
+
+  const code = role?.code?.toLowerCase() ?? "";
+  return code.includes("docente") || code.includes("tutor");
+};
+
+const countDocentes = (users: ApiUser[]) => users.filter((user) => (user.roles ?? []).some(isDocenteRole)).length;
+
+const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocument[]): ActivityItem[] => {
+  const reviewedItems: Array<ActivityItem & { sortAt: number }> = reviewed.map((doc) => ({
+    id: Number(`${doc.id}1`),
+    type: "review",
+    title: `Revisado documento de ${doc.docente}`,
+    description: doc.documento,
+    time: formatRelativeTime(doc.reviewedAtIso),
+    related: doc.documento,
+    sortAt: new Date(doc.reviewedAtIso.replace(" ", "T")).getTime() || 0,
+  }));
+
+  const pendingItems: Array<ActivityItem & { sortAt: number }> = pending.map((doc) => ({
+    id: Number(`${doc.id}2`),
+    type: "upload",
+    title: `${doc.docente} subió un documento`,
+    description: doc.documento,
+    time: formatRelativeTime(doc.submittedAt),
+    related: doc.documento,
+    sortAt: new Date(doc.submittedAt.replace(" ", "T")).getTime() || 0,
+  }));
+
+  return [...reviewedItems, ...pendingItems]
+    .sort((a, b) => b.sortAt - a.sortAt)
+    .slice(0, 8)
+    .map(({ sortAt, ...item }) => item);
+};
+
 export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
-  const [pendingDocuments, setPendingDocuments] = useState([
-    {
-      id: 1,
-      docente: "Mtro. Juan Pérez",
-      documento: "Planeación - Programación Web",
-      carrera: "Ingeniería en Sistemas",
-      tipo: "Planeación",
-      fecha: "2026-05-17",
-      revisado: false,
-    },
-    {
-      id: 2,
-      docente: "Dra. Ana Martínez",
-      documento: "Instrumento 30% - Base de Datos",
-      carrera: "TSU en Desarrollo de Software",
-      tipo: "Instrumento 30%",
-      fecha: "2026-05-16",
-      revisado: false,
-    },
-    {
-      id: 3,
-      docente: "Mtro. Carlos López",
-      documento: "Lista Concentrada - Redes",
-      carrera: "Ingeniería en Redes",
-      tipo: "Lista Concentrada",
-      fecha: "2026-05-15",
-      revisado: false,
-    },
-    {
-      id: 4,
-      docente: "Dra. Laura Gómez",
-      documento: "Instrumento 60% - Infraestructura",
-      carrera: "TSU en Infraestructura",
-      tipo: "Instrumento 60%",
-      fecha: "2026-05-17",
-      revisado: false,
-    },
-  ]);
-
-  const [reviewedDocuments, setReviewedDocuments] = useState([
-    {
-      id: 101,
-      docente: "Dra. María González",
-      documento: "Instrumento 60% - Programación Web",
-      carrera: "Ingeniería en Sistemas",
-      tipo: "Instrumento 60%",
-      fecha: "2026-05-17",
-      reviewedAt: "2026-05-17 09:15",
-    },
-    {
-      id: 102,
-      docente: "Mtro. Roberto Silva",
-      documento: "Planeación - Redes",
-      carrera: "Ingeniería en Redes",
-      tipo: "Planeación",
-      fecha: "2026-05-16",
-      reviewedAt: "2026-05-17 10:05",
-    },
-  ]);
-
-  const [recentActivity, setRecentActivity] = useState([
-    {
-      id: 1,
-      type: "review",
-      title: "Revisado documento de Mtro. Juan Pérez",
-      description: "Planeación - Programación Web",
-      time: "Hace 5 min",
-      related: "Planeación - Programación Web",
-    },
-    {
-      id: 2,
-      type: "upload",
-      title: "Dra. Ana Martínez actualizó su instrumento",
-      description: "Instrumento 30% - Base de Datos",
-      time: "Hace 15 min",
-      related: "Instrumento 30% - Base de Datos",
-    },
-    {
-      id: 3,
-      type: "upload",
-      title: "Mtro. Roberto Silva subió nuevo documento",
-      description: "Lista Concentrada - Redes",
-      time: "Hace 30 min",
-      related: "Lista Concentrada - Redes",
-    },
-    {
-      id: 4,
-      type: "comment",
-      title: "Comentario agregado para Dra. Ana Martínez",
-      description: "Se pidió corrección de portada",
-      time: "Hace 1 hora",
-      related: "Instrumento 30% - Base de Datos",
-    },
-  ]);
+  const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
+  const [reviewedDocuments, setReviewedDocuments] = useState<ReviewedDocument[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [docentesTotal, setDocentesTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isReviewing, setIsReviewing] = useState(false);
 
   const [selectedDocument, setSelectedDocument] = useState<null | {
     id: number;
@@ -131,14 +192,42 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     related: string;
   }>(null);
 
+  const loadDashboard = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [pendingRes, reviewedRes, usersRes] = await Promise.all([
+        apiFetch("/documents", { query: { status: "pendiente" } }),
+        apiFetch("/documents", { query: { status: "revisado" } }),
+        apiFetch("/users"),
+      ]);
+
+      const pending = ((pendingRes?.data ?? []) as ApiDocument[]).map(mapPendingDocument);
+      const reviewed = ((reviewedRes?.data ?? []) as ApiDocument[]).map(mapReviewedDocument);
+      const users = (usersRes?.data ?? []) as ApiUser[];
+
+      setPendingDocuments(pending);
+      setReviewedDocuments(reviewed);
+      setRecentActivity(buildRecentActivity(pending, reviewed));
+      setDocentesTotal(countDocentes(users));
+    } catch {
+      toast.error("No se pudo cargar el panel administrativo");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
+
   const stats = useMemo(
     () => [
       {
         title: "Total Docentes",
-        value: "48",
+        value: docentesTotal,
         description: "Activos este cuatrimestre",
         icon: Users,
-        trend: "+3 vs anterior",
+        trend: docentesTotal > 0 ? "Con actividad" : "Sin registros",
         color: "text-emerald-700 dark:text-emerald-300",
         bgColor: "bg-emerald-100/80 dark:bg-emerald-950/40",
         cardClass: "bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70 border-emerald-200/70 dark:from-emerald-950/25 dark:via-slate-950 dark:to-emerald-950/35 dark:border-emerald-800/60",
@@ -147,10 +236,10 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
       },
       {
         title: "Documentos Pendientes",
-        value: pendingDocuments.filter((doc) => !doc.revisado).length,
+        value: pendingDocuments.length,
         description: "Por abrir y revisar",
         icon: Clock,
-        trend: "Hoy llegaron 4",
+        trend: pendingDocuments.length > 0 ? `${pendingDocuments.length} por atender` : "Al día",
         color: "text-slate-700 dark:text-slate-200",
         bgColor: "bg-slate-100/80 dark:bg-slate-800/80",
         cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70",
@@ -162,7 +251,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         value: reviewedDocuments.length,
         description: "Ya abiertos por administración",
         icon: CheckCircle2,
-        trend: "+2 hoy",
+        trend: `${reviewedDocuments.filter((doc) => isToday(doc.reviewedAtIso)).length} hoy`,
         color: "text-emerald-700 dark:text-emerald-300",
         bgColor: "bg-emerald-100/70 dark:bg-emerald-950/40",
         cardClass: "bg-gradient-to-br from-emerald-50 via-white to-emerald-50/80 border-emerald-200/70 dark:from-emerald-950/20 dark:via-slate-950 dark:to-emerald-950/25 dark:border-emerald-800/60",
@@ -171,10 +260,10 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
       },
       {
         title: "Revisados Hoy",
-        value: reviewedDocuments.filter((doc) => doc.reviewedAt.startsWith("2026-05-17")).length,
+        value: reviewedDocuments.filter((doc) => isToday(doc.reviewedAtIso)).length,
         description: "Documentos abiertos hoy",
         icon: Eye,
-        trend: "En curso",
+        trend: reviewedDocuments.filter((doc) => isToday(doc.reviewedAtIso)).length > 0 ? "En curso" : "Sin actividad",
         color: "text-slate-700 dark:text-slate-200",
         bgColor: "bg-slate-100/80 dark:bg-slate-800/80",
         cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70",
@@ -182,40 +271,26 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         action: "documentos-revisados-hoy" as AdminView,
       },
     ],
-    [pendingDocuments, reviewedDocuments]
+    [docentesTotal, pendingDocuments, reviewedDocuments]
   );
 
-  const handleReviewDocument = useCallback((documentId: number) => {
-    const doc = pendingDocuments.find((item) => item.id === documentId);
-    if (!doc) return;
+  const handleReviewDocument = useCallback(async (documentId: number) => {
+    setIsReviewing(true);
+    try {
+      await apiFetch(`/documents/${documentId}/review`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "revisado" }),
+      });
 
-    setPendingDocuments((current) => current.map((item) => (item.id === documentId ? { ...item, revisado: true } : item)));
-
-    setReviewedDocuments((current) => [
-      {
-        id: Date.now(),
-        docente: doc.docente,
-        documento: doc.documento,
-        carrera: doc.carrera,
-        tipo: doc.tipo,
-        fecha: doc.fecha,
-        reviewedAt: new Date().toISOString(),
-      },
-      ...current,
-    ]);
-
-    setRecentActivity((current) => [
-      {
-        id: Date.now(),
-        type: "review",
-        title: `Revisado documento de ${doc.docente}`,
-        description: doc.documento,
-        time: "Hace unos segundos",
-        related: doc.documento,
-      },
-      ...current,
-    ]);
-  }, [pendingDocuments]);
+      toast.success("Documento marcado como revisado");
+      await loadDashboard();
+    } catch {
+      toast.error("No se pudo marcar el documento como revisado");
+    } finally {
+      setIsReviewing(false);
+    }
+  }, [loadDashboard]);
 
   const openDocument = useCallback((doc: { id: number; docente: string; documento: string; carrera: string; tipo: string; fecha: string }) => {
     setSelectedDocument(doc);
@@ -228,7 +303,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   /* Small memoized presentational components to reduce re-renders */
   const StatsGrid = React.memo(function StatsGrid({ stats, onNavigate }: { stats: any[]; onNavigate: (view: AdminView) => void }) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -240,16 +315,16 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
             >
               <Card className={`h-full overflow-hidden border shadow-sm hover:shadow-md transition cursor-pointer ${stat.cardClass}`}>
                 <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-semibold text-foreground">{stat.title}</CardTitle>
-                  <div className={`h-10 w-10 rounded-xl ${stat.bgColor} flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5`}>
+                <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm">{stat.title}</CardTitle>
+                  <div className={`h-9 w-9 rounded-xl ${stat.bgColor} flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5 sm:h-10 sm:w-10`}>
                     <Icon className={`h-4 w-4 ${stat.color}`} aria-hidden />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{stat.value}</div>
-                  <p className="text-xs text-foreground/70">{stat.description}</p>
-                  <p className={`text-xs mt-1 font-medium ${stat.color}`}>{stat.trend}</p>
+                <CardContent className="pt-0">
+                  <div className="text-2xl leading-none font-bold text-foreground sm:text-2xl">{stat.value}</div>
+                  <p className="mt-1 text-[11px] leading-snug text-foreground/70 sm:text-xs">{stat.description}</p>
+                  <p className={`mt-1 text-[11px] font-medium sm:text-xs ${stat.color}`}>{stat.trend}</p>
                 </CardContent>
               </Card>
             </button>
@@ -274,24 +349,29 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
                 onOpen(doc);
               }
             }}
-            className="flex items-center justify-between p-3 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors cursor-pointer dark:bg-slate-950/60"
+            className="flex flex-col gap-3 p-3 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors cursor-pointer dark:bg-slate-950/60 sm:flex-row sm:items-center sm:justify-between"
           >
-            <div className="flex items-center gap-3 flex-1">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center dark:bg-emerald-950/50 dark:text-emerald-300">
                 <FileText className="h-5 w-5 text-muted-foreground" aria-hidden />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="font-medium text-sm truncate text-foreground">{doc.documento}</p>
                 <p className="text-xs text-muted-foreground">{doc.docente}</p>
-                <Badge variant="outline" className="mt-2 text-[11px]">
+                <Badge variant="outline" className="mt-2 w-fit max-w-full text-[11px]">
                   {doc.carrera}
                 </Badge>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="ghost" tabIndex={-1} className="pointer-events-none">
-                Abrir
-              </Button>
+            <div className="flex w-full items-center justify-end sm:w-auto sm:shrink-0">
+              <ResponsiveActionButton
+                icon={<Eye className="h-4 w-4" aria-hidden />}
+                label="Abrir"
+                size="sm"
+                variant="ghost"
+                tabIndex={-1}
+                className="pointer-events-none w-full justify-center sm:w-auto sm:min-w-[6rem]"
+              />
             </div>
           </div>
         ))}
@@ -372,14 +452,20 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-emerald-100/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/20 dark:to-emerald-950/20">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-foreground">Documentos Pendientes de Revisión</CardTitle>
-              <Badge variant="warning">{pendingDocuments.filter((doc) => !doc.revisado).length}</Badge>
+              <Badge variant="warning" className="self-start sm:self-auto">{pendingDocuments.length}</Badge>
             </div>
             <CardDescription>Requieren tu aprobación</CardDescription>
           </CardHeader>
           <CardContent>
-            <PendingList items={pendingDocuments} onOpen={openDocument} />
+            {isLoading ? (
+              <p className="text-sm text-muted-foreground">Cargando documentos pendientes...</p>
+            ) : pendingDocuments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No hay documentos pendientes por revisar.</p>
+            ) : (
+              <PendingList items={pendingDocuments} onOpen={openDocument} />
+            )}
           </CardContent>
         </Card>
 
@@ -389,7 +475,13 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
             <CardDescription>Últimas acciones en el sistema</CardDescription>
           </CardHeader>
           <CardContent>
-            <ActivityList items={recentActivity} onOpen={openActivity} />
+            {isLoading ? (
+              <p className="text-sm text-muted-foreground">Cargando actividad reciente...</p>
+            ) : recentActivity.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin actividad reciente.</p>
+            ) : (
+              <ActivityList items={recentActivity} onOpen={openActivity} />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -420,14 +512,15 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
               Cerrar
             </Button>
             <Button
+              disabled={isReviewing}
               onClick={() => {
                 if (selectedDocument) {
-                  handleReviewDocument(selectedDocument.id);
+                  void handleReviewDocument(selectedDocument.id);
                   setSelectedDocument(null);
                 }
               }}
             >
-              Marcar como revisado
+              {isReviewing ? "Guardando..." : "Marcar como revisado"}
             </Button>
           </DialogFooter>
         </DialogContent>

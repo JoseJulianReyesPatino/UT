@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -8,32 +8,105 @@ import { Checkbox } from "../../components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
-import { UserPlus, Search, Edit, Key, UserCheck, UserX, Eye, EyeOff, ShieldAlert, Mail } from "lucide-react";
+import { UserPlus, Search, Edit, Key, UserCheck, UserX, ShieldAlert, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { apiFetch } from "../../lib/api";
+import { useAuth } from "../../context/AuthContext";
+
+type UserRole = "docente" | "tutor" | "administrador";
 
 type Docente = {
   id: number;
   nombre: string;
+  area?: string;
   apellidos?: string;
   telefono?: string;
-  fechaNacimiento?: string;
   email: string;
-  roles?: string[];
+  roles?: UserRole[];
   documentos: number;
   status: "activo" | "inactivo";
   avatar: string;
 };
 
-type NuevoDocenteForm = {
+type NuevoUsuarioForm = {
   nombres: string;
   apellidos: string;
   telefono: string;
   email: string;
-  fechaNacimiento: string;
-  roles?: { docente: boolean; tutor: boolean };
+  roles: { docente: boolean; tutor: boolean; administrador: boolean };
 };
 
 const DEFAULT_PASSWORD = "12345678";
+
+type ApiUserRole = string | { code?: string | null; name?: string | null };
+
+type ApiUser = {
+  id: number | string;
+  full_name: string;
+  email: string;
+  phone?: string | null;
+  area?: string | null;
+  avatar_url?: string | null;
+  is_active?: number | boolean;
+  documents_count?: number | string | null;
+  roles?: ApiUserRole[];
+};
+
+type UsersResponse = {
+  data: ApiUser[];
+};
+
+const normalizeRole = (role: ApiUserRole): UserRole | null => {
+  const token = typeof role === "string" ? role : role.code ?? role.name ?? "";
+  const normalized = token.toLowerCase().trim();
+
+  if (normalized.includes("admin")) return "administrador";
+  if (normalized.includes("tutor")) return "tutor";
+  if (normalized.includes("docente") || normalized.includes("teacher")) return "docente";
+  return null;
+};
+
+const getInitials = (fullName: string) => {
+  const initials = fullName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+
+  return initials || "ND";
+};
+
+const splitFullName = (fullName: string) => {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) {
+    return { nombres: fullName.trim(), apellidos: "" };
+  }
+
+  return {
+    nombres: parts.slice(0, -1).join(" "),
+    apellidos: parts.slice(-1).join(" "),
+  };
+};
+
+const mapApiUser = (user: ApiUser): Docente => {
+  const roles = (user.roles ?? [])
+    .map(normalizeRole)
+    .filter((role): role is UserRole => role !== null);
+
+  return {
+    id: Number(user.id),
+    nombre: user.full_name,
+    area: user.area ?? undefined,
+    telefono: user.phone ?? undefined,
+    email: user.email,
+    roles,
+    documentos: Number(user.documents_count ?? 0),
+    status: user.is_active ? "activo" : "inactivo",
+    avatar: user.avatar_url ?? getInitials(user.full_name),
+  };
+};
 
 type StatusConfirmationDialogProps = {
   open: boolean;
@@ -103,7 +176,7 @@ function StatusConfirmationDialog({
             <p className="mt-3 text-sm text-foreground/80">
               {isDeactivating
                 ? "Para continuar con la baja, escribe el correo exacto del docente en el campo inferior."
-                : "Esta acción reactivará el acceso del docente en la simulación administrativa."}
+                : "Esta acción reactivará el acceso del usuario en la API."}
             </p>
             {isDeactivating && (
               <div className="space-y-2 pt-4">
@@ -141,54 +214,18 @@ function StatusConfirmationDialog({
 }
 
 const initialDocentes: Docente[] = [
-  {
-    id: 1,
-    nombre: "Mtro. Juan Pérez",
-    apellidos: "Gómez",
-    telefono: "444 123 4567",
-    fechaNacimiento: "1985-04-18",
-    email: "juan.perez@universidad.edu",
-    roles: ["docente"],
-    documentos: 23,
-    status: "activo",
-    avatar: "JP",
-  },
-  {
-    id: 2,
-    nombre: "Dra. Ana Martínez",
-    apellidos: "López",
-    telefono: "444 987 6543",
-    fechaNacimiento: "1988-09-25",
-    email: "ana.martinez@universidad.edu",
-    roles: ["docente"],
-    documentos: 18,
-    status: "activo",
-    avatar: "AM",
-  },
-  {
-    id: 3,
-    nombre: "Mtro. Carlos López",
-    apellidos: "Ramírez",
-    telefono: "",
-    fechaNacimiento: "",
-    email: "carlos.lopez@universidad.edu",
-    roles: ["docente"],
-    documentos: 12,
-    status: "inactivo",
-    avatar: "CL",
-  },
 ];
 
-const initialForm: NuevoDocenteForm = {
+const initialForm: NuevoUsuarioForm = {
   nombres: "",
   apellidos: "",
   telefono: "",
   email: "",
-  fechaNacimiento: "",
-  roles: { docente: true, tutor: false },
+  roles: { docente: true, tutor: false, administrador: false },
 };
 
 export function DocenteManagement() {
+  const { user: currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -200,9 +237,37 @@ export function DocenteManagement() {
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [statusConfirmationEmail, setStatusConfirmationEmail] = useState("");
   const [docentes, setDocentes] = useState(initialDocentes);
-  const [newDocente, setNewDocente] = useState<NuevoDocenteForm>(initialForm);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [newDocente, setNewDocente] = useState<NuevoUsuarioForm>(initialForm);
   const [selectedDocente, setSelectedDocente] = useState<Docente | null>(null);
-  const [editDocente, setEditDocente] = useState({ nombres: "", apellidos: "", telefono: "", fechaNacimiento: "", email: "", roles: { docente: true, tutor: false } });
+  const [editDocente, setEditDocente] = useState({ nombres: "", apellidos: "", telefono: "", email: "", roles: { docente: true, tutor: false, administrador: false } });
+
+  const loadUsers = async () => {
+    setIsLoadingUsers(true);
+    setUsersError(null);
+
+    try {
+      const payload = (await apiFetch("/users", { method: "GET" })) as UsersResponse;
+      // Exclude administrator users from the general management list
+      const filtered = (payload.data ?? []).filter((u) => {
+        const roles = (u.roles ?? []) as ApiUserRole[];
+        return !roles.map(normalizeRole).includes("administrador");
+      });
+
+      setDocentes(filtered.map(mapApiUser));
+    } catch (error: any) {
+      const message = error instanceof Error ? error.message : "No fue posible cargar los usuarios";
+      setUsersError(message);
+      toast.error(message);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadUsers();
+  }, []);
 
   const resetForm = () => {
     setNewDocente(initialForm);
@@ -212,41 +277,27 @@ export function DocenteManagement() {
 
   const resetEditForm = () => {
     setSelectedDocente(null);
-    setEditDocente({ nombres: "", apellidos: "", telefono: "", fechaNacimiento: "", email: "" });
-  };
-
-  const splitNombre = (nombreCompleto: string) => {
-    const parts = nombreCompleto.trim().split(/\s+/);
-    if (parts.length <= 1) {
-      return { nombres: nombreCompleto.trim(), apellidos: "" };
-    }
-
-    return {
-      nombres: parts.slice(0, -1).join(" "),
-      apellidos: parts.slice(-1).join(" "),
-    };
-  };
-
-  const getAvatar = (nombres: string, apellidos: string) => {
-    const initials = `${nombres.trim().charAt(0)}${apellidos.trim().charAt(0)}`.toUpperCase();
-    return initials || "ND";
+    setEditDocente({ nombres: "", apellidos: "", telefono: "", email: "", roles: { docente: true, tutor: false, administrador: false } });
   };
 
   const filteredDocentes = docentes.filter((doc) =>
     doc.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    doc.email.toLowerCase().includes(searchTerm.toLowerCase())
+    doc.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (doc.roles ?? []).join(", ").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const openEditDialog = (docente: Docente) => {
-    const nombreSeparado = splitNombre(docente.nombre);
     setSelectedDocente(docente);
     setEditDocente({
-      nombres: nombreSeparado.nombres,
-      apellidos: docente.apellidos ?? nombreSeparado.apellidos,
+      nombres: splitFullName(docente.nombre).nombres,
+      apellidos: docente.apellidos ?? splitFullName(docente.nombre).apellidos,
       telefono: docente.telefono ?? "",
-      fechaNacimiento: docente.fechaNacimiento ?? "",
       email: docente.email,
-      roles: { docente: (docente.roles || []).includes("docente"), tutor: (docente.roles || []).includes("tutor") },
+      roles: {
+        docente: (docente.roles || []).includes("docente"),
+        tutor: (docente.roles || []).includes("tutor"),
+        administrador: (docente.roles || []).includes("administrador"),
+      },
     });
     setShowEditDialog(true);
   };
@@ -262,28 +313,6 @@ export function DocenteManagement() {
     setShowStatusDialog(true);
   };
 
-  const handleToggleStatus = (docenteId: number) => {
-    setDocentes((current) =>
-      current.map((docente) =>
-        docente.id === docenteId
-          ? { ...docente, status: docente.status === "activo" ? "inactivo" : "activo" }
-          : docente
-      )
-    );
-
-    const updatedDocente = docentes.find((docente) => docente.id === docenteId);
-    if (updatedDocente) {
-      toast.success(
-        updatedDocente.status === "activo"
-          ? "Docente dado de baja correctamente"
-          : "Docente dado de alta correctamente",
-        {
-          description: updatedDocente.nombre,
-        }
-      );
-    }
-  };
-
   const confirmToggleStatus = async () => {
     if (!selectedDocente) return;
 
@@ -293,14 +322,30 @@ export function DocenteManagement() {
     }
 
     setIsChangingStatus(true);
-    toast.loading(selectedDocente.status === "activo" ? "Dando de baja..." : "Dando de alta...");
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    toast.dismiss();
-    handleToggleStatus(selectedDocente.id);
-    setIsChangingStatus(false);
-    setShowStatusDialog(false);
-    setSelectedDocente(null);
-    setStatusConfirmationEmail("");
+    const toastId = toast.loading(selectedDocente.status === "activo" ? "Dando de baja..." : "Dando de alta...");
+
+    try {
+      if (selectedDocente.status === "activo") {
+        await apiFetch(`/users/${selectedDocente.id}`, { method: "DELETE" });
+        toast.success("Usuario dado de baja correctamente", { id: toastId, description: selectedDocente.nombre });
+      } else {
+        await apiFetch(`/users/${selectedDocente.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ is_active: true }),
+        });
+        toast.success("Usuario dado de alta correctamente", { id: toastId, description: selectedDocente.nombre });
+      }
+
+      await loadUsers();
+      setShowStatusDialog(false);
+      setSelectedDocente(null);
+      setStatusConfirmationEmail("");
+    } catch (error: any) {
+      toast.error(error instanceof Error ? error.message : "No fue posible cambiar el estado", { id: toastId });
+    } finally {
+      setIsChangingStatus(false);
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -316,55 +361,65 @@ export function DocenteManagement() {
       return;
     }
 
+    const roles: UserRole[] = [
+      ...(editDocente.roles.docente ? ["docente"] : []),
+      ...(editDocente.roles.tutor ? ["tutor"] : []),
+      ...(editDocente.roles.administrador ? ["administrador"] : []),
+    ];
+
     setIsSavingEdit(true);
-    toast.loading("Guardando cambios...");
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const toastId = toast.loading("Guardando cambios...");
 
-    setDocentes((current) =>
-      current.map((docente) =>
-        docente.id === selectedDocente.id
-          ? {
-              ...docente,
-              nombre: editDocente.nombres.trim(),
-              apellidos: editDocente.apellidos.trim(),
-              telefono: editDocente.telefono.trim(),
-              fechaNacimiento: editDocente.fechaNacimiento,
-              email: editDocente.email.trim(),
-              avatar: getAvatar(editDocente.nombres, editDocente.apellidos),
-              roles: [
-                ...(editDocente.roles?.docente ? ["docente"] : []),
-                ...(editDocente.roles?.tutor ? ["tutor"] : []),
-              ],
-            }
-          : docente
-      )
-    );
+    try {
+      await apiFetch(`/users/${selectedDocente.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: `${editDocente.nombres.trim()} ${editDocente.apellidos.trim()}`.trim(),
+          email: editDocente.email.trim(),
+          phone: editDocente.telefono.trim() || null,
+          roles,
+        }),
+      });
 
-    toast.dismiss();
-    toast.success("Docente actualizado correctamente");
-    setIsSavingEdit(false);
-    setShowEditDialog(false);
-    resetEditForm();
+      toast.success("Usuario actualizado correctamente", { id: toastId });
+      await loadUsers();
+      setShowEditDialog(false);
+      resetEditForm();
+    } catch (error: any) {
+      toast.error(error instanceof Error ? error.message : "No fue posible actualizar el usuario", { id: toastId });
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
   const handleResetPassword = async () => {
     if (!selectedDocente) return;
 
     setIsResettingPassword(true);
-    toast.loading("Generando contraseña temporal...");
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const toastId = toast.loading("Generando contraseña temporal...");
 
-    const temporaryPassword = `TMP-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-    toast.dismiss();
-    toast.success("Contraseña restablecida", {
-      description: `${selectedDocente.nombre}. Contraseña temporal: ${temporaryPassword}`,
-    });
-    setIsResettingPassword(false);
-    setShowResetDialog(false);
-    resetEditForm();
+    try {
+      await apiFetch(`/users/${selectedDocente.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: DEFAULT_PASSWORD }),
+      });
+
+      toast.success("Contraseña restablecida", {
+        id: toastId,
+        description: `${selectedDocente.nombre}. Contraseña temporal: ${DEFAULT_PASSWORD}`,
+      });
+      setShowResetDialog(false);
+      resetEditForm();
+    } catch (error: any) {
+      toast.error(error instanceof Error ? error.message : "No fue posible restablecer la contraseña", { id: toastId });
+    } finally {
+      setIsResettingPassword(false);
+    }
   };
 
-  const hasRole = Boolean(newDocente.roles && (newDocente.roles.docente || newDocente.roles.tutor));
+  const hasRole = Boolean(newDocente.roles && (newDocente.roles.docente || newDocente.roles.tutor || newDocente.roles.administrador));
   const canCreate = Boolean(newDocente.nombres.trim() && newDocente.apellidos.trim() && newDocente.email.trim() && hasRole);
 
   const handleCreateDocente = async () => {
@@ -378,33 +433,46 @@ export function DocenteManagement() {
       return;
     }
 
+    if (!hasRole) {
+      toast.error("Debes seleccionar al menos un rol");
+      return;
+    }
+
     setIsCreating(true);
-    toast.loading("Creando docente...");
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const toastId = toast.loading("Creando usuario...");
 
-    const fullName = `${newDocente.nombres.trim()} ${newDocente.apellidos.trim()}`;
-    const createdDocente: Docente = {
-      id: Date.now(),
-      nombre: fullName,
-      email: newDocente.email.trim(),
-      roles: [
-        ...(newDocente.roles?.docente ? ["docente"] : []),
-        ...(newDocente.roles?.tutor ? ["tutor"] : []),
-      ],
-      documentos: 0,
-      status: "activo",
-      avatar: getAvatar(newDocente.nombres, newDocente.apellidos),
-      // La contraseña simulada queda fija para los usuarios nuevos.
-    };
+    const roles: UserRole[] = [
+      ...(newDocente.roles.docente ? ["docente"] : []),
+      ...(newDocente.roles.tutor ? ["tutor"] : []),
+      ...(newDocente.roles.administrador ? ["administrador"] : []),
+    ];
 
-    setDocentes((current) => [createdDocente, ...current]);
-    toast.dismiss();
-    toast.success("Docente creado correctamente", {
-      description: `${fullName} ya quedó registrado. Contraseña temporal: ${DEFAULT_PASSWORD}`,
-    });
-    setIsCreating(false);
-    setShowNewDialog(false);
-    resetForm();
+    try {
+      await apiFetch("/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: `${newDocente.nombres.trim()} ${newDocente.apellidos.trim()}`.trim(),
+          email: newDocente.email.trim(),
+          phone: newDocente.telefono.trim() || null,
+          roles,
+          password: DEFAULT_PASSWORD,
+          is_active: true,
+        }),
+      });
+
+      toast.success("Usuario creado correctamente", {
+        id: toastId,
+        description: `Contraseña temporal: ${DEFAULT_PASSWORD}`,
+      });
+      await loadUsers();
+      setShowNewDialog(false);
+      resetForm();
+    } catch (error: any) {
+      toast.error(error instanceof Error ? error.message : "No fue posible crear el usuario", { id: toastId });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -450,54 +518,71 @@ export function DocenteManagement() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {filteredDocentes.map((docente) => (
-              <div
-                key={docente.id}
-                className="flex flex-col gap-4 p-4 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors dark:bg-slate-950/60 dark:hover:bg-slate-900/70 overflow-hidden sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="flex items-center gap-4 min-w-0 flex-1">
-                  <Avatar className="h-12 w-12 flex-shrink-0">
-                    <AvatarFallback className="bg-success/10 text-success">
-                      {docente.avatar}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <p className="font-medium break-words sm:truncate">{docente.nombre}</p>
-                    <p className="text-sm text-muted-foreground break-words sm:truncate">{docente.email}</p>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-muted-foreground">
-                      <span className="truncate">{docente.documentos} documentos enviados</span>
-                      <span className="truncate">{(docente.roles || []).join(", ")}</span>
+            {isLoadingUsers ? (
+              <div className="rounded-xl border border-dashed border-border bg-background/80 p-8 text-center text-sm text-muted-foreground">
+                Cargando usuarios desde la API...
+              </div>
+            ) : usersError ? (
+              <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-sm text-destructive">
+                {usersError}
+              </div>
+            ) : filteredDocentes.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-background/80 p-8 text-center text-sm text-muted-foreground">
+                No hay usuarios que coincidan con la búsqueda.
+              </div>
+            ) : (
+              filteredDocentes.map((docente) => (
+                <div
+                  key={docente.id}
+                  className="flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-background/80 p-4 transition-colors hover:bg-accent/60 dark:bg-slate-950/60 dark:hover:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-4">
+                    <Avatar className="h-12 w-12 flex-shrink-0">
+                      <AvatarFallback className="bg-success/10 text-success">
+                        {docente.avatar}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="break-words font-medium sm:truncate">{docente.nombre}</p>
+                      <p className="break-words text-sm text-muted-foreground sm:truncate">{docente.email}</p>
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span className="truncate">{docente.documentos} documentos enviados</span>
+                        <span className="truncate">{(docente.roles || []).join(", ")}</span>
+                      </div>
                     </div>
                   </div>
+                  <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                    <Badge variant={docente.status === "activo" ? "success" : "outline"} className="shrink-0">
+                      {docente.status === "activo" ? "Activo" : "Inactivo"}
+                    </Badge>
+                    <ResponsiveActionButton
+                      variant="ghost"
+                      label="Editar"
+                      title="Editar"
+                      onClick={() => openEditDialog(docente)}
+                      disabled={String(docente.id) === currentUser?.id}
+                      icon={<Edit className="h-4 w-4" />}
+                    />
+                    <ResponsiveActionButton
+                      variant="ghost"
+                      label="Restablecer"
+                      title="Restablecer contraseña"
+                      onClick={() => openResetDialog(docente)}
+                      disabled={String(docente.id) === currentUser?.id}
+                      icon={<Key className="h-4 w-4" />}
+                    />
+                    <ResponsiveActionButton
+                      variant="ghost"
+                      label={docente.status === "activo" ? "Dar baja" : "Dar alta"}
+                      title="Cambiar estado"
+                      onClick={() => openStatusDialog(docente)}
+                      disabled={String(docente.id) === currentUser?.id}
+                      icon={docente.status === "activo" ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                    />
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 flex-shrink-0 sm:justify-end">
-                  <Badge variant={docente.status === "activo" ? "success" : "outline"} className="shrink-0">
-                    {docente.status === "activo" ? "Activo" : "Inactivo"}
-                  </Badge>
-                  <ResponsiveActionButton
-                    variant="ghost"
-                    label="Editar"
-                    title="Editar"
-                    onClick={() => openEditDialog(docente)}
-                    icon={<Edit className="h-4 w-4" />}
-                  />
-                  <ResponsiveActionButton
-                    variant="ghost"
-                    label="Restablecer"
-                    title="Restablecer contraseña"
-                    onClick={() => openResetDialog(docente)}
-                    icon={<Key className="h-4 w-4" />}
-                  />
-                  <ResponsiveActionButton
-                    variant="ghost"
-                    label={docente.status === "activo" ? "Dar baja" : "Dar alta"}
-                    title="Cambiar estado"
-                    onClick={() => openStatusDialog(docente)}
-                    icon={docente.status === "activo" ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                  />
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -512,7 +597,7 @@ export function DocenteManagement() {
           <DialogHeader>
             <DialogTitle>Editar Docente</DialogTitle>
             <DialogDescription>
-              Ajusta los datos del docente en esta simulación administrativa.
+              Ajusta los datos del usuario directamente sobre la API.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -533,16 +618,15 @@ export function DocenteManagement() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Correo electrónico (obligatorio)</Label>
-              <Input
-                type="email"
-                value={editDocente.email}
-                onChange={(e) => setEditDocente((current) => ({ ...current, email: e.target.value }))}
-              />
-            </div>
-
             <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Correo electrónico (obligatorio)</Label>
+                <Input
+                  type="email"
+                  value={editDocente.email}
+                  onChange={(e) => setEditDocente((current) => ({ ...current, email: e.target.value }))}
+                />
+              </div>
               <div className="space-y-2">
                 <Label>Número de teléfono (opcional)</Label>
                 <Input
@@ -554,35 +638,28 @@ export function DocenteManagement() {
                   placeholder="653 123 3445"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Fecha de nacimiento (opcional)</Label>
-                <Input
-                  type="date"
-                  value={editDocente.fechaNacimiento}
-                  onChange={(e) => setEditDocente((current) => ({ ...current, fechaNacimiento: e.target.value }))}
-                />
-              </div>
             </div>
 
             <div className="space-y-2">
               <Label>Roles</Label>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <label className="flex items-center gap-2">
                   <Checkbox
                     checked={!!editDocente.roles?.docente}
-                    onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false }), docente: Boolean(val) } }))}
+                    onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), docente: Boolean(val) } }))}
                   />
                   <span className="text-sm">Docente</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <Checkbox
                     checked={!!editDocente.roles?.tutor}
-                    onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false }), tutor: Boolean(val) } }))}
+                    onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), tutor: Boolean(val) } }))}
                   />
                   <span className="text-sm">Tutor</span>
                 </label>
+                {/* Administrador role is managed separately; not editable here */}
               </div>
-              <p className="text-xs text-muted-foreground">Selecciona si el usuario será docente, tutor o ambos.</p>
+              <p className="text-xs text-muted-foreground">Selecciona si el usuario será docente o tutor.</p>
             </div>
 
           </div>
@@ -607,7 +684,7 @@ export function DocenteManagement() {
           <DialogHeader>
             <DialogTitle>Restablecer Contraseña</DialogTitle>
             <DialogDescription>
-              Se generará una contraseña temporal simulada para el docente seleccionado.
+              Se restablecerá la contraseña del usuario en la API.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
@@ -696,36 +773,26 @@ export function DocenteManagement() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Fecha de nacimiento (opcional)</Label>
-                <Input
-                  type="date"
-                  value={newDocente.fechaNacimiento}
-                  onChange={(e) => setNewDocente((current) => ({ ...current, fechaNacimiento: e.target.value }))}
-                />
-              </div>
-            </div>
-
             <div className="space-y-2">
               <Label>Roles</Label>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <label className="flex items-center gap-2">
                   <Checkbox
                     checked={!!newDocente.roles?.docente}
-                    onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false }), docente: Boolean(val) } }))}
+                    onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), docente: Boolean(val) } }))}
                   />
                   <span className="text-sm">Docente</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <Checkbox
                     checked={!!newDocente.roles?.tutor}
-                    onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false }), tutor: Boolean(val) } }))}
+                    onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), tutor: Boolean(val) } }))}
                   />
                   <span className="text-sm">Tutor</span>
                 </label>
+                {/* Administrador role not available when creating users from this form */}
               </div>
-              <p className="text-xs text-muted-foreground">Selecciona si el usuario será docente, tutor o ambos.</p>
+              <p className="text-xs text-muted-foreground">Selecciona si el usuario será docente o tutor.</p>
             </div>
             
           </div>

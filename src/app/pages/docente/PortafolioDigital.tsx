@@ -9,7 +9,9 @@ import { Upload, FileText, Menu, X } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuatrimestre } from "../../data/curricula";
-const calendarioPdf = new URL("../../../assets/Calendario25-26.pdf", import.meta.url).href;
+import { getCalendarFileUrl } from "../../lib/calendar";
+
+const calendarioPdf = getCalendarFileUrl();
 
 interface PortafolioFormData {
   plan: Plan | "";

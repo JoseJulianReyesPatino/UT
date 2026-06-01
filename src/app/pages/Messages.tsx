@@ -6,8 +6,11 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Textarea } from "../components/ui/textarea";
-import { CornerUpLeft, Paperclip, Search, Send, X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { CornerUpLeft, Paperclip, PencilLine, Search, Send, X, Trash } from "lucide-react";
 import { cn } from "../../lib/utils";
+import apiFetch from "../lib/api";
+import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 
 type AttachmentItem = {
@@ -42,111 +45,8 @@ type Conversation = {
   messages: ChatMessage[];
 };
 
-const initialConversations: Conversation[] = [
-  {
-    id: 1,
-    name: "Mtra. María González",
-    role: "Administrador",
-    lastMessage: "Tu documento ha sido aprobado",
-    timestamp: "Hace 5 min",
-    unread: 2,
-    avatar: "MG",
-    status: "online",
-    messages: [
-      { id: 1, sender: "María González", content: "Hola, revisé tu documento de planeación", timestamp: "10:30 AM", isOwn: false },
-      { id: 2, sender: "Tú", content: "Gracias por la revisión. ¿Hay algo que deba corregir?", timestamp: "10:32 AM", isOwn: true },
-      { id: 3, sender: "María González", content: "Todo está perfecto. Tu documento ha sido aprobado.", timestamp: "10:35 AM", isOwn: false },
-      { id: 4, sender: "Tú", content: "Excelente, muchas gracias!", timestamp: "10:36 AM", isOwn: true },
-    ],
-  },
-  {
-    id: 2,
-    name: "Mtro. Roberto Silva",
-    role: "Docente",
-    lastMessage: "¿Tienes el formato de planeación?",
-    timestamp: "Hace 1 hora",
-    unread: 0,
-    avatar: "RS",
-    status: "away",
-    messages: [
-      { id: 1, sender: "Mtro. Roberto Silva", content: "¿Tienes el formato de planeación?", timestamp: "9:10 AM", isOwn: false },
-      { id: 2, sender: "Tú", content: "Sí, te lo comparto en un momento.", timestamp: "9:12 AM", isOwn: true },
-    ],
-  },
-  {
-    id: 3,
-    name: "Dra. Ana Martínez",
-    role: "Coordinadora",
-    lastMessage: "Reunión pendiente",
-    timestamp: "Ayer",
-    unread: 1,
-    avatar: "AM",
-    status: "offline",
-    messages: [
-      { id: 1, sender: "Dra. Ana Martínez", content: "Tenemos reunión pendiente para revisar avances.", timestamp: "Ayer 4:20 PM", isOwn: false },
-      { id: 2, sender: "Tú", content: "Claro, quedo atento al horario.", timestamp: "Ayer 4:23 PM", isOwn: true },
-    ],
-  },
-  {
-    id: 5,
-    name: "Mtro. Juan Pérez",
-    role: "Docente",
-    lastMessage: "Envié la planeación",
-    timestamp: "Hace 3 días",
-    unread: 0,
-    avatar: "JP",
-    status: "online",
-    messages: [
-      { id: 1, sender: "Mtro. Juan Pérez", content: "Adjunto mi planeación.", timestamp: "Hace 3 días", isOwn: false },
-    ],
-  },
-  {
-    id: 6,
-    name: "Mtro. Carlos López",
-    role: "Docente",
-    lastMessage: "Lista concentrada enviada",
-    timestamp: "Hace 4 días",
-    unread: 0,
-    avatar: "CL",
-    status: "away",
-    messages: [
-      { id: 1, sender: "Mtro. Carlos López", content: "Envío la lista concentrada.", timestamp: "Hace 4 días", isOwn: false },
-    ],
-  },
-  {
-    id: 7,
-    name: "Dra. Laura Gómez",
-    role: "Tutor",
-    lastMessage: "Ficha técnica subida",
-    timestamp: "Hace 5 días",
-    unread: 0,
-    avatar: "LG",
-    status: "online",
-    messages: [
-      { id: 1, sender: "Dra. Laura Gómez", content: "Subí la ficha técnica.", timestamp: "Hace 5 días", isOwn: false },
-    ],
-  },
-  {
-    id: 4,
-    name: "Lic. Karla Hernández",
-    role: "Administración",
-    lastMessage: "Te envié los archivos por aquí",
-    timestamp: "Hace 2 días",
-    unread: 0,
-    avatar: "KH",
-    status: "online",
-    messages: [
-      {
-        id: 1,
-        sender: "Lic. Karla Hernández",
-        content: "Te envié los archivos por aquí.",
-        timestamp: "Hace 2 días",
-        isOwn: false,
-        attachments: [{ name: "formatos.zip", sizeLabel: "2.4 MB", typeLabel: "Archivo comprimido" }],
-      },
-    ],
-  },
-];
+// When connected to backend we will load real conversations/messages.
+const initialConversations: Conversation[] = [];
 
 const formatSize = (size: number) => {
   if (size < 1024) return `${size} B`;
@@ -159,6 +59,18 @@ const getTimeLabel = () =>
     hour: "2-digit",
     minute: "2-digit",
   });
+
+const parseMessageDate = (timestamp: string) => {
+  const normalized = timestamp.includes("T") ? timestamp : timestamp.replace(" ", "T");
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const canEditMessage = (timestamp: string) => {
+  const parsed = parseMessageDate(timestamp);
+  if (!parsed) return false;
+  return Date.now() - parsed.getTime() <= 5 * 60 * 1000;
+};
 
 function PendingAttachmentChip({
   attachment,
@@ -256,7 +168,20 @@ function ConversationRow({
 function MessageBubble({
   message,
   onReply,
-}: Readonly<{ message: ChatMessage; onReply: (message: ChatMessage) => void }>) {
+  onDelete,
+  onEdit,
+}: Readonly<{ message: ChatMessage; onReply: (message: ChatMessage) => void; onDelete?: (messageId: number) => void; onEdit?: (messageId: number, body: string) => void }>) {
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editBody, setEditBody] = useState(message.content);
+  const editable = message.isOwn && canEditMessage(message.timestamp);
+
+  useEffect(() => {
+    if (editOpen) {
+      setEditBody(message.content);
+    }
+  }, [editOpen, message.content]);
+
   return (
     <div className={cn("flex items-end", message.isOwn ? "justify-end" : "justify-start")}> 
       {!message.isOwn && (
@@ -295,12 +220,62 @@ function MessageBubble({
 
         <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
           <span className="opacity-90">{message.timestamp}</span>
-          <button type="button" onClick={() => onReply(message)} className="inline-flex items-center gap-1">
-            <CornerUpLeft className="h-3.5 w-3.5" />
-            Responder
-          </button>
+          <div className="inline-flex items-center gap-2">
+            <button type="button" onClick={() => onReply(message)} className="inline-flex items-center gap-1">
+              <CornerUpLeft className="h-3.5 w-3.5" />
+              Responder
+            </button>
+            {editable && onEdit && (
+              <button type="button" onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1" aria-label="Editar mensaje" title="Editar mensaje">
+                <PencilLine className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {message.isOwn && onDelete && (
+              <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
+                <button type="button" onClick={() => setRemoveOpen(true)} className="inline-flex items-center gap-1 text-destructive">
+                  <Trash className="h-3.5 w-3.5" />
+                </button>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Eliminar mensaje</DialogTitle>
+                    <DialogDescription>¿Seguro que deseas eliminar este mensaje? Esta acción no se puede deshacer.</DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setRemoveOpen(false)}>Cancelar</Button>
+                    <Button variant="destructive" onClick={() => { setRemoveOpen(false); onDelete(message.id); }}>Eliminar</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </div>
       </div>
+
+      {editable && onEdit && (
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar mensaje</DialogTitle>
+              <DialogDescription>Modifica el contenido del mensaje y guarda los cambios.</DialogDescription>
+            </DialogHeader>
+            <Textarea value={editBody} onChange={(event) => setEditBody(event.target.value)} className="min-h-[120px]" />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+              <Button
+                variant="success"
+                onClick={() => {
+                  const nextBody = editBody.trim();
+                  if (!nextBody) return;
+                  setEditOpen(false);
+                  onEdit(message.id, nextBody);
+                }}
+              >
+                Guardar cambios
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -321,6 +296,17 @@ function PendingAttachmentsBar({
   );
 }
 
+function EmptyConversationState({ title, description }: Readonly<{ title: string; description: string }>) {
+  return (
+    <div className="flex h-full min-h-[260px] items-center justify-center px-6 py-10 text-center">
+      <div className="max-w-sm space-y-2 rounded-3xl border border-dashed border-emerald-200 bg-white/70 p-6 shadow-sm dark:border-emerald-900/50 dark:bg-slate-950/40">
+        <p className="text-base font-semibold text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  );
+}
+
 function getStatusLabel(status: Conversation["status"]) {
   if (status === "online") return "En línea";
   if (status === "away") return "Ausente";
@@ -332,11 +318,11 @@ export function Messages(props: Readonly<{
   onConsume?: () => void;
 }> = {}) {
   const { initialOpen, onConsume } = props;
-  const { user } = useAuth();
+  const { user, isReady } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
-  const [selectedChat, setSelectedChat] = useState<number>(initialConversations[0]?.id ?? 1);
+  const [selectedChat, setSelectedChat] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentItem[]>([]);
@@ -350,6 +336,16 @@ export function Messages(props: Readonly<{
     ? "Tutor"
     : "Docente";
   const peerRoleLabel = currentRoleLabel === "Administrador" ? "Docente" : "Administrador";
+
+  const getInitials = (name?: string) => {
+    if (!name) return "CH";
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "CH";
+  };
 
   // If another page requests opening a conversation with a document, create or open it
   const processInitialOpen = (detail: NonNullable<typeof initialOpen>) => {
@@ -393,43 +389,133 @@ export function Messages(props: Readonly<{
 
     if (!recipientName) return;
 
-    setConversations((current) => {
-      const found = current.find((conversation) => conversation.name === recipientName);
-      if (found) {
-        setSelectedChat(found.id);
-        return document
-          ? current.map((conversation) =>
-              conversation.id === found.id ? appendDocumentToConversation(conversation, document) : conversation
-            )
-          : current;
+    // Try to find existing conversation by name; if none, attempt to create one with backend
+    (async () => {
+      try {
+        // load conversations if empty
+        if (conversations.length === 0) await loadConversations();
+
+        const found = conversations.find((c) => c.name === recipientName);
+        if (found) {
+          setSelectedChat(found.id);
+          if (document) await apiFetch(`/conversations/${found.id}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ body: `Te comparto el documento: ${document.title}` }),
+          });
+          await loadMessages(found.id);
+          onConsume?.();
+          return;
+        }
+
+        // try resolve recipient user id via /users
+        const usersPayload = (await apiFetch('/users', { method: 'GET' })) as { data?: any[] } | null;
+        const users = usersPayload?.data ?? [];
+        const recipient = users.find((u) => (u.full_name ?? u.name) === recipientName || (recipientRole && (u.roles ?? []).some((r:any)=> (r.code??r).toLowerCase().includes(recipientRole.toLowerCase()))));
+
+        let conversationId: number | null = null;
+        if (recipient) {
+          const created = (await apiFetch('/conversations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipient_user_id: recipient.id }),
+          })) as { data?: any };
+          conversationId = created?.data?.id ?? null;
+        }
+
+        if (conversationId) {
+          await loadConversations();
+          setSelectedChat(conversationId);
+          if (document) await apiFetch(`/conversations/${conversationId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ body: `Te comparto el documento: ${document.title}` }),
+          });
+          await loadMessages(conversationId);
+        }
+
+        onConsume?.();
+      } catch (err) {
+        console.error('openInitialConversation error', err);
       }
-
-      const newId = Date.now();
-      const initials = recipientName.split(" ").map((n) => n[0]).slice(0, 2).join("");
-      const baseConversation: Conversation = {
-        id: newId,
-        name: recipientName,
-        role: recipientRole || "Docente",
-        lastMessage: "Nuevo chat",
-        timestamp: "Ahora",
-        unread: 0,
-        avatar: initials,
-        status: "online",
-        messages: [],
-      };
-
-      const newConversation = document ? appendDocumentToConversation(baseConversation, document) : baseConversation;
-      setSelectedChat(newId);
-      return [newConversation, ...current];
-    });
-
-    onConsume?.();
+    })();
   };
 
   React.useEffect(() => {
     if (!initialOpen) return;
     processInitialOpen(initialOpen);
   }, [initialOpen]);
+
+  // --- Backend integration: load conversations and messages ---
+  const normalizeConversation = (raw: any): Conversation => {
+    return {
+      id: raw.id,
+      name: raw.name ?? raw.display_name ?? 'Conversación',
+      role: raw.role ?? 'Docente',
+      lastMessage: raw.lastMessage ?? raw.last_message ?? raw.lastMessage ?? 'Nuevo chat',
+      timestamp: raw.timestamp ?? raw.lastMessageAt ?? raw.updated_at ?? '',
+      unread: Number(raw.unread ?? 0),
+      avatar: raw.avatar ?? getInitials(raw.name ?? raw.display_name),
+      status: raw.status ?? 'offline',
+      messages: [],
+    };
+  };
+
+  const normalizeMessage = (raw: any): ChatMessage => ({
+    id: raw.id,
+    sender: raw.sender ?? raw.user_name ?? 'Usuario',
+    content: raw.content ?? raw.body ?? '',
+    timestamp: raw.timestamp ?? raw.created_at ?? new Date().toISOString(),
+    isOwn: Boolean(raw.isOwn || raw.is_own || raw.sender_id === Number(user?.id)),
+    attachments: raw.attachments ?? [],
+    replyTo: raw.replyTo ?? null,
+  });
+
+  const loadConversations = async () => {
+    try {
+      const payload = (await apiFetch('/conversations', { method: 'GET' })) as { data?: any[] };
+      const rows = payload?.data ?? [];
+      const convs = rows.map(normalizeConversation);
+      setConversations((current) => convs.map((conversation) => {
+        const existing = current.find((item) => item.id === conversation.id);
+        return existing ? { ...conversation, messages: existing.messages } : conversation;
+      }));
+      // auto-select first if none selected
+      if (convs.length > 0 && selectedChat === null) setSelectedChat(convs[0].id);
+      window.dispatchEvent(new Event('ut-messages-updated'));
+      return convs;
+    } catch (err) {
+      console.error('loadConversations error', err);
+      return [];
+    }
+  };
+
+  const loadMessages = async (conversationId: number) => {
+    try {
+      const payload = (await apiFetch(`/conversations/${conversationId}/messages`, { method: 'GET' })) as { data?: any[] };
+      const rows = payload?.data ?? [];
+      const msgs = rows.map(normalizeMessage);
+      setConversations((current) => current.map((c) => (c.id === conversationId ? { ...c, messages: msgs } : c)));
+      return msgs;
+    } catch (err) {
+      console.error('loadMessages error', err);
+      return [];
+    }
+  };
+
+  const markConversationAsRead = async (conversationId: number) => {
+    try {
+      await apiFetch(`/conversations/${conversationId}/read`, { method: 'PATCH' });
+      setConversations((current) => current.map((c) => (c.id === conversationId ? { ...c, unread: 0 } : c)));
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (!isReady) return;
+    void loadConversations();
+  }, [isReady]);
 
   const filteredConversations = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -461,6 +547,7 @@ export function Messages(props: Readonly<{
     setSelectedChat(conversationId);
     setReplyingTo(null);
     updateConversation(conversationId, (conversation) => ({ ...conversation, unread: 0 }));
+    void Promise.all([loadMessages(conversationId), markConversationAsRead(conversationId)]);
   };
 
   const handleRemoveAttachment = (removeIndex: number) => {
@@ -496,40 +583,53 @@ export function Messages(props: Readonly<{
 
     const currentConversation = filteredConversations.find((conversation) => conversation.id === selectedChat);
     if (!currentConversation) return;
+    // send to backend
+    (async () => {
+      try {
+        await apiFetch(`/conversations/${selectedChat}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body: trimmedMessage || (pendingAttachments.length > 0 ? 'Adjunto enviado' : ''), reply_to_message_id: replyingTo?.id ?? null }),
+        });
+        setMessage('');
+        setPendingAttachments([]);
+        setReplyingTo(null);
+        setIsTyping(false);
+        await Promise.all([loadMessages(selectedChat as number), loadConversations()]);
+      } catch (err) {
+        console.error('send message error', err);
+      }
+    })();
+  };
 
-    const newMessage: ChatMessage = {
-      id: Date.now(),
-      sender: "Tú",
-      content: trimmedMessage || "Adjunto enviado",
-      timestamp: getTimeLabel(),
-      isOwn: true,
-      attachments: pendingAttachments.length > 0 ? pendingAttachments : undefined,
-      replyTo: replyingTo
-        ? {
-            id: replyingTo.id,
-            sender: replyingTo.sender,
-            content: replyingTo.content,
-          }
-        : undefined,
-    };
+  const handleDeleteMessage = async (messageId: number) => {
+    if (!selectedChat) return;
+    try {
+      await apiFetch(`/conversations/${selectedChat}/messages/${messageId}`, { method: 'DELETE' });
+      await Promise.all([loadMessages(selectedChat), loadConversations()]);
+      window.dispatchEvent(new Event('ut-messages-updated'));
+      toast.success("Mensaje eliminado");
+    } catch (err: any) {
+      console.error('delete message error', err);
+      toast.error(err?.message ?? 'No fue posible eliminar el mensaje');
+    }
+  };
 
-    setConversations((current) =>
-      current.map((conversation) =>
-        conversation.id === selectedChat
-          ? {
-              ...conversation,
-              messages: [...conversation.messages, newMessage],
-              lastMessage: newMessage.content,
-              timestamp: "Ahora",
-            }
-          : conversation
-      )
-    );
-
-    setMessage("");
-    setPendingAttachments([]);
-    setReplyingTo(null);
-    setIsTyping(false);
+  const handleEditMessage = async (messageId: number, body: string) => {
+    if (!selectedChat) return;
+    try {
+      await apiFetch(`/conversations/${selectedChat}/messages/${messageId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      });
+      await Promise.all([loadMessages(selectedChat), loadConversations()]);
+      window.dispatchEvent(new Event('ut-messages-updated'));
+      toast.success('Mensaje actualizado');
+    } catch (err: any) {
+      console.error('edit message error', err);
+      toast.error(err?.message ?? 'No fue posible editar el mensaje');
+    }
   };
 
   useEffect(() => {
@@ -638,7 +738,7 @@ export function Messages(props: Readonly<{
                 <div className="space-y-4 pb-2 pt-1">
                   {activeConversation.messages.length > 0 ? (
                     activeConversation.messages.map((messageItem) => (
-                      <MessageBubble key={messageItem.id} message={messageItem} onReply={setReplyingTo} />
+                      <MessageBubble key={messageItem.id} message={messageItem} onReply={setReplyingTo} onDelete={handleDeleteMessage} onEdit={handleEditMessage} />
                     ))
                   ) : (
                     <EmptyConversationState

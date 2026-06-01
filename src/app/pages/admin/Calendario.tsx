@@ -1,44 +1,53 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, Download, FileUp, Eye, Trash2 } from "lucide-react";
+import { CalendarDays, Download, Eye, FileUp } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
+import apiFetch from "../../lib/api";
+import { getCalendarDownloadUrl, getCalendarFileUrl } from "../../lib/calendar";
 
-const CALENDAR_STORAGE_KEY = "utslrc-admin-calendar-pdf";
-
-type StoredCalendar = {
+type CalendarMeta = {
+  id: number | null;
   name: string;
-  dataUrl: string;
-};
-
-const readStoredCalendar = (): StoredCalendar | null => {
-  try {
-    const raw = localStorage.getItem(CALENDAR_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredCalendar;
-    if (!parsed || typeof parsed.dataUrl !== "string" || typeof parsed.name !== "string") return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+  uploadedAt: string | null;
+  isActive: boolean;
 };
 
 export function CalendarioAdmin() {
-  const [calendar, setCalendar] = useState<StoredCalendar | null>(null);
+  const [calendar, setCalendar] = useState<CalendarMeta | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setCalendar(readStoredCalendar());
+    void (async () => {
+      try {
+        const response = await apiFetch("/calendar");
+        const data = response?.data;
+        setCalendar({
+          id: data?.id ?? null,
+          name: data?.file_name ?? "Calendario25-26.pdf",
+          uploadedAt: data?.uploaded_at ?? null,
+          isActive: Boolean(data?.is_active),
+        });
+      } catch {
+        setCalendar({
+          id: null,
+          name: "Calendario25-26.pdf",
+          uploadedAt: null,
+          isActive: false,
+        });
+      }
+    })();
   }, []);
 
-  const calendarSrc = useMemo(() => calendar?.dataUrl ?? new URL("../../../assets/Calendario25-26.pdf", import.meta.url).href, [calendar]);
+  const calendarSrc = useMemo(() => getCalendarFileUrl(calendar?.uploadedAt ?? "base"), [calendar?.uploadedAt]);
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+
     if (file.type !== "application/pdf") {
       toast.error("El archivo debe ser un PDF");
       return;
@@ -46,32 +55,27 @@ export function CalendarioAdmin() {
 
     setIsLoading(true);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
-        reader.readAsDataURL(file);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await apiFetch("/calendar", {
+        method: "POST",
+        body: formData,
       });
 
-      const nextCalendar = { name: file.name, dataUrl };
-      localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(nextCalendar));
-      setCalendar(nextCalendar);
+      const data = response?.data;
+      setCalendar({
+        id: data?.id ?? null,
+        name: data?.file_name ?? file.name,
+        uploadedAt: data?.uploaded_at ?? new Date().toISOString(),
+        isActive: Boolean(data?.is_active ?? true),
+      });
       toast.success("Calendario actualizado");
     } catch {
       toast.error("No se pudo cargar el calendario");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleRemove = () => {
-    localStorage.removeItem(CALENDAR_STORAGE_KEY);
-    setCalendar(null);
-    toast.success("Calendario restaurado al archivo base");
-  };
-
-  const handleOpen = () => {
-    window.open(calendarSrc, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -90,31 +94,20 @@ export function CalendarioAdmin() {
       <Card className="border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-slate-50/70 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-950">
         <CardHeader>
           <CardTitle>Calendario vigente</CardTitle>
-          <CardDescription>
-            Si subes un PDF nuevo, este panel mostrará esa versión en esta sesión del navegador.
-          </CardDescription>
+          <CardDescription>El archivo se guarda en la API para que docentes y admin vean la misma versión.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Label htmlFor="calendar-upload" className="cursor-pointer">
-              <Button type="button" variant="success" asChild>
-                <span>
-                  <FileUp className="mr-2 h-4 w-4" />Subir calendario
-                </span>
-              </Button>
-            </Label>
-            <Input id="calendar-upload" type="file" accept="application/pdf" className="hidden" onChange={handleUpload} disabled={isLoading} />
-            <Button type="button" variant="outline" onClick={handleOpen}>
+            <Button type="button" variant="success" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
+              <FileUp className="mr-2 h-4 w-4" />Subir calendario
+            </Button>
+            <Input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleUpload} disabled={isLoading} />
+            <Button type="button" variant="outline" onClick={() => window.open(calendarSrc, "_blank", "noopener,noreferrer")}>
               <Eye className="mr-2 h-4 w-4" />Abrir PDF
             </Button>
-            <Button type="button" variant="outline" onClick={() => window.open(calendarSrc, "_blank", "noopener,noreferrer") }>
+            <Button type="button" variant="outline" onClick={() => window.open(getCalendarDownloadUrl(), "_blank", "noopener,noreferrer") }>
               <Download className="mr-2 h-4 w-4" />Descargar
             </Button>
-            {calendar && (
-              <Button type="button" variant="ghost" onClick={handleRemove}>
-                <Trash2 className="mr-2 h-4 w-4" />Restaurar archivo base
-              </Button>
-            )}
           </div>
 
           <div className="rounded-2xl border border-border bg-background/80 p-4 shadow-sm">
@@ -123,7 +116,11 @@ export function CalendarioAdmin() {
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-border bg-background">
-            <iframe src={`${calendarSrc}#toolbar=1&navpanes=0`} className="h-[72vh] w-full" title="Calendario institucional" />
+            <iframe
+              src={`${calendarSrc}#toolbar=1&navpanes=0`}
+              className="h-[72vh] w-full"
+              title="Calendario institucional"
+            />
           </div>
         </CardContent>
       </Card>

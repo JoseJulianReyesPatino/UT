@@ -5,11 +5,12 @@ import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Button } from "../../components/ui/button";
-import { Upload, FileText, Menu, X } from "lucide-react";
+import { Upload, Menu } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuatrimestre } from "../../data/curricula";
+import { getCalendarFileUrl } from "../../lib/calendar";
 
 interface PlaneacionFormData {
   plan: Plan | "";
@@ -39,7 +40,7 @@ export default function PlaneacionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<PlaneacionFormData>(initialFormData);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const calendarioUrl = new URL("../../../assets/Calendario25-26.pdf", import.meta.url).href;
+  const calendarioUrl = getCalendarFileUrl();
 
   // Obtener carreras disponibles según el plan
   const carrerasDisponibles = useMemo(() => {
@@ -328,35 +329,18 @@ export default function PlaneacionPage() {
             </div>
 
             {formData.archivos.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-2 pt-2">
                 {formData.archivos.map((archivo, index) => (
-                  <div key={`${archivo.name}-${archivo.size}-${index}`} className="p-3 bg-success/10 border border-success/20 rounded-lg flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm flex-1">
-                      <FileText className="h-4 w-4 text-success" />
-                      <span className="font-medium">{archivo.name}</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeFile(index)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <PdfPreview
+                    key={`${archivo.name}-${archivo.size}-${index}`}
+                    file={archivo}
+                    title="Documento cargado"
+                    onRemove={() => removeFile(index)}
+                  />
                 ))}
               </div>
             )}
           </div>
-
-          {/* Vista previa de archivos */}
-          {formData.archivos.length > 0 && (
-            <div className="space-y-2">
-              {formData.archivos.map((archivo, index) => (
-                <PdfPreview key={`preview-${archivo.name}-${archivo.size}-${index}`} file={archivo} title={`Vista previa - ${archivo.name}`} />
-              ))}
-            </div>
-          )}
 
           {/* Nombre del docente */}
           <div className="space-y-2">

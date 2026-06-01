@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -6,8 +6,9 @@ import { Label } from "../../components/ui/label";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { getFormConfig, getGroups, addGroup, removeGroup, saveGroups, saveFormConfig, Group, type FormId, type FormRole } from "../../../lib/formConfig";
+import { getFormConfig, saveFormConfig, Group, type FormId, type FormRole } from "../../../lib/formConfig";
 import { useAuth } from "../../context/AuthContext";
+import { apiFetch } from "../../lib/api";
 import { useTheme } from "../../context/ThemeContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { CalendarDays, ChevronDown, ChevronUp, FileText, Grid2x2, Moon, PencilLine, Search, Sun, Trash2, Users, Settings2 } from "lucide-react";
@@ -81,7 +82,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
   const [formConfig, setFormConfig] = useState(getFormConfig());
-  const [groups, setGroups] = useState<Group[]>(getGroups());
+  const [groups, setGroups] = useState<Group[]>([]);
 
   const [plan, setPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
   const [careerCode, setCareerCode] = useState("");
@@ -100,16 +101,17 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     groupNumber: number;
   }>(null);
 
-  const [profileName, setProfileName] = useState("");
   const [profileFirstNames, setProfileFirstNames] = useState("");
   const [profileLastNames, setProfileLastNames] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
   const [profileAvatar, setProfileAvatar] = useState<string | undefined>(undefined);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [groupSearch, setGroupSearch] = useState("");
   const [groupViewPlan, setGroupViewPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
   const [openFormSection, setOpenFormSection] = useState<FormSectionId | null>(null);
   const [openFormItems, setOpenFormItems] = useState<Record<FormId, boolean>>({});
+  const loadedProfileUserId = useRef<string | null>(null);
 
   const toggleFormItem = (id: FormId) => {
     setOpenFormItems((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -133,7 +135,19 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
   useEffect(() => {
     setFormConfig(getFormConfig());
-    setGroups(getGroups());
+
+    const loadGroups = async () => {
+      try {
+        const res = await apiFetch('/groups');
+        setGroups(res?.data ?? []);
+      } catch (err: any) {
+        // keep empty list on error
+        console.error('Failed to load groups', err);
+        setGroups([]);
+      }
+    };
+
+    loadGroups();
   }, []);
 
   useEffect(() => {
@@ -142,15 +156,15 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
   useEffect(() => {
     if (!user) return;
-    const nameParts = (user.name ?? "").trim().split(/\s+/).filter(Boolean);
-    if (nameParts.length <= 1) {
-      setProfileFirstNames(user.name ?? "");
-      setProfileLastNames("");
-    } else {
-      setProfileFirstNames(nameParts.slice(0, Math.max(1, nameParts.length - 2)).join(" "));
-      setProfileLastNames(nameParts.slice(Math.max(1, nameParts.length - 2)).join(" "));
+
+    const shouldInitializeFromUser = loadedProfileUserId.current !== String(user.id);
+
+    if (shouldInitializeFromUser) {
+      setProfileFirstNames(user.firstNames ?? "");
+      setProfileLastNames(user.lastNames ?? "");
+      loadedProfileUserId.current = String(user.id);
     }
-    setProfileName(user.name ?? "");
+
     setProfilePhone(user.phone ?? "");
     setProfileAvatar(user.avatar);
   }, [user]);
@@ -268,19 +282,31 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     }));
   };
 
-  const handleAddGroup = () => {
+  const handleAddGroup = async () => {
     if (!careerCode.trim() || !cuatrimestre) return;
     setIsLoading(true);
-    setTimeout(() => {
-      addGroup({ careerCode: careerCode.toUpperCase(), plan, cuatrimestre: Number(cuatrimestre), groupNumber: Number(groupNumber) });
-      setGroups(getGroups());
-      // clear inputs
+    try {
+      const payload = {
+        careerCode: careerCode.trim().toUpperCase(),
+        plan,
+        cuatrimestre: Number(cuatrimestre),
+        groupNumber: Number(groupNumber),
+      };
+      const res = await apiFetch('/groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      setGroups((prev) => [res.data, ...prev]);
       setCareerCode("");
       setCuatrimestre("");
       setGroupNumber(1);
+      toast.success('Grupo creado');
+    } catch (err: any) {
+      toast.error(err?.message ?? 'No fue posible crear el grupo');
+    } finally {
       setIsLoading(false);
-      toast.success("Grupo creado");
-    }, 400);
+    }
   };
 
   const handleStartEditGroup = (group: Group) => {
@@ -306,30 +332,30 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     setEditingGroupOriginal(null);
   };
 
-  const handleSaveGroupEdit = () => {
+  const handleSaveGroupEdit = async () => {
     if (!editingGroupId || !editingGroupCareerCode.trim() || !editingGroupCuatrimestre) return;
     setIsLoading(true);
+    try {
+      const payload = {
+        careerCode: editingGroupCareerCode.trim().toUpperCase(),
+        plan: editingGroupPlan,
+        cuatrimestre: Number(editingGroupCuatrimestre),
+        groupNumber: Number(editingGroupNumber),
+      };
+      const res = await apiFetch(`/groups/${editingGroupId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-    setTimeout(() => {
-      const nextGroups = groups.map((group) => (
-        group.id === editingGroupId
-          ? {
-              ...group,
-              plan: editingGroupPlan,
-              careerCode: editingGroupCareerCode.trim().toUpperCase(),
-              cuatrimestre: Number(editingGroupCuatrimestre),
-              groupNumber: Number(editingGroupNumber),
-              name: `${editingGroupCareerCode.trim().toUpperCase()}${editingGroupCuatrimestre}-${editingGroupNumber}`,
-            }
-          : group
-      ));
-
-      setGroups(nextGroups);
-      saveGroups(nextGroups);
+      setGroups((prev) => prev.map((g) => (g.id === editingGroupId ? res.data : g)));
       clearEditingGroupState();
+      toast.success('Grupo actualizado');
+    } catch (err: any) {
+      toast.error(err?.message ?? 'No fue posible actualizar el grupo');
+    } finally {
       setIsLoading(false);
-      toast.success("Grupo actualizado");
-    }, 400);
+    }
   };
 
   const handleRemoveGroup = (id: number) => {
@@ -339,9 +365,14 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     setDeleteTarget({
       label: group.name,
       description: "Grupo",
-      onConfirm: () => {
-        removeGroup(id);
-        setGroups(getGroups());
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/groups/${id}`, { method: 'DELETE' });
+          setGroups((prev) => prev.filter((g) => g.id !== id));
+          toast.success('Grupo eliminado');
+        } catch (err: any) {
+          toast.error(err?.message ?? 'No fue posible eliminar el grupo');
+        }
       },
     });
     setDeleteConfirmation("");
@@ -356,8 +387,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("La imagen no debe superar 2 MB");
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error("La imagen no debe superar 4 MB");
       return;
     }
 
@@ -369,7 +400,12 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     reader.readAsDataURL(file);
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
+    if (!user) {
+      toast.error("No se pudo cargar el usuario actual");
+      return;
+    }
+
     const firstNames = profileFirstNames.trim();
     const lastNames = profileLastNames.trim();
     const normalizedPhone = profilePhone.replace(/\D/g, "").slice(0, 10);
@@ -386,12 +422,35 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
     const fullName = `${firstNames} ${lastNames}`.trim();
 
-    updateProfile({
-      name: fullName,
-      phone: normalizedPhone,
-      avatar: profileAvatar,
-    });
-    toast.success("Configuración de cuenta actualizada");
+    setIsSavingProfile(true);
+
+    try {
+      await apiFetch(`/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: fullName,
+          first_names: firstNames,
+          last_names: lastNames,
+          phone: normalizedPhone,
+          avatar_url: profileAvatar ?? null,
+        }),
+      });
+
+      updateProfile({
+        name: fullName,
+        firstNames,
+        lastNames,
+        phone: normalizedPhone,
+        avatar: profileAvatar,
+      });
+
+      toast.success("Configuración de cuenta actualizada");
+    } catch (error: any) {
+      toast.error(error instanceof Error ? error.message : "No fue posible guardar la configuración");
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const shellClass = theme === "dark"
@@ -453,10 +512,6 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           <div>
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Configuración del Sistema</h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">Ajustes globales y parámetros del sistema</p>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <Grid2x2 className="h-4 w-4 text-emerald-500" />
-            Panel de administración
           </div>
         </div>
       </div>
@@ -530,7 +585,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                   <div className="space-y-2">
                     <Label htmlFor="avatar">Foto de perfil</Label>
                     <Input id="avatar" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} />
-                    <p className="text-xs text-muted-foreground">Formatos: PNG/JPG/WEBP. Tamaño máximo: 2MB.</p>
+                    <p className="text-xs text-muted-foreground">Formatos: PNG/JPG/WEBP. Tamaño máximo: 4MB.</p>
                   </div>
                 </div>
 
@@ -593,7 +648,9 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button variant="success" onClick={handleSaveProfile}>Guardar configuración</Button>
+                  <Button variant="success" onClick={handleSaveProfile} disabled={isSavingProfile}>
+                    {isSavingProfile ? "Guardando..." : "Guardar cambios"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>

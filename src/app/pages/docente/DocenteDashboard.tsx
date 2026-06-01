@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import apiFetch from "../../lib/api";
+import { useAuth } from "../../context/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -21,77 +23,90 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const manualDocenteUrl = new URL("../../../assets/Manual de Usuario del Docente.pdf", import.meta.url).href;
   const [isIntroOpen, setIsIntroOpen] = useState(true);
 
-  const stats = [
-    {
-      title: "Documentos Pendientes",
-      value: "3",
-      description: "Por entregar esta semana",
-      icon: Clock,
-      trend: "+2 desde ayer",
-      color: "text-emerald-700 dark:text-emerald-300",
-      bgColor: "bg-emerald-100/80 dark:bg-emerald-950/40",
-      cardClass: "bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70 border-emerald-200/70 dark:from-emerald-950/25 dark:via-slate-950 dark:to-emerald-950/35 dark:border-emerald-800/60",
-      accentClass: "from-emerald-400/40 via-emerald-300/20 to-transparent",
-      action: "historial",
-    },
-    {
-      title: "Documentos Aprobados",
-      value: "12",
-      description: "Este cuatrimestre",
-      icon: CheckCircle2,
-      trend: "+3 este mes",
-      color: "text-emerald-700 dark:text-emerald-300",
-      bgColor: "bg-emerald-100/80 dark:bg-emerald-950/40",
-      cardClass: "bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70 border-emerald-200/70 dark:from-emerald-950/25 dark:via-slate-950 dark:to-emerald-950/35 dark:border-emerald-800/60",
-      accentClass: "from-emerald-400/40 via-emerald-300/20 to-transparent",
-      action: "historial",
-    },
-    {
-      title: "En Revisión",
-      value: "2",
-      description: "Esperando aprobación",
-      icon: AlertCircle,
-      trend: "Últimas 24h",
-      color: "text-slate-700 dark:text-slate-200",
-      bgColor: "bg-slate-100/80 dark:bg-slate-800/80",
-      cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70",
-      accentClass: "from-slate-400/35 via-slate-300/20 to-transparent",
-      action: "historial",
-    },
-  ];
+  const { isReady } = useAuth();
 
-  const recentDocuments = [
-    {
-      id: 1,
-      name: "Planeación - Programación Web",
-      materia: "Programación Web",
-      tipo: "Planeación",
-      fecha: "2026-05-15",
-      status: "aprobado",
-    },
-    {
-      id: 2,
-      name: "Instrumento 30% - Base de Datos",
-      materia: "Base de Datos",
-      tipo: "Instrumento 30%",
-      fecha: "2026-05-14",
-      status: "revision",
-    },
-    {
-      id: 3,
-      name: "Lista Concentrada - Redes",
-      materia: "Redes de Computadoras",
-      tipo: "Lista Concentrada",
-      fecha: "2026-05-10",
-      status: "pendiente",
-    },
-  ];
+  const [stats, setStats] = useState<{
+    title: string;
+    value: string;
+    description: string;
+    icon: any;
+    trend?: string;
+    color?: string;
+    bgColor?: string;
+    cardClass?: string;
+    accentClass?: string;
+    action?: string;
+  }[]>([]);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
-  const proximasEntregas = [
-    { titulo: "Instrumento 60% - Todos los grupos", fecha: "2026-05-20", dias: 3 },
-    { titulo: "Portafolio Digital - TSU", fecha: "2026-05-25", dias: 8 },
-    { titulo: "Acta Final - Ingeniería", fecha: "2026-06-01", dias: 15 },
-  ];
+  const [recentDocuments, setRecentDocuments] = useState<any[]>([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+
+  const [proximasEntregas, setProximasEntregas] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!isReady) return;
+
+    const load = async () => {
+      setIsLoadingStats(true);
+      setIsLoadingDocuments(true);
+      try {
+        const dashboard = (await apiFetch('/dashboard/stats', { method: 'GET' })) as any;
+
+        const statsArr = [
+          {
+            title: 'Documentos Pendientes',
+            value: String(dashboard.documents_pending ?? 0),
+            description: 'Por entregar',
+            icon: Clock,
+            action: 'historial',
+          },
+          {
+            title: 'Documentos Aprobados',
+            value: String(dashboard.documents_reviewed ?? 0),
+            description: 'Este cuatrimestre',
+            icon: CheckCircle2,
+            action: 'historial',
+          },
+          {
+            title: 'En Revisión',
+            value: String((dashboard.documents_total ?? 0) - (dashboard.documents_reviewed ?? 0) - (dashboard.documents_pending ?? 0)),
+            description: 'En revisión',
+            icon: AlertCircle,
+            action: 'historial',
+          },
+        ];
+        setStats(statsArr);
+
+        // Load recent documents (user-scoped)
+        const docsPayload = (await apiFetch('/documents?per_page=6', { method: 'GET' })) as any;
+        const docs = (docsPayload?.data?.data ?? docsPayload?.data ?? []) as any[];
+        setRecentDocuments(docs.map((d) => ({
+          id: d.id,
+          name: d.nombre ?? d.title ?? 'Documento',
+          materia: d.materia ?? '-',
+          tipo: d.tipoLabel ?? d.tipo ?? 'Documento',
+          fecha: d.fecha ?? null,
+          status: d.status ?? 'pendiente',
+        })));
+
+        // Upcoming: take pending documents and nearest dates
+        const pending = docs.filter((d) => d.status === 'pendiente' && d.fecha).map((d) => ({ titulo: d.nombre ?? 'Documento', fecha: d.fecha }));
+        const upcoming = pending
+          .map((p) => ({ ...p, dias: Math.max(0, Math.ceil((new Date(p.fecha).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) }))
+          .sort((a, b) => a.dias - b.dias)
+          .slice(0, 5);
+        setProximasEntregas(upcoming);
+      } catch (err) {
+        // ignore, UI shows empty states
+      } finally {
+        setIsLoadingStats(false);
+        setIsLoadingDocuments(false);
+      }
+    };
+
+    void load();
+  }, [isReady]);
 
   return (
     <div className="space-y-6">

@@ -9,8 +9,10 @@ import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
-const calendarioPdf = new URL("../../../assets/Calendario25-26.pdf", import.meta.url).href;
 import { getGroups } from "../../../lib/formConfig";
+import { getCalendarFileUrl } from "../../lib/calendar";
+
+const calendarioPdf = getCalendarFileUrl();
 
 interface AsesoriaFormData {
   plan: Plan | "";

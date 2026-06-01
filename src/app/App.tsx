@@ -34,10 +34,11 @@ import { Button } from "./components/ui/button";
 import { Menu, Sun, Moon } from "lucide-react";
 
 function AppContent() {
-  const { isAuthenticated, user, notice } = useAuth();
+  const { isAuthenticated, isReady, user, notice } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const logoSrc = theme === "dark" ? "/src/assets/Logotipo UTSLRC-BLANCO.png" : "/src/assets/Logotipo  UTSLRC.png";
-  const [currentView, setCurrentView] = useState("dashboard");
+  const currentViewStorageKey = "utslrc-current-view";
+  const [currentView, setCurrentView] = useState(() => sessionStorage.getItem(currentViewStorageKey) ?? "dashboard");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [deferredMessageOpen, setDeferredMessageOpen] = useState<null | { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string } }>(null);
@@ -59,15 +60,64 @@ function AppContent() {
   ) : null;
 
   useEffect(() => {
-    if (isAuthenticated) {
-      setIsLoggingOut(false);
-      setCurrentView("dashboard");
-    } else {
+    if (!isReady) {
+      return;
+    }
+
+    if (!isAuthenticated) {
       setMobileSidebarOpen(false);
       setDeferredMessageOpen(null);
       setCurrentView("dashboard");
+      sessionStorage.removeItem(currentViewStorageKey);
+      return;
     }
-  }, [isAuthenticated]);
+
+    const allowedViews = user?.role === "administrador"
+      ? new Set([
+          "dashboard",
+          "docentes",
+          "tutores",
+          "mensajes",
+          "documentos",
+          "documentos-revisados",
+          "documentos-revisados-hoy",
+          "ciclos",
+          "estadias-admin",
+          "calendario",
+          "configuracion",
+          "configuracion-cuenta",
+        ])
+      : new Set([
+          "dashboard",
+          "planeacion",
+          "instrumento-30-normal",
+          "instrumento-40-nuevo",
+          "instrumento-60-nuevo",
+          "instrumento-70-normal",
+          "lista-concentrada",
+          "asesoria",
+          "portafolio",
+          "acta-final",
+          "estadias",
+          "tutorias",
+          "tutorias-carga-academica",
+          "tutorias-reporte-bajas",
+          "tutorias-concentrado-asesorias",
+          "tutorias-acta-asistencia-grupal",
+          "tutorias-ficha-tecnica",
+          "historial",
+          "mensajes",
+          "perfil",
+        ]);
+
+    if (!allowedViews.has(currentView)) {
+      setCurrentView("dashboard");
+      sessionStorage.setItem(currentViewStorageKey, "dashboard");
+    } else {
+      sessionStorage.setItem(currentViewStorageKey, currentView);
+    }
+    setIsLoggingOut(false);
+  }, [currentView, isAuthenticated, isReady, user?.role]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -82,6 +132,14 @@ function AppContent() {
   }, []);
 
   // logout handled by AuthContext logout directly where needed
+
+  if (!isReady) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Cargando sesión...
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (

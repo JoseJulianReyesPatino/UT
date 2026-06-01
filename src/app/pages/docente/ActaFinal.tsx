@@ -7,10 +7,12 @@ import { Button } from "../../components/ui/button";
 import { Upload, FileText, Menu, X } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
-const calendarioPdf = new URL("../../../assets/Calendario25-26.pdf", import.meta.url).href;
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuatrimestre } from "../../data/curricula";
 import { getGroups } from "../../../lib/formConfig";
+import { getCalendarFileUrl } from "../../lib/calendar";
+
+const calendarioPdf = getCalendarFileUrl();
 
 interface ActaFinalFormData {
   plan: Plan | "";

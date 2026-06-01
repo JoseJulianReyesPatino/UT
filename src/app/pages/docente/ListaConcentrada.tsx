@@ -10,6 +10,7 @@ import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
+import { getCalendarFileUrl } from "../../lib/calendar";
 
 interface ListaConcentradaFormData {
   plan: Plan | "";
@@ -39,7 +40,7 @@ export default function ListaConcentradaPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<ListaConcentradaFormData>(initialFormData);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const calendarioUrl = new URL("../../../assets/Calendario25-26.pdf", import.meta.url).href;
+  const calendarioUrl = getCalendarFileUrl();
 
   // Obtener carreras disponibles según el plan
   const carrerasDisponibles = useMemo(() => {

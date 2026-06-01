@@ -327,6 +327,10 @@ export default function Tutores() {
   const sectionCardClassName =
     "overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20";
 
+  const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-2 xl:grid-cols-5";
+  const filterSelectTriggerClassName = "w-full text-[13px] leading-tight sm:text-sm";
+  const filterSelectValueClassName = "truncate";
+
   const getDocumentRowClassName = (isReturned: boolean) => (
     `relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border transition-colors ${isReturned
       ? "border-rose-300/70 bg-rose-50/70 hover:bg-rose-50 dark:border-rose-900/60 dark:bg-rose-950/20 dark:hover:bg-rose-950/30"
@@ -342,25 +346,37 @@ export default function Tutores() {
       </div>
 
       <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
-        <TabsList className="bg-gradient-to-r from-emerald-100 via-emerald-50 to-emerald-50 p-1 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
-          <TabsTrigger value="all">
+        <div className="sm:hidden mb-3">
+          <Select value={activeSection} onValueChange={(v) => setActiveSection(v as ReviewSection)}>
+            <SelectTrigger className="w-full"><SelectValue placeholder="Sección" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="pendientes">Pendientes</SelectItem>
+              <SelectItem value="revisados">Revisados</SelectItem>
+              <SelectItem value="hoy">Revisados hoy</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <TabsList className="hidden sm:flex w-full gap-2 p-1 px-2 bg-gradient-to-r from-emerald-100 via-emerald-50 to-emerald-50 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 flex-wrap">
+          <TabsTrigger value="all" className="px-3 py-2 text-sm">
             Todos
             <Badge variant="outline" className="ml-2">{allDocuments.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="pendientes">
+          <TabsTrigger value="pendientes" className="px-3 py-2 text-sm">
             Pendientes
             <Badge variant="warning" className="ml-2">{filteredPending.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="revisados">Revisados</TabsTrigger>
-          <TabsTrigger value="hoy">Revisados hoy</TabsTrigger>
+          <TabsTrigger value="revisados" className="px-3 py-2 text-sm">Revisados</TabsTrigger>
+          <TabsTrigger value="hoy" className="px-3 py-2 text-sm">Revisados hoy</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
-            <CardHeader>
-              <div className="flex flex-wrap items-center gap-4 pt-4">
+            <CardHeader className="pb-4">
+              <div className={filtersGridClassName}>
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filtrar por ciclo" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
                     {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
@@ -368,14 +384,14 @@ export default function Tutores() {
                 </Select>
                 
                 <Select value={filterTutor} onValueChange={setFilterTutor}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por tutor" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los tutores</SelectItem>
                     {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
                     {careerOptions.map((career) => (
@@ -384,20 +400,22 @@ export default function Tutores() {
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por apartado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
                     {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los documentos</SelectItem>
-                    <SelectItem value="returned">Solo devueltos</SelectItem>
-                    <SelectItem value="not-returned">No devueltos</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="col-span-2 sm:col-span-1">
+                  <Select value={filterReturned} onValueChange={setFilterReturned}>
+                    <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los documentos</SelectItem>
+                      <SelectItem value="returned">Solo devueltos</SelectItem>
+                      <SelectItem value="not-returned">No devueltos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -413,14 +431,14 @@ export default function Tutores() {
                         onClick={() => setPreviewDocument(doc)}
                         className={previewCardOverlayClassName}
                       />
-                      <div className="relative z-20 flex items-start gap-3 flex-1 pointer-events-none">
+                      <div className="relative z-20 flex items-start gap-3 flex-1 min-w-0 pointer-events-none">
                         <div className="relative z-20 h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 pointer-events-none">
                           <FileText className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                          <p className="font-medium">{doc.documento}</p>
+                          <p className="font-medium break-words text-sm sm:text-base">{doc.documento}</p>
                           <p className="text-sm text-muted-foreground">{"tutor" in doc ? doc.tutor : (doc as any).tutor} • {doc.carrera}</p>
-                          <div className="mt-2 flex flex-wrap gap-2">
+                          <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                             {"materia" in doc && doc.materia && doc.materia.trim() !== "-" && (
                               <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
                                 {doc.materia}
@@ -457,7 +475,7 @@ export default function Tutores() {
                             )}
                         </div>
                       </div>
-                      <div className="relative z-20 flex items-center gap-2 pointer-events-auto">
+                      <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
                         <ResponsiveActionButton
                           variant="outline"
                           size="sm"
@@ -533,10 +551,10 @@ export default function Tutores() {
 
         <TabsContent value="pendientes" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
-            <CardHeader>
-              <div className="flex flex-wrap items-center gap-4">
+            <CardHeader className="pb-4">
+              <div className={filtersGridClassName}>
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filtrar por ciclo" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
                     {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
@@ -544,14 +562,14 @@ export default function Tutores() {
                 </Select>
                 
                 <Select value={filterTutor} onValueChange={setFilterTutor}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por tutor" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los tutores</SelectItem>
                     {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
                     {careerOptions.map((career) => (
@@ -560,20 +578,22 @@ export default function Tutores() {
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por apartado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
                     {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los documentos</SelectItem>
-                    <SelectItem value="returned">Solo devueltos</SelectItem>
-                    <SelectItem value="not-returned">No devueltos</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="col-span-2 sm:col-span-1">
+                  <Select value={filterReturned} onValueChange={setFilterReturned}>
+                    <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los documentos</SelectItem>
+                      <SelectItem value="returned">Solo devueltos</SelectItem>
+                      <SelectItem value="not-returned">No devueltos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -588,34 +608,34 @@ export default function Tutores() {
                       onClick={() => setPreviewDocument(doc)}
                       className={previewCardOverlayClassName}
                     />
-                    <div className="relative z-20 flex items-start gap-3 flex-1 pointer-events-none">
+                    <div className="relative z-20 flex items-start gap-3 flex-1 min-w-0 pointer-events-none">
                       <div className="relative z-20 h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 pointer-events-none">
                         <FileText className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                        <p className="font-medium">{doc.documento}</p>
-                        <p className="text-sm text-muted-foreground">{doc.tutor} • {doc.carrera}</p>
-                        <div className="flex flex-wrap gap-2 mt-2">
+                        <p className="break-words text-sm font-medium leading-snug sm:text-base">{doc.documento}</p>
+                        <p className="mt-1 text-xs leading-snug text-muted-foreground sm:text-sm">{doc.tutor} • {doc.carrera}</p>
+                        <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                           {doc.materia && doc.materia.trim() !== "-" && (
-                            <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
+                            <Button type="button" variant="outline" className={`${previewChipClassName} w-full justify-center pointer-events-auto sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
                               {doc.materia}
                             </Button>
                           )}
-                          <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
+                          <Button type="button" variant="outline" className={`${previewChipClassName} w-full justify-center pointer-events-auto sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
                             {doc.cuatrimestre}° Cuatri
                           </Button>
-                          <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
+                          <Button type="button" variant="outline" className={`${previewChipClassName} w-full justify-center pointer-events-auto sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
                             Grupo {doc.grupo}
                           </Button>
-                          <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
+                          <Button type="button" variant="outline" className={`${previewChipClassName} w-full justify-center pointer-events-auto sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
                             {doc.ciclo}
                           </Button>
-                          <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
+                          <Button type="button" variant="outline" className={`${previewChipClassName} col-span-2 w-full justify-center pointer-events-auto sm:col-span-1 sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
                             {doc.apartado}
                           </Button>
                         </div>
                         {doc.fecha && (
-                          <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-xs text-muted-foreground">{formatTime12(doc.fecha)}</span> : null}</p>
+                          <p className="mt-2 text-[11px] leading-snug text-muted-foreground sm:text-xs">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-[11px] text-muted-foreground sm:text-xs">{formatTime12(doc.fecha)}</span> : null}</p>
                         )}
                         {'returnedAt' in doc && doc.returnedAt && (
                           <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>
@@ -625,8 +645,8 @@ export default function Tutores() {
                         )}
                       </div>
                     </div>
-                    <div className="relative z-20 flex items-center gap-2 pointer-events-auto">
-                      {isReturned && <Badge variant="destructive">Devuelto</Badge>}
+                    <div className="relative z-20 grid grid-cols-2 gap-2 pointer-events-auto sm:flex sm:flex-wrap sm:items-center sm:justify-end">
+                      {isReturned && <Badge variant="destructive" className="col-span-2 justify-self-end sm:col-span-1">Devuelto</Badge>}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
@@ -701,24 +721,24 @@ export default function Tutores() {
 
         <TabsContent value="revisados" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
-            <CardHeader>
-              <div className="flex flex-wrap items-center gap-4 pt-4">
+            <CardHeader className="pb-4">
+              <div className={filtersGridClassName}>
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filtrar por ciclo" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
                     {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterTutor} onValueChange={setFilterTutor}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por tutor" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los tutores</SelectItem>
                     {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
                     {careerOptions.map((career) => (
@@ -727,20 +747,22 @@ export default function Tutores() {
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por apartado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
                     {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los documentos</SelectItem>
-                    <SelectItem value="returned">Solo devueltos</SelectItem>
-                    <SelectItem value="not-returned">No devueltos</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="col-span-2 sm:col-span-1">
+                  <Select value={filterReturned} onValueChange={setFilterReturned}>
+                    <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los documentos</SelectItem>
+                      <SelectItem value="returned">Solo devueltos</SelectItem>
+                      <SelectItem value="not-returned">No devueltos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
           </Card>
@@ -768,7 +790,7 @@ export default function Tutores() {
                             <FileText className="h-6 w-6 text-muted-foreground" />
                           </div>
                           <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                            <p className="font-medium">{doc.documento}</p>
+                            <p className="font-medium break-words text-sm sm:text-base">{doc.documento}</p>
                             <p className="text-sm text-muted-foreground">{doc.tutor}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
@@ -789,7 +811,7 @@ export default function Tutores() {
                             )}
                           </div>
                         </div>
-                        <div className="relative z-20 flex items-center gap-2 pointer-events-auto">
+                        <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
@@ -853,26 +875,26 @@ export default function Tutores() {
 
         <TabsContent value="hoy" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
-            <CardHeader>
+            <CardHeader className="pb-4">
               <CardTitle>Revisados hoy</CardTitle>
               <CardDescription>Documentos abiertos por administración en el día</CardDescription>
-              <div className="mt-4 flex flex-wrap items-center gap-4">
+              <div className={filtersGridClassName}>
                 <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filtrar por ciclo" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
                     {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterTutor} onValueChange={setFilterTutor}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por tutor" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los tutores</SelectItem>
                     {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por carrera" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
                     {careerOptions.map((career) => (
@@ -881,14 +903,14 @@ export default function Tutores() {
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por apartado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
                     {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger>
+                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los documentos</SelectItem>
                     <SelectItem value="returned">Solo devueltos</SelectItem>
@@ -946,7 +968,7 @@ export default function Tutores() {
                           )}
                         </div>
                       </div>
-                      <div className="relative z-20 flex items-center gap-2 pointer-events-auto">
+                      <div className="relative z-20 flex flex-wrap items-center justify-end gap-2 pointer-events-auto">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
