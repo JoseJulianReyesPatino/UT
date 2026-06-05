@@ -26,6 +26,7 @@ export type FormId =
   | "concentrado-asesorias"
   | "acta-asistencia-grupal"
   | "ficha-tecnica"
+  | "remedial"
   | "carta-presentacion"
   | "carta-aceptacion"
   | "carta-terminacion"
@@ -57,6 +58,7 @@ const DEFAULT_FORM_ACCESS: FormAccessConfig = {
   "instrumento-60-nuevo": { roles: ["docente"], dueAt: null },
   "instrumento-70-normal": { roles: ["docente"], dueAt: null },
   "lista-concentrada": { roles: ["docente"], dueAt: null },
+  remedial: { roles: ["docente"], dueAt: null },
   asesoria: { roles: ["docente"], dueAt: null },
   "portafolio-digital": { roles: ["docente"], dueAt: null },
   "acta-final": { roles: ["docente"], dueAt: null },
@@ -87,6 +89,7 @@ const cloneDefaultFormAccess = (): FormAccessConfig => ({
   "instrumento-60-nuevo": { ...DEFAULT_FORM_ACCESS["instrumento-60-nuevo"] },
   "instrumento-70-normal": { ...DEFAULT_FORM_ACCESS["instrumento-70-normal"] },
   "lista-concentrada": { ...DEFAULT_FORM_ACCESS["lista-concentrada"] },
+  remedial: { ...DEFAULT_FORM_ACCESS["remedial"] },
   asesoria: { ...DEFAULT_FORM_ACCESS.asesoria },
   "portafolio-digital": { ...DEFAULT_FORM_ACCESS["portafolio-digital"] },
   "acta-final": { ...DEFAULT_FORM_ACCESS["acta-final"] },

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "../../components/ui/badge";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
-import { Calendar, Key, Upload } from "lucide-react";
+import { Calendar, Eye, EyeOff, Key, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 export function Profile() {
@@ -25,6 +25,9 @@ export function Profile() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [profileStats, setProfileStats] = useState({
     documentsSent: 0,
     documentsReviewed: 0,
@@ -213,6 +216,9 @@ export function Profile() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
     } catch (error: any) {
       toast.error(error instanceof Error ? error.message : "No fue posible cambiar la contraseña");
     } finally {
@@ -248,8 +254,10 @@ export function Profile() {
     : "Docente";
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="relative min-h-[calc(100vh-2rem)] overflow-hidden bg-gradient-to-br from-emerald-50 via-background to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950">
+      <div className="absolute inset-0 pointer-events-none opacity-60 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.12),transparent_30%)] dark:opacity-40" />
+      <div className="relative z-10 space-y-6">
+        <div>
         <h1>Mi Perfil</h1>
         <p className="text-muted-foreground">
           Gestiona tu información personal y preferencias
@@ -380,30 +388,69 @@ export function Profile() {
             <div className="mt-4 space-y-4">
               <div className="space-y-2">
                 <Label>Contraseña actual</Label>
-                <Input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(event) => setCurrentPassword(event.target.value)}
-                  placeholder="Ingresa tu contraseña actual"
-                />
+                <div className="relative">
+                  <Input
+                    type={showCurrentPassword ? "text" : "password"}
+                    value={currentPassword}
+                    onChange={(event) => setCurrentPassword(event.target.value)}
+                    placeholder="Ingresa tu contraseña actual"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                    onClick={() => setShowCurrentPassword((value) => !value)}
+                    aria-label={showCurrentPassword ? "Ocultar contraseña actual" : "Mostrar contraseña actual"}
+                  >
+                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Nueva contraseña</Label>
-                <Input
-                  type="password"
-                  value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  placeholder="Ingresa la nueva contraseña"
-                />
+                <div className="relative">
+                  <Input
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    placeholder="Ingresa la nueva contraseña"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                    onClick={() => setShowNewPassword((value) => !value)}
+                    aria-label={showNewPassword ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Confirmar contraseña</Label>
-                <Input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  placeholder="Repite la nueva contraseña"
-                />
+                <div className="relative">
+                  <Input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    placeholder="Repite la nueva contraseña"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                    onClick={() => setShowConfirmPassword((value) => !value)}
+                    aria-label={showConfirmPassword ? "Ocultar confirmación" : "Mostrar confirmación"}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button
@@ -463,6 +510,7 @@ export function Profile() {
           </Card>
         </div>
       </div>
+    </div>
 
       {user?.role !== "administrador" && (
         <Card>

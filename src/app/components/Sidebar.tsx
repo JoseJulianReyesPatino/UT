@@ -241,7 +241,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const { theme } = useTheme();
   // Sidebar starts expanded for both admin and docente.
   const [collapsed, setCollapsed] = useState(false);
-  const logoSrc = theme === "dark" ? "/src/assets/LogotipoUTSLRC-BLANCO.png" : "/src/assets/LogotipoUTSLRC.png";
+  const logoSrc = theme === "dark" ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [instrumento3040Open, setInstrumento3040Open] = useState(true);
@@ -339,6 +339,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const docenteMenuItems = [
     { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
     { id: "planeacion", label: "Planeación", icon: FileText },
+    { id: "remedial", label: "Remedial", icon: FileText },
     { id: "lista-concentrada", label: "Lista Concentrada", icon: FileStack },
     { id: "asesoria", label: "Asesoría", icon: Users },
     { id: "portafolio", label: "Portafolio Digital", icon: FolderOpen },

@@ -141,6 +141,7 @@ export function DocumentHistory() {
       { value: "asesoria", label: "Asesoría" },
       { value: "portafolio-digital", label: "Portafolio Digital" },
       { value: "acta-final", label: "Acta Final" },
+      { value: "remedial", label: "Remedial" },
       { value: "estadias", label: "Estadías" },
       { value: "tutorias", label: "Tutorías" },
       { value: "carga-academica", label: "Carga Académica" },

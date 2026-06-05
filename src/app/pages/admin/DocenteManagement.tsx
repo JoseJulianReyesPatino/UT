@@ -5,15 +5,17 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Checkbox } from "../../components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
-import { UserPlus, Search, Edit, Key, UserCheck, UserX, ShieldAlert, Mail } from "lucide-react";
+import { UserPlus, Search, Edit, Key, UserCheck, UserX, ShieldAlert, Mail, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 
 type UserRole = "docente" | "tutor" | "administrador";
+type StatusFilter = "all" | "activo" | "inactivo";
 
 type Docente = {
   id: number;
@@ -227,6 +229,7 @@ const initialForm: NuevoUsuarioForm = {
 export function DocenteManagement() {
   const { user: currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("activo");
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
@@ -251,7 +254,7 @@ export function DocenteManagement() {
       const payload = (await apiFetch("/users", { method: "GET" })) as UsersResponse;
       // Exclude administrator users from the general management list
       const filtered = (payload.data ?? []).filter((u) => {
-        const roles = (u.roles ?? []) as ApiUserRole[];
+        const roles = u.roles ?? [];
         return !roles.map(normalizeRole).includes("administrador");
       });
 
@@ -280,11 +283,115 @@ export function DocenteManagement() {
     setEditDocente({ nombres: "", apellidos: "", telefono: "", email: "", roles: { docente: true, tutor: false, administrador: false } });
   };
 
-  const filteredDocentes = docentes.filter((doc) =>
-    doc.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    doc.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (doc.roles ?? []).join(", ").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredDocentes = docentes.filter((doc) => {
+    const matchesSearch =
+      doc.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (doc.roles ?? []).join(", ").toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const statusFilterLabelMap: Record<StatusFilter, string> = {
+    all: "Todos",
+    activo: "Activos",
+    inactivo: "Inactivos",
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    if (value === "all" || value === "activo" || value === "inactivo") {
+      setStatusFilter(value);
+    }
+  };
+
+  let usersListContent: React.ReactNode;
+
+  if (isLoadingUsers) {
+    usersListContent = (
+      <div className="rounded-xl border border-dashed border-border bg-background/80 p-8 text-center text-sm text-muted-foreground">
+        Cargando usuarios desde la API...
+      </div>
+    );
+  } else if (usersError) {
+    usersListContent = (
+      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-sm text-destructive">
+        {usersError}
+      </div>
+    );
+  } else if (filteredDocentes.length === 0) {
+    let emptyMessage = "No hay usuarios que coincidan con los filtros seleccionados.";
+    if (statusFilter === "activo") {
+      emptyMessage = "No hay docentes activos que coincidan con la búsqueda actual.";
+    }
+
+    usersListContent = (
+      <div className="rounded-xl border border-dashed border-border bg-background/80 p-8 text-center text-sm text-muted-foreground">
+        {emptyMessage}
+      </div>
+    );
+  } else {
+    usersListContent = filteredDocentes.map((docente) => {
+      const isActive = docente.status === "activo";
+      const statusBadgeVariant = isActive ? "success" : "outline";
+      const statusLabel = isActive ? "Activo" : "Inactivo";
+      const statusActionLabel = isActive ? "Dar baja" : "Dar alta";
+      const statusActionIcon = isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />;
+
+      return (
+        <div
+          key={docente.id}
+          className="flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-background/80 p-4 transition-colors hover:bg-accent/60 dark:bg-slate-950/60 dark:hover:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <Avatar className="h-12 w-12 flex-shrink-0">
+              <AvatarFallback className="bg-success/10 text-success">
+                {docente.avatar}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="break-words font-medium sm:truncate">{docente.nombre}</p>
+              <p className="break-words text-sm text-muted-foreground sm:truncate">{docente.email}</p>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span className="truncate">{docente.documentos} documentos enviados</span>
+                <span className="truncate">{(docente.roles || []).join(", ")}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+            <Badge variant={statusBadgeVariant} className="shrink-0">
+              {statusLabel}
+            </Badge>
+            <ResponsiveActionButton
+              variant="ghost"
+              label="Editar"
+              title="Editar"
+              onClick={() => openEditDialog(docente)}
+              disabled={String(docente.id) === currentUser?.id}
+              icon={<Edit className="h-4 w-4" />}
+            />
+            <ResponsiveActionButton
+              variant="ghost"
+              label="Restablecer"
+              title="Restablecer contraseña"
+              onClick={() => openResetDialog(docente)}
+              disabled={String(docente.id) === currentUser?.id}
+              icon={<Key className="h-4 w-4" />}
+            />
+            <ResponsiveActionButton
+              variant="ghost"
+              label={statusActionLabel}
+              title="Cambiar estado"
+              onClick={() => openStatusDialog(docente)}
+              disabled={String(docente.id) === currentUser?.id}
+              icon={statusActionIcon}
+            />
+          </div>
+        </div>
+      );
+    });
+  }
 
   const openEditDialog = (docente: Docente) => {
     setSelectedDocente(docente);
@@ -503,86 +610,41 @@ export function DocenteManagement() {
 
       <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-emerald-50/60 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20">
         <CardHeader>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CardTitle>Usuarios Registrados</CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar usuario..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 bg-background/90 dark:bg-slate-900/85"
-              />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/75 px-3 py-2 dark:bg-slate-900/65">
+                <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Estado:</span>
+                <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+                  <SelectTrigger className="h-8 w-[140px] border-0 bg-transparent px-2 text-sm shadow-none focus:ring-0">
+                    <SelectValue placeholder="Filtrar estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="activo">Activos</SelectItem>
+                    <SelectItem value="inactivo">Inactivos</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Badge variant="outline" className="hidden sm:inline-flex">
+                  {statusFilterLabelMap[statusFilter]}
+                </Badge>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar usuario..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 bg-background/90 dark:bg-slate-900/85"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {isLoadingUsers ? (
-              <div className="rounded-xl border border-dashed border-border bg-background/80 p-8 text-center text-sm text-muted-foreground">
-                Cargando usuarios desde la API...
-              </div>
-            ) : usersError ? (
-              <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-sm text-destructive">
-                {usersError}
-              </div>
-            ) : filteredDocentes.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border bg-background/80 p-8 text-center text-sm text-muted-foreground">
-                No hay usuarios que coincidan con la búsqueda.
-              </div>
-            ) : (
-              filteredDocentes.map((docente) => (
-                <div
-                  key={docente.id}
-                  className="flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-background/80 p-4 transition-colors hover:bg-accent/60 dark:bg-slate-950/60 dark:hover:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="flex min-w-0 flex-1 items-center gap-4">
-                    <Avatar className="h-12 w-12 flex-shrink-0">
-                      <AvatarFallback className="bg-success/10 text-success">
-                        {docente.avatar}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <p className="break-words font-medium sm:truncate">{docente.nombre}</p>
-                      <p className="break-words text-sm text-muted-foreground sm:truncate">{docente.email}</p>
-                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span className="truncate">{docente.documentos} documentos enviados</span>
-                        <span className="truncate">{(docente.roles || []).join(", ")}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-                    <Badge variant={docente.status === "activo" ? "success" : "outline"} className="shrink-0">
-                      {docente.status === "activo" ? "Activo" : "Inactivo"}
-                    </Badge>
-                    <ResponsiveActionButton
-                      variant="ghost"
-                      label="Editar"
-                      title="Editar"
-                      onClick={() => openEditDialog(docente)}
-                      disabled={String(docente.id) === currentUser?.id}
-                      icon={<Edit className="h-4 w-4" />}
-                    />
-                    <ResponsiveActionButton
-                      variant="ghost"
-                      label="Restablecer"
-                      title="Restablecer contraseña"
-                      onClick={() => openResetDialog(docente)}
-                      disabled={String(docente.id) === currentUser?.id}
-                      icon={<Key className="h-4 w-4" />}
-                    />
-                    <ResponsiveActionButton
-                      variant="ghost"
-                      label={docente.status === "activo" ? "Dar baja" : "Dar alta"}
-                      title="Cambiar estado"
-                      onClick={() => openStatusDialog(docente)}
-                      disabled={String(docente.id) === currentUser?.id}
-                      icon={docente.status === "activo" ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                    />
-                  </div>
-                </div>
-              ))
-            )}
+            {usersListContent}
           </div>
         </CardContent>
       </Card>

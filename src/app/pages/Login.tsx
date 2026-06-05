@@ -6,8 +6,6 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent } from "../components/ui/card";
 import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon } from "lucide-react";
-import superiorImage from "../../assets/superior.png";
-import inferiorImage from "../../assets/inferior.png";
 
 export function Login() {
   const THEME_TOGGLE_COOLDOWN_MS = 700;
@@ -21,12 +19,13 @@ export function Login() {
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
-  const logoSrc = isDark ? "/src/assets/LogotipoUTSLRC-BLANCO.png" : "/src/assets/LogotipoUTSLRC.png";
+  const logoSrc = isDark ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
+  const superiorImage = new URL("../../assets/superior.webp", import.meta.url).href;
+  const inferiorImage = new URL("../../assets/inferior.webp", import.meta.url).href;
 
   const pageBackground = isDark
     ? "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950"
     : "bg-gradient-to-br from-white via-slate-50 to-white";
-  const titleText = isDark ? "text-slate-50" : "text-slate-900";
   const cardSurface = isDark
     ? "bg-slate-950/85 border-slate-800/80 shadow-[0_24px_70px_rgba(0,0,0,0.45)]"
     : "bg-white border-slate-100/50 shadow-2xl";
@@ -166,7 +165,7 @@ export function Login() {
                 
                 {/* Imagen del gallo */}
                 <img
-                  src="/src/assets/mascota3.png"
+                  src="/src/assets/mascota3.webp"
                   alt="Mascota institucional"
                   className="relative z-10 h-full w-full object-contain drop-shadow-2xl transition-transform duration-300 hover:scale-110 origin-center -translate-y-12"
                 />

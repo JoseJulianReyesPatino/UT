@@ -19,13 +19,14 @@ interface InstrumentoFormPageProps {
   formTitle: string;
   percentageLabel: string;
   planLabel: string;
-  plan: Plan;
+  plan: Plan | "";
   fileInputId: string;
   successMessage: string;
+  allowPlanSelection?: boolean;
 }
 
 interface InstrumentoFormData {
-  plan: Plan;
+  plan: Plan | "";
   carrera: string;
   cuatrimestre: Cuatrimestre | "";
   materia: string;
@@ -36,7 +37,7 @@ interface InstrumentoFormData {
   nota: string;
 }
 
-const buildInitialFormData = (plan: Plan): InstrumentoFormData => ({
+const buildInitialFormData = (plan: Plan | ""): InstrumentoFormData => ({
   plan,
   carrera: "",
   cuatrimestre: "",
@@ -50,19 +51,22 @@ const buildInitialFormData = (plan: Plan): InstrumentoFormData => ({
 
 export function InstrumentoFormPage(props: Readonly<InstrumentoFormPageProps>) {
   const { title, subtitle, formTitle, percentageLabel, planLabel, plan, fileInputId, successMessage } = props;
+  const allowPlanSelection = props.allowPlanSelection ?? false;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<InstrumentoFormData>(() => buildInitialFormData(plan));
   const [sheetOpen, setSheetOpen] = useState(false);
   const calendarioUrl = getCalendarFileUrl();
 
   const carrerasDisponibles = useMemo(() => {
+    if (allowPlanSelection && !formData.plan) return [];
+
     if (formData.plan === "nuevo-modelo") {
       const tsu = carrieras["nuevo-modelo"].tsu.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
       const ing = carrieras["nuevo-modelo"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
       return [...tsu, ...ing];
     }
     return carrieras["plan-normal"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
-  }, [formData.plan]);
+  }, [formData.plan, allowPlanSelection]);
 
   const cuatrimestresDisponibles = useMemo(() => {
     if (!formData.carrera) return [];
@@ -83,6 +87,7 @@ export function InstrumentoFormPage(props: Readonly<InstrumentoFormPageProps>) {
   const isValid = useMemo(() => {
     const validarGrupo = /^[A-Z]{2,4}-\d{2}$/i.test(formData.grupo);
     return Boolean(
+      (allowPlanSelection ? formData.plan : true) &&
       formData.carrera &&
         formData.cuatrimestre &&
         formData.materia &&
@@ -91,7 +96,7 @@ export function InstrumentoFormPage(props: Readonly<InstrumentoFormPageProps>) {
         formData.archivos.length > 0 &&
         formData.docente.trim(),
     );
-  }, [formData]);
+  }, [formData, allowPlanSelection]);
 
   const resetForm = () => setFormData(buildInitialFormData(plan));
 
@@ -161,12 +166,11 @@ export function InstrumentoFormPage(props: Readonly<InstrumentoFormPageProps>) {
           <h1 className="text-3xl font-bold">{title}</h1>
           <p className="text-muted-foreground">{subtitle}</p>
           <div className="flex flex-wrap items-center gap-2 pt-2">
-            <Badge variant="secondary" className="rounded-full px-3 py-1">
-              {percentageLabel}
-            </Badge>
-            <Badge variant="outline" className="rounded-full px-3 py-1">
-              {planLabel}
-            </Badge>
+            {percentageLabel && (
+              <Badge variant="secondary" className="rounded-full px-3 py-1">
+                {percentageLabel}
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -210,14 +214,35 @@ export function InstrumentoFormPage(props: Readonly<InstrumentoFormPageProps>) {
         <CardContent className="space-y-5">
           <div className="space-y-2">
             <Label>Plan *</Label>
-            <div className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-              {planLabel} - el plan se fija desde esta ruta.
-            </div>
+            {allowPlanSelection ? (
+              <div className="flex gap-2">
+                <Button
+                  variant={formData.plan === "nuevo-modelo" ? "success" : "outline"}
+                  onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))}
+                >
+                  Plan Nuevo Modelo
+                </Button>
+                <Button
+                  variant={formData.plan === "plan-normal" ? "success" : "outline"}
+                  onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))}
+                >
+                  Plan Normal
+                </Button>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                {planLabel} - el plan se fija desde esta ruta.
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
             <Label>Carrera *</Label>
-            <Select value={formData.carrera} onValueChange={(value) => setFormData((current) => ({ ...current, carrera: value, cuatrimestre: "", materia: "" }))}>
+            <Select
+              value={formData.carrera}
+              onValueChange={(value) => setFormData((current) => ({ ...current, carrera: value, cuatrimestre: "", materia: "" }))}
+              disabled={allowPlanSelection && !formData.plan}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona la carrera" />
               </SelectTrigger>

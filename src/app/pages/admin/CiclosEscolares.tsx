@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -6,11 +6,12 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Calendar, Check, ChevronLeft, FileText, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Calendar, Check, ChevronLeft, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
+import { apiFetch } from "../../lib/api";
 
 type CycleStatus = "activo" | "cerrado";
 
@@ -32,6 +33,26 @@ type CycleFormState = {
   fechaFin: string;
   status: CycleStatus;
 };
+
+type ApiCycle = {
+  id: number;
+  name: string;
+  year: number;
+  period_name: string;
+  start_date: string;
+  end_date: string;
+  status: CycleStatus;
+};
+
+const mapApiCycle = (cycle: ApiCycle): AcademicCycle => ({
+  id: cycle.id,
+  nombre: cycle.name,
+  anio: cycle.year,
+  periodo: cycle.period_name,
+  fechaInicio: cycle.start_date,
+  fechaFin: cycle.end_date,
+  status: cycle.status,
+});
 
 type DocumentRecord = {
   id: number;
@@ -140,35 +161,7 @@ function DocumentPreviewDialog({ open, document, onOpenChange, onOpenPdf }: Read
   );
 }
 
-const initialCycles: AcademicCycle[] = [
-  {
-    id: 1,
-    nombre: "Cuatrimestre Enero-Abril 2026",
-    anio: 2026,
-    periodo: "Enero-Abril",
-    fechaInicio: "2026-01-13",
-    fechaFin: "2026-04-30",
-    status: "activo",
-  },
-  {
-    id: 2,
-    nombre: "Cuatrimestre Septiembre-Diciembre 2025",
-    anio: 2025,
-    periodo: "Septiembre-Diciembre",
-    fechaInicio: "2025-09-01",
-    fechaFin: "2025-12-20",
-    status: "cerrado",
-  },
-  {
-    id: 3,
-    nombre: "Cuatrimestre Mayo-Agosto 2025",
-    anio: 2025,
-    periodo: "Mayo-Agosto",
-    fechaInicio: "2025-05-01",
-    fechaFin: "2025-08-31",
-    status: "cerrado",
-  },
-];
+const initialCycles: AcademicCycle[] = [];
 
 const initialDocuments: DocumentRecord[] = [
   { id: 1, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Planeación - Programación Web", docente: "Mtro. Juan Pérez", carrera: "Ingeniería en Sistemas", plan: "Plan Nuevo Modelo", cuatrimestre: "5", materia: "Programación Web", parcial: "Parcial 1", grupo: "ITIID-8", tipo: "planeacion" },
@@ -224,6 +217,26 @@ export function CiclosEscolares() {
   const [documents, setDocuments] = useState<DocumentRecord[]>(initialDocuments);
   const [tutorDocuments] = useState<TutorDocumentRecord[]>(initialTutorDocuments);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCycles = async () => {
+      try {
+        const response = await apiFetch("/cycles", { method: "GET" });
+        if (cancelled) return;
+        setCiclos(response.data.map(mapApiCycle));
+      } catch (error) {
+        toast.error("No fue posible cargar los ciclos escolares");
+      }
+    };
+
+    loadCycles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [filterPlan, setFilterPlan] = useState("all");
   const [filterCarrera, setFilterCarrera] = useState("all");
   const [filterCuatrimestre, setFilterCuatrimestre] = useState("all");
@@ -235,20 +248,6 @@ export function CiclosEscolares() {
   );
 
   const getActiveCycle = () => ciclos.find((cycle) => cycle.status === "activo");
-
-  const setSingleActiveCycle = (targetCycleId: number, nextStatus: CycleStatus) => {
-    setCiclos((current) => current.map((cycle) => {
-      if (cycle.id === targetCycleId) {
-        return { ...cycle, status: nextStatus };
-      }
-
-      if (nextStatus === "activo") {
-        return { ...cycle, status: "cerrado" };
-      }
-
-      return cycle;
-    }));
-  };
 
   const openDocsForCycle = (ciclo: AcademicCycle) => {
     setSelectedCycle(ciclo);
@@ -281,41 +280,49 @@ export function CiclosEscolares() {
     setConfirmDialog({ open: true, type, ciclo });
   };
 
-  const createCycle = () => {
+  const createCycle = async () => {
     if (!newCycleForm.nombre.trim() || !newCycleForm.periodo.trim() || !newCycleForm.fechaInicio || !newCycleForm.fechaFin) {
       toast.error("Completa todos los campos obligatorios");
       return;
     }
 
-    const anio = Number(newCycleForm.anio);
-    if (Number.isNaN(anio)) {
+    const year = Number(newCycleForm.anio);
+    if (Number.isNaN(year)) {
       toast.error("El año debe ser numérico");
       return;
     }
 
-    const newCycle: AcademicCycle = {
-      id: Date.now(),
-      nombre: newCycleForm.nombre.trim(),
-      anio,
-      periodo: newCycleForm.periodo.trim(),
-      fechaInicio: newCycleForm.fechaInicio,
-      fechaFin: newCycleForm.fechaFin,
-      status: newCycleForm.status,
-    };
+    try {
+      const response = await apiFetch("/cycles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newCycleForm.nombre.trim(),
+          year,
+          period_name: newCycleForm.periodo.trim(),
+          start_date: newCycleForm.fechaInicio,
+          end_date: newCycleForm.fechaFin,
+          status: newCycleForm.status,
+        }),
+      });
 
-    setCiclos((current) => {
-      const nextCycles = newCycle.status === "activo"
-        ? current.map((cycle) => ({ ...cycle, status: "cerrado" as CycleStatus }))
-        : current;
-
-      return [newCycle, ...nextCycles];
-    });
-    toast.success("Ciclo escolar creado correctamente");
-    setNewCycleForm({ nombre: "", anio: "2026", periodo: "", fechaInicio: "", fechaFin: "", status: "activo" });
-    setShowNewDialog(false);
+      const nextCycle: ApiCycle = response.data;
+      setCiclos((current) => {
+        const mapped = mapApiCycle(nextCycle);
+        if (mapped.status === "activo") {
+          return [mapped, ...current.map((cycle) => ({ ...cycle, status: "cerrado" }))];
+        }
+        return [mapped, ...current];
+      });
+      toast.success("Ciclo escolar creado correctamente");
+      setNewCycleForm({ nombre: "", anio: "2026", periodo: "", fechaInicio: "", fechaFin: "", status: "activo" });
+      setShowNewDialog(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al crear el ciclo");
+    }
   };
 
-  const updateCycle = () => {
+  const updateCycle = async () => {
     if (!selectedCycle) return;
 
     if (!editCycleForm.nombre.trim() || !editCycleForm.periodo.trim() || !editCycleForm.fechaInicio || !editCycleForm.fechaFin) {
@@ -323,71 +330,115 @@ export function CiclosEscolares() {
       return;
     }
 
-    const anio = Number(editCycleForm.anio);
-    if (Number.isNaN(anio)) {
+    const year = Number(editCycleForm.anio);
+    if (Number.isNaN(year)) {
       toast.error("El año debe ser numérico");
       return;
     }
 
-    const previousName = selectedCycle.nombre;
     const updatedName = editCycleForm.nombre.trim();
     const requestedStatus: CycleStatus = editCycleForm.status;
 
-    if (requestedStatus === "activo") {
-      const activeCycle = getActiveCycle();
-      if (activeCycle && activeCycle.id !== selectedCycle.id) {
-        toast.error(`Solo puede haber un ciclo activo. Primero cierra ${activeCycle.nombre}.`);
-        return;
+      if (requestedStatus === "activo") {
+        const activeCycle = getActiveCycle();
+        if (activeCycle && activeCycle.id !== selectedCycle.id) {
+          toast.error(`Solo puede haber un ciclo activo. Primero cierra ${activeCycle.nombre}.`);
+          return;
+        }
       }
+
+    try {
+      const response = await apiFetch(`/cycles/${selectedCycle.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: updatedName,
+          year,
+          period_name: editCycleForm.periodo.trim(),
+          start_date: editCycleForm.fechaInicio,
+          end_date: editCycleForm.fechaFin,
+          status: requestedStatus,
+        }),
+      });
+
+      const updatedCycle: ApiCycle = response.data;
+      const mappedCycle = mapApiCycle(updatedCycle);
+      setCiclos((current) => current.map((cycle) => {
+        if (cycle.id === selectedCycle.id) {
+          return mappedCycle;
+        }
+        if (mappedCycle.status === "activo") {
+          return { ...cycle, status: "cerrado" };
+        }
+        return cycle;
+      }));
+      toast.success("Ciclo escolar actualizado correctamente");
+      setShowEditDialog(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al actualizar el ciclo");
     }
 
-    setCiclos((current) =>
-      current.map((cycle) =>
-        cycle.id === selectedCycle.id
-          ? {
-              ...cycle,
-              nombre: updatedName,
-              anio,
-              periodo: editCycleForm.periodo.trim(),
-              fechaInicio: editCycleForm.fechaInicio,
-              fechaFin: editCycleForm.fechaFin,
-              status: requestedStatus,
-            }
-          : cycle
-      )
-    );
-
-    setDocuments((current) => current.map((document) => (document.ciclo === previousName ? { ...document, ciclo: updatedName } : document)));
-    toast.success("Ciclo escolar actualizado correctamente");
-    setShowEditDialog(false);
   };
 
-  const deleteCycle = () => {
+  const deleteCycle = async () => {
     if (!selectedCycle) return;
 
     if (deleteConfirmationName.trim() !== selectedCycle.nombre) {
       toast.error("Escribe exactamente el nombre del ciclo para eliminarlo");
       return;
     }
-
-    setCiclos((current) => current.filter((cycle) => cycle.id !== selectedCycle.id));
-    setDocuments((current) => current.filter((document) => document.ciclo !== selectedCycle.nombre));
-    toast.success(`Ciclo ${selectedCycle.nombre} eliminado correctamente`);
-    setShowDeleteDialog(false);
-    setSelectedCycle(null);
-    setDeleteConfirmationName("");
+    try {
+      await apiFetch(`/cycles/${selectedCycle.id}`, {
+        method: "DELETE",
+      });
+      setCiclos((current) => current.filter((cycle) => cycle.id !== selectedCycle.id));
+      setDocuments((current) => current.filter((document) => document.ciclo !== selectedCycle.nombre));
+      toast.success(`Ciclo ${selectedCycle.nombre} eliminado correctamente`);
+      setShowDeleteDialog(false);
+      setSelectedCycle(null);
+      setDeleteConfirmationName("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al eliminar el ciclo");
+    }
   };
 
-  const performConfirm = () => {
+  const performConfirm = async () => {
     if (!confirmDialog.ciclo || !confirmDialog.type) return;
 
     const ciclo = confirmDialog.ciclo;
     if (confirmDialog.type === "close") {
-      setSingleActiveCycle(ciclo.id, "cerrado");
-      toast.success(`Ciclo ${ciclo.nombre} cerrado correctamente`);
+      try {
+        const response = await apiFetch(`/cycles/${ciclo.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "cerrado" }),
+        });
+        setCiclos((current) => current.map((cycle) => (cycle.id === ciclo.id ? mapApiCycle(response.data) : cycle)));
+        toast.success(`Ciclo ${ciclo.nombre} cerrado correctamente`);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Error al cerrar el ciclo");
+      }
     } else {
-      setSingleActiveCycle(ciclo.id, "activo");
-      toast.success(`Ciclo ${ciclo.nombre} activado correctamente`);
+      try {
+        const response = await apiFetch(`/cycles/${ciclo.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "activo" }),
+        });
+        const updatedCycle = mapApiCycle(response.data);
+        setCiclos((current) => current.map((cycle) => {
+          if (cycle.id === ciclo.id) {
+            return updatedCycle;
+          }
+          if (updatedCycle.status === "activo") {
+            return { ...cycle, status: "cerrado" };
+          }
+          return cycle;
+        }));
+        toast.success(`Ciclo ${ciclo.nombre} activado correctamente`);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Error al activar el ciclo");
+      }
     }
     setConfirmDialog({ open: false });
   };

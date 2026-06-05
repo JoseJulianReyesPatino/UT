@@ -19,6 +19,7 @@ import Instrumento3040Page from "./pages/docente/Instrumento3040";
 import Instrumento40Page from "./pages/docente/Instrumento40";
 import Instrumento6070Page from "./pages/docente/Instrumento6070";
 import Instrumento60Page from "./pages/docente/Instrumento60";
+import RemedialPage from "./pages/docente/Remedial";
 import ListaConcentradaPage from "./pages/docente/ListaConcentrada";
 import AsesoriaPage from "./pages/docente/Asesoria";
 import PortafolioDigitalPage from "./pages/docente/PortafolioDigital";
@@ -94,6 +95,7 @@ function AppContent() {
           "instrumento-40-nuevo",
           "instrumento-60-nuevo",
           "instrumento-70-normal",
+          "remedial",
           "lista-concentrada",
           "asesoria",
           "portafolio",
@@ -177,6 +179,8 @@ function AppContent() {
           return wrapForm("instrumento-60-nuevo", "Instrumento 60%", <Instrumento60Page />);
         case "instrumento-70-normal":
           return wrapForm("instrumento-70-normal", "Instrumento 70%", <Instrumento6070Page />);
+        case "remedial":
+          return wrapForm("remedial", "Remedial", <RemedialPage />);
         case "lista-concentrada":
           return wrapForm("lista-concentrada", "Lista Concentrada", <ListaConcentradaPage />);
         case "asesoria":

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
@@ -25,6 +25,7 @@ type ChatMessage = {
   content: string;
   timestamp: string;
   isOwn: boolean;
+  avatar?: string;
   attachments?: AttachmentItem[];
   replyTo?: {
     id: number;
@@ -45,7 +46,6 @@ type Conversation = {
   messages: ChatMessage[];
 };
 
-// When connected to backend we will load real conversations/messages.
 const initialConversations: Conversation[] = [];
 
 const formatSize = (size: number) => {
@@ -118,14 +118,6 @@ function ConversationRow({
   active: boolean;
   onSelect: (conversationId: number) => void;
 }>) {
-  let statusClassName = "bg-slate-400";
-
-  if (conversation.status === "online") {
-    statusClassName = "bg-emerald-500";
-  } else if (conversation.status === "away") {
-    statusClassName = "bg-amber-500";
-  }
-
   return (
     <button
       type="button"
@@ -141,9 +133,13 @@ function ConversationRow({
       <div className="flex items-start gap-3 px-3 py-3.5">
         <div className="relative mt-0.5 shrink-0">
           <Avatar className="h-9 w-9 ring-1 ring-white/70 dark:ring-slate-900/60">
-            <AvatarFallback className="bg-success/10 text-success">{conversation.avatar}</AvatarFallback>
+            {conversation.avatar?.startsWith('http') || conversation.avatar?.startsWith('/') ? (
+              <img src={conversation.avatar} alt={conversation.name} className="h-full w-full object-cover" />
+            ) : (
+              <AvatarFallback className="bg-success/10 text-success">{conversation.avatar}</AvatarFallback>
+            )}
           </Avatar>
-          <span className={cn("absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background", statusClassName)} />
+          <span className={cn("absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background", StatusDot({ status: conversation.status }))} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
@@ -187,7 +183,13 @@ function MessageBubble({
       {!message.isOwn && (
         <div className="mr-2 mt-0.5 shrink-0">
           <Avatar className="h-8 w-8 ring-1 ring-white/80 dark:ring-slate-900/50">
-            <AvatarFallback className="bg-success/10 text-success">{message.sender.split(" ").map(n=>n[0]).slice(0,2).join("")}</AvatarFallback>
+            {message.avatar?.startsWith('http') || message.avatar?.startsWith('/') ? (
+              <img src={message.avatar} alt={message.sender} className="h-full w-full object-cover" />
+            ) : (
+              <AvatarFallback className="bg-success/10 text-success">
+                {message.sender.split(" ").map(n=>n[0]).slice(0,2).join("")}
+              </AvatarFallback>
+            )}
           </Avatar>
         </div>
       )}
@@ -328,6 +330,8 @@ export function Messages(props: Readonly<{
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentItem[]>([]);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
   const currentRoleLabel = user?.roles?.length && user.roles.length > 1
     ? user.roles.map((role) => (role === "administrador" ? "Administrador" : role === "tutor" ? "Tutor" : "Docente")).join(" y ")
     : user?.role === "administrador"
@@ -336,6 +340,39 @@ export function Messages(props: Readonly<{
     ? "Tutor"
     : "Docente";
   const peerRoleLabel = currentRoleLabel === "Administrador" ? "Docente" : "Administrador";
+
+  // Recuperar conversaciones guardadas al montar
+  useEffect(() => {
+    const savedConversations = sessionStorage.getItem('chat_conversations');
+    if (savedConversations) {
+      try {
+        const parsed = JSON.parse(savedConversations);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setConversations(parsed);
+        }
+      } catch (e) {
+        console.error('Error loading cached conversations', e);
+      }
+    }
+    const savedSelectedChat = sessionStorage.getItem('chat_selected_chat');
+    if (savedSelectedChat) {
+      setSelectedChat(Number(savedSelectedChat));
+    }
+  }, []);
+
+  // Guardar conversaciones en sessionStorage
+  useEffect(() => {
+    if (conversations.length > 0 && !isInitialLoad) {
+      sessionStorage.setItem('chat_conversations', JSON.stringify(conversations));
+    }
+  }, [conversations, isInitialLoad]);
+
+  // Guardar selectedChat en sessionStorage
+  useEffect(() => {
+    if (selectedChat !== null) {
+      sessionStorage.setItem('chat_selected_chat', String(selectedChat));
+    }
+  }, [selectedChat]);
 
   const getInitials = (name?: string) => {
     if (!name) return "CH";
@@ -347,8 +384,96 @@ export function Messages(props: Readonly<{
       .join("") || "CH";
   };
 
-  // If another page requests opening a conversation with a document, create or open it
-  const processInitialOpen = (detail: NonNullable<typeof initialOpen>) => {
+  const normalizeConversation = useCallback((raw: any): Conversation => {
+    return {
+      id: raw.id,
+      name: raw.name ?? raw.display_name ?? 'Conversación',
+      role: raw.role ?? 'Docente',
+      lastMessage: raw.lastMessage ?? raw.last_message ?? raw.lastMessage ?? 'Nuevo chat',
+      timestamp: raw.timestamp ?? raw.lastMessageAt ?? raw.updated_at ?? '',
+      unread: Number(raw.unread ?? 0),
+      avatar: raw.avatar_url ?? getInitials(raw.name ?? raw.display_name),
+      status: 'offline',
+      messages: [],
+    };
+  }, [getInitials]);
+
+  const normalizeMessage = useCallback((raw: any): ChatMessage => ({
+    id: raw.id,
+    sender: raw.sender ?? raw.user_name ?? 'Usuario',
+    content: raw.content ?? raw.body ?? '',
+    timestamp: raw.timestamp ?? raw.created_at ?? new Date().toISOString(),
+    isOwn: Boolean(raw.isOwn || raw.is_own || raw.sender_id === Number(user?.id)),
+    avatar: raw.avatar_url ?? undefined,
+    attachments: raw.attachments ?? [],
+    replyTo: raw.replyTo ?? null,
+  }), [user?.id]);
+
+  const loadConversations = useCallback(async () => {
+    try {
+      const payload = (await apiFetch('/conversations', { method: 'GET' })) as { data?: any[] };
+      const rows = payload?.data ?? [];
+      const convs = rows.map(normalizeConversation);
+      setConversations((current) => {
+        const merged = convs.map((conversation) => {
+          const existing = current.find((item) => item.id === conversation.id);
+          return existing ? { ...conversation, messages: existing.messages } : conversation;
+        });
+        return merged;
+      });
+      if (convs.length > 0 && selectedChat === null) {
+        const savedSelected = sessionStorage.getItem('chat_selected_chat');
+        if (savedSelected) {
+          setSelectedChat(Number(savedSelected));
+        } else {
+          setSelectedChat(convs[0].id);
+        }
+      }
+      setIsInitialLoad(false);
+      window.dispatchEvent(new Event('ut-messages-updated'));
+      return convs;
+    } catch (err) {
+      console.error('loadConversations error', err);
+      setIsInitialLoad(false);
+      return [];
+    }
+  }, [normalizeConversation, selectedChat]);
+
+  const loadMessages = useCallback(async (conversationId: number) => {
+    try {
+      const payload = (await apiFetch(`/conversations/${conversationId}/messages`, { method: 'GET' })) as { data?: any[] };
+      const rows = payload?.data ?? [];
+      const msgs = rows.map(normalizeMessage);
+      setConversations((current) => current.map((c) => (c.id === conversationId ? { ...c, messages: msgs } : c)));
+      return msgs;
+    } catch (err) {
+      console.error('loadMessages error', err);
+      return [];
+    }
+  }, [normalizeMessage]);
+
+  const markConversationAsRead = useCallback(async (conversationId: number) => {
+    try {
+      await apiFetch(`/conversations/${conversationId}/read`, { method: 'PATCH' });
+      setConversations((current) => current.map((c) => (c.id === conversationId ? { ...c, unread: 0 } : c)));
+    } catch (err) {
+      // ignore
+    }
+  }, []);
+
+  // POLLING: Actualizar mensajes cada 3 segundos si hay una conversación activa
+  useEffect(() => {
+    if (!selectedChat) return;
+    
+    const interval = setInterval(async () => {
+      await loadMessages(selectedChat);
+      await loadConversations();
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, [selectedChat, loadMessages, loadConversations]);
+
+  const processInitialOpen = useCallback((detail: NonNullable<typeof initialOpen>) => {
     const { conversationId, recipientName, recipientRole, document } = detail;
     const buildDocumentAttachment = (doc: { id: number; title: string }): AttachmentItem => ({
       name: `${doc.title}.pdf`,
@@ -389,10 +514,8 @@ export function Messages(props: Readonly<{
 
     if (!recipientName) return;
 
-    // Try to find existing conversation by name; if none, attempt to create one with backend
     (async () => {
       try {
-        // load conversations if empty
         if (conversations.length === 0) await loadConversations();
 
         const found = conversations.find((c) => c.name === recipientName);
@@ -408,7 +531,6 @@ export function Messages(props: Readonly<{
           return;
         }
 
-        // try resolve recipient user id via /users
         const usersPayload = (await apiFetch('/users', { method: 'GET' })) as { data?: any[] } | null;
         const users = usersPayload?.data ?? [];
         const recipient = users.find((u) => (u.full_name ?? u.name) === recipientName || (recipientRole && (u.roles ?? []).some((r:any)=> (r.code??r).toLowerCase().includes(recipientRole.toLowerCase()))));
@@ -439,83 +561,17 @@ export function Messages(props: Readonly<{
         console.error('openInitialConversation error', err);
       }
     })();
-  };
+  }, [conversations, loadConversations, loadMessages, onConsume]);
 
   React.useEffect(() => {
     if (!initialOpen) return;
     processInitialOpen(initialOpen);
-  }, [initialOpen]);
-
-  // --- Backend integration: load conversations and messages ---
-  const normalizeConversation = (raw: any): Conversation => {
-    return {
-      id: raw.id,
-      name: raw.name ?? raw.display_name ?? 'Conversación',
-      role: raw.role ?? 'Docente',
-      lastMessage: raw.lastMessage ?? raw.last_message ?? raw.lastMessage ?? 'Nuevo chat',
-      timestamp: raw.timestamp ?? raw.lastMessageAt ?? raw.updated_at ?? '',
-      unread: Number(raw.unread ?? 0),
-      avatar: raw.avatar ?? getInitials(raw.name ?? raw.display_name),
-      status: raw.status ?? 'offline',
-      messages: [],
-    };
-  };
-
-  const normalizeMessage = (raw: any): ChatMessage => ({
-    id: raw.id,
-    sender: raw.sender ?? raw.user_name ?? 'Usuario',
-    content: raw.content ?? raw.body ?? '',
-    timestamp: raw.timestamp ?? raw.created_at ?? new Date().toISOString(),
-    isOwn: Boolean(raw.isOwn || raw.is_own || raw.sender_id === Number(user?.id)),
-    attachments: raw.attachments ?? [],
-    replyTo: raw.replyTo ?? null,
-  });
-
-  const loadConversations = async () => {
-    try {
-      const payload = (await apiFetch('/conversations', { method: 'GET' })) as { data?: any[] };
-      const rows = payload?.data ?? [];
-      const convs = rows.map(normalizeConversation);
-      setConversations((current) => convs.map((conversation) => {
-        const existing = current.find((item) => item.id === conversation.id);
-        return existing ? { ...conversation, messages: existing.messages } : conversation;
-      }));
-      // auto-select first if none selected
-      if (convs.length > 0 && selectedChat === null) setSelectedChat(convs[0].id);
-      window.dispatchEvent(new Event('ut-messages-updated'));
-      return convs;
-    } catch (err) {
-      console.error('loadConversations error', err);
-      return [];
-    }
-  };
-
-  const loadMessages = async (conversationId: number) => {
-    try {
-      const payload = (await apiFetch(`/conversations/${conversationId}/messages`, { method: 'GET' })) as { data?: any[] };
-      const rows = payload?.data ?? [];
-      const msgs = rows.map(normalizeMessage);
-      setConversations((current) => current.map((c) => (c.id === conversationId ? { ...c, messages: msgs } : c)));
-      return msgs;
-    } catch (err) {
-      console.error('loadMessages error', err);
-      return [];
-    }
-  };
-
-  const markConversationAsRead = async (conversationId: number) => {
-    try {
-      await apiFetch(`/conversations/${conversationId}/read`, { method: 'PATCH' });
-      setConversations((current) => current.map((c) => (c.id === conversationId ? { ...c, unread: 0 } : c)));
-    } catch (err) {
-      // ignore
-    }
-  };
+  }, [initialOpen, processInitialOpen]);
 
   useEffect(() => {
     if (!isReady) return;
     void loadConversations();
-  }, [isReady]);
+  }, [isReady, loadConversations]);
 
   const filteredConversations = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -531,6 +587,16 @@ export function Messages(props: Readonly<{
   }, [conversations, peerRoleLabel, search]);
 
   const activeConversation = filteredConversations.find((conversation) => conversation.id === selectedChat) ?? filteredConversations[0];
+
+  // Scroll al final cuando se selecciona una conversación o cambian los mensajes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+      }
+    }, 100);
+    return () => clearTimeout(timeoutId);
+  }, [selectedChat, activeConversation?.messages.length]);
 
   useEffect(() => {
     if (!activeConversation) return;
@@ -583,7 +649,6 @@ export function Messages(props: Readonly<{
 
     const currentConversation = filteredConversations.find((conversation) => conversation.id === selectedChat);
     if (!currentConversation) return;
-    // send to backend
     (async () => {
       try {
         await apiFetch(`/conversations/${selectedChat}/messages`, {
@@ -632,12 +697,6 @@ export function Messages(props: Readonly<{
     }
   };
 
-  useEffect(() => {
-    // Auto-scroll to bottom when messages change or pending attachments change
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeConversation?.messages.length, pendingAttachments.length]);
-
-  // Typing indicator local handling
   useEffect(() => {
     if (!message) return;
     setIsTyping(true);
@@ -703,7 +762,11 @@ export function Messages(props: Readonly<{
             {activeConversation ? (
               <div className="flex items-start gap-3">
                 <Avatar className="h-11 w-11 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
-                  <AvatarFallback className="bg-success/10 text-success">{activeConversation.avatar}</AvatarFallback>
+                  {activeConversation.avatar?.startsWith('http') || activeConversation.avatar?.startsWith('/') ? (
+                    <img src={activeConversation.avatar} alt={activeConversation.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <AvatarFallback className="bg-success/10 text-success">{activeConversation.avatar}</AvatarFallback>
+                  )}
                 </Avatar>
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -716,10 +779,6 @@ export function Messages(props: Readonly<{
                   </div>
                   <CardDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span>{activeConversation.role}</span>
-                    <span className="inline-flex items-center gap-1">
-                      <StatusDot status={activeConversation.status} />
-                      {getStatusLabel(activeConversation.status)}
-                    </span>
                     <span>{activeConversation.timestamp}</span>
                   </CardDescription>
                 </div>
@@ -746,6 +805,8 @@ export function Messages(props: Readonly<{
                       description="Todavía no hay mensajes en esta conversación. Puedes iniciar la charla desde abajo."
                     />
                   )}
+                  {/* Referencia para scroll al final */}
+                  <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
             ) : (
