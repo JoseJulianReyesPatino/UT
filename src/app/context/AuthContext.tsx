@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useMemo, useEffect, useRef } from "react";
-import { AUTH_TOKEN_STORAGE_KEY } from "../lib/env";
+import { AUTH_TOKEN_STORAGE_KEY, resolveApiAssetUrl } from "../lib/env";
 import { apiFetch } from "../lib/api";
 
 type UserRole = "docente" | "tutor" | "administrador";
@@ -153,7 +153,7 @@ const mapApiUser = (apiUser: ApiLoginResponse["user"]): User => {
     email: apiUser.email,
     role: primaryRole,
     roles,
-    avatar: apiUser.avatar_url ?? cachedProfile?.avatar ?? undefined,
+    avatar: resolveApiAssetUrl(apiUser.avatar_url ?? cachedProfile?.avatar ?? undefined),
     phone: apiUser.phone ?? undefined,
     area: apiUser.area ?? undefined,
     createdAt: apiUser.created_at ?? undefined,

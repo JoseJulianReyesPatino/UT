@@ -53,7 +53,7 @@ type ReviewedDocument = {
 
 type DocumentItem = PendingDocument | ReviewedDocument;
 
-type DocumentReviewProps = Readonly<{ initialSection?: ReviewSection }>;
+type DocumentReviewProps = Readonly<{ initialSection?: ReviewSection; initialForm?: string }>;
 
 type CareerFilterOption = { value: string; label: string };
 
@@ -63,6 +63,7 @@ const apartadoFilterOptions = [
 	{ value: "Instrumento 40%", label: "Instrumento 40%" },
 	{ value: "Instrumento 60%", label: "Instrumento 60%" },
 	{ value: "Instrumento 70%", label: "Instrumento 70%" },
+	{ value: "Remedial", label: "Remedial" },
 	{ value: "Lista Concentrada", label: "Lista Concentrada" },
 	{ value: "Asesoría", label: "Asesoría" },
 	{ value: "Portafolio Digital Final", label: "Portafolio Digital Final" },
@@ -75,6 +76,7 @@ const initialPendingDocuments: PendingDocument[] = [
 	{ id: 3, ciclo: "Ciclo Escolar 2025", plan: "Plan Normal", docente: "Mtro. Carlos López", documento: "Lista Concentrada - Redes", apartado: "Lista Concentrada", carrera: "Ingeniería en Redes", materia: "Redes de Computadoras", cuatrimestre: "7", grupo: "A", parcial: "Parcial 1", fecha: "2026-05-15" },
 	{ id: 4, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Dra. María González", documento: "Asesoría - Tutoría Grupal", apartado: "Asesoría", carrera: "Ingeniería en Sistemas", materia: "Tutorías BIS", cuatrimestre: "5", grupo: "C", parcial: "Parcial 2", fecha: "2026-05-14", returned: false },
 	{ id: 5, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Dra. María González", documento: "Instrumento 40% - Programación Web", apartado: "Instrumento 40%", carrera: "Ingeniería en Sistemas", materia: "Programación Web", cuatrimestre: "5", grupo: "C", parcial: "Parcial 2", fecha: "2026-05-14", returned: false },
+	{ id: 6, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Mtro. Luis Herrera", documento: "Remedial - Matemáticas", apartado: "Remedial", carrera: "TSU Desarrollo Software", materia: "Matemáticas", cuatrimestre: "3", grupo: "B", parcial: "Parcial 1", fecha: "2026-05-18" },
 ];
 
 const initialReviewedDocuments: ReviewedDocument[] = [
@@ -83,6 +85,7 @@ const initialReviewedDocuments: ReviewedDocument[] = [
 	{ id: 103, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Dra. Ana Martínez", documento: "Lista Concentrada - Base de Datos", apartado: "Lista Concentrada", carrera: "TSU Desarrollo Software", cuatrimestre: "3", grupo: "B", parcial: "Parcial 1", reviewedAt: "2026-05-16 16:40" },
 	{ id: 104, ciclo: "Ciclo Escolar 2026", plan: "Plan Normal", docente: "Mtro. Carlos López", documento: "Instrumento 70% - Redes", apartado: "Instrumento 70%", carrera: "Ingeniería en Redes", cuatrimestre: "8", grupo: "A", parcial: "Parcial 3", reviewedAt: "2026-05-15 11:25" },
 	{ id: 105, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Dra. Laura Gómez", documento: "Ficha Técnica - Tutorías", apartado: "Tutorías", carrera: "TSU Infraestructura", cuatrimestre: "3", grupo: "D", parcial: "Final", reviewedAt: "2026-05-15 13:10", returned: false },
+	{ id: 106, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Mtra. Gabriela Ramos", documento: "Remedial - Física", apartado: "Remedial", carrera: "Ingeniería en Sistemas", cuatrimestre: "6", grupo: "A", parcial: "Parcial 1", reviewedAt: "2026-05-14 14:30" },
 ];
 
 const getCareerFilterOptions = (plan: string): CareerFilterOption[] => {
@@ -132,14 +135,14 @@ const formatDateTimeFromIso = (value?: string) => {
 	}
 };
 
-export default function DocumentReview({ initialSection = "all" }: DocumentReviewProps) {
+export default function DocumentReview({ initialSection = "all", initialForm }: DocumentReviewProps) {
 	const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>(initialPendingDocuments);
 	const [reviewedDocuments, setReviewedDocuments] = useState<ReviewedDocument[]>(initialReviewedDocuments);
 	const [filterCiclo, setFilterCiclo] = useState("all");
 	const [filterPlan, setFilterPlan] = useState("all");
 	const [filterCarrera, setFilterCarrera] = useState("all");
 	const [filterDocente, setFilterDocente] = useState("all");
-	const [filterApartado, setFilterApartado] = useState("all");
+	const [filterApartado, setFilterApartado] = useState(initialForm ?? "all");
 	const [filterCuatrimestre, setFilterCuatrimestre] = useState("all");
 	const [filterGrupo, setFilterGrupo] = useState("all");
 	const [filterParcial, setFilterParcial] = useState("all");
@@ -323,13 +326,13 @@ export default function DocumentReview({ initialSection = "all" }: DocumentRevie
 	return (
 		<div className="relative space-y-6 overflow-hidden bg-gradient-to-br from-emerald-50 via-background to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950">
 			<div className="absolute inset-0 pointer-events-none opacity-60 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.12),transparent_30%)] dark:opacity-40" />
-			<div className="relative z-10 space-y-6">
-				<div>
-					<h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">Revisión de Documentos</h1>
-					<p className="text-muted-foreground">Revisa y aprueba los documentos enviados por los docentes</p>
-				</div>
+				<div className="relative z-10 space-y-6">
+					<div>
+						<h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">Revisión de Documentos</h1>
+						<p className="text-muted-foreground">Revisa y aprueba los documentos enviados por los docentes</p>
+					</div>
 
-				<Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
+					<Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
 					<TabsList className="bg-gradient-to-r from-emerald-100 via-emerald-50 to-emerald-50 p-1 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 flex-wrap">
 						<TabsTrigger value="all">Todos <Badge variant="outline" className="ml-2">{allDocuments.length}</Badge></TabsTrigger>
 						<TabsTrigger value="pendientes">Pendientes <Badge variant="warning" className="ml-2">{filteredPendingDocuments.length}</Badge></TabsTrigger>

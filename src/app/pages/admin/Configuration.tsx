@@ -82,6 +82,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
   const [formConfig, setFormConfig] = useState(getFormConfig());
+  const [formCodeToId, setFormCodeToId] = useState<Record<FormId, number>>({} as Record<FormId, number>);
+  const [isFormConfigLoading, setIsFormConfigLoading] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
 
   const [plan, setPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
@@ -105,12 +107,16 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const [profileLastNames, setProfileLastNames] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
   const [profileAvatar, setProfileAvatar] = useState<string | undefined>(undefined);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [groupSearch, setGroupSearch] = useState("");
   const [groupViewPlan, setGroupViewPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
   const [openFormSection, setOpenFormSection] = useState<FormSectionId | null>(null);
-  const [openFormItems, setOpenFormItems] = useState<Record<FormId, boolean>>({});
+  const [openFormItems, setOpenFormItems] = useState<Record<FormId, boolean>>({} as Record<FormId, boolean>);
   const loadedProfileUserId = useRef<string | null>(null);
 
   const toggleFormItem = (id: FormId) => {
@@ -136,6 +142,38 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   useEffect(() => {
     setFormConfig(getFormConfig());
 
+    const loadFormConfig = async () => {
+      setIsFormConfigLoading(true);
+
+      try {
+        const res = await apiFetch('/forms');
+        const savedConfig = getFormConfig();
+        const formAccess = { ...savedConfig.formAccess };
+        const idMap = {} as Record<FormId, number>;
+
+        for (const item of res?.data ?? []) {
+          const formCode = String(item.form_code).replace(/_/g, '-') as FormId;
+          idMap[formCode] = item.id;
+
+          if (formCode in formAccess) {
+            formAccess[formCode] = {
+              roles: item.access_roles ?? formAccess[formCode].roles,
+              dueAt: item.due_at ?? formAccess[formCode].dueAt,
+            };
+          }
+        }
+
+        const nextConfig = { ...savedConfig, formAccess };
+        saveFormConfig(nextConfig);
+        setFormConfig(nextConfig);
+        setFormCodeToId(idMap);
+      } catch (err: any) {
+        console.error('Failed to load forms configuration', err);
+      } finally {
+        setIsFormConfigLoading(false);
+      }
+    };
+
     const loadGroups = async () => {
       try {
         const res = await apiFetch('/groups');
@@ -147,6 +185,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       }
     };
 
+    loadFormConfig();
     loadGroups();
   }, []);
 
@@ -262,8 +301,44 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     });
   };
 
+  const saveFormAccessRule = async (formId: FormId, nextRule: { roles: FormRole[]; dueAt: string | null }) => {
+    const formIdNumber = formCodeToId[formId];
+    if (!formIdNumber) {
+      return;
+    }
+
+    try {
+      await apiFetch(`/forms/${formIdNumber}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          access_roles: nextRule.roles,
+          due_at: nextRule.dueAt,
+        }),
+      });
+    } catch (err: any) {
+      toast.error(err?.message ?? 'No fue posible guardar la configuración del formulario');
+    }
+  };
+
+  const persistFormAccess = async (formId: FormId, updater: (current: { roles: FormRole[]; dueAt: string | null }) => { roles: FormRole[]; dueAt: string | null }) => {
+    setFormConfig((current) => {
+      const nextRule = updater(current.formAccess[formId]);
+      const next = {
+        ...current,
+        formAccess: {
+          ...current.formAccess,
+          [formId]: nextRule,
+        },
+      };
+      saveFormConfig(next);
+      void saveFormAccessRule(formId, nextRule);
+      return next;
+    });
+  };
+
   const toggleFormRole = (formId: FormId, role: FormRole) => {
-    updateFormAccess(formId, (current) => {
+    persistFormAccess(formId, (current) => {
       const nextRoles = current.roles.includes(role)
         ? current.roles.filter((item) => item !== role)
         : [...current.roles, role];
@@ -276,7 +351,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   };
 
   const handleDeadlineChange = (formId: FormId, value: string) => {
-    updateFormAccess(formId, (current) => ({
+    persistFormAccess(formId, (current) => ({
       ...current,
       dueAt: value || null,
     }));
@@ -450,6 +525,46 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       toast.error(error instanceof Error ? error.message : "No fue posible guardar la configuración");
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleSavePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error("Completa todos los campos de contraseña");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      toast.error("La nueva contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("La confirmación no coincide");
+      return;
+    }
+
+    setIsSavingPassword(true);
+
+    try {
+      await apiFetch("/auth/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          password: newPassword,
+          password_confirmation: confirmPassword,
+        }),
+      });
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("Contraseña actualizada correctamente");
+    } catch (error: any) {
+      toast.error(error instanceof Error ? error.message : "No fue posible actualizar la contraseña");
+    } finally {
+      setIsSavingPassword(false);
     }
   };
 
@@ -629,6 +744,49 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                       maxLength={10}
                       placeholder="Ej. 6531234567"
                     />
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Cambiar contraseña</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Actualiza tu contraseña sin salir de esta sección.</p>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2 md:col-span-1">
+                        <Label>Contraseña actual</Label>
+                        <Input
+                          type="password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Ingresa tu contraseña actual"
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-1">
+                        <Label>Nueva contraseña</Label>
+                        <Input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Ingresa la nueva contraseña"
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-1">
+                        <Label>Confirmar contraseña</Label>
+                        <Input
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Repite la contraseña"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button variant="outline" onClick={handleSavePassword} disabled={isSavingPassword}>
+                        {isSavingPassword ? "Guardando..." : "Actualizar contraseña"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
 

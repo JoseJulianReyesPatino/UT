@@ -357,6 +357,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     { id: "tutores", label: "Tutores", icon: User },
     { id: "estadias-admin", label: "Estadías", icon: FileArchive },
     { id: "calendario", label: "Calendario", icon: CalendarDays },
+    { id: "remediales", label: "Remediales", icon: FileText },
     { id: "documentos", label: "Documentos", icon: FileText },
     { id: "ciclos", label: "Ciclos Escolares", icon: FileStack },
     { id: "mensajes", label: "Mensajes", icon: MessageSquare },

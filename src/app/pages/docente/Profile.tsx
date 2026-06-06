@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "../../components/ui/badge";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
+import { resolveApiAssetUrl } from "../../lib/env";
 import { Calendar, Eye, EyeOff, Key, Upload } from "lucide-react";
 import { toast } from "sonner";
 
@@ -88,8 +89,8 @@ export function Profile() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Selecciona una imagen válida");
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      toast.error("Solo se permiten imágenes PNG, JPG o WEBP");
       event.target.value = "";
       return;
     }
@@ -100,12 +101,14 @@ export function Profile() {
       return;
     }
 
-    setSelectedAvatarFile(file);
-
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
         setAvatarPreview(reader.result);
+        setSelectedAvatarFile(file);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
     };
     reader.readAsDataURL(file);
@@ -114,9 +117,11 @@ export function Profile() {
   const handleSaveChanges = async () => {
     if (!user) return;
 
-    const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+    const explicitName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+    const fallbackName = user.name || [user.firstNames, user.lastNames].filter(Boolean).join(" ");
+    const fullName = explicitName || fallbackName;
 
-    if (!fullName) {
+    if (!fullName.trim()) {
       toast.error("El nombre no puede quedar vacío");
       return;
     }
@@ -124,18 +129,28 @@ export function Profile() {
     setIsSavingProfile(true);
 
     try {
-      const formData = new FormData();
-      formData.append("_method", "PATCH");
-      formData.append("full_name", fullName);
+      let requestOptions: RequestInit;
 
       if (selectedAvatarFile) {
+        const formData = new FormData();
+        formData.append("full_name", fullName);
         formData.append("avatar", selectedAvatarFile);
+        requestOptions = {
+          method: "PATCH",
+          body: formData,
+        };
+      } else {
+        requestOptions = {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            full_name: fullName,
+            avatar_url: avatarPreview ?? null,
+          }),
+        };
       }
 
-      const response = (await apiFetch("/auth/profile", {
-        method: "POST",
-        body: formData,
-      })) as {
+      const response = (await apiFetch("/auth/profile", requestOptions)) as {
         user: {
           full_name: string;
           first_names?: string | null;
@@ -146,19 +161,46 @@ export function Profile() {
         };
       };
 
+      const normalizedAvatar = resolveApiAssetUrl(response.user.avatar_url ?? undefined);
+
       updateProfile({
         name: response.user.full_name,
         firstNames: response.user.first_names ?? firstName.trim(),
         lastNames: response.user.last_names ?? lastName.trim(),
-        avatar: response.user.avatar_url ?? undefined,
+        avatar: normalizedAvatar,
         phone: response.user.phone ?? undefined,
         area: response.user.area ?? undefined,
       });
 
-      setAvatarPreview(response.user.avatar_url ?? undefined);
+      setAvatarPreview(normalizedAvatar);
       setSelectedAvatarFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
+      }
+
+      try {
+        const meResponse = (await apiFetch("/auth/me", { method: "GET" })) as { user: {
+          full_name: string;
+          first_names?: string | null;
+          last_names?: string | null;
+          email: string;
+          phone?: string | null;
+          area?: string | null;
+          avatar_url?: string | null;
+        } };
+
+        const refreshedAvatar = resolveApiAssetUrl(meResponse.user.avatar_url ?? undefined);
+        updateProfile({
+          name: meResponse.user.full_name,
+          firstNames: meResponse.user.first_names ?? firstName.trim(),
+          lastNames: meResponse.user.last_names ?? lastName.trim(),
+          avatar: refreshedAvatar,
+          phone: meResponse.user.phone ?? undefined,
+          area: meResponse.user.area ?? undefined,
+        });
+        setAvatarPreview(refreshedAvatar);
+      } catch {
+        // ignore refresh failure, keep the optimistic state
       }
 
       toast.success("Perfil actualizado correctamente");
@@ -303,12 +345,12 @@ export function Profile() {
                 <Input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/webp"
                   className="hidden"
                   onChange={handleAvatarChange}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  JPG, PNG o GIF. Máximo 4MB
+                  JPG, PNG o WEBP. Máximo 4MB
                 </p>
               </div>
             </div>

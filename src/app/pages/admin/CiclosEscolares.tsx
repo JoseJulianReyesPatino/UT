@@ -29,6 +29,8 @@ type CycleFormState = {
   nombre: string;
   anio: string;
   periodo: string;
+  periodoInicio?: string;
+  periodoFin?: string;
   fechaInicio: string;
   fechaFin: string;
   status: CycleStatus;
@@ -53,6 +55,24 @@ const mapApiCycle = (cycle: ApiCycle): AcademicCycle => ({
   fechaFin: cycle.end_date,
   status: cycle.status,
 });
+
+const monthOptions = [
+  { value: "01", label: "Enero" },
+  { value: "02", label: "Febrero" },
+  { value: "03", label: "Marzo" },
+  { value: "04", label: "Abril" },
+  { value: "05", label: "Mayo" },
+  { value: "06", label: "Junio" },
+  { value: "07", label: "Julio" },
+  { value: "08", label: "Agosto" },
+  { value: "09", label: "Septiembre" },
+  { value: "10", label: "Octubre" },
+  { value: "11", label: "Noviembre" },
+  { value: "12", label: "Diciembre" },
+];
+
+const currentYear = new Date().getFullYear();
+const yearOptions = Array.from({ length: currentYear - 2024 + 1 + 5 }, (_, index) => String(2024 + index));
 
 type DocumentRecord = {
   id: number;
@@ -198,11 +218,13 @@ export function CiclosEscolares() {
   const [deleteConfirmationName, setDeleteConfirmationName] = useState("");
   const [newCycleForm, setNewCycleForm] = useState<CycleFormState>({
     nombre: "",
-    anio: "2026",
+    anio: String(currentYear),
     periodo: "",
+    periodoInicio: "",
+    periodoFin: "",
     fechaInicio: "",
     fechaFin: "",
-    status: "activo",
+    status: "cerrado",
   });
   const [editCycleForm, setEditCycleForm] = useState<CycleFormState>({
     nombre: "",
@@ -281,14 +303,26 @@ export function CiclosEscolares() {
   };
 
   const createCycle = async () => {
-    if (!newCycleForm.nombre.trim() || !newCycleForm.periodo.trim() || !newCycleForm.fechaInicio || !newCycleForm.fechaFin) {
+    const startMonth = monthOptions.find((option) => option.value === newCycleForm.periodoInicio);
+    const endMonth = monthOptions.find((option) => option.value === newCycleForm.periodoFin);
+    const periodLabel = startMonth && endMonth ? `${startMonth.label}-${endMonth.label}` : "";
+    const cycleName = periodLabel && newCycleForm.anio ? `Cuatrimestre ${periodLabel} ${newCycleForm.anio}` : "";
+
+    if (!newCycleForm.anio.trim() || !newCycleForm.periodoInicio || !newCycleForm.periodoFin || !newCycleForm.fechaInicio || !newCycleForm.fechaFin || !cycleName) {
       toast.error("Completa todos los campos obligatorios");
       return;
     }
 
     const year = Number(newCycleForm.anio);
-    if (Number.isNaN(year)) {
-      toast.error("El año debe ser numérico");
+    if (Number.isNaN(year) || year < 2024) {
+      toast.error("El año debe ser 2024 o posterior");
+      return;
+    }
+
+    const startIndex = monthOptions.findIndex((option) => option.value === newCycleForm.periodoInicio);
+    const endIndex = monthOptions.findIndex((option) => option.value === newCycleForm.periodoFin);
+    if (startIndex > endIndex) {
+      toast.error("El mes de inicio debe ser anterior o igual al mes de fin");
       return;
     }
 
@@ -297,25 +331,28 @@ export function CiclosEscolares() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: newCycleForm.nombre.trim(),
+          name: cycleName,
           year,
-          period_name: newCycleForm.periodo.trim(),
+          period_name: periodLabel,
           start_date: newCycleForm.fechaInicio,
           end_date: newCycleForm.fechaFin,
-          status: newCycleForm.status,
+          status: "cerrado",
         }),
       });
 
       const nextCycle: ApiCycle = response.data;
-      setCiclos((current) => {
-        const mapped = mapApiCycle(nextCycle);
-        if (mapped.status === "activo") {
-          return [mapped, ...current.map((cycle) => ({ ...cycle, status: "cerrado" }))];
-        }
-        return [mapped, ...current];
-      });
+      setCiclos((current) => [mapApiCycle(nextCycle), ...current]);
       toast.success("Ciclo escolar creado correctamente");
-      setNewCycleForm({ nombre: "", anio: "2026", periodo: "", fechaInicio: "", fechaFin: "", status: "activo" });
+      setNewCycleForm({
+        nombre: "",
+        anio: String(currentYear),
+        periodo: "",
+        periodoInicio: "",
+        periodoFin: "",
+        fechaInicio: "",
+        fechaFin: "",
+        status: "cerrado",
+      });
       setShowNewDialog(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al crear el ciclo");
@@ -663,21 +700,57 @@ export function CiclosEscolares() {
             <div className="space-y-2">
               <Label>Nombre del Ciclo</Label>
               <Input
-                placeholder="Cuatrimestre Mayo-Agosto 2026"
-                value={newCycleForm.nombre}
-                onChange={(e) => setNewCycleForm((current) => ({ ...current, nombre: e.target.value }))}
+                disabled
+                placeholder="Se genera automáticamente"
+                value={newCycleForm.periodoInicio && newCycleForm.periodoFin ? `Cuatrimestre ${monthOptions.find((m) => m.value === newCycleForm.periodoInicio)?.label}-${monthOptions.find((m) => m.value === newCycleForm.periodoFin)?.label} ${newCycleForm.anio}` : ""}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Año</Label>
-                <Input type="number" value={newCycleForm.anio} onChange={(e) => setNewCycleForm((current) => ({ ...current, anio: e.target.value }))} />
+                <Select value={newCycleForm.anio} onValueChange={(value) => setNewCycleForm((current) => ({ ...current, anio: value }))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona año" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={year}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
-                <Label>Período</Label>
-                <Input placeholder="Mayo-Agosto" value={newCycleForm.periodo} onChange={(e) => setNewCycleForm((current) => ({ ...current, periodo: e.target.value }))} />
+                <Label>Mes de inicio</Label>
+                <Select value={newCycleForm.periodoInicio} onValueChange={(value) => setNewCycleForm((current) => ({ ...current, periodoInicio: value }))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Inicio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map((month) => (
+                      <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Mes de fin</Label>
+                <Select value={newCycleForm.periodoFin} onValueChange={(value) => setNewCycleForm((current) => ({ ...current, periodoFin: value }))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Fin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map((month) => (
+                      <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+            {newCycleForm.periodoInicio && newCycleForm.periodoFin && monthOptions.findIndex((m) => m.value === newCycleForm.periodoInicio) > monthOptions.findIndex((m) => m.value === newCycleForm.periodoFin) && (
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive-foreground">
+                El mes de inicio debe ser anterior o igual al mes de fin.
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Fecha de Inicio</Label>

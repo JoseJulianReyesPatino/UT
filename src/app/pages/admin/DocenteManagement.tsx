@@ -229,7 +229,7 @@ const initialForm: NuevoUsuarioForm = {
 export function DocenteManagement() {
   const { user: currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("activo");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);

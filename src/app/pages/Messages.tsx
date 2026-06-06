@@ -331,6 +331,11 @@ export function Messages(props: Readonly<{
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [newConversationOpen, setNewConversationOpen] = useState(false);
+  const [recipientQuery, setRecipientQuery] = useState("");
+  const [recipientUsers, setRecipientUsers] = useState<any[]>([]);
+  const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
+  const [recipientFetchError, setRecipientFetchError] = useState<string | null>(null);
   
   const currentRoleLabel = user?.roles?.length && user.roles.length > 1
     ? user.roles.map((role) => (role === "administrador" ? "Administrador" : role === "tutor" ? "Tutor" : "Docente")).join(" y ")
@@ -340,6 +345,71 @@ export function Messages(props: Readonly<{
     ? "Tutor"
     : "Docente";
   const peerRoleLabel = currentRoleLabel === "Administrador" ? "Docente" : "Administrador";
+
+  const recipientRoleCode = peerRoleLabel.toLowerCase();
+
+  const loadRecipientUsers = useCallback(async () => {
+    try {
+      setIsLoadingRecipients(true);
+      setRecipientFetchError(null);
+      const usersPayload = (await apiFetch('/users', { method: 'GET' })) as { data?: any[] } | null;
+      const users = usersPayload?.data ?? [];
+      const filtered = (users ?? []).filter((recipient) => {
+        if (!recipient) return false;
+        const roles = recipient.roles ?? [];
+        const hasPeerRole = roles.some((role: any) => (role.code ?? role).toString().toLowerCase() === recipientRoleCode);
+        return recipient.id !== user?.id && hasPeerRole;
+      });
+      setRecipientUsers(filtered);
+    } catch (err) {
+      console.error('loadRecipientUsers error', err);
+      setRecipientFetchError('No fue posible cargar usuarios');
+    } finally {
+      setIsLoadingRecipients(false);
+    }
+  }, [recipientRoleCode, user?.id]);
+
+  useEffect(() => {
+    if (!newConversationOpen) return;
+    void loadRecipientUsers();
+  }, [newConversationOpen, loadRecipientUsers]);
+
+  const filteredRecipientUsers = useMemo(() => {
+    const normalizedSearch = recipientQuery.trim().toLowerCase();
+    return recipientUsers.filter((recipient) => {
+      const fullName = ((recipient.full_name ?? recipient.name ?? '') as string).toLowerCase();
+      return !normalizedSearch || fullName.includes(normalizedSearch);
+    });
+  }, [recipientQuery, recipientUsers]);
+
+  const handleCreateConversation = async (recipient: any) => {
+    try {
+      const normalizedRecipientName = ((recipient.full_name ?? recipient.name ?? '') as string).trim().toLowerCase();
+      const existingConversation = conversations.find((conversation) => conversation.name.trim().toLowerCase() === normalizedRecipientName);
+      if (existingConversation) {
+        setSelectedChat(existingConversation.id);
+        setNewConversationOpen(false);
+        setRecipientQuery('');
+        await loadMessages(existingConversation.id);
+        return;
+      }
+
+      const created = (await apiFetch('/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient_user_id: recipient.id }),
+      })) as { data?: any };
+      const newConversation = normalizeConversation(created.data);
+      setConversations((current) => [newConversation, ...current]);
+      setSelectedChat(newConversation.id);
+      setNewConversationOpen(false);
+      setRecipientQuery('');
+      await loadMessages(newConversation.id);
+    } catch (err) {
+      console.error('createConversation error', err);
+      toast.error('No fue posible crear la conversación');
+    }
+  };
 
   // Recuperar conversaciones guardadas al montar
   useEffect(() => {
@@ -516,9 +586,14 @@ export function Messages(props: Readonly<{
 
     (async () => {
       try {
-        if (conversations.length === 0) await loadConversations();
+        const normalizedRecipientName = recipientName.trim().toLowerCase();
+        let availableConversations = conversations;
+        let found = availableConversations.find((c) => c.name.trim().toLowerCase() === normalizedRecipientName);
+        if (!found) {
+          availableConversations = await loadConversations();
+          found = availableConversations.find((c) => c.name.trim().toLowerCase() === normalizedRecipientName);
+        }
 
-        const found = conversations.find((c) => c.name === recipientName);
         if (found) {
           setSelectedChat(found.id);
           if (document) await apiFetch(`/conversations/${found.id}/messages`, {
@@ -533,7 +608,11 @@ export function Messages(props: Readonly<{
 
         const usersPayload = (await apiFetch('/users', { method: 'GET' })) as { data?: any[] } | null;
         const users = usersPayload?.data ?? [];
-        const recipient = users.find((u) => (u.full_name ?? u.name) === recipientName || (recipientRole && (u.roles ?? []).some((r:any)=> (r.code??r).toLowerCase().includes(recipientRole.toLowerCase()))));
+        const recipient = users.find((u) => {
+          const fullName = (u.full_name ?? u.name ?? '').trim().toLowerCase();
+          const roleMatches = recipientRole && (u.roles ?? []).some((r: any) => (r.code ?? r).toString().toLowerCase().includes(recipientRole.toLowerCase()));
+          return fullName === normalizedRecipientName || roleMatches;
+        });
 
         let conversationId: number | null = null;
         if (recipient) {
@@ -728,9 +807,16 @@ export function Messages(props: Readonly<{
                 <CardDescription className="hidden sm:block">Conversaciones recientes</CardDescription>
               </div>
             </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre o mensaje..." className="pl-9" />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre o mensaje..." className="pl-9" />
+              </div>
+              {(user?.role === "administrador" || user?.roles?.includes("administrador")) && (
+                <Button variant="secondary" onClick={() => setNewConversationOpen(true)}>
+                  Nuevo chat
+                </Button>
+              )}
             </div>
           </CardHeader>
 
@@ -756,6 +842,49 @@ export function Messages(props: Readonly<{
             </ScrollArea>
           </CardContent>
         </Card>
+
+        <Dialog open={newConversationOpen} onOpenChange={setNewConversationOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Iniciar nuevo chat</DialogTitle>
+              <DialogDescription>Busca un {peerRoleLabel.toLowerCase()} y crea una nueva conversación.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={recipientQuery}
+                  onChange={(e) => setRecipientQuery(e.target.value)}
+                  placeholder={`Buscar ${peerRoleLabel.toLowerCase()} por nombre...`}
+                  className="pl-9"
+                />
+              </div>
+              {isLoadingRecipients ? (
+                <p className="text-sm text-muted-foreground">Cargando usuarios...</p>
+              ) : recipientFetchError ? (
+                <p className="text-sm text-destructive">{recipientFetchError}</p>
+              ) : (
+                <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-background/80 p-3">
+                  {filteredRecipientUsers.length > 0 ? (
+                    filteredRecipientUsers.map((recipient) => (
+                      <button
+                        key={recipient.id}
+                        type="button"
+                        onClick={() => handleCreateConversation(recipient)}
+                        className="w-full rounded-xl border border-border/60 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/80"
+                      >
+                        <p className="font-semibold">{recipient.full_name ?? recipient.name}</p>
+                        <p className="text-sm text-muted-foreground">{peerRoleLabel}</p>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No se encontraron usuarios.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <Card className="flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
           <CardHeader className="border-b border-border/60 bg-background/80 pb-4">

@@ -29,6 +29,8 @@ import TutoriasPage from "./pages/docente/Tutorias";
 import { Sidebar } from "./components/Sidebar";
 import { FormAccessGuard } from "./components/FormAccessGuard";
 import { Alert, AlertDescription } from "./components/ui/alert";
+import { getFormConfig, saveFormConfig, type FormId } from "../lib/formConfig";
+import { apiFetch } from "./lib/api";
 
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
@@ -80,6 +82,7 @@ function AppContent() {
           "tutores",
           "mensajes",
           "documentos",
+          "remediales",
           "documentos-revisados",
           "documentos-revisados-hoy",
           "ciclos",
@@ -132,6 +135,36 @@ function AppContent() {
     globalThis.addEventListener("openMessagesConversation", handler);
     return () => globalThis.removeEventListener("openMessagesConversation", handler);
   }, []);
+
+  useEffect(() => {
+    if (!isReady || !isAuthenticated) {
+      return;
+    }
+
+    const syncFormConfig = async () => {
+      try {
+        const res = await apiFetch('/forms');
+        const currentConfig = getFormConfig();
+        const nextAccess = { ...currentConfig.formAccess };
+
+        for (const form of res?.data ?? []) {
+          const formCode = String(form.form_code).replace(/_/g, '-') as FormId;
+          if (formCode in nextAccess) {
+            nextAccess[formCode] = {
+              roles: form.access_roles ?? nextAccess[formCode].roles,
+              dueAt: form.due_at ?? nextAccess[formCode].dueAt,
+            };
+          }
+        }
+
+        saveFormConfig({ ...currentConfig, formAccess: nextAccess });
+      } catch (error) {
+        console.error('Failed to sync form configuration', error);
+      }
+    };
+
+    syncFormConfig();
+  }, [isReady, isAuthenticated]);
 
   // logout handled by AuthContext logout directly where needed
 
@@ -224,6 +257,8 @@ function AppContent() {
           return <Messages />;
         case "documentos":
           return <DocumentReview initialSection="pendientes" />;
+        case "remediales":
+          return <DocumentReview initialSection="pendientes" initialForm="Remedial" />;
         case "documentos-revisados":
           return <DocumentReview initialSection="revisados" />;
         case "documentos-revisados-hoy":
