@@ -201,8 +201,8 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         apiFetch("/users"),
       ]);
 
-      const pending = ((pendingRes?.data ?? []) as ApiDocument[]).map(mapPendingDocument);
-      const reviewed = ((reviewedRes?.data ?? []) as ApiDocument[]).map(mapReviewedDocument);
+      const pending = ((pendingRes?.data?.data ?? []) as ApiDocument[]).map(mapPendingDocument);
+      const reviewed = ((reviewedRes?.data?.data ?? []) as ApiDocument[]).map(mapReviewedDocument);
       const users = (usersRes?.data ?? []) as ApiUser[];
 
       setPendingDocuments(pending);

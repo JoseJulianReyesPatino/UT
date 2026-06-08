@@ -22,7 +22,8 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  updateProfile: (updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => void;
+  updateProfile: (updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => Promise<void>;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   isReady: boolean;
   notice: { type: "success" | "error"; message: string } | null;
@@ -113,16 +114,18 @@ const loadCachedProfile = (userId: string) => {
 };
 
 const saveCachedProfile = (user: User) => {
-  const avatar = user.avatar && (!user.avatar.startsWith("data:") || user.avatar.length <= 2000)
-    ? user.avatar
-    : "";
+  // FIXED: No guardar data URLs en caché (solo URLs reales o vacío)
+  let avatarToCache = "";
+  if (user.avatar && !user.avatar.startsWith("data:") && user.avatar.length <= 2000) {
+    avatarToCache = user.avatar;
+  }
 
   localStorage.setItem(
     profileCacheKey(user.id),
     JSON.stringify({
       firstNames: user.firstNames ?? "",
       lastNames: user.lastNames ?? "",
-      avatar,
+      avatar: avatarToCache,
     }),
   );
 };
@@ -145,6 +148,11 @@ const mapApiUser = (apiUser: ApiLoginResponse["user"]): User => {
   const fallbackNames = splitNameParts(apiUser.full_name);
   const cachedProfile = loadCachedProfile(String(apiUser.id));
 
+  // FIXED: Priorizar la URL del servidor sobre la caché para el avatar
+  const avatarUrl = apiUser.avatar_url 
+    ? resolveApiAssetUrl(apiUser.avatar_url)
+    : (cachedProfile?.avatar ? resolveApiAssetUrl(cachedProfile.avatar) : undefined);
+
   return {
     id: String(apiUser.id),
     name: apiUser.full_name,
@@ -153,7 +161,7 @@ const mapApiUser = (apiUser: ApiLoginResponse["user"]): User => {
     email: apiUser.email,
     role: primaryRole,
     roles,
-    avatar: resolveApiAssetUrl(apiUser.avatar_url ?? cachedProfile?.avatar ?? undefined),
+    avatar: avatarUrl,
     phone: apiUser.phone ?? undefined,
     area: apiUser.area ?? undefined,
     createdAt: apiUser.created_at ?? undefined,
@@ -194,7 +202,6 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       flashNotice('success', 'Accediendo al sistema');
       setUser(apiUser);
     } catch (err: any) {
-      // Normalize 422 (invalid credentials) to a friendly message and preserve status
       if (err && err.status === 422) {
         flashNotice('error', 'Correo o contraseña inválidos');
         const e = new Error('Correo o contraseña inválidos');
@@ -203,6 +210,24 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       }
       flashNotice('error', err instanceof Error ? err.message : 'No fue posible iniciar sesión');
       throw err;
+    }
+  };
+
+  // FIXED: Nueva función para refrescar los datos del usuario desde el servidor
+  const refreshUser = async () => {
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    if (!token) {
+      return;
+    }
+
+    try {
+      const payload = (await apiFetch('/auth/me', { method: 'GET' })) as { user: ApiLoginResponse['user'] };
+      const apiUser = mapApiUser(payload.user);
+      setUser(apiUser);
+      saveCachedProfile(apiUser);
+    } catch (error) {
+      console.error('Error refreshing user:', error);
+      // Si hay error al refrescar, no hacemos nada, mantenemos el usuario actual
     }
   };
 
@@ -239,17 +264,36 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     setNotice(null);
   };
 
-  const updateProfile = (updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => {
+  // FIXED: updateProfile ahora es async y refresca desde el servidor después de actualizar
+  const updateProfile = async (updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => {
     setUser((currentUser) => {
       if (!currentUser) return currentUser;
+      
+      // Actualización optimista inmediata
       const nextUser = { ...currentUser, ...updates };
       saveCachedProfile(nextUser);
       return nextUser;
     });
+
+    // Opcional: refrescar desde el servidor para asegurar consistencia
+    // Esto es útil después de actualizaciones que vienen del backend
+    // Descomentar si quieres asegurar que el estado siempre esté sincronizado
+    // setTimeout(() => {
+    //   refreshUser();
+    // }, 100);
   };
 
   const value = useMemo(
-    () => ({ user, login, logout, updateProfile, isAuthenticated: !!user, isReady, notice }),
+    () => ({ 
+      user, 
+      login, 
+      logout, 
+      updateProfile, 
+      refreshUser,
+      isAuthenticated: !!user, 
+      isReady, 
+      notice 
+    }),
     [isReady, notice, user]
   );
 

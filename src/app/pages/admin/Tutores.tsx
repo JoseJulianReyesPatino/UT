@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -9,11 +9,14 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
+import { apiFetch } from "../../lib/api";
+import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
 import { carrieras } from "../../data/curricula";
+import { useAuth } from "../../context/AuthContext";
 
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
 
-type TutorPendingDocument = {
+type TutorDocument = {
   id: number;
   ciclo: string;
   plan: string;
@@ -24,28 +27,13 @@ type TutorPendingDocument = {
   materia?: string;
   cuatrimestre?: string;
   grupo?: string;
-  fecha: string;
-  returned?: boolean;
-  returnedAt?: string;
-  resubmittedAt?: string;
-};
-
-type TutorReviewedDocument = {
-  id: number;
-  ciclo: string;
-  plan: string;
-  tutor: string;
-  documento: string;
-  apartado: string;
-  carrera: string;
-  reviewedAt: string;
   fecha?: string;
+  status: string;
   returned?: boolean;
   returnedAt?: string;
-  resubmittedAt?: string;
+  reviewedAt?: string;
+  submittedAt?: string;
 };
-
-type TutorDocumentItem = TutorPendingDocument | TutorReviewedDocument;
 
 type ReturnConfirmation = {
   type: "return" | "cancel-return";
@@ -57,6 +45,27 @@ type CareerOption = {
   label: string;
 };
 
+const mapApiDocumentToTutorDocument = (doc: any): TutorDocument => ({
+  id: Number(doc.id ?? 0),
+  ciclo: doc.cycle_name ?? "N/D",
+  plan: doc.plan ?? "N/D",
+  tutor: doc.uploaded_by_name ?? "N/D",
+  documento: doc.title ?? "Documento",
+  apartado: doc.apartado_label ?? "N/D",
+  carrera: doc.carrera_label ?? "N/D",
+  materia: doc.materia || undefined,
+  cuatrimestre: doc.group_id ? String(doc.group_id) : undefined,
+  grupo: doc.group_id ? String(doc.group_id) : undefined,
+  fecha: doc.submitted_at ?? undefined,
+  status: doc.status ?? "pendiente",
+  returned: (doc.status ?? "") === "devuelto",
+  returnedAt: doc.returned_at ?? undefined,
+  reviewedAt: doc.reviewed_at ?? undefined,
+  submittedAt: doc.submitted_at ?? undefined,
+});
+
+const emptyStateLegend = "Aún no hay documentos de tutores para mostrar en esta sección. Cuando un tutor suba uno, aparecerá aquí automáticamente.";
+
 const careerOptions: CareerOption[] = Array.from(
   new Map(
     [
@@ -67,95 +76,12 @@ const careerOptions: CareerOption[] = Array.from(
   ).values()
 );
 
-const initialPending: TutorPendingDocument[] = [
-  {
-    id: 1,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Nuevo Modelo",
-    tutor: "Mtro. Juan Pérez",
-    documento: "Carga académica - Tutoría Grupo A",
-    apartado: "Carga académica",
-    carrera: "Ingeniería en Sistemas",
-    materia: "-",
-    cuatrimestre: "5",
-    grupo: "A",
-    fecha: "2026-05-17 08:20",
-  },
-  {
-    id: 2,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Nuevo Modelo",
-    tutor: "Dra. Ana Martínez",
-    documento: "Reporte de bajas - Tutoría Grupo B",
-    apartado: "Reporte de bajas",
-    carrera: "TSU Desarrollo Software",
-    materia: "-",
-    cuatrimestre: "3",
-    grupo: "B",
-    fecha: "2026-05-16 09:05",
-  },
-  {
-    id: 3,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Nuevo Modelo",
-    tutor: "Mtra. Laura Gómez",
-    documento: "Concentrado de asesorías y bajas - Grupo C",
-    apartado: "Concentrado de asesorías y bajas",
-    carrera: "Ingeniería en Sistemas",
-    materia: "-",
-    cuatrimestre: "4",
-    grupo: "C",
-    fecha: "2026-05-15 11:40",
-  },
-  {
-    id: 4,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Nuevo Modelo",
-    tutor: "Mtro. Carlos López",
-    documento: "Acta de asistencia grupal - Tutoría Grupal",
-    apartado: "Acta de asistencia grupal",
-    carrera: "Ingeniería en Redes",
-    materia: "-",
-    cuatrimestre: "7",
-    grupo: "A",
-    fecha: "2026-05-14 12:10",
-  },
-  {
-    id: 5,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Nuevo Modelo",
-    tutor: "Dra. María González",
-    documento: "Ficha Técnica - Tutoría Grupo D",
-    apartado: "Ficha Técnica",
-    carrera: "TSU Infraestructura",
-    materia: "-",
-    cuatrimestre: "2",
-    grupo: "D",
-    fecha: "2026-05-13 07:55",
-    returned: false,
-    returnedAt: "2026-05-18 10:00",
-    resubmittedAt: "2026-05-18 11:35",
-  },
-];
-
-const initialReviewed: TutorReviewedDocument[] = [
-  {
-    id: 101,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Nuevo Modelo",
-    tutor: "Mtro. Roberto Silva",
-    documento: "Ficha Técnica - Tutorías",
-    apartado: "Ficha Técnica",
-    carrera: "Ingeniería en Sistemas",
-    fecha: "2026-05-17 08:25",
-    reviewedAt: "2026-05-17 09:15",
-    returned: false,
-  },
-];
+// no mock initial data — load from backend
 
 export default function Tutores() {
-  const [pendingDocuments, setPendingDocuments] = useState<TutorPendingDocument[]>(initialPending);
-  const [reviewedDocuments, setReviewedDocuments] = useState<TutorReviewedDocument[]>(initialReviewed);
+  const { isReady, isAuthenticated } = useAuth();
+  const [pendingDocuments, setPendingDocuments] = useState<TutorDocument[]>([]);
+  const [reviewedDocuments, setReviewedDocuments] = useState<TutorDocument[]>([]);
   const [filterCiclo, setFilterCiclo] = useState("all");
   const [filterCarrera, setFilterCarrera] = useState("all");
   const [filterTutor, setFilterTutor] = useState("all");
@@ -165,6 +91,78 @@ export default function Tutores() {
   const [previewDocument, setPreviewDocument] = useState<TutorDocumentItem | null>(null);
   const [returnConfirmation, setReturnConfirmation] = useState<ReturnConfirmation | null>(null);
   const [reviewConfirmation, setReviewConfirmation] = useState<TutorPendingDocument | null>(null);
+  const [page, setPage] = useState<number>(1);
+  const [perPage, setPerPage] = useState<number>(20);
+  const [total, setTotal] = useState<number>(0);
+
+  const buildQueryFromFilters = () => {
+    const q: Record<string, any> = { uploader_role: 'tutor', page, per_page: perPage };
+    if (filterCarrera !== 'all') q.carrera_label = filterCarrera;
+    if (filterTutor !== 'all') q.uploaded_by_name = filterTutor;
+    if (filterApartado !== 'all') q.apartado_label = filterApartado;
+    if (filterReturned === 'returned') q.status = 'devuelto';
+    if (filterReturned === 'not-returned') q.status = 'pendiente';
+    if (activeSection === 'pendientes') q.status = 'pendiente';
+    if (activeSection === 'revisados') q.status = 'revisado';
+    // note: filterCiclo is a label; backend expects cycle_id — keep client-side for now
+    return q;
+  };
+
+  const loadDocuments = async () => {
+    if (!isReady) return;
+    if (!isAuthenticated) {
+      setPendingDocuments([]);
+      setReviewedDocuments([]);
+      return;
+    }
+
+    try {
+      const response = await apiFetch('/documents', { query: buildQueryFromFilters() });
+      const documents = Array.isArray(response?.data) ? response.data.map(mapApiDocumentToTutorDocument) : [];
+      setPendingDocuments(documents.filter((doc) => doc.status === 'pendiente'));
+      setReviewedDocuments(documents.filter((doc) => doc.status !== 'pendiente'));
+      if (response?.meta) {
+        setTotal(response.meta.total ?? 0);
+        setPage(response.meta.page ?? 1);
+        setPerPage(response.meta.per_page ?? perPage);
+      }
+    } catch (error: any) {
+      toast.error(error?.message ?? 'No fue posible cargar los documentos de tutores');
+    }
+  };
+
+  useEffect(() => {
+    if (!isReady) return;
+    void loadDocuments();
+  }, [isAuthenticated, isReady]);
+
+  // reload when filters, section or pagination changes
+  useEffect(() => {
+    const to = setTimeout(() => { void loadDocuments(); }, 150);
+    return () => clearTimeout(to);
+  }, [filterCarrera, filterTutor, filterApartado, filterReturned, activeSection, page, perPage]);
+
+  const downloadDocument = async (documentId: number) => {
+    try {
+      const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      const url = `${API_BASE_URL.replace(/\/+$/, '')}/documents/${documentId}/file`;
+      const headers: Record<string,string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(url, { method: 'GET', headers });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || res.statusText);
+      }
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+      // optional: revoke after some time
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (err: any) {
+      toast.error(err?.message ?? 'No fue posible descargar el archivo');
+    }
+  };
 
   const allDocuments = [...pendingDocuments, ...reviewedDocuments];
   const todayKey = new Date().toISOString().slice(0, 10);
@@ -242,7 +240,7 @@ export default function Tutores() {
   const filteredPending = pendingDocuments.filter(matchesFilters);
   const filteredReviewed = reviewedDocuments.filter(matchesFilters);
   const filteredAll = allDocuments.filter(matchesFilters);
-  const reviewedToday = filteredReviewed.filter((doc) => doc.reviewedAt && doc.reviewedAt.startsWith(todayKey));
+  const reviewedToday = filteredReviewed.filter((doc) => doc.reviewedAt?.startsWith(todayKey));
 
   const getDocumentStatusLabel = (doc: TutorDocumentItem) => {
     if ("resubmittedAt" in doc && doc.resubmittedAt) return "Reenviado";
@@ -263,51 +261,47 @@ export default function Tutores() {
   const tutoresDisponibles = Array.from(new Set(allDocuments.map((doc) => ("tutor" in doc ? doc.tutor : (doc as any).tutor))));
   const apartadosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.apartado)));
 
-  const handleReviewDocument = (documentId: number) => {
-    const documentToReview = pendingDocuments.find((doc) => doc.id === documentId);
+  const handleReviewDocument = async (documentId: number) => {
+    try {
+      const response = await apiFetch(`/documents/${documentId}/review`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'revisado', notes: 'Revisado por administración' }),
+      });
 
-    if (!documentToReview) return;
-
-    // store full ISO so we can format date/time as needed
-    const reviewedAt = new Date().toISOString();
-
-    setPendingDocuments((current) => current.filter((d) => d.id !== documentId));
-    setReviewedDocuments((current) => [
-      {
-        id: documentToReview.id,
-        ciclo: documentToReview.ciclo,
-        plan: documentToReview.plan,
-        tutor: documentToReview.tutor,
-        documento: documentToReview.documento,
-        apartado: documentToReview.apartado,
-        carrera: documentToReview.carrera,
-        reviewedAt,
-        fecha: documentToReview.fecha,
-        returnedAt: documentToReview.returnedAt,
-      },
-      ...current,
-    ]);
-    toast.success("Documento de tutor marcado como revisado");
+      const updated = mapApiDocumentToTutorDocument(response.data);
+      setPendingDocuments((current) => current.filter((d) => d.id !== documentId));
+      setReviewedDocuments((current) => [updated, ...current.filter((d) => d.id !== documentId)]);
+      toast.success('Documento de tutor marcado como revisado');
+    } catch (error: any) {
+      toast.error(error?.message ?? 'No fue posible marcar el documento como revisado');
+    }
   };
 
-  const setDocumentReturnedState = (documentId: number, returned: boolean) => {
-    const returnedAt = returned ? new Date().toISOString() : undefined;
+  const setDocumentReturnedState = async (documentId: number, returned: boolean) => {
+    try {
+      const targetStatus = returned ? 'devuelto' : 'revisado';
+      const response = await apiFetch(`/documents/${documentId}/review`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetStatus, notes: returned ? 'Documento devuelto' : 'Devolución cancelada' }),
+      });
 
-    setPendingDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned, returnedAt } : d)));
-    setReviewedDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned, returnedAt } : d)));
+      const updated = mapApiDocumentToTutorDocument(response.data);
+      setPendingDocuments((current) => current.filter((d) => d.id !== documentId));
+      setReviewedDocuments((current) => [updated, ...current.filter((d) => d.id !== documentId)]);
+      return updated;
+    } catch (error: any) {
+      toast.error(error?.message ?? 'No fue posible actualizar el estado del documento');
+      return null;
+    }
   };
 
-  const handleConfirmReturnAction = () => {
+  const handleConfirmReturnAction = async () => {
     if (!returnConfirmation) return;
 
-    if (returnConfirmation.type === "return") {
-      setDocumentReturnedState(returnConfirmation.document.id, true);
-      toast.success("Documento marcado como devuelto");
-    } else {
-      setDocumentReturnedState(returnConfirmation.document.id, false);
-      toast.success("Devolución cancelada correctamente");
-    }
-
+    const shouldReturn = returnConfirmation.type === 'return';
+    await setDocumentReturnedState(returnConfirmation.document.id, shouldReturn);
     setReturnConfirmation(null);
   };
 
@@ -420,7 +414,11 @@ export default function Tutores() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {filteredAll.map((doc) => {
+                {filteredAll.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/70 bg-background/70 p-8 text-center text-muted-foreground dark:bg-slate-950/40">
+                    {emptyStateLegend}
+                  </div>
+                ) : filteredAll.map((doc) => {
                   const isReviewed = "reviewedAt" in doc;
                   const isReturned = Boolean(doc.returned);
                   return (
@@ -481,7 +479,7 @@ export default function Tutores() {
                           size="sm"
                           label="Ver"
                           title="Ver PDF"
-                          onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}
+                          onClick={(e) => { e.stopPropagation(); void downloadDocument(doc.id); }}
                           icon={<Eye className="h-4 w-4" />}
                         />
 
@@ -491,7 +489,7 @@ export default function Tutores() {
                           size="sm"
                           label="Revisar"
                           title="Revisar documento"
-                          onClick={(e) => { e.stopPropagation(); setReviewConfirmation(doc as TutorPendingDocument); }}
+                          onClick={(e) => { e.stopPropagation(); setReviewConfirmation(doc); }}
                           icon={<Check className="h-4 w-4" />}
                         />
                         )}
@@ -598,7 +596,11 @@ export default function Tutores() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {filteredPending.map((doc) => {
+                {filteredPending.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/70 bg-background/70 p-8 text-center text-muted-foreground dark:bg-slate-950/40">
+                    {emptyStateLegend}
+                  </div>
+                ) : filteredPending.map((doc) => {
                   const isReturned = Boolean(doc.returned);
                   return (
                   <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
@@ -649,7 +651,7 @@ export default function Tutores() {
                       {isReturned && <Badge variant="destructive" className="col-span-2 justify-self-end sm:col-span-1">Devuelto</Badge>}
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); void downloadDocument(doc.id); }} aria-label="Ver PDF">
                             <Eye className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
@@ -767,7 +769,11 @@ export default function Tutores() {
             </CardHeader>
           </Card>
           <div className="space-y-4">
-            {Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => (
+            {Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/70 bg-background/70 p-8 text-center text-muted-foreground dark:bg-slate-950/40">
+                {emptyStateLegend}
+              </div>
+            ) : Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => (
               <Card key={date} className={sectionCardClassName}>
                 <CardHeader>
                   <CardTitle>{formatDateOnlyFromKey(date)}</CardTitle>
@@ -814,7 +820,7 @@ export default function Tutores() {
                         <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
+                              <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); void downloadDocument(doc.id); }} aria-label="Ver PDF">
                                 <Eye className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>
@@ -923,7 +929,7 @@ export default function Tutores() {
               <div className="space-y-3">
                 {reviewedToday.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border/70 bg-background/70 p-8 text-center text-muted-foreground dark:bg-slate-950/40">
-                    No hay documentos revisados hoy.
+                    {emptyStateLegend}
                   </div>
                 ) : (
                   reviewedToday.map((doc) => {
@@ -971,7 +977,7 @@ export default function Tutores() {
                       <div className="relative z-20 flex flex-wrap items-center justify-end gap-2 pointer-events-auto">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
+                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); void downloadDocument(doc.id); }} aria-label="Ver PDF">
                               <Eye className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>

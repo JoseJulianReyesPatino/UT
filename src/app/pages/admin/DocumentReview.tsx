@@ -11,6 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { carrieras } from "../../data/curricula";
+import apiFetch from "../../lib/api";
+import { formatGroupCode } from "../../../lib/utils";
+import { useAuth } from "../../context/AuthContext";
 
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
 
@@ -70,23 +73,25 @@ const apartadoFilterOptions = [
 	{ value: "Acta de Asistencia Grupal", label: "Acta de Asistencia Grupal" },
 ];
 
-const initialPendingDocuments: PendingDocument[] = [
-	{ id: 1, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Mtro. Juan Pérez", documento: "Planeación - Programación Web", apartado: "Planeación", carrera: "Ingeniería en Sistemas", materia: "Programación Web", cuatrimestre: "5", grupo: "A", parcial: "Parcial 1", fecha: "2026-05-17" },
-	{ id: 2, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Dra. Ana Martínez", documento: "Instrumento 30% - Base de Datos", apartado: "Instrumento 30%", carrera: "TSU Desarrollo Software", materia: "Base de Datos", cuatrimestre: "3", grupo: "B", parcial: "Parcial 2", fecha: "2026-05-16" },
-	{ id: 3, ciclo: "Ciclo Escolar 2025", plan: "Plan Normal", docente: "Mtro. Carlos López", documento: "Lista Concentrada - Redes", apartado: "Lista Concentrada", carrera: "Ingeniería en Redes", materia: "Redes de Computadoras", cuatrimestre: "7", grupo: "A", parcial: "Parcial 1", fecha: "2026-05-15" },
-	{ id: 4, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Dra. María González", documento: "Asesoría - Tutoría Grupal", apartado: "Asesoría", carrera: "Ingeniería en Sistemas", materia: "Tutorías BIS", cuatrimestre: "5", grupo: "C", parcial: "Parcial 2", fecha: "2026-05-14", returned: false },
-	{ id: 5, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Dra. María González", documento: "Instrumento 40% - Programación Web", apartado: "Instrumento 40%", carrera: "Ingeniería en Sistemas", materia: "Programación Web", cuatrimestre: "5", grupo: "C", parcial: "Parcial 2", fecha: "2026-05-14", returned: false },
-	{ id: 6, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Mtro. Luis Herrera", documento: "Remedial - Matemáticas", apartado: "Remedial", carrera: "TSU Desarrollo Software", materia: "Matemáticas", cuatrimestre: "3", grupo: "B", parcial: "Parcial 1", fecha: "2026-05-18" },
-];
-
-const initialReviewedDocuments: ReviewedDocument[] = [
-	{ id: 101, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Dra. María González", documento: "Instrumento 60% - Programación Web", apartado: "Instrumento 60%", carrera: "Ingeniería en Sistemas", cuatrimestre: "5", grupo: "C", parcial: "Parcial 2", fecha: "2026-05-17 08:20", returnedAt: "2026-05-17 08:55", resubmittedAt: "2026-05-17 09:05", reviewedAt: "2026-05-17 09:15" },
-	{ id: 102, ciclo: "Ciclo Escolar 2025", plan: "Plan Normal", docente: "Mtro. Roberto Silva", documento: "Planeación - Redes", apartado: "Planeación", carrera: "Ingeniería en Redes", cuatrimestre: "7", grupo: "A", parcial: "Parcial 1", reviewedAt: "2026-05-17 10:05" },
-	{ id: 103, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Dra. Ana Martínez", documento: "Lista Concentrada - Base de Datos", apartado: "Lista Concentrada", carrera: "TSU Desarrollo Software", cuatrimestre: "3", grupo: "B", parcial: "Parcial 1", reviewedAt: "2026-05-16 16:40" },
-	{ id: 104, ciclo: "Ciclo Escolar 2026", plan: "Plan Normal", docente: "Mtro. Carlos López", documento: "Instrumento 70% - Redes", apartado: "Instrumento 70%", carrera: "Ingeniería en Redes", cuatrimestre: "8", grupo: "A", parcial: "Parcial 3", reviewedAt: "2026-05-15 11:25" },
-	{ id: 105, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Dra. Laura Gómez", documento: "Ficha Técnica - Tutorías", apartado: "Tutorías", carrera: "TSU Infraestructura", cuatrimestre: "3", grupo: "D", parcial: "Final", reviewedAt: "2026-05-15 13:10", returned: false },
-	{ id: 106, ciclo: "Ciclo Escolar 2026", plan: "Plan Nuevo Modelo", docente: "Mtra. Gabriela Ramos", documento: "Remedial - Física", apartado: "Remedial", carrera: "Ingeniería en Sistemas", cuatrimestre: "6", grupo: "A", parcial: "Parcial 1", reviewedAt: "2026-05-14 14:30" },
-];
+type ApiDocument = {
+	id: number;
+	title?: string | null;
+	form_title?: string | null;
+	apartado_label?: string | null;
+	carrera_label?: string | null;
+	uploaded_by_name?: string | null;
+	materia?: string | null;
+	parcial?: string | null;
+	group_code?: string | null;
+	group?: { group_code?: string | null } | null;
+	plan?: string | null;
+	status?: string | null;
+	submitted_at?: string | null;
+	reviewed_at?: string | null;
+	returned_at?: string | null;
+	resubmitted_at?: string | null;
+	fileUrl?: string | null;
+};
 
 const getCareerFilterOptions = (plan: string): CareerFilterOption[] => {
 	const nuevoModelo = [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria].map((career) => ({ value: career.nombre, label: career.nombre }));
@@ -135,9 +140,17 @@ const formatDateTimeFromIso = (value?: string) => {
 	}
 };
 
+const getPreviewUrl = (documentId: number) => {
+	const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api").replace(/\/api\/?$/, "");
+	return `${baseUrl}/api/documents/${documentId}/file`;
+};
+
 export default function DocumentReview({ initialSection = "all", initialForm }: DocumentReviewProps) {
-	const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>(initialPendingDocuments);
-	const [reviewedDocuments, setReviewedDocuments] = useState<ReviewedDocument[]>(initialReviewedDocuments);
+	const { isReady, isAuthenticated } = useAuth();
+	const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
+	const [reviewedDocuments, setReviewedDocuments] = useState<ReviewedDocument[]>([]);
+	const [isLoading, setIsLoading] = useState(true);
+	const [loadError, setLoadError] = useState<string | null>(null);
 	const [filterCiclo, setFilterCiclo] = useState("all");
 	const [filterPlan, setFilterPlan] = useState("all");
 	const [filterCarrera, setFilterCarrera] = useState("all");
@@ -152,6 +165,55 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 
 	const allDocuments = [...pendingDocuments, ...reviewedDocuments];
 	const todayKey = new Date().toISOString().slice(0, 10);
+
+	useEffect(() => {
+		if (!isReady) return;
+		if (!isAuthenticated) {
+			setPendingDocuments([]);
+			setReviewedDocuments([]);
+			setLoadError("Inicia sesión para cargar los documentos.");
+			setIsLoading(false);
+			return;
+		}
+
+		let isMounted = true;
+
+		const loadDocuments = async () => {
+			setIsLoading(true);
+			setLoadError(null);
+
+			try {
+				const [pendingResponse, reviewedResponse, returnedResponse] = await Promise.all([
+					apiFetch("/documents", { query: { status: "pendiente" } }),
+					apiFetch("/documents", { query: { status: "revisado" } }),
+					apiFetch("/documents", { query: { status: "devuelto" } }),
+				]);
+
+				const pendingItems = ((pendingResponse?.data?.data ?? []) as ApiDocument[]).map((doc) => mapApiDocument(doc, "pending"));
+				const reviewedItems = [
+					...((reviewedResponse?.data?.data ?? []) as ApiDocument[]).map((doc) => mapApiDocument(doc, "reviewed")),
+					...((returnedResponse?.data?.data ?? []) as ApiDocument[]).map((doc) => mapApiDocument(doc, "reviewed")),
+				];
+
+				if (!isMounted) return;
+
+				setPendingDocuments(pendingItems);
+				setReviewedDocuments(reviewedItems);
+			} catch {
+				if (!isMounted) return;
+				setLoadError("No fue posible cargar los documentos desde el backend");
+				setPendingDocuments([]);
+				setReviewedDocuments([]);
+			} finally {
+				if (isMounted) setIsLoading(false);
+			}
+		};
+
+		void loadDocuments();
+		return () => {
+			isMounted = false;
+		};
+	}, [isAuthenticated, isReady]);
 
 	const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5";
 	const filterSelectTriggerClassName = "w-full text-[13px] leading-tight sm:text-sm";
@@ -200,26 +262,43 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		}, {});
 	}, [filteredReviewedDocuments]);
 
-	const handleReviewDocument = (documentId: number) => {
-		const documentToReview = pendingDocuments.find((doc) => doc.id === documentId);
-		if (!documentToReview) return;
+	const handleReviewDocument = async (documentId: number) => {
+		try {
+			await apiFetch(`/documents/${documentId}/review`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ status: "revisado" }),
+			});
 
-		const reviewedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
-		const resubmittedAt = documentToReview.resubmittedAt ?? (documentToReview.returned ? reviewedAt : undefined);
+			setPendingDocuments((currentDocuments) => currentDocuments.filter((doc) => doc.id !== documentId));
+			setReviewedDocuments((currentDocuments) => {
+				const reviewedDoc = pendingDocuments.find((doc) => doc.id === documentId);
+				if (!reviewedDoc) return currentDocuments;
 
-		setPendingDocuments((currentDocuments) => currentDocuments.filter((doc) => doc.id !== documentId));
-		setReviewedDocuments((currentDocuments) => [
-			{ ...documentToReview, reviewedAt, fecha: documentToReview.fecha, returnedAt: documentToReview.returnedAt, resubmittedAt },
-			...currentDocuments,
-		]);
-		toast.success("Documento marcado como revisado");
+				return [
+					{
+						...reviewedDoc,
+						reviewedAt: new Date().toISOString(),
+						returned: false,
+					},
+					...currentDocuments,
+				];
+			});
+			toast.success("Documento marcado como revisado");
+		} catch {
+			toast.error("No se pudo marcar el documento como revisado");
+		}
 	};
 
-	const handleReturnDocument = (documentId: number) => {
-		const returnedAt = new Date().toISOString();
-		setPendingDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt, resubmittedAt: undefined } : doc)));
-		setReviewedDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt, resubmittedAt: undefined } : doc)));
-		toast.success("Documento marcado como devuelto");
+	const handleReturnDocument = async (documentId: number) => {
+		try {
+			await apiFetch(`/documents/${documentId}/return`, { method: "PATCH" });
+			setPendingDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt: new Date().toISOString(), resubmittedAt: undefined } : doc)));
+			setReviewedDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt: new Date().toISOString(), resubmittedAt: undefined } : doc)));
+			toast.success("Documento marcado como devuelto");
+		} catch {
+			toast.error("No se pudo devolver el documento");
+		}
 	};
 
 	const handleShareToMessages = (doc: DocumentItem) => {
@@ -232,7 +311,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		setPendingAction(null);
 
 		if (type === "review") {
-			handleReviewDocument(document.id);
+			void handleReviewDocument(document.id);
 			return;
 		}
 
@@ -242,7 +321,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			return;
 		}
 
-		handleReturnDocument(document.id);
+		void handleReturnDocument(document.id);
 	};
 
 	const getStatusVariant = (doc: DocumentItem) => {
@@ -264,6 +343,18 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		return `Vas a devolver: ${pendingAction.document.documento}`;
 	})();
 
+	const renderListState = (content: React.ReactNode) => {
+		if (isLoading) {
+			return <p className="text-sm text-muted-foreground">Cargando documentos reales del backend...</p>;
+		}
+
+		if (loadError) {
+			return <p className="text-sm text-destructive">{loadError}</p>;
+		}
+
+		return content;
+	};
+
 	const renderFilters = () => (
 		<div className={filtersGridClassName}>
 			<Select value={filterCiclo} onValueChange={setFilterCiclo}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los ciclos</SelectItem>{ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}</SelectContent></Select>
@@ -276,6 +367,35 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			<Select value={filterApartado} onValueChange={setFilterApartado}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Apartado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los apartados</SelectItem>{apartadoFilterOptions.map((apartado) => <SelectItem key={apartado.value} value={apartado.value}>{apartado.label}</SelectItem>)}</SelectContent></Select>
 		</div>
 	);
+
+	const mapApiDocument = (doc: ApiDocument, kind: "pending" | "reviewed"): PendingDocument | ReviewedDocument => {
+		const base = {
+			id: Number(doc.id),
+			ciclo: "Ciclo Escolar 2026",
+			plan: doc.plan ?? "Plan Nuevo Modelo",
+			docente: doc.uploaded_by_name ?? "Docente",
+			documento: doc.title ?? "Documento sin título",
+			apartado: doc.apartado_label ?? doc.form_title ?? "Documento",
+			carrera: doc.carrera_label ?? "Sin carrera",
+			materia: doc.materia ?? "Sin materia",
+			cuatrimestre: "-",
+			grupo: formatGroupCode(doc.group?.group_code ?? doc.group_code ?? "-"),
+			parcial: doc.parcial ?? "-",
+			fecha: doc.submitted_at ?? "",
+			returned: doc.status === "devuelto",
+			returnedAt: doc.returned_at ?? undefined,
+			resubmittedAt: doc.resubmitted_at ?? undefined,
+		};
+
+		if (kind === "reviewed") {
+			return {
+				...base,
+				reviewedAt: doc.reviewed_at ?? doc.submitted_at ?? new Date().toISOString(),
+			};
+		}
+
+		return base;
+	};
 
 	const renderDocumentRow = (doc: DocumentItem) => {
 		const isReviewed = "reviewedAt" in doc;
@@ -343,14 +463,16 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					<TabsContent value="all" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
 							<CardHeader>{renderFilters()}</CardHeader>
-							<CardContent><div className="space-y-3">{filteredAllDocuments.length === 0 ? <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">No hay documentos en esta sección.</div> : filteredAllDocuments.map(renderDocumentRow)}</div></CardContent>
+							<CardContent>
+								{renderListState(<div className="space-y-3">{filteredAllDocuments.length === 0 ? <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">No hay documentos en esta sección.</div> : filteredAllDocuments.map(renderDocumentRow)}</div>)}
+							</CardContent>
 						</Card>
 					</TabsContent>
 
 					<TabsContent value="pendientes" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
 							<CardHeader>{renderFilters()}</CardHeader>
-							<CardContent><div className="space-y-3">{filteredPendingDocuments.length === 0 ? <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">No hay documentos pendientes.</div> : filteredPendingDocuments.map(renderDocumentRow)}</div></CardContent>
+							<CardContent>{renderListState(<div className="space-y-3">{filteredPendingDocuments.length === 0 ? <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">No hay documentos pendientes.</div> : filteredPendingDocuments.map(renderDocumentRow)}</div>)}</CardContent>
 						</Card>
 					</TabsContent>
 
@@ -362,7 +484,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 							{Object.entries(reviewedByDate).map(([date, docs]) => (
 								<Card key={date} className={sectionCardClassName}>
 									<CardHeader><CardTitle>{formatDateOnlyFromKey(date)}</CardTitle><CardDescription>{docs.length} documentos revisados</CardDescription></CardHeader>
-									<CardContent><div className="space-y-3">{docs.map(renderDocumentRow)}</div></CardContent>
+									<CardContent>{renderListState(<div className="space-y-3">{docs.map(renderDocumentRow)}</div>)}</CardContent>
 								</Card>
 							))}
 						</div>
@@ -375,7 +497,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 								<CardDescription>Documentos abiertos por administración en el día</CardDescription>
 								{renderFilters()}
 							</CardHeader>
-							<CardContent><div className="space-y-3">{reviewedTodayDocuments.length === 0 ? <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">No hay documentos revisados hoy.</div> : reviewedTodayDocuments.map(renderDocumentRow)}</div></CardContent>
+							<CardContent>{renderListState(<div className="space-y-3">{reviewedTodayDocuments.length === 0 ? <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">No hay documentos revisados hoy.</div> : reviewedTodayDocuments.map(renderDocumentRow)}</div>)}</CardContent>
 						</Card>
 					</TabsContent>
 				</Tabs>
@@ -383,18 +505,13 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 
 			<Dialog open={previewDocument !== null} onOpenChange={(open) => { if (!open) setPreviewDocument(null); }}>
 				<DialogContent className="max-w-[95vw] w-[95vw] max-h-[92vh] overflow-y-auto">
-					<DialogHeader><DialogTitle>Vista previa del documento</DialogTitle><DialogDescription>Simulación de lectura del archivo PDF del documento seleccionado.</DialogDescription></DialogHeader>
+					<DialogHeader><DialogTitle>Vista previa del documento</DialogTitle><DialogDescription>Visualiza el PDF real asociado al documento seleccionado.</DialogDescription></DialogHeader>
 					{previewDocument && (
 						<div className="space-y-4">
 							<div className="flex flex-wrap gap-2"><Badge variant="outline">{previewDocument.ciclo}</Badge><Badge variant="outline">{previewDocument.plan}</Badge><Badge variant="outline">{previewDocument.apartado}</Badge></div>
 							<div className="rounded-lg border border-border bg-muted/30 p-4 md:p-6">
-								<div className="mx-auto flex min-h-[70vh] w-full max-w-[1100px] flex-col justify-between rounded-lg border border-border bg-background p-6 md:p-10 shadow-sm">
-									<div className="space-y-4">
-										<div><p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Documento PDF</p><h3 className="mt-2 text-2xl font-semibold md:text-3xl">{previewDocument.documento}</h3><p className="text-base text-muted-foreground">{previewDocument.docente}</p></div>
-										<div className="grid gap-3 text-sm md:grid-cols-2 md:gap-4"><p><span className="font-medium">Carrera:</span> {previewDocument.carrera}</p><p><span className="font-medium">Materia:</span> {"materia" in previewDocument ? previewDocument.materia : "N/D"}</p><p><span className="font-medium">Cuatrimestre:</span> {"cuatrimestre" in previewDocument ? previewDocument.cuatrimestre : "N/D"}</p><p><span className="font-medium">Grupo:</span> {"grupo" in previewDocument ? previewDocument.grupo : "N/D"}</p></div>
-									</div>
-									<div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">Esta es una vista previa simulada del PDF asociado al documento.</div>
-								</div>
+								<iframe src={getPreviewUrl(previewDocument.id)} className="h-[70vh] w-full rounded-lg border border-border" title={previewDocument.documento} />
+								<div className="mt-4 rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">Vista previa directa del documento desde la API de archivos.</div>
 							</div>
 						</div>
 					)}

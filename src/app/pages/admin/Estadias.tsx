@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -8,6 +8,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/too
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import apiFetch from "../../lib/api";
+import { getDocumentFileUrl } from "../../lib/documents";
+import { formatGroupCode } from "../../../lib/utils";
+import { useAuth } from "../../context/AuthContext";
 
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
 
@@ -45,78 +49,36 @@ type EstadiaReviewedDocument = {
 
 type EstadiaDocumentItem = EstadiaPendingDocument | EstadiaReviewedDocument;
 
-const initialPending: EstadiaPendingDocument[] = [
-  {
-    id: 1,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Nuevo Modelo",
-    cuatrimestre: "10",
-    docente: "Mtro. Juan Pérez",
-    documento: "Carta de presentación - Estadías Grupo A",
-    apartado: "Carta de Presentación",
-    carrera: "Ingeniería en Logística Internacional (ILI)",
-    grupo: "ILI-9",
-    fecha: "2026-05-17",
-  },
-  {
-    id: 2,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Nuevo Modelo",
-    cuatrimestre: "6",
-    docente: "Dra. Ana Martínez",
-    documento: "Carta de aceptación - Estadías Grupo B",
-    apartado: "Carta de Aceptación",
-    carrera: "TSU en Desarrollo de Software Multiplataforma (DSM)",
-    grupo: "DSM-5",
-    fecha: "2026-05-16",
-  },
-  {
-    id: 3,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Normal",
-    cuatrimestre: "11",
-    docente: "Mtro. Carlos López",
-    documento: "Carta de terminación - Estadías Grupo C",
-    apartado: "Carta de Terminación",
-    carrera: "Ing. en Desarrollo y Gestión de Software PN (IDGS)",
-    grupo: "IDGS-10",
-    fecha: "2026-05-15",
-  },
-  {
-    id: 4,
-    ciclo: "Ciclo Escolar 2025",
-    plan: "Plan Nuevo Modelo",
-    cuatrimestre: "6",
-    docente: "Dra. María González",
-    documento: "Acta final - Estadías Grupo D",
-    apartado: "Acta Final",
-    carrera: "TSU en Mecatrónica (IM)",
-    grupo: "IM-5",
-    fecha: "2026-05-14",
-  },
-];
-
-const initialReviewed: EstadiaReviewedDocument[] = [
-  {
-    id: 101,
-    ciclo: "Ciclo Escolar 2026",
-    plan: "Plan Nuevo Modelo",
-    cuatrimestre: "10",
-    docente: "Mtro. Roberto Silva",
-    documento: "Carta de presentación - Estadías",
-    apartado: "Carta de Presentación",
-    carrera: "TSU en Automatización (AUT)",
-    fecha: "2026-05-17 08:20",
-    returnedAt: "2026-05-17 08:55",
-    resubmittedAt: "2026-05-17 09:05",
-    reviewedAt: "2026-05-17 09:15",
-    returned: false,
-  },
-];
+type ApiDocument = {
+  id: number;
+  nombre?: string;
+  title?: string | null;
+  tipo?: string | null;
+  tipoLabel?: string | null;
+  form_title?: string | null;
+  apartado_label?: string | null;
+  carrera_label?: string | null;
+  uploaded_by_name?: string | null;
+  materia?: string | null;
+  parcial?: string | null;
+  grupo?: string | null;
+  group?: { group_code?: string | null } | null;
+  group_code?: string | null;
+  plan?: string | null;
+  status?: string | null;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+  returned_at?: string | null;
+  resubmitted_at?: string | null;
+  fileUrl?: string | null;
+};
 
 export default function Estadias() {
-  const [pendingDocuments, setPendingDocuments] = useState<EstadiaPendingDocument[]>(initialPending);
-  const [reviewedDocuments, setReviewedDocuments] = useState<EstadiaReviewedDocument[]>(initialReviewed);
+  const { isReady, isAuthenticated } = useAuth();
+  const [pendingDocuments, setPendingDocuments] = useState<EstadiaPendingDocument[]>([]);
+  const [reviewedDocuments, setReviewedDocuments] = useState<EstadiaReviewedDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filterCiclo, setFilterCiclo] = useState("all");
   const [filterPlan, setFilterPlan] = useState("all");
   const [filterCarrera, setFilterCarrera] = useState("all");
@@ -185,6 +147,42 @@ export default function Estadias() {
     }
   };
 
+  const isEstadiasDocument = (doc: ApiDocument) => {
+    const tipo = (doc.tipo ?? doc.tipoLabel ?? doc.form_title ?? "").toLowerCase();
+    const label = (doc.tipoLabel ?? doc.apartado_label ?? doc.form_title ?? "").toLowerCase();
+    return ["estadias", "carta-presentacion", "carta-aceptacion", "carta-terminacion", "acta-final"].some((value) => tipo.includes(value) || label.includes(value))
+      || /estad[ií]a|carta de/i.test(label);
+  };
+
+  const mapApiDocument = (doc: ApiDocument, kind: "pending" | "reviewed"): EstadiaPendingDocument | EstadiaReviewedDocument => {
+    const base = {
+      id: Number(doc.id),
+      ciclo: "Ciclo Escolar 2026",
+      plan: doc.plan ?? "Plan Nuevo Modelo",
+      cuatrimestre: doc.parcial ?? "-",
+      docente: doc.uploaded_by_name ?? "Docente",
+      documento: doc.title ?? doc.nombre ?? "Documento sin título",
+      apartado: doc.apartado_label ?? doc.tipoLabel ?? doc.form_title ?? "Documento",
+      carrera: doc.carrera_label ?? "Sin carrera",
+      grupo: formatGroupCode(doc.group?.group_code ?? doc.group_code ?? "-"),
+      fecha: doc.submitted_at ?? "",
+      returned: doc.status === "devuelto",
+      returnedAt: doc.returned_at ?? undefined,
+      resubmittedAt: doc.resubmitted_at ?? undefined,
+    };
+
+    if (kind === "reviewed") {
+      return {
+        ...base,
+        reviewedAt: doc.reviewed_at ?? doc.submitted_at ?? new Date().toISOString(),
+      };
+    }
+
+    return base;
+  };
+
+  const emptyStateLegend = "Aún no hay documentos de estadías para mostrar en esta sección. Cuando un docente suba uno, aparecerá aquí automáticamente.";
+
   const previewChipClassName =
     "h-8 rounded-full border-border bg-background/90 px-3 text-xs font-medium text-foreground hover:bg-emerald-50 hover:text-emerald-900 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-200";
 
@@ -227,6 +225,59 @@ export default function Estadias() {
   const filteredAll = allDocuments.filter(matchesFilters);
   const reviewedToday = filteredReviewed.filter((doc) => doc.reviewedAt.startsWith(todayKey));
 
+  useEffect(() => {
+    if (!isReady) return;
+    if (!isAuthenticated) {
+      setPendingDocuments([]);
+      setReviewedDocuments([]);
+      setLoadError("Inicia sesión para cargar los documentos de estadías.");
+      setIsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadDocuments = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const [pendingResponse, reviewedResponse, returnedResponse] = await Promise.all([
+          apiFetch("/documents", { query: { status: "pendiente" } }),
+          apiFetch("/documents", { query: { status: "revisado" } }),
+          apiFetch("/documents", { query: { status: "devuelto" } }),
+        ]);
+
+        const pendingItems = ((pendingResponse?.data?.data ?? []) as ApiDocument[])
+          .filter(isEstadiasDocument)
+          .map((doc) => mapApiDocument(doc, "pending"));
+
+        const reviewedItems = [
+          ...((reviewedResponse?.data?.data ?? []) as ApiDocument[]).filter(isEstadiasDocument).map((doc) => mapApiDocument(doc, "reviewed")),
+          ...((returnedResponse?.data?.data ?? []) as ApiDocument[]).filter(isEstadiasDocument).map((doc) => mapApiDocument(doc, "reviewed")),
+        ];
+
+        if (!isMounted) return;
+
+        setPendingDocuments(pendingItems);
+        setReviewedDocuments(reviewedItems);
+      } catch {
+        if (!isMounted) return;
+        setLoadError("No fue posible cargar los documentos de estadías desde el backend");
+        setPendingDocuments([]);
+        setReviewedDocuments([]);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    void loadDocuments();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, isReady]);
+
   const reviewedByDate = useMemo(() => {
     return filteredReviewed.reduce<Record<string, EstadiaReviewedDocument[]>>((groups, doc) => {
       const date = doc.reviewedAt ? doc.reviewedAt.slice(0, 10) : "";
@@ -256,39 +307,43 @@ export default function Estadias() {
     }
   }, [filterCuatrimestre, cuatrimestresDisponibles]);
 
-  const handleReviewDocument = (documentId: number) => {
-    const documentToReview = pendingDocuments.find((doc) => doc.id === documentId);
-    if (!documentToReview) return;
+  const handleReviewDocument = async (documentId: number) => {
+    try {
+      await apiFetch(`/documents/${documentId}/review`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "revisado" }),
+      });
 
-    // Use YYYY-MM-DD HH:MM to match reviewedToday prefix checks
-    const reviewedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+      setPendingDocuments((current) => current.filter((doc) => doc.id !== documentId));
+      setReviewedDocuments((current) => {
+        const reviewedDoc = pendingDocuments.find((doc) => doc.id === documentId);
+        if (!reviewedDoc) return current;
 
-    setPendingDocuments((current) => current.filter((doc) => doc.id !== documentId));
-    setReviewedDocuments((current) => [
-      {
-        id: documentToReview.id,
-        ciclo: documentToReview.ciclo,
-        plan: documentToReview.plan,
-        cuatrimestre: documentToReview.cuatrimestre,
-        docente: documentToReview.docente,
-        documento: documentToReview.documento,
-        apartado: documentToReview.apartado,
-        carrera: documentToReview.carrera,
-        reviewedAt,
-        fecha: documentToReview.fecha,
-        returnedAt: documentToReview.returnedAt,
-        resubmittedAt: documentToReview.resubmittedAt,
-      },
-      ...current,
-    ]);
-    toast.success("Documento de estadías marcado como revisado");
+        return [
+          {
+            ...reviewedDoc,
+            reviewedAt: new Date().toISOString(),
+            returned: false,
+          },
+          ...current,
+        ];
+      });
+      toast.success("Documento de estadías marcado como revisado");
+    } catch {
+      toast.error("No se pudo marcar el documento como revisado");
+    }
   };
 
-  const handleReturnDocument = (documentId: number) => {
-    const returnedAt = new Date().toISOString();
-    setPendingDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt, resubmittedAt: undefined } : doc)));
-    setReviewedDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt, resubmittedAt: undefined } : doc)));
-    toast.success("Documento marcado como devuelto");
+  const handleReturnDocument = async (documentId: number) => {
+    try {
+      await apiFetch(`/documents/${documentId}/return`, { method: "PATCH" });
+      const returnedAt = new Date().toISOString();
+      setPendingDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt, resubmittedAt: undefined } : doc)));
+      setReviewedDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt, resubmittedAt: undefined } : doc)));
+      toast.success("Documento marcado como devuelto");
+    } catch {
+      toast.error("No se pudo devolver el documento");
+    }
   };
 
   const setDocumentReturnedState = (documentId: number, returned: boolean) => {
@@ -327,8 +382,7 @@ export default function Estadias() {
   const handleConfirmReturnAction = () => {
     if (!returnConfirmation) return;
     if (returnConfirmation.type === "return") {
-      setDocumentReturnedState(returnConfirmation.document.id, true);
-      toast.success("Documento marcado como devuelto");
+      void handleReturnDocument(returnConfirmation.document.id);
     } else {
       setDocumentReturnedState(returnConfirmation.document.id, false);
       toast.success("Devolución cancelada correctamente");
@@ -429,7 +483,11 @@ export default function Estadias() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {filteredAll.map((doc) => {
+                {isLoading && <p className="text-sm text-muted-foreground">Cargando documentos reales del backend...</p>}
+                {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
+                {!isLoading && !loadError && filteredAll.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">{emptyStateLegend}</div>
+                ) : !isLoading && !loadError && filteredAll.map((doc) => {
                   const isReviewed = "reviewedAt" in doc;
                   const isReturned = Boolean(doc.returned);
 
@@ -548,7 +606,11 @@ export default function Estadias() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {filteredPending.map((doc) => (
+                {isLoading && <p className="text-sm text-muted-foreground">Cargando documentos reales del backend...</p>}
+                {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
+                {!isLoading && !loadError && filteredPending.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">{emptyStateLegend}</div>
+                ) : !isLoading && !loadError && filteredPending.map((doc) => (
                   <div key={doc.id} className="cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                     <div className="flex items-start gap-3 flex-1">
                       <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -851,7 +913,7 @@ export default function Estadias() {
               <div className="space-y-3">
                     {reviewedToday.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
-                    No hay documentos revisados hoy.
+                    {emptyStateLegend}
                   </div>
                 ) : (
                   reviewedToday.map((doc) => {
@@ -931,23 +993,13 @@ export default function Estadias() {
                 <Badge variant="outline">{previewDocument.apartado}</Badge>
               </div>
               <div className="rounded-lg border border-border bg-muted/30 p-4 md:p-6">
-                <div className="mx-auto flex min-h-[70vh] w-full max-w-[1100px] flex-col justify-between rounded-lg border border-border bg-background p-6 md:p-10 shadow-sm">
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Documento PDF</p>
-                      <h3 className="mt-2 text-2xl font-semibold md:text-3xl">{previewDocument.documento}</h3>
-                      <p className="text-base text-muted-foreground">{previewDocument.docente}</p>
-                    </div>
-                    <div className="grid gap-3 text-sm md:grid-cols-2 md:gap-4">
-                      <p><span className="font-medium">Carrera:</span> {previewDocument.carrera}</p>
-                      <p><span className="font-medium">Grupo:</span> {"grupo" in previewDocument ? previewDocument.grupo : "N/D"}</p>
-                      <p><span className="font-medium">Plan:</span> {previewDocument.plan}</p>
-                      <p><span className="font-medium">Apartado:</span> {previewDocument.apartado}</p>
-                    </div>
-                  </div>
-                  <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                    Esta es una vista previa simulada del PDF asociado al documento.
-                  </div>
+                <iframe
+                  src={getDocumentFileUrl(previewDocument.id)}
+                  className="h-[70vh] w-full rounded-lg border border-border bg-background"
+                  title={previewDocument.documento}
+                />
+                <div className="mt-4 rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  Vista previa directa del PDF desde la API de archivos.
                 </div>
               </div>
             </div>

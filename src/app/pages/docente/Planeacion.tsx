@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
@@ -11,6 +11,10 @@ import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuatrimestre } from "../../data/curricula";
 import { getCalendarFileUrl } from "../../lib/calendar";
+import { useAuth } from "../../context/AuthContext";
+import { apiFetch } from "../../lib/api";
+import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { formatGroupCode } from "../../../lib/utils";
 
 interface PlaneacionFormData {
   plan: Plan | "";
@@ -37,9 +41,12 @@ const initialFormData: PlaneacionFormData = {
 };
 
 export default function PlaneacionPage() {
+  const { user, refreshUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<PlaneacionFormData>(initialFormData);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [groupsOptions, setGroupsOptions] = useState<Array<{ id: number; group_code: string; group_number: number}>>([]);
+  const [history, setHistory] = useState<any[]>([]);
   const calendarioUrl = getCalendarFileUrl();
 
   // Obtener carreras disponibles según el plan
@@ -54,6 +61,52 @@ export default function PlaneacionPage() {
       return carrieras["plan-normal"].ingenieria.map(c => ({ codigo: c.codigo, nombre: c.nombre, tipo: "Plan Normal" }));
     }
   }, [formData.plan]);
+
+  useEffect(() => {
+    // load groups when carrera and cuatrimestre are selected
+    const career = formData.carrera;
+    const cuatri = formData.cuatrimestre;
+    if (!career || !cuatri) {
+      setGroupsOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await apiFetch('/groups', { query: { career_code: career, cuatrimestre: cuatri } });
+        if (cancelled) return;
+        const data = Array.isArray(res?.data) ? res.data : [];
+        setGroupsOptions(data.map((g: any) => ({ id: Number(g.id), group_code: g.group_code, group_number: Number(g.group_number) })));
+      } catch (err) {
+        console.error('Could not load groups', err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [formData.carrera, formData.cuatrimestre]);
+
+  // reset grupo when carrera or cuatrimestre changes
+  useEffect(() => {
+    setFormData((c) => ({ ...c, grupo: '' }));
+  }, [formData.carrera, formData.cuatrimestre]);
+
+  useEffect(() => {
+    // load historical documents for this user and this form (planeacion -> form_id = 1)
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (!user) return;
+        const res = await apiFetch('/documents', { query: { uploaded_by: user.id, form_id: 1, per_page: 50 } });
+        if (cancelled) return;
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      } catch (err) {
+        console.error('Could not load history', err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user]);
 
   // Obtener cuatrimestres disponibles según carrera
   const cuatrimestresDisponibles = useMemo(() => {
@@ -78,7 +131,9 @@ export default function PlaneacionPage() {
   }, [formData.carrera, formData.cuatrimestre, formData.plan]);
 
   const isValid = useMemo(() => {
-    const validarGrupo = /^[A-Z]{2,4}-\d{2}$/i.test(formData.grupo);
+    const validarGrupoPattern = /^[A-Z]{2,4}-\d{2}$/i.test(formData.grupo);
+    // if groupsOptions loaded, allow numeric id selection as valid
+    const validarGrupo = groupsOptions.length > 0 ? formData.grupo !== '' : validarGrupoPattern;
     return (
       formData.plan &&
       formData.carrera &&
@@ -86,10 +141,10 @@ export default function PlaneacionPage() {
       formData.materia &&
       validarGrupo &&
       formData.archivos.length > 0 &&
-      formData.docente.trim() &&
+      !!user &&
       formData.autorizacion
     );
-  }, [formData]);
+  }, [formData, user]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -147,14 +202,50 @@ export default function PlaneacionPage() {
       toast.error("Completa todos los campos obligatorios");
       return;
     }
-
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    toast.success("Planeacion enviada correctamente", {
-      description: "Tu documento fue enviado para revision administrativa.",
-    });
-    setIsSubmitting(false);
-    resetForm();
+    try {
+      if (formData.archivos.length === 0) {
+        throw new Error('No hay archivos para subir');
+      }
+
+      // find carrera label
+      const carreraEntry = carrerasDisponibles.find((c) => c.codigo === formData.carrera);
+      const carreraLabel = carreraEntry ? carreraEntry.nombre : formData.carrera;
+
+      for (const file of formData.archivos) {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('form_id', '1');
+        fd.append('title', `${formData.materia} - Planeación`);
+        fd.append('apartado_label', 'Planeacion');
+        if (formData.plan) fd.append('plan', formData.plan);
+        fd.append('carrera_label', carreraLabel);
+        if (formData.materia) fd.append('materia', formData.materia);
+        if (formData.cuatrimestre) fd.append('parcial', String(formData.cuatrimestre));
+        if (formData.grupo) {
+          // if grupo is selected from groupsOptions, we expect group_code or numeric id; try to resolve id
+          const sel = groupsOptions.find((g) => formatGroupCode(g.group_code) === formData.grupo || String(g.id) === formData.grupo);
+          if (sel) fd.append('group_id', String(sel.id));
+          else fd.append('group_id', formData.grupo);
+        }
+
+        await apiFetch('/documents', { method: 'POST', body: fd });
+      }
+
+      toast.success('Planeacion enviada correctamente', {
+        description: 'Tu documento fue enviado para revision administrativa.',
+      });
+      resetForm();
+      // refresh history
+      if (user) {
+        const res = await apiFetch('/documents', { query: { uploaded_by: user.id, form_id: 1, per_page: 50 } });
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? 'No fue posible subir la planeación');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -176,15 +267,48 @@ export default function PlaneacionPage() {
             <SheetHeader>
               <SheetTitle>Historial de archivos</SheetTitle>
             </SheetHeader>
-            <div className="mt-4">
-              {formData.archivos.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión.</p>
+            <div className="mt-4 space-y-4">
+              {history && history.length > 0 ? (
+                <div>
+                  <p className="text-sm font-medium mb-2">Archivos subidos</p>
+                  <ul className="space-y-2">
+                    {history.map((h) => (
+                      <li key={h.id} className="text-sm flex items-center justify-between">
+                        <span>{h.title ?? h.file_path}</span>
+                        <div className="flex items-center gap-2">
+                          <button className="text-sm underline" onClick={async () => {
+                            try {
+                              const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+                              const url = `${API_BASE_URL.replace(/\/+$/, '')}/documents/${h.id}/file`;
+                              const headers: Record<string,string> = {};
+                              if (token) headers['Authorization'] = `Bearer ${token}`;
+                              const res = await fetch(url, { method: 'GET', headers });
+                              if (!res.ok) throw new Error(res.statusText);
+                              const blob = await res.blob();
+                              const blobUrl = URL.createObjectURL(blob);
+                              window.open(blobUrl, '_blank');
+                              setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+                            } catch (e) {
+                              toast.error('No fue posible descargar el archivo');
+                            }
+                          }}>Descargar</button>
+                          <span className="text-xs text-muted-foreground">{new Date(h.submitted_at).toLocaleString()}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : formData.archivos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión ni en el historial.</p>
               ) : (
-                <ul className="space-y-2">
-                  {formData.archivos.map((f, i) => (
-                    <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
-                  ))}
-                </ul>
+                <div>
+                  <p className="text-sm font-medium mb-2">Archivos en esta sesión</p>
+                  <ul className="space-y-2">
+                    {formData.archivos.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           </SheetContent>
@@ -291,13 +415,26 @@ export default function PlaneacionPage() {
             {/* Grupo */}
             <div className="space-y-2 sm:col-span-1">
               <Label>Grupo *</Label>
-              <Input
-                value={formData.grupo}
-                onChange={(e) => setFormData((current) => ({ ...current, grupo: e.target.value.toUpperCase() }))}
-                placeholder="Ej. JTH-01"
-                maxLength={7}
-              />
-              <p className="text-xs text-muted-foreground">Formato: Ej. JTH-01</p>
+              {groupsOptions.length > 0 ? (
+                <Select value={formData.grupo} onValueChange={(v) => setFormData((c) => ({ ...c, grupo: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona el grupo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groupsOptions.map((g) => (
+                      <SelectItem key={g.id} value={String(g.id)}>{formatGroupCode(g.group_code)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={formData.grupo}
+                  onChange={(e) => setFormData((current) => ({ ...current, grupo: e.target.value.toUpperCase() }))}
+                  placeholder="Ej. JTH-01"
+                  maxLength={7}
+                />
+              )}
+              <p className="text-xs text-muted-foreground">Formato: Ej. JTH-01 o selección automática</p>
             </div>
           </div>
 
@@ -342,14 +479,12 @@ export default function PlaneacionPage() {
             )}
           </div>
 
-          {/* Nombre del docente */}
+          {/* Nombre del docente (desde cuenta autenticada) */}
           <div className="space-y-2">
-            <Label>Nombre del docente *</Label>
-            <Input
-              value={formData.docente}
-              onChange={(e) => setFormData((current) => ({ ...current, docente: e.target.value }))}
-              placeholder="Primer nombre y apellidos completos"
-            />
+            <Label>Nombre del docente</Label>
+            <div className=" rounded-md border border-border px-3 py-2 bg-background text-sm">
+              {user ? `${user.firstNames ?? ''} ${user.lastNames ?? ''}`.trim() || user.name : 'Inicia sesión para continuar'}
+            </div>
           </div>
 
           {/* Autorización */}

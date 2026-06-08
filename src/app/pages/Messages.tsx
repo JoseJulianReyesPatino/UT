@@ -13,6 +13,18 @@ import apiFetch from "../lib/api";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 
+
+// Función para convertir URL relativa a absoluta
+const getAbsoluteUrl = (url?: string | null): string | undefined => {
+  if (!url) return undefined;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/')) {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
+    return `${baseUrl}${url}`;
+  }
+  return url;
+};
+
 type AttachmentItem = {
   name: string;
   sizeLabel: string;
@@ -454,30 +466,33 @@ export function Messages(props: Readonly<{
       .join("") || "CH";
   };
 
-  const normalizeConversation = useCallback((raw: any): Conversation => {
-    return {
-      id: raw.id,
-      name: raw.name ?? raw.display_name ?? 'Conversación',
-      role: raw.role ?? 'Docente',
-      lastMessage: raw.lastMessage ?? raw.last_message ?? raw.lastMessage ?? 'Nuevo chat',
-      timestamp: raw.timestamp ?? raw.lastMessageAt ?? raw.updated_at ?? '',
-      unread: Number(raw.unread ?? 0),
-      avatar: raw.avatar_url ?? getInitials(raw.name ?? raw.display_name),
-      status: 'offline',
-      messages: [],
-    };
-  }, [getInitials]);
-
-  const normalizeMessage = useCallback((raw: any): ChatMessage => ({
+const normalizeConversation = useCallback((raw: any): Conversation => {
+  // Usar avatar_url y convertir a URL absoluta
+  const avatarValue = getAbsoluteUrl(raw.avatar_url) ?? getInitials(raw.name ?? raw.display_name);
+  
+  return {
     id: raw.id,
-    sender: raw.sender ?? raw.user_name ?? 'Usuario',
-    content: raw.content ?? raw.body ?? '',
-    timestamp: raw.timestamp ?? raw.created_at ?? new Date().toISOString(),
-    isOwn: Boolean(raw.isOwn || raw.is_own || raw.sender_id === Number(user?.id)),
-    avatar: raw.avatar_url ?? undefined,
-    attachments: raw.attachments ?? [],
-    replyTo: raw.replyTo ?? null,
-  }), [user?.id]);
+    name: raw.name ?? raw.display_name ?? 'Conversación',
+    role: raw.role ?? 'Docente',
+    lastMessage: raw.lastMessage ?? raw.last_message ?? raw.lastMessage ?? 'Nuevo chat',
+    timestamp: raw.timestamp ?? raw.lastMessageAt ?? raw.updated_at ?? '',
+    unread: Number(raw.unread ?? 0),
+    avatar: avatarValue,
+    status: 'offline',
+    messages: [],
+  };
+}, [getInitials]);
+
+const normalizeMessage = useCallback((raw: any): ChatMessage => ({
+  id: raw.id,
+  sender: raw.sender ?? raw.user_name ?? 'Usuario',
+  content: raw.content ?? raw.body ?? '',
+  timestamp: raw.timestamp ?? raw.created_at ?? new Date().toISOString(),
+  isOwn: Boolean(raw.isOwn || raw.is_own || raw.sender_id === Number(user?.id)),
+  avatar: getAbsoluteUrl(raw.avatar_url ?? raw.avatar),
+  attachments: raw.attachments ?? [],
+  replyTo: raw.replyTo ?? null,
+}), [user?.id]);
 
   const loadConversations = useCallback(async () => {
     try {

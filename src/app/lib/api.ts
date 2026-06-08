@@ -19,13 +19,19 @@ function buildUrl(
 
 export async function apiFetch(path: string, options: FetchOptions = {}) {
   const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  
+  // FIXED: No establecer Content-Type automáticamente si es FormData
+  const isFormData = options.body instanceof FormData;
+  
   const headers: Record<string, string> = {
     Accept: "application/json",
-    ...((options.headers as Record<string, string>) ?? {}),
+    "ngrok-skip-browser-warning": "true",
+    ...(options.headers as Record<string, string>),
   };
 
-  if (API_BASE_URL.includes("ngrok-free.dev")) {
-    headers["ngrok-skip-browser-warning"] = "true";
+  // Solo agregar Content-Type si NO es FormData (el navegador lo setea automáticamente para FormData)
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json";
   }
 
   if (token) {
@@ -34,26 +40,35 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
 
   const url = buildUrl(path, options.query);
 
-  const res = await fetch(url, { ...options, headers });
-  const text = await res.text();
-  let json = null;
   try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    // ignore parse errors
-  }
+    const res = await fetch(url, {
+      ...options,
+      mode: "cors",
+      credentials: "include",
+      headers,
+    });
+    const text = await res.text();
+    let json = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      // ignore
+    }
 
-  if (!res.ok) {
-    const message =
-      json && json.message ? json.message : res.statusText || "Error";
-    const errors = json && json.errors ? json.errors : undefined;
-    const err: any = new Error(message);
-    err.status = res.status;
-    if (errors) err.errors = errors;
-    throw err;
-  }
+    if (!res.ok) {
+      const message = json?.message ?? res.statusText ?? "Error";
+      const errors = json?.errors ?? undefined;
+      const err: any = new Error(message);
+      err.status = res.status;
+      if (errors) err.errors = errors;
+      throw err;
+    }
 
-  return json;
+    return json;
+  } catch (error) {
+    console.error("API Fetch Error:", error);
+    throw error;
+  }
 }
 
 export default apiFetch;

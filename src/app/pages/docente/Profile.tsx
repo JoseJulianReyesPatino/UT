@@ -95,8 +95,8 @@ export function Profile() {
       return;
     }
 
-    if (file.size > 4 * 1024 * 1024) {
-      toast.error("La imagen no puede superar 4MB");
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("La imagen no puede superar 8MB");
       event.target.value = "";
       return;
     }
@@ -145,7 +145,6 @@ export function Profile() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             full_name: fullName,
-            avatar_url: avatarPreview ?? null,
           }),
         };
       }
@@ -161,50 +160,30 @@ export function Profile() {
         };
       };
 
-      const normalizedAvatar = resolveApiAssetUrl(response.user.avatar_url ?? undefined);
+      // Resolver la URL del avatar
+      const resolvedAvatar = resolveApiAssetUrl(response.user.avatar_url ?? undefined);
 
+      // Actualizar el estado local Y el contexto
       updateProfile({
         name: response.user.full_name,
         firstNames: response.user.first_names ?? firstName.trim(),
         lastNames: response.user.last_names ?? lastName.trim(),
-        avatar: normalizedAvatar,
+        avatar: resolvedAvatar,
         phone: response.user.phone ?? undefined,
         area: response.user.area ?? undefined,
       });
 
-      setAvatarPreview(normalizedAvatar);
+      // Actualizar la vista previa local con la URL real
+      setAvatarPreview(resolvedAvatar);
       setSelectedAvatarFile(null);
+      
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
 
-      try {
-        const meResponse = (await apiFetch("/auth/me", { method: "GET" })) as { user: {
-          full_name: string;
-          first_names?: string | null;
-          last_names?: string | null;
-          email: string;
-          phone?: string | null;
-          area?: string | null;
-          avatar_url?: string | null;
-        } };
-
-        const refreshedAvatar = resolveApiAssetUrl(meResponse.user.avatar_url ?? undefined);
-        updateProfile({
-          name: meResponse.user.full_name,
-          firstNames: meResponse.user.first_names ?? firstName.trim(),
-          lastNames: meResponse.user.last_names ?? lastName.trim(),
-          avatar: refreshedAvatar,
-          phone: meResponse.user.phone ?? undefined,
-          area: meResponse.user.area ?? undefined,
-        });
-        setAvatarPreview(refreshedAvatar);
-      } catch {
-        // ignore refresh failure, keep the optimistic state
-      }
-
       toast.success("Perfil actualizado correctamente");
     } catch (error: any) {
+      console.error("Error al guardar perfil:", error);
       toast.error(error instanceof Error ? error.message : "No fue posible guardar el perfil");
     } finally {
       setIsSavingProfile(false);
@@ -274,6 +253,7 @@ export function Profile() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+    
   const memberSinceLabel = useMemo(() => {
     if (!user?.createdAt) return "Sin datos";
 
@@ -300,288 +280,288 @@ export function Profile() {
       <div className="absolute inset-0 pointer-events-none opacity-60 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.12),transparent_30%)] dark:opacity-40" />
       <div className="relative z-10 space-y-6">
         <div>
-        <h1>Mi Perfil</h1>
-        <p className="text-muted-foreground">
-          Gestiona tu información personal y preferencias
-        </p>
-      </div>
+          <h1 className="text-2xl font-bold">Mi Perfil</h1>
+          <p className="text-muted-foreground">
+            Gestiona tu información personal y preferencias
+          </p>
+        </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Información Personal</CardTitle>
-            <CardDescription>
-              Actualiza tus datos de perfil
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20">
-                {avatarPreview ? (
-                  <AvatarImage
-                    src={avatarPreview}
-                    alt={user?.name ?? "Foto de perfil"}
-                    onClick={() => setIsAvatarOpen(true)}
-                    className="cursor-pointer"
-                  />
-                ) : (
-                  <AvatarFallback
-                    className="bg-success/10 text-success text-xl cursor-pointer"
-                    onClick={() => setIsAvatarOpen(true)}
-                  >
-                    {avatarInitials || "--"}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              <div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Cambiar Foto
-                </Button>
-                <Input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={handleAvatarChange}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  JPG, PNG o WEBP. Máximo 4MB
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Nombre</Label>
-                <Input
-                  value={firstName}
-                  onChange={(event) => setFirstName(event.target.value)}
-                  placeholder="Primer nombre"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Apellido</Label>
-                <Input
-                  value={lastName}
-                  onChange={(event) => setLastName(event.target.value)}
-                  placeholder="Apellidos completos"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Correo Electrónico</Label>
-              <Input value={user?.email ?? ""} disabled className="bg-muted/40" />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Rol</Label>
-              <div className="flex items-center gap-2">
-                <Input 
-                  value={roleLabel} 
-                  disabled 
-                  className="flex-1"
-                />
-                <Badge variant="outline">
-                  {roleLabel}
-                </Badge>
-              </div>
-            </div>
-
-            <div className="pt-4 flex gap-2">
-              <Button variant="outline" onClick={handleCancelChanges}>Cancelar</Button>
-              <Button variant="success" onClick={handleSaveChanges} disabled={isSavingProfile}>
-                {isSavingProfile ? "Guardando..." : "Guardar Cambios"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Avatar preview dialog */}
-        <Dialog open={isAvatarOpen} onOpenChange={setIsAvatarOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Foto de perfil</DialogTitle>
-              <DialogDescription>Vista previa de tu imagen de perfil</DialogDescription>
-            </DialogHeader>
-            <div className="mt-4 flex justify-center">
-              {avatarPreview ? (
-                <img src={avatarPreview} alt={`Foto de perfil de ${user?.name}`} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
-              ) : (
-                <div className="h-40 w-40 rounded-lg bg-success/10 flex items-center justify-center text-2xl">
-                  {avatarInitials || "--"}
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={isPasswordOpen} onOpenChange={setIsPasswordOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Cambiar contraseña</DialogTitle>
-              <DialogDescription>Actualiza tu contraseña de acceso</DialogDescription>
-            </DialogHeader>
-            <div className="mt-4 space-y-4">
-              <div className="space-y-2">
-                <Label>Contraseña actual</Label>
-                <div className="relative">
-                  <Input
-                    type={showCurrentPassword ? "text" : "password"}
-                    value={currentPassword}
-                    onChange={(event) => setCurrentPassword(event.target.value)}
-                    placeholder="Ingresa tu contraseña actual"
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                    onClick={() => setShowCurrentPassword((value) => !value)}
-                    aria-label={showCurrentPassword ? "Ocultar contraseña actual" : "Mostrar contraseña actual"}
-                  >
-                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Nueva contraseña</Label>
-                <div className="relative">
-                  <Input
-                    type={showNewPassword ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(event) => setNewPassword(event.target.value)}
-                    placeholder="Ingresa la nueva contraseña"
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                    onClick={() => setShowNewPassword((value) => !value)}
-                    aria-label={showNewPassword ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
-                  >
-                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Confirmar contraseña</Label>
-                <div className="relative">
-                  <Input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
-                    placeholder="Repite la nueva contraseña"
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                    onClick={() => setShowConfirmPassword((value) => !value)}
-                    aria-label={showConfirmPassword ? "Ocultar confirmación" : "Mostrar confirmación"}
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={() => setIsPasswordOpen(false)}
-                  disabled={isSavingPassword}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  variant="success"
-                  onClick={handlePasswordSave}
-                  disabled={isSavingPassword}
-                >
-                  {isSavingPassword ? "Guardando..." : "Actualizar contraseña"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <div className="space-y-6">
-          <Card>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Información de Cuenta</CardTitle>
+              <CardTitle>Información Personal</CardTitle>
+              <CardDescription>
+                Actualiza tus datos de perfil
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-3 text-sm">
-                <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                  <Calendar className="h-4 w-4" />
-                </div>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-20 w-20">
+                  {avatarPreview ? (
+                    <AvatarImage
+                      src={avatarPreview}
+                      alt={user?.name ?? "Foto de perfil"}
+                      onClick={() => setIsAvatarOpen(true)}
+                      className="cursor-pointer"
+                    />
+                  ) : (
+                    <AvatarFallback
+                      className="bg-success/10 text-success text-xl cursor-pointer"
+                      onClick={() => setIsAvatarOpen(true)}
+                    >
+                      {avatarInitials || "--"}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
                 <div>
-                  <p className="font-medium">Miembro desde</p>
-                  <p className="text-muted-foreground capitalize">{memberSinceLabel}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Cambiar Foto
+                  </Button>
+                  <Input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    JPG, PNG o WEBP. Máximo 8MB
+                  </p>
                 </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Nombre</Label>
+                  <Input
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    placeholder="Primer nombre"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Apellido</Label>
+                  <Input
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                    placeholder="Apellidos completos"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Correo Electrónico</Label>
+                <Input value={user?.email ?? ""} disabled className="bg-muted/40" />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Rol</Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value={roleLabel} 
+                    disabled 
+                    className="flex-1"
+                  />
+                  <Badge variant="outline">
+                    {roleLabel}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-2">
+                <Button variant="outline" onClick={handleCancelChanges}>Cancelar</Button>
+                <Button variant="success" onClick={handleSaveChanges} disabled={isSavingProfile}>
+                  {isSavingProfile ? "Guardando..." : "Guardar Cambios"}
+                </Button>
               </div>
             </CardContent>
           </Card>
 
+          {/* Avatar preview dialog */}
+          <Dialog open={isAvatarOpen} onOpenChange={setIsAvatarOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Foto de perfil</DialogTitle>
+                <DialogDescription>Vista previa de tu imagen de perfil</DialogDescription>
+              </DialogHeader>
+              <div className="mt-4 flex justify-center">
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt={`Foto de perfil de ${user?.name}`} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
+                ) : (
+                  <div className="h-40 w-40 rounded-lg bg-success/10 flex items-center justify-center text-2xl">
+                    {avatarInitials || "--"}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isPasswordOpen} onOpenChange={setIsPasswordOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Cambiar contraseña</DialogTitle>
+                <DialogDescription>Actualiza tu contraseña de acceso</DialogDescription>
+              </DialogHeader>
+              <div className="mt-4 space-y-4">
+                <div className="space-y-2">
+                  <Label>Contraseña actual</Label>
+                  <div className="relative">
+                    <Input
+                      type={showCurrentPassword ? "text" : "password"}
+                      value={currentPassword}
+                      onChange={(event) => setCurrentPassword(event.target.value)}
+                      placeholder="Ingresa tu contraseña actual"
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                      onClick={() => setShowCurrentPassword((value) => !value)}
+                      aria-label={showCurrentPassword ? "Ocultar contraseña actual" : "Mostrar contraseña actual"}
+                    >
+                      {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Nueva contraseña</Label>
+                  <div className="relative">
+                    <Input
+                      type={showNewPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(event) => setNewPassword(event.target.value)}
+                      placeholder="Ingresa la nueva contraseña"
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                      onClick={() => setShowNewPassword((value) => !value)}
+                      aria-label={showNewPassword ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
+                    >
+                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Confirmar contraseña</Label>
+                  <div className="relative">
+                    <Input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      placeholder="Repite la nueva contraseña"
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                      onClick={() => setShowConfirmPassword((value) => !value)}
+                      aria-label={showConfirmPassword ? "Ocultar confirmación" : "Mostrar confirmación"}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => setIsPasswordOpen(false)}
+                    disabled={isSavingPassword}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="success"
+                    onClick={handlePasswordSave}
+                    disabled={isSavingPassword}
+                  >
+                    {isSavingPassword ? "Guardando..." : "Actualizar contraseña"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Información de Cuenta</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+                    <Calendar className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Miembro desde</p>
+                    <p className="text-muted-foreground capitalize">{memberSinceLabel}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Seguridad</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  type="button"
+                  onClick={() => setIsPasswordOpen(true)}
+                >
+                  <Key className="h-4 w-4 mr-2" />
+                  Cambiar Contraseña
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {user?.role !== "administrador" && (
           <Card>
             <CardHeader>
-              <CardTitle>Seguridad</CardTitle>
+              <CardTitle>Estadísticas</CardTitle>
+              <CardDescription>Resumen de tu actividad</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                type="button"
-                onClick={() => setIsPasswordOpen(true)}
-              >
-                <Key className="h-4 w-4 mr-2" />
-                Cambiar Contraseña
-              </Button>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Documentos Enviados</p>
+                  <p className="text-2xl font-bold">{profileStats.documentsSent}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Revisados</p>
+                  <p className="text-2xl font-bold text-success">{profileStats.documentsReviewed}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">En Revisión</p>
+                  <p className="text-2xl font-bold text-emerald-600">{profileStats.documentsPending}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Devueltos</p>
+                  <p className="text-2xl font-bold text-destructive">{profileStats.documentsReturned}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
-        </div>
+        )}
       </div>
-    </div>
-
-      {user?.role !== "administrador" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Estadísticas</CardTitle>
-            <CardDescription>Resumen de tu actividad</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-4">
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Documentos Enviados</p>
-                <p className="text-2xl font-bold">{profileStats.documentsSent}</p>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Revisados</p>
-                <p className="text-2xl font-bold text-success">{profileStats.documentsReviewed}</p>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">En Revisión</p>
-                <p className="text-2xl font-bold text-emerald-600">{profileStats.documentsPending}</p>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Devueltos</p>
-                <p className="text-2xl font-bold text-destructive">{profileStats.documentsReturned}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
