@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Checkbox } from "../../components/ui/checkbox";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
@@ -8,7 +9,8 @@ import { Button } from "../../components/ui/button";
 import { Upload, Menu } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetDescription, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
+import { ScrollArea } from "../../components/ui/scroll-area";
 import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuatrimestre } from "../../data/curricula";
 import { getCalendarFileUrl } from "../../lib/calendar";
 import { useAuth } from "../../context/AuthContext";
@@ -43,8 +45,11 @@ const initialFormData: PlaneacionFormData = {
 export default function PlaneacionPage() {
   const { user, refreshUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isReplacing = false;
+  const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
   const [formData, setFormData] = useState<PlaneacionFormData>(initialFormData);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const formRef = useRef<HTMLDivElement | null>(null);
   const [groupsOptions, setGroupsOptions] = useState<Array<{ id: number; group_code: string; group_number: number}>>([]);
   const [history, setHistory] = useState<any[]>([]);
   const calendarioUrl = getCalendarFileUrl();
@@ -144,7 +149,7 @@ export default function PlaneacionPage() {
       !!user &&
       formData.autorizacion
     );
-  }, [formData, user]);
+  }, [formData, user, groupsOptions.length]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -159,8 +164,8 @@ export default function PlaneacionPage() {
     }
 
     for (let file of newFiles) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error(`${file.name} excede el límite de 2 MB`);
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} excede el límite de 5 MB`);
         return;
       }
       if (file.type !== "application/pdf") {
@@ -197,6 +202,88 @@ export default function PlaneacionPage() {
     return `${espacios} espacio${plural} disponible${plural}`;
   };
 
+  const findCareerCodeByLabel = (label: string, planType: Plan | "") => {
+    if (!label || !planType) return "";
+    const candidates = planType === "nuevo-modelo"
+      ? [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria]
+      : carrieras["plan-normal"].ingenieria;
+
+    const searchLabel = label.toLowerCase();
+    let found = candidates.find((c) => c.nombre.toLowerCase() === searchLabel);
+    if (!found) {
+      found = candidates.find((c) => c.nombre.toLowerCase().includes(searchLabel) || searchLabel.includes(c.nombre.toLowerCase()));
+    }
+    return found?.codigo ?? "";
+  };
+
+  const populateFormForEdit = (document: any) => {
+    // Normalizar el valor de `plan` que venga de la DB (puede ser 'Plan Normal', 'plan-normal', 'nuevo-modelo', etc.)
+    const normalizePlanKey = (p: any) => {
+      if (!p) return "plan-normal";
+      const s = String(p).toLowerCase();
+      if (s.includes("nuevo")) return "nuevo-modelo";
+      if (s.includes("normal") || s.includes("plan-normal")) return "plan-normal";
+      return "plan-normal";
+    };
+
+    const planKey = normalizePlanKey(document.plan ?? "");
+    const careerCode = findCareerCodeByLabel(document.carrera_label ?? "", planKey as any);
+    setEditingDocumentId(document.id);
+    setFormData({
+      plan: planKey as Plan,
+      carrera: careerCode,
+      cuatrimestre: String(document.parcial || "") as Cuatrimestre,
+      materia: document.materia ?? "",
+      grupo: document.group_code ? formatGroupCode(document.group_code) : String(document.group_id ?? ""),
+      archivos: [],
+      docente: user ? `${user.firstNames ?? ''} ${user.lastNames ?? ''}`.trim() : '',
+      autorizacion: true,
+      nota: document.note ?? document.nota ?? "",
+    });
+    setSheetOpen(false);
+    formRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const documentFileUrl = (id: number) => `${API_BASE_URL.replace(/\/+$/, '')}/documents/${id}/file`;
+
+  const getUploadedFileName = (doc: any) => {
+    const path = String(doc?.file_path ?? '');
+    if (!path) return 'Documento sin nombre';
+    const base = path.split('/').pop() ?? path;
+    // Stored files look like: doc_<uniqid>_<originalName>.pdf
+    return base.replace(/^doc_[^_]+_/, '');
+  };
+
+  const openDocument = async (id: number, action: 'view' | 'download') => {
+    try {
+      const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      headers['ngrok-skip-browser-warning'] = 'true';
+      headers['Accept'] = 'application/pdf';
+
+      const res = await fetch(documentFileUrl(id), { method: 'GET', headers });
+      if (!res.ok) throw new Error(res.statusText || 'Error al abrir documento');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      if (action === 'view') {
+        window.open(blobUrl, '_blank');
+      } else {
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = '';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch (error) {
+      toast.error('No fue posible abrir el documento');
+    }
+  };
+
   const handleSubmit = async () => {
     if (!isValid) {
       toast.error("Completa todos los campos obligatorios");
@@ -212,29 +299,59 @@ export default function PlaneacionPage() {
       const carreraEntry = carrerasDisponibles.find((c) => c.codigo === formData.carrera);
       const carreraLabel = carreraEntry ? carreraEntry.nombre : formData.carrera;
 
-      for (const file of formData.archivos) {
-        const fd = new FormData();
-        fd.append('file', file);
-        fd.append('form_id', '1');
-        fd.append('title', `${formData.materia} - Planeación`);
-        fd.append('apartado_label', 'Planeacion');
-        if (formData.plan) fd.append('plan', formData.plan);
-        fd.append('carrera_label', carreraLabel);
-        if (formData.materia) fd.append('materia', formData.materia);
-        if (formData.cuatrimestre) fd.append('parcial', String(formData.cuatrimestre));
-        if (formData.grupo) {
-          // if grupo is selected from groupsOptions, we expect group_code or numeric id; try to resolve id
-          const sel = groupsOptions.find((g) => formatGroupCode(g.group_code) === formData.grupo || String(g.id) === formData.grupo);
-          if (sel) fd.append('group_id', String(sel.id));
-          else fd.append('group_id', formData.grupo);
-        }
-
-        await apiFetch('/documents', { method: 'POST', body: fd });
+      const file = formData.archivos[0];
+      if (!file) {
+        throw new Error('Selecciona un archivo PDF');
       }
 
-      toast.success('Planeacion enviada correctamente', {
-        description: 'Tu documento fue enviado para revision administrativa.',
+      // Convert file to base64 and send as JSON to avoid PHP tmp issues
+      const toBase64 = (f: File) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            const parts = result.split(',');
+            resolve(parts[1] ?? '');
+          };
+          reader.onerror = (e) => reject(e);
+          reader.readAsDataURL(f);
+        });
+
+      const fileBase64 = await toBase64(file);
+
+      const payload: any = {
+        form_id: 1,
+        title: `${formData.materia} - Planeación`,
+        apartado_label: 'Planeacion',
+        carrera_label: carreraLabel,
+        file_base64: fileBase64,
+        file_name: file.name,
+        file_type: file.type,
+        file_size: file.size,
+      };
+
+      if (formData.plan) payload.plan = formData.plan;
+      if (formData.materia) payload.materia = formData.materia;
+      if (formData.cuatrimestre) payload.parcial = String(formData.cuatrimestre);
+      if (formData.grupo) {
+        const sel = groupsOptions.find((g) => formatGroupCode(g.group_code) === formData.grupo || String(g.id) === formData.grupo);
+        if (sel) {
+          payload.group_id = Number(sel.id);
+          payload.group_code = formatGroupCode(sel.group_code);
+        } else {
+          const numeric = Number(formData.grupo);
+          payload.group_id = Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+          payload.group_code = formatGroupCode(formData.grupo);
+        }
+      }
+      if (editingDocumentId) payload.original_document_id = String(editingDocumentId);
+
+      await apiFetch('/documents', { method: 'POST', body: JSON.stringify(payload) });
+
+      toast.success(editingDocumentId ? 'Planeación actualizada correctamente' : 'Planeacion enviada correctamente', {
+        description: editingDocumentId ? 'Tu documento ha sido actualizado.' : 'Tu documento fue enviado para revision administrativa.',
       });
+      setEditingDocumentId(null);
       resetForm();
       // refresh history
       if (user) {
@@ -266,37 +383,38 @@ export default function PlaneacionPage() {
           <SheetContent side="right">
             <SheetHeader>
               <SheetTitle>Historial de archivos</SheetTitle>
+              <SheetDescription>Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
             </SheetHeader>
             <div className="mt-4 space-y-4">
               {history && history.length > 0 ? (
-                <div>
-                  <p className="text-sm font-medium mb-2">Archivos subidos</p>
-                  <ul className="space-y-2">
-                    {history.map((h) => (
-                      <li key={h.id} className="text-sm flex items-center justify-between">
-                        <span>{h.title ?? h.file_path}</span>
-                        <div className="flex items-center gap-2">
-                          <button className="text-sm underline" onClick={async () => {
-                            try {
-                              const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-                              const url = `${API_BASE_URL.replace(/\/+$/, '')}/documents/${h.id}/file`;
-                              const headers: Record<string,string> = {};
-                              if (token) headers['Authorization'] = `Bearer ${token}`;
-                              const res = await fetch(url, { method: 'GET', headers });
-                              if (!res.ok) throw new Error(res.statusText);
-                              const blob = await res.blob();
-                              const blobUrl = URL.createObjectURL(blob);
-                              window.open(blobUrl, '_blank');
-                              setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-                            } catch (e) {
-                              toast.error('No fue posible descargar el archivo');
-                            }
-                          }}>Descargar</button>
-                          <span className="text-xs text-muted-foreground">{new Date(h.submitted_at).toLocaleString()}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                <div className="space-y-3">
+                  <p className="text-sm font-medium mb-2">Historial de planeaciones</p>
+                  <div className="relative">
+                    <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-slate-200/70 bg-white/40 pr-2 dark:border-slate-700 dark:bg-slate-900/30">
+                      <div className="grid gap-3 p-1">
+                        {history.map((h) => (
+                          <div key={h.id} className="rounded-lg border border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <p className="text-sm font-semibold">{h.title ?? h.file_path}</p>
+                                <p className="text-xs text-muted-foreground break-all">PDF: {getUploadedFileName(h)}</p>
+                                <p className="text-xs text-muted-foreground">{h.materia ?? 'Planeación'}</p>
+                              </div>
+                              <p className="text-xs text-muted-foreground">{new Date(h.submitted_at).toLocaleString()}</p>
+                            </div>
+
+                            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex flex-wrap gap-2">
+                                <Button size="sm" variant="outline" onClick={() => openDocument(h.id, 'view')}>Ver</Button>
+                                <Button size="sm" variant="secondary" onClick={() => populateFormForEdit(h)} disabled={isReplacing}>Editar documento</Button>
+                              </div>
+                              <span className="text-xs text-muted-foreground">Estatus: {h.status ?? 'Pendiente'}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
                 </div>
               ) : formData.archivos.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión ni en el historial.</p>
@@ -320,10 +438,16 @@ export default function PlaneacionPage() {
         <Button variant="outline" size="sm" onClick={() => window.open(calendarioUrl, "_blank")}>Calendario</Button>
       </div>
 
-      <Card>
+      <div ref={formRef}>
+        <Card>
         <CardHeader>
           <CardTitle>Formulario de Planeación</CardTitle>
           <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
+          {editingDocumentId ? (
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+              Estás editando la planeación existente #{editingDocumentId}. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+            </div>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-5">
           {/* Plan selection inside form (moved from sheet) */}
@@ -442,7 +566,7 @@ export default function PlaneacionPage() {
           <div className="space-y-2">
             <Label>Documentos (PDF) *</Label>
             <p className="text-sm text-muted-foreground">
-              Adjuntar el documento en formato PDF, con un límite de 2 MB por archivo. En caso de ser necesario, se permite la carga simultánea de hasta tres archivos.
+              Adjuntar el documento en formato PDF, con un límite de 5 MB por archivo. En caso de ser necesario, se permite la carga simultánea de hasta tres archivos.
             </p>
             <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-success/50 transition-colors">
               <input
@@ -488,11 +612,18 @@ export default function PlaneacionPage() {
           </div>
 
           {/* Autorización */}
-          <div className="space-y-2 text-sm">
-            <p className="font-medium">Declaración de autorización</p>
-            <p>
-              Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.
-            </p>
+          <div className="flex items-start gap-3">
+            <Checkbox
+              checked={formData.autorizacion}
+              onCheckedChange={(value) => setFormData((current) => ({ ...current, autorizacion: Boolean(value) }))}
+              id="autorizacion"
+            />
+            <div className="space-y-2 text-sm">
+              <Label htmlFor="autorizacion" className="font-medium">Declaración de autorización</Label>
+              <p>
+                Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.
+              </p>
+            </div>
           </div>
 
           {/* Nota (opcional) */}
@@ -510,11 +641,12 @@ export default function PlaneacionPage() {
               Limpiar
             </Button>
             <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting}>
-              {isSubmitting ? "Enviando..." : "Enviar planeación"}
+              {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar planeación" : "Enviar planeación"}
             </Button>
           </div>
         </CardContent>
       </Card>
     </div>
+  </div>
   );
 }

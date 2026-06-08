@@ -13,6 +13,7 @@ import {
   Eye,
   CheckCircle2,
 } from "lucide-react";
+import Charging2 from "../../../assets/CHARGING_2.png";
 
 type AdminView = "dashboard" | "docentes" | "documentos" | "documentos-revisados" | "documentos-revisados-hoy";
 
@@ -201,8 +202,8 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         apiFetch("/users"),
       ]);
 
-      const pending = ((pendingRes?.data?.data ?? []) as ApiDocument[]).map(mapPendingDocument);
-      const reviewed = ((reviewedRes?.data?.data ?? []) as ApiDocument[]).map(mapReviewedDocument);
+      const pending = ((pendingRes?.data ?? []) as ApiDocument[]).map(mapPendingDocument);
+      const reviewed = ((reviewedRes?.data ?? []) as ApiDocument[]).map(mapReviewedDocument);
       const users = (usersRes?.data ?? []) as ApiUser[];
 
       setPendingDocuments(pending);
@@ -460,7 +461,12 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando documentos pendientes...</p>
+              <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                <div className="flex flex-col items-center gap-2">
+                  <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
+                  <div>Cargando documentos pendientes...</div>
+                </div>
+              </div>
             ) : pendingDocuments.length === 0 ? (
               <p className="text-sm text-muted-foreground">No hay documentos pendientes por revisar.</p>
             ) : (
@@ -476,7 +482,12 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando actividad reciente...</p>
+              <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                <div className="flex flex-col items-center gap-2">
+                  <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
+                  <div>Cargando actividad reciente...</div>
+                </div>
+              </div>
             ) : recentActivity.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin actividad reciente.</p>
             ) : (

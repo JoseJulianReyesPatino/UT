@@ -13,6 +13,7 @@ import { apiFetch } from "../../lib/api";
 import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
 import { carrieras } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
+import ChargingImg from "../../../assets/Form_Not_Found.png";
 
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
 
@@ -65,6 +66,15 @@ const mapApiDocumentToTutorDocument = (doc: any): TutorDocument => ({
 });
 
 const emptyStateLegend = "Aún no hay documentos de tutores para mostrar en esta sección. Cuando un tutor suba uno, aparecerá aquí automáticamente.";
+
+const EmptyState = ({ text }: { text: string }) => (
+  <div className="rounded-lg border border-dashed border-border/70 bg-background/70 p-8 text-center text-muted-foreground dark:bg-slate-950/40">
+    <div className="flex flex-col items-center gap-4">
+      <img src={ChargingImg} alt="No forms" className="h-72 w-auto mx-auto" />
+      <p>{text}</p>
+    </div>
+  </div>
+);
 
 const careerOptions: CareerOption[] = Array.from(
   new Map(
@@ -415,9 +425,7 @@ export default function Tutores() {
             <CardContent>
               <div className="space-y-3">
                 {filteredAll.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/70 bg-background/70 p-8 text-center text-muted-foreground dark:bg-slate-950/40">
-                    {emptyStateLegend}
-                  </div>
+                  <EmptyState text={emptyStateLegend} />
                 ) : filteredAll.map((doc) => {
                   const isReviewed = "reviewedAt" in doc;
                   const isReturned = Boolean(doc.returned);
@@ -597,9 +605,7 @@ export default function Tutores() {
             <CardContent>
               <div className="space-y-3">
                 {filteredPending.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/70 bg-background/70 p-8 text-center text-muted-foreground dark:bg-slate-950/40">
-                    {emptyStateLegend}
-                  </div>
+                  <EmptyState text={emptyStateLegend} />
                 ) : filteredPending.map((doc) => {
                   const isReturned = Boolean(doc.returned);
                   return (
@@ -770,9 +776,7 @@ export default function Tutores() {
           </Card>
           <div className="space-y-4">
             {Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/70 bg-background/70 p-8 text-center text-muted-foreground dark:bg-slate-950/40">
-                {emptyStateLegend}
-              </div>
+              <EmptyState text={emptyStateLegend} />
             ) : Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => (
               <Card key={date} className={sectionCardClassName}>
                 <CardHeader>
@@ -928,9 +932,7 @@ export default function Tutores() {
             <CardContent>
               <div className="space-y-3">
                 {reviewedToday.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/70 bg-background/70 p-8 text-center text-muted-foreground dark:bg-slate-950/40">
-                    {emptyStateLegend}
-                  </div>
+                  <EmptyState text={emptyStateLegend} />
                 ) : (
                   reviewedToday.map((doc) => {
                     const isReturned = Boolean(doc.returned);

@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
+import { FormClosedState } from "./FormClosedState";
 import { isFormExpired, isFormRoleAllowed, type FormId } from "../../lib/formConfig";
 
 interface FormAccessGuardProps {
@@ -51,6 +52,11 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
             : "Tu rol no está autorizado para este formulario."}
         </AlertDescription>
       </Alert>
+
+      <FormClosedState
+        title={title}
+        message={`Si necesitas acceso, solicita al administrador que actualice la fecha de vencimiento o los roles permitidos para ${title.toLowerCase()}.`}
+      />
 
       <Card className="border-dashed border-slate-200 bg-white/80 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
         <CardContent className="space-y-4 pt-6">

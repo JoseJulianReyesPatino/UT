@@ -12,8 +12,9 @@ import { cn } from "../../lib/utils";
 import apiFetch from "../lib/api";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
-
-
+import Charging2 from "../../assets/CHARGING_2.png";
+ 
+ 
 // Función para convertir URL relativa a absoluta
 const getAbsoluteUrl = (url?: string | null): string | undefined => {
   if (!url) return undefined;
@@ -24,13 +25,13 @@ const getAbsoluteUrl = (url?: string | null): string | undefined => {
   }
   return url;
 };
-
+ 
 type AttachmentItem = {
   name: string;
   sizeLabel: string;
   typeLabel: string;
 };
-
+ 
 type ChatMessage = {
   id: number;
   sender: string;
@@ -45,7 +46,7 @@ type ChatMessage = {
     content: string;
   };
 };
-
+ 
 type Conversation = {
   id: number;
   name: string;
@@ -57,33 +58,33 @@ type Conversation = {
   status: "online" | "offline" | "away";
   messages: ChatMessage[];
 };
-
+ 
 const initialConversations: Conversation[] = [];
-
+ 
 const formatSize = (size: number) => {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 };
-
+ 
 const getTimeLabel = () =>
   new Date().toLocaleTimeString("es-MX", {
     hour: "2-digit",
     minute: "2-digit",
   });
-
+ 
 const parseMessageDate = (timestamp: string) => {
   const normalized = timestamp.includes("T") ? timestamp : timestamp.replace(" ", "T");
   const parsed = new Date(normalized);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
-
+ 
 const canEditMessage = (timestamp: string) => {
   const parsed = parseMessageDate(timestamp);
   if (!parsed) return false;
   return Date.now() - parsed.getTime() <= 5 * 60 * 1000;
 };
-
+ 
 function PendingAttachmentChip({
   attachment,
   index,
@@ -108,19 +109,19 @@ function PendingAttachmentChip({
     </div>
   );
 }
-
+ 
 function StatusDot({ status }: Readonly<{ status: Conversation["status"] }>) {
   let statusClassName = "bg-slate-400";
-
+ 
   if (status === "online") {
     statusClassName = "bg-emerald-500";
   } else if (status === "away") {
     statusClassName = "bg-amber-500";
   }
-
+ 
   return <span className={cn("h-2 w-2 rounded-full", statusClassName)} />;
 }
-
+ 
 function ConversationRow({
   conversation,
   active,
@@ -172,7 +173,7 @@ function ConversationRow({
     </button>
   );
 }
-
+ 
 function MessageBubble({
   message,
   onReply,
@@ -183,13 +184,13 @@ function MessageBubble({
   const [editOpen, setEditOpen] = useState(false);
   const [editBody, setEditBody] = useState(message.content);
   const editable = message.isOwn && canEditMessage(message.timestamp);
-
+ 
   useEffect(() => {
     if (editOpen) {
       setEditBody(message.content);
     }
   }, [editOpen, message.content]);
-
+ 
   return (
     <div className={cn("flex items-end", message.isOwn ? "justify-end" : "justify-start")}> 
       {!message.isOwn && (
@@ -205,7 +206,7 @@ function MessageBubble({
           </Avatar>
         </div>
       )}
-
+ 
       <div
         className={cn(
           "max-w-[78%] rounded-2xl px-4 py-3 shadow-sm relative",
@@ -217,7 +218,7 @@ function MessageBubble({
       >
         <div className="text-xs font-medium mb-1 text-foreground/70">{!message.isOwn && message.sender}</div>
         <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
-
+ 
         {message.attachments && message.attachments.length > 0 && (
           <div className="mt-3 space-y-2">
             {message.attachments.map((attachment) => (
@@ -231,7 +232,7 @@ function MessageBubble({
             ))}
           </div>
         )}
-
+ 
         <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
           <span className="opacity-90">{message.timestamp}</span>
           <div className="inline-flex items-center gap-2">
@@ -264,7 +265,7 @@ function MessageBubble({
           </div>
         </div>
       </div>
-
+ 
       {editable && onEdit && (
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent>
@@ -293,7 +294,7 @@ function MessageBubble({
     </div>
   );
 }
-
+ 
 function PendingAttachmentsBar({
   attachments,
   onRemove,
@@ -309,7 +310,7 @@ function PendingAttachmentsBar({
     </div>
   );
 }
-
+ 
 function EmptyConversationState({ title, description }: Readonly<{ title: string; description: string }>) {
   return (
     <div className="flex h-full min-h-[260px] items-center justify-center px-6 py-10 text-center">
@@ -320,13 +321,13 @@ function EmptyConversationState({ title, description }: Readonly<{ title: string
     </div>
   );
 }
-
+ 
 function getStatusLabel(status: Conversation["status"]) {
   if (status === "online") return "En línea";
   if (status === "away") return "Ausente";
   return "Desconectado";
 }
-
+ 
 export function Messages(props: Readonly<{
   initialOpen?: { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string } } | null;
   onConsume?: () => void;
@@ -357,9 +358,9 @@ export function Messages(props: Readonly<{
     ? "Tutor"
     : "Docente";
   const peerRoleLabel = currentRoleLabel === "Administrador" ? "Docente" : "Administrador";
-
+ 
   const recipientRoleCode = peerRoleLabel.toLowerCase();
-
+ 
   const loadRecipientUsers = useCallback(async () => {
     try {
       setIsLoadingRecipients(true);
@@ -380,12 +381,12 @@ export function Messages(props: Readonly<{
       setIsLoadingRecipients(false);
     }
   }, [recipientRoleCode, user?.id]);
-
+ 
   useEffect(() => {
     if (!newConversationOpen) return;
     void loadRecipientUsers();
   }, [newConversationOpen, loadRecipientUsers]);
-
+ 
   const filteredRecipientUsers = useMemo(() => {
     const normalizedSearch = recipientQuery.trim().toLowerCase();
     return recipientUsers.filter((recipient) => {
@@ -393,7 +394,7 @@ export function Messages(props: Readonly<{
       return !normalizedSearch || fullName.includes(normalizedSearch);
     });
   }, [recipientQuery, recipientUsers]);
-
+ 
   const handleCreateConversation = async (recipient: any) => {
     try {
       const normalizedRecipientName = ((recipient.full_name ?? recipient.name ?? '') as string).trim().toLowerCase();
@@ -405,7 +406,7 @@ export function Messages(props: Readonly<{
         await loadMessages(existingConversation.id);
         return;
       }
-
+ 
       const created = (await apiFetch('/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -422,7 +423,7 @@ export function Messages(props: Readonly<{
       toast.error('No fue posible crear la conversación');
     }
   };
-
+ 
   // Recuperar conversaciones guardadas al montar
   useEffect(() => {
     const savedConversations = sessionStorage.getItem('chat_conversations');
@@ -441,21 +442,21 @@ export function Messages(props: Readonly<{
       setSelectedChat(Number(savedSelectedChat));
     }
   }, []);
-
+ 
   // Guardar conversaciones en sessionStorage
   useEffect(() => {
     if (conversations.length > 0 && !isInitialLoad) {
       sessionStorage.setItem('chat_conversations', JSON.stringify(conversations));
     }
   }, [conversations, isInitialLoad]);
-
+ 
   // Guardar selectedChat en sessionStorage
   useEffect(() => {
     if (selectedChat !== null) {
       sessionStorage.setItem('chat_selected_chat', String(selectedChat));
     }
   }, [selectedChat]);
-
+ 
   const getInitials = (name?: string) => {
     if (!name) return "CH";
     return name
@@ -465,35 +466,35 @@ export function Messages(props: Readonly<{
       .map((p) => p[0]?.toUpperCase() ?? "")
       .join("") || "CH";
   };
-
-const normalizeConversation = useCallback((raw: any): Conversation => {
-  // Usar avatar_url y convertir a URL absoluta
-  const avatarValue = getAbsoluteUrl(raw.avatar_url) ?? getInitials(raw.name ?? raw.display_name);
-  
-  return {
+ 
+  const normalizeConversation = useCallback((raw: any): Conversation => {
+    const avatarValue = getAbsoluteUrl(raw.avatar_url) ?? getInitials(raw.name ?? raw.display_name);
+    
+    return {
+      id: raw.id,
+      name: raw.name ?? raw.display_name ?? 'Conversación',
+      role: raw.role ?? 'Docente',
+      lastMessage: raw.lastMessage ?? raw.last_message ?? raw.lastMessage ?? 'Nuevo chat',
+      timestamp: raw.timestamp ?? raw.lastMessageAt ?? raw.updated_at ?? '',
+      unread: Number(raw.unread ?? 0),
+      avatar: avatarValue,
+      status: 'offline',
+      messages: [],
+    };
+  }, []);
+ 
+  const normalizeMessage = useCallback((raw: any): ChatMessage => ({
     id: raw.id,
-    name: raw.name ?? raw.display_name ?? 'Conversación',
-    role: raw.role ?? 'Docente',
-    lastMessage: raw.lastMessage ?? raw.last_message ?? raw.lastMessage ?? 'Nuevo chat',
-    timestamp: raw.timestamp ?? raw.lastMessageAt ?? raw.updated_at ?? '',
-    unread: Number(raw.unread ?? 0),
-    avatar: avatarValue,
-    status: 'offline',
-    messages: [],
-  };
-}, [getInitials]);
-
-const normalizeMessage = useCallback((raw: any): ChatMessage => ({
-  id: raw.id,
-  sender: raw.sender ?? raw.user_name ?? 'Usuario',
-  content: raw.content ?? raw.body ?? '',
-  timestamp: raw.timestamp ?? raw.created_at ?? new Date().toISOString(),
-  isOwn: Boolean(raw.isOwn || raw.is_own || raw.sender_id === Number(user?.id)),
-  avatar: getAbsoluteUrl(raw.avatar_url ?? raw.avatar),
-  attachments: raw.attachments ?? [],
-  replyTo: raw.replyTo ?? null,
-}), [user?.id]);
-
+    sender: raw.sender ?? raw.user_name ?? 'Usuario',
+    content: raw.content ?? raw.body ?? '',
+    timestamp: raw.timestamp ?? raw.created_at ?? new Date().toISOString(),
+    isOwn: Boolean(raw.isOwn || raw.is_own || raw.sender_id === Number(user?.id)),
+    avatar: getAbsoluteUrl(raw.avatar_url ?? raw.avatar),
+    attachments: raw.attachments ?? [],
+    replyTo: raw.replyTo ?? null,
+  }), [user?.id]);
+ 
+  // FIX: loadConversations sin selectedChat en dependencias para evitar loop infinito
   const loadConversations = useCallback(async () => {
     try {
       const payload = (await apiFetch('/conversations', { method: 'GET' })) as { data?: any[] };
@@ -506,14 +507,13 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
         });
         return merged;
       });
-      if (convs.length > 0 && selectedChat === null) {
-        const savedSelected = sessionStorage.getItem('chat_selected_chat');
-        if (savedSelected) {
-          setSelectedChat(Number(savedSelected));
-        } else {
-          setSelectedChat(convs[0].id);
-        }
-      }
+      // FIX: Leer selectedChat desde el estado funcional en lugar del closure
+      setSelectedChat((prev) => {
+        if (prev !== null) return prev;
+        const saved = sessionStorage.getItem('chat_selected_chat');
+        if (saved) return Number(saved);
+        return convs.length > 0 ? convs[0].id : null;
+      });
       setIsInitialLoad(false);
       window.dispatchEvent(new Event('ut-messages-updated'));
       return convs;
@@ -522,8 +522,8 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
       setIsInitialLoad(false);
       return [];
     }
-  }, [normalizeConversation, selectedChat]);
-
+  }, [normalizeConversation]); // FIX: eliminado selectedChat de dependencias
+ 
   const loadMessages = useCallback(async (conversationId: number) => {
     try {
       const payload = (await apiFetch(`/conversations/${conversationId}/messages`, { method: 'GET' })) as { data?: any[] };
@@ -536,7 +536,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
       return [];
     }
   }, [normalizeMessage]);
-
+ 
   const markConversationAsRead = useCallback(async (conversationId: number) => {
     try {
       await apiFetch(`/conversations/${conversationId}/read`, { method: 'PATCH' });
@@ -545,19 +545,28 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
       // ignore
     }
   }, []);
-
-  // POLLING: Actualizar mensajes cada 3 segundos si hay una conversación activa
+ 
+  // FIX: Refs para que el polling siempre use la versión más reciente de las funciones
+  // sin necesidad de recrear el intervalo cuando cambian
+  const loadMessagesRef = useRef(loadMessages);
+  const loadConversationsRef = useRef(loadConversations);
+ 
+  useEffect(() => { loadMessagesRef.current = loadMessages; }, [loadMessages]);
+  useEffect(() => { loadConversationsRef.current = loadConversations; }, [loadConversations]);
+ 
+  // FIX: Polling estable — el intervalo solo se recrea cuando cambia selectedChat,
+  // no en cada render ni cuando se recrean las funciones
   useEffect(() => {
     if (!selectedChat) return;
-    
-    const interval = setInterval(async () => {
-      await loadMessages(selectedChat);
-      await loadConversations();
+ 
+    const interval = setInterval(() => {
+      void loadMessagesRef.current(selectedChat);
+      void loadConversationsRef.current();
     }, 3000);
-    
+ 
     return () => clearInterval(interval);
-  }, [selectedChat, loadMessages, loadConversations]);
-
+  }, [selectedChat]); // FIX: solo selectedChat como dependencia
+ 
   const processInitialOpen = useCallback((detail: NonNullable<typeof initialOpen>) => {
     const { conversationId, recipientName, recipientRole, document } = detail;
     const buildDocumentAttachment = (doc: { id: number; title: string }): AttachmentItem => ({
@@ -565,7 +574,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
       sizeLabel: "—",
       typeLabel: "Documento PDF",
     });
-
+ 
     const appendDocumentToConversation = (conv: Conversation, doc: { id: number; title: string }): Conversation => {
       const documentMessage: ChatMessage = {
         id: Date.now(),
@@ -575,7 +584,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
         isOwn: true,
         attachments: [buildDocumentAttachment(doc)],
       };
-
+ 
       return {
         ...conv,
         messages: [...conv.messages, documentMessage],
@@ -583,7 +592,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
         timestamp: "Ahora",
       };
     };
-
+ 
     if (conversationId) {
       setSelectedChat(conversationId);
       if (document) {
@@ -596,9 +605,9 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
       onConsume?.();
       return;
     }
-
+ 
     if (!recipientName) return;
-
+ 
     (async () => {
       try {
         const normalizedRecipientName = recipientName.trim().toLowerCase();
@@ -608,7 +617,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
           availableConversations = await loadConversations();
           found = availableConversations.find((c) => c.name.trim().toLowerCase() === normalizedRecipientName);
         }
-
+ 
         if (found) {
           setSelectedChat(found.id);
           if (document) await apiFetch(`/conversations/${found.id}/messages`, {
@@ -620,7 +629,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
           onConsume?.();
           return;
         }
-
+ 
         const usersPayload = (await apiFetch('/users', { method: 'GET' })) as { data?: any[] } | null;
         const users = usersPayload?.data ?? [];
         const recipient = users.find((u) => {
@@ -628,7 +637,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
           const roleMatches = recipientRole && (u.roles ?? []).some((r: any) => (r.code ?? r).toString().toLowerCase().includes(recipientRole.toLowerCase()));
           return fullName === normalizedRecipientName || roleMatches;
         });
-
+ 
         let conversationId: number | null = null;
         if (recipient) {
           const created = (await apiFetch('/conversations', {
@@ -638,7 +647,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
           })) as { data?: any };
           conversationId = created?.data?.id ?? null;
         }
-
+ 
         if (conversationId) {
           await loadConversations();
           setSelectedChat(conversationId);
@@ -649,39 +658,39 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
           });
           await loadMessages(conversationId);
         }
-
+ 
         onConsume?.();
       } catch (err) {
         console.error('openInitialConversation error', err);
       }
     })();
   }, [conversations, loadConversations, loadMessages, onConsume]);
-
+ 
   React.useEffect(() => {
     if (!initialOpen) return;
     processInitialOpen(initialOpen);
   }, [initialOpen, processInitialOpen]);
-
+ 
   useEffect(() => {
     if (!isReady) return;
     void loadConversations();
   }, [isReady, loadConversations]);
-
+ 
   const filteredConversations = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-
+ 
     return conversations.filter((conversation) => {
       const matchesRole = conversation.role === peerRoleLabel;
       const matchesSearch =
         !normalizedSearch ||
         [conversation.name, conversation.role, conversation.lastMessage].some((value) => value.toLowerCase().includes(normalizedSearch));
-
+ 
       return matchesRole && matchesSearch;
     });
   }, [conversations, peerRoleLabel, search]);
-
+ 
   const activeConversation = filteredConversations.find((conversation) => conversation.id === selectedChat) ?? filteredConversations[0];
-
+ 
   // Scroll al final cuando se selecciona una conversación o cambian los mensajes
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -691,29 +700,29 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
     }, 100);
     return () => clearTimeout(timeoutId);
   }, [selectedChat, activeConversation?.messages.length]);
-
+ 
   useEffect(() => {
     if (!activeConversation) return;
     if (selectedChat !== activeConversation.id) {
       setSelectedChat(activeConversation.id);
     }
   }, [activeConversation, selectedChat]);
-
+ 
   const updateConversation = (conversationId: number, updater: (conversation: Conversation) => Conversation) => {
     setConversations((current) => current.map((conversation) => (conversation.id === conversationId ? updater(conversation) : conversation)));
   };
-
+ 
   const handleConversationSelect = (conversationId: number) => {
     setSelectedChat(conversationId);
     setReplyingTo(null);
     updateConversation(conversationId, (conversation) => ({ ...conversation, unread: 0 }));
     void Promise.all([loadMessages(conversationId), markConversationAsRead(conversationId)]);
   };
-
+ 
   const handleRemoveAttachment = (removeIndex: number) => {
     setPendingAttachments((current) => current.filter((_, currentIndex) => currentIndex !== removeIndex));
   };
-
+ 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     const attachments = files.map((file) => ({
@@ -721,26 +730,26 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
       sizeLabel: formatSize(file.size),
       typeLabel: file.type || "Archivo",
     }));
-
+ 
     setPendingAttachments((current) => [...current, ...attachments]);
     event.target.value = "";
   };
-
+ 
   const addFiles = (files: File[]) => {
     const attachments = files.map((file) => ({
       name: file.name,
       sizeLabel: formatSize(file.size),
       typeLabel: file.type || "Archivo",
     }));
-
+ 
     setPendingAttachments((current) => [...current, ...attachments]);
   };
-
+ 
   const handleSend = () => {
     const trimmedMessage = message.trim();
-
+ 
     if (!trimmedMessage && pendingAttachments.length === 0) return;
-
+ 
     const currentConversation = filteredConversations.find((conversation) => conversation.id === selectedChat);
     if (!currentConversation) return;
     (async () => {
@@ -760,7 +769,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
       }
     })();
   };
-
+ 
   const handleDeleteMessage = async (messageId: number) => {
     if (!selectedChat) return;
     try {
@@ -773,7 +782,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
       toast.error(err?.message ?? 'No fue posible eliminar el mensaje');
     }
   };
-
+ 
   const handleEditMessage = async (messageId: number, body: string) => {
     if (!selectedChat) return;
     try {
@@ -790,20 +799,20 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
       toast.error(err?.message ?? 'No fue posible editar el mensaje');
     }
   };
-
+ 
   useEffect(() => {
     if (!message) return;
     setIsTyping(true);
     const t = setTimeout(() => setIsTyping(false), 1200);
     return () => clearTimeout(t);
   }, [message]);
-
+ 
   const handleDropFiles = (e: React.DragEvent) => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer?.files ?? []);
     if (files.length > 0) addFiles(files as File[]);
   };
-
+ 
   return (
     <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-5 overflow-hidden">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -812,7 +821,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
           <p className="max-w-2xl text-sm text-muted-foreground hidden sm:block">Mensajería interna: mensajes, archivos y seguimiento.</p>
         </div>
       </div>
-
+ 
       <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
         <Card className="hidden sm:flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
           <CardHeader className="space-y-4 border-b border-border/60 pb-4">
@@ -834,7 +843,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
               )}
             </div>
           </CardHeader>
-
+ 
           <CardContent className="min-h-0 flex-1 p-0">
             <ScrollArea className="h-full pr-1">
               {filteredConversations.length > 0 ? (
@@ -857,7 +866,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
             </ScrollArea>
           </CardContent>
         </Card>
-
+ 
         <Dialog open={newConversationOpen} onOpenChange={setNewConversationOpen}>
           <DialogContent>
             <DialogHeader>
@@ -875,7 +884,12 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
                 />
               </div>
               {isLoadingRecipients ? (
-                <p className="text-sm text-muted-foreground">Cargando usuarios...</p>
+                <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2">
+                    <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
+                    <div>Cargando usuarios...</div>
+                  </div>
+                </div>
               ) : recipientFetchError ? (
                 <p className="text-sm text-destructive">{recipientFetchError}</p>
               ) : (
@@ -900,7 +914,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
             </div>
           </DialogContent>
         </Dialog>
-
+ 
         <Card className="flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
           <CardHeader className="border-b border-border/60 bg-background/80 pb-4">
             {activeConversation ? (
@@ -934,7 +948,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
               </div>
             )}
           </CardHeader>
-
+ 
           <CardContent className="min-h-0 flex-1 p-0">
             {activeConversation ? (
               <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 px-3 py-4 pr-2 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
@@ -949,7 +963,6 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
                       description="Todavía no hay mensajes en esta conversación. Puedes iniciar la charla desde abajo."
                     />
                   )}
-                  {/* Referencia para scroll al final */}
                   <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
@@ -960,7 +973,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
               />
             )}
           </CardContent>
-
+ 
           <div className="shrink-0 border-t border-border/60 bg-background/95 p-4 shadow-[0_-12px_30px_rgba(16,185,129,0.06)] backdrop-blur-sm">
             {replyingTo && (
               <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
@@ -979,7 +992,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
               </div>
             )}
             {pendingAttachments.length > 0 && <PendingAttachmentsBar attachments={pendingAttachments} onRemove={handleRemoveAttachment} />}
-
+ 
             <div className="space-y-3">
               <Textarea
                 placeholder="Escribe un mensaje..."
@@ -993,7 +1006,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
                   }
                 }}
               />
-
+ 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
@@ -1008,7 +1021,7 @@ const normalizeMessage = useCallback((raw: any): ChatMessage => ({
                   </Button>
                   <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
                 </div>
-
+ 
                 <Button variant="success" className="rounded-full px-5 shadow-md shadow-emerald-500/20" onClick={handleSend}>
                   <Send className="h-4 w-4 mr-2" />
                   Enviar mensaje

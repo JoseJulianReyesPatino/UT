@@ -20,6 +20,7 @@ import Instrumento40Page from "./pages/docente/Instrumento40";
 import Instrumento6070Page from "./pages/docente/Instrumento6070";
 import Instrumento60Page from "./pages/docente/Instrumento60";
 import RemedialPage from "./pages/docente/Remedial";
+import Charging2 from "../assets/CHARGING_2.png";
 import ListaConcentradaPage from "./pages/docente/ListaConcentrada";
 import AsesoriaPage from "./pages/docente/Asesoria";
 import PortafolioDigitalPage from "./pages/docente/PortafolioDigital";
@@ -171,7 +172,10 @@ function AppContent() {
   if (!isReady) {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        Cargando sesión...
+        <div className="flex flex-col items-center gap-2 text-center">
+          <img src={Charging2} alt="Cargando sesión" className="h-48 w-auto" />
+          <div>Cargando sesión...</div>
+        </div>
       </div>
     );
   }

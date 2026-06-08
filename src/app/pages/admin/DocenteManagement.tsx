@@ -13,6 +13,7 @@ import { UserPlus, Search, Edit, Key, UserCheck, UserX, ShieldAlert, Mail, Slide
 import { toast } from "sonner";
 import { apiFetch } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
+import Charging2 from "../../../assets/CHARGING_2.png";
 
 type UserRole = "docente" | "tutor" | "administrador";
 type StatusFilter = "all" | "activo" | "inactivo";
@@ -311,7 +312,10 @@ export function DocenteManagement() {
   if (isLoadingUsers) {
     usersListContent = (
       <div className="rounded-xl border border-dashed border-border bg-background/80 p-8 text-center text-sm text-muted-foreground">
-        Cargando usuarios desde la API...
+        <div className="flex flex-col items-center gap-2">
+          <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
+          <div>Cargando usuarios desde la API...</div>
+        </div>
       </div>
     );
   } else if (usersError) {

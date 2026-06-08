@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import apiFetch from "../../lib/api";
 import { getDocumentFileUrl } from "../../lib/documents";
+import ChargingImg from "../../../assets/Form_Not_Found.png";
+import Charging2 from "../../../assets/CHARGING_2.png";
 import { formatGroupCode } from "../../../lib/utils";
 import { useAuth } from "../../context/AuthContext";
 
@@ -182,6 +184,15 @@ export default function Estadias() {
   };
 
   const emptyStateLegend = "Aún no hay documentos de estadías para mostrar en esta sección. Cuando un docente suba uno, aparecerá aquí automáticamente.";
+
+  const EmptyState = ({ text }: { text: string }) => (
+    <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
+      <div className="flex flex-col items-center gap-4">
+        <img src={ChargingImg} alt="No forms" className="h-72 w-auto mx-auto" />
+        <p>{text}</p>
+      </div>
+    </div>
+  );
 
   const previewChipClassName =
     "h-8 rounded-full border-border bg-background/90 px-3 text-xs font-medium text-foreground hover:bg-emerald-50 hover:text-emerald-900 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-200";
@@ -483,10 +494,17 @@ export default function Estadias() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading && <p className="text-sm text-muted-foreground">Cargando documentos reales del backend...</p>}
+                {isLoading && (
+                  <div className="rounded-lg border border-dashed border-border p-4 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center gap-2">
+                      <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
+                      <p>Cargando documentos</p>
+                    </div>
+                  </div>
+                )}
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
                 {!isLoading && !loadError && filteredAll.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">{emptyStateLegend}</div>
+                  <EmptyState text={emptyStateLegend} />
                 ) : !isLoading && !loadError && filteredAll.map((doc) => {
                   const isReviewed = "reviewedAt" in doc;
                   const isReturned = Boolean(doc.returned);
@@ -606,10 +624,17 @@ export default function Estadias() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading && <p className="text-sm text-muted-foreground">Cargando documentos reales del backend...</p>}
+                {isLoading && (
+                  <div className="rounded-lg border border-dashed border-border p-4 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center gap-2">
+                      <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
+                      <p>Cargando documentos</p>
+                    </div>
+                  </div>
+                )}
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
                 {!isLoading && !loadError && filteredPending.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">{emptyStateLegend}</div>
+                  <EmptyState text={emptyStateLegend} />
                 ) : !isLoading && !loadError && filteredPending.map((doc) => (
                   <div key={doc.id} className="cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                     <div className="flex items-start gap-3 flex-1">
@@ -912,9 +937,7 @@ export default function Estadias() {
             <CardContent>
               <div className="space-y-3">
                     {reviewedToday.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
-                    {emptyStateLegend}
-                  </div>
+                  <EmptyState text={emptyStateLegend} />
                 ) : (
                   reviewedToday.map((doc) => {
                     const isReturned = Boolean(doc.returned);
