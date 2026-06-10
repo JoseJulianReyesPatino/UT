@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, ReactNode, useMemo, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, ReactNode, useMemo, useEffect, useRef, useCallback } from "react";
 import { AUTH_TOKEN_STORAGE_KEY, resolveApiAssetUrl } from "../lib/env";
 import { apiFetch } from "../lib/api";
+import { clearAvatarCache } from "../lib/avatar";
 
 type UserRole = "docente" | "tutor" | "administrador";
 
@@ -22,8 +23,8 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  updateProfile: (updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => Promise<void>;
-  refreshUser: () => Promise<void>;
+  updateProfile: (updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => void;
+  refreshUser: () => Promise<User | null>;
   isAuthenticated: boolean;
   isReady: boolean;
   notice: { type: "success" | "error"; message: string } | null;
@@ -62,9 +63,7 @@ const normalizeRoleToken = (role: ApiRolePayload): string => {
   return name ?? "";
 };
 
-const normalizeRoles = (
-  roles: ApiRolePayload[] | undefined,
-): UserRole[] => {
+const normalizeRoles = (roles: ApiRolePayload[] | undefined): UserRole[] => {
   const result: UserRole[] = [];
   (roles ?? []).forEach((r) => {
     const s = normalizeRoleToken(r);
@@ -114,7 +113,6 @@ const loadCachedProfile = (userId: string) => {
 };
 
 const saveCachedProfile = (user: User) => {
-  // FIXED: No guardar data URLs en caché (solo URLs reales o vacío)
   let avatarToCache = "";
   if (user.avatar && !user.avatar.startsWith("data:") && user.avatar.length <= 2000) {
     avatarToCache = user.avatar;
@@ -148,7 +146,6 @@ const mapApiUser = (apiUser: ApiLoginResponse["user"]): User => {
   const fallbackNames = splitNameParts(apiUser.full_name);
   const cachedProfile = loadCachedProfile(String(apiUser.id));
 
-  // FIXED: Priorizar la URL del servidor sobre la caché para el avatar
   const avatarUrl = apiUser.avatar_url 
     ? resolveApiAssetUrl(apiUser.avatar_url)
     : (cachedProfile?.avatar ? resolveApiAssetUrl(cachedProfile.avatar) : undefined);
@@ -213,11 +210,10 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     }
   };
 
-  // FIXED: Nueva función para refrescar los datos del usuario desde el servidor
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async (): Promise<User | null> => {
     const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
     if (!token) {
-      return;
+      return null;
     }
 
     try {
@@ -225,11 +221,16 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       const apiUser = mapApiUser(payload.user);
       setUser(apiUser);
       saveCachedProfile(apiUser);
+      
+      // Disparar evento de actualización de usuario
+      window.dispatchEvent(new CustomEvent('ut-user-updated', { detail: { user: apiUser } }));
+      
+      return apiUser;
     } catch (error) {
       console.error('Error refreshing user:', error);
-      // Si hay error al refrescar, no hacemos nada, mantenemos el usuario actual
+      return null;
     }
-  };
+  }, []);
 
   useEffect(() => {
     localStorage.removeItem("utslrc-user-profiles");
@@ -262,26 +263,18 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
     setUser(null);
     setNotice(null);
+    clearAvatarCache();
   };
 
-  // FIXED: updateProfile ahora es async y refresca desde el servidor después de actualizar
-  const updateProfile = async (updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => {
+  const updateProfile = useCallback((updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => {
     setUser((currentUser) => {
       if (!currentUser) return currentUser;
       
-      // Actualización optimista inmediata
       const nextUser = { ...currentUser, ...updates };
       saveCachedProfile(nextUser);
       return nextUser;
     });
-
-    // Opcional: refrescar desde el servidor para asegurar consistencia
-    // Esto es útil después de actualizaciones que vienen del backend
-    // Descomentar si quieres asegurar que el estado siempre esté sincronizado
-    // setTimeout(() => {
-    //   refreshUser();
-    // }, 100);
-  };
+  }, []);
 
   const value = useMemo(
     () => ({ 
@@ -294,7 +287,7 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       isReady, 
       notice 
     }),
-    [isReady, notice, user]
+    [isReady, notice, user, updateProfile, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

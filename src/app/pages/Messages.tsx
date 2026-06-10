@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -12,26 +12,15 @@ import { cn } from "../../lib/utils";
 import apiFetch from "../lib/api";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
+import { getAvatarUrlWithTimestamp, getInitials, isImageUrl } from "../lib/avatar";
 import Charging2 from "../../assets/CHARGING_2.png";
- 
- 
-// Función para convertir URL relativa a absoluta
-const getAbsoluteUrl = (url?: string | null): string | undefined => {
-  if (!url) return undefined;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/')) {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
-    return `${baseUrl}${url}`;
-  }
-  return url;
-};
- 
+
 type AttachmentItem = {
   name: string;
   sizeLabel: string;
   typeLabel: string;
 };
- 
+
 type ChatMessage = {
   id: number;
   sender: string;
@@ -46,7 +35,7 @@ type ChatMessage = {
     content: string;
   };
 };
- 
+
 type Conversation = {
   id: number;
   name: string;
@@ -58,33 +47,33 @@ type Conversation = {
   status: "online" | "offline" | "away";
   messages: ChatMessage[];
 };
- 
+
 const initialConversations: Conversation[] = [];
- 
+
 const formatSize = (size: number) => {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 };
- 
+
 const getTimeLabel = () =>
   new Date().toLocaleTimeString("es-MX", {
     hour: "2-digit",
     minute: "2-digit",
   });
- 
+
 const parseMessageDate = (timestamp: string) => {
   const normalized = timestamp.includes("T") ? timestamp : timestamp.replace(" ", "T");
   const parsed = new Date(normalized);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
- 
+
 const canEditMessage = (timestamp: string) => {
   const parsed = parseMessageDate(timestamp);
   if (!parsed) return false;
   return Date.now() - parsed.getTime() <= 5 * 60 * 1000;
 };
- 
+
 function PendingAttachmentChip({
   attachment,
   index,
@@ -109,28 +98,40 @@ function PendingAttachmentChip({
     </div>
   );
 }
- 
+
 function StatusDot({ status }: Readonly<{ status: Conversation["status"] }>) {
   let statusClassName = "bg-slate-400";
- 
+
   if (status === "online") {
     statusClassName = "bg-emerald-500";
   } else if (status === "away") {
     statusClassName = "bg-amber-500";
   }
- 
+
   return <span className={cn("h-2 w-2 rounded-full", statusClassName)} />;
 }
- 
-function ConversationRow({
+
+// Componente memoizado para evitar re-renders innecesarios
+const ConversationRow = React.memo(({
   conversation,
   active,
   onSelect,
-}: Readonly<{
+}: {
   conversation: Conversation;
   active: boolean;
   onSelect: (conversationId: number) => void;
-}>) {
+}) => {
+  // Calcular la URL de la imagen UNA SOLA VEZ y memoizarla
+  const imageUrl = useMemo(() => {
+    if (conversation.avatar && isImageUrl(conversation.avatar)) {
+      return getAvatarUrlWithTimestamp(conversation.avatar);
+    }
+    return undefined;
+  }, [conversation.avatar]); // Solo se recalcula si cambia el avatar
+  
+  const showImage = !!imageUrl;
+  const initials = getInitials(conversation.name);
+  
   return (
     <button
       type="button"
@@ -146,10 +147,16 @@ function ConversationRow({
       <div className="flex items-start gap-3 px-3 py-3.5">
         <div className="relative mt-0.5 shrink-0">
           <Avatar className="h-9 w-9 ring-1 ring-white/70 dark:ring-slate-900/60">
-            {conversation.avatar?.startsWith('http') || conversation.avatar?.startsWith('/') ? (
-              <img src={conversation.avatar} alt={conversation.name} className="h-full w-full object-cover" />
+            {showImage && imageUrl ? (
+              <AvatarImage 
+                src={imageUrl} 
+                alt={conversation.name} 
+                className="h-full w-full object-cover"
+              />
             ) : (
-              <AvatarFallback className="bg-success/10 text-success">{conversation.avatar}</AvatarFallback>
+              <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-medium">
+                {initials}
+              </AvatarFallback>
             )}
           </Avatar>
           <span className={cn("absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background", StatusDot({ status: conversation.status }))} />
@@ -172,41 +179,58 @@ function ConversationRow({
       </div>
     </button>
   );
-}
- 
-function MessageBubble({
+});
+
+// Componente memoizado para mensajes
+const MessageBubble = React.memo(({
   message,
   onReply,
   onDelete,
   onEdit,
-}: Readonly<{ message: ChatMessage; onReply: (message: ChatMessage) => void; onDelete?: (messageId: number) => void; onEdit?: (messageId: number, body: string) => void }>) {
+}: {
+  message: ChatMessage;
+  onReply: (message: ChatMessage) => void;
+  onDelete?: (messageId: number) => void;
+  onEdit?: (messageId: number, body: string) => void;
+}) => {
   const [removeOpen, setRemoveOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editBody, setEditBody] = useState(message.content);
   const editable = message.isOwn && canEditMessage(message.timestamp);
- 
+  
+  // Calcular la URL de la imagen UNA SOLA VEZ
+  const imageUrl = useMemo(() => {
+    if (message.avatar && isImageUrl(message.avatar)) {
+      return getAvatarUrlWithTimestamp(message.avatar);
+    }
+    return undefined;
+  }, [message.avatar]);
+  
+  const showImage = !!imageUrl;
+  const senderInitials = getInitials(message.sender);
+
   useEffect(() => {
     if (editOpen) {
       setEditBody(message.content);
     }
   }, [editOpen, message.content]);
- 
+
   return (
     <div className={cn("flex items-end", message.isOwn ? "justify-end" : "justify-start")}> 
       {!message.isOwn && (
         <div className="mr-2 mt-0.5 shrink-0">
           <Avatar className="h-8 w-8 ring-1 ring-white/80 dark:ring-slate-900/50">
-            {message.avatar?.startsWith('http') || message.avatar?.startsWith('/') ? (
-              <img src={message.avatar} alt={message.sender} className="h-full w-full object-cover" />
+            {showImage && imageUrl ? (
+              <AvatarImage src={imageUrl} alt={message.sender} className="h-full w-full object-cover" />
             ) : (
-              <AvatarFallback className="bg-success/10 text-success">
-                {message.sender.split(" ").map(n=>n[0]).slice(0,2).join("")}
+              <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-medium">
+                {senderInitials}
               </AvatarFallback>
             )}
           </Avatar>
         </div>
       )}
- 
+
       <div
         className={cn(
           "max-w-[78%] rounded-2xl px-4 py-3 shadow-sm relative",
@@ -218,7 +242,7 @@ function MessageBubble({
       >
         <div className="text-xs font-medium mb-1 text-foreground/70">{!message.isOwn && message.sender}</div>
         <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
- 
+
         {message.attachments && message.attachments.length > 0 && (
           <div className="mt-3 space-y-2">
             {message.attachments.map((attachment) => (
@@ -232,7 +256,7 @@ function MessageBubble({
             ))}
           </div>
         )}
- 
+
         <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
           <span className="opacity-90">{message.timestamp}</span>
           <div className="inline-flex items-center gap-2">
@@ -265,7 +289,7 @@ function MessageBubble({
           </div>
         </div>
       </div>
- 
+
       {editable && onEdit && (
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent>
@@ -293,8 +317,8 @@ function MessageBubble({
       )}
     </div>
   );
-}
- 
+});
+
 function PendingAttachmentsBar({
   attachments,
   onRemove,
@@ -310,7 +334,7 @@ function PendingAttachmentsBar({
     </div>
   );
 }
- 
+
 function EmptyConversationState({ title, description }: Readonly<{ title: string; description: string }>) {
   return (
     <div className="flex h-full min-h-[260px] items-center justify-center px-6 py-10 text-center">
@@ -321,13 +345,7 @@ function EmptyConversationState({ title, description }: Readonly<{ title: string
     </div>
   );
 }
- 
-function getStatusLabel(status: Conversation["status"]) {
-  if (status === "online") return "En línea";
-  if (status === "away") return "Ausente";
-  return "Desconectado";
-}
- 
+
 export function Messages(props: Readonly<{
   initialOpen?: { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string } } | null;
   onConsume?: () => void;
@@ -349,6 +367,7 @@ export function Messages(props: Readonly<{
   const [recipientUsers, setRecipientUsers] = useState<any[]>([]);
   const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
   const [recipientFetchError, setRecipientFetchError] = useState<string | null>(null);
+  const [avatarVersion, setAvatarVersion] = useState(0);
   
   const currentRoleLabel = user?.roles?.length && user.roles.length > 1
     ? user.roles.map((role) => (role === "administrador" ? "Administrador" : role === "tutor" ? "Tutor" : "Docente")).join(" y ")
@@ -357,10 +376,24 @@ export function Messages(props: Readonly<{
     : user?.role === "tutor"
     ? "Tutor"
     : "Docente";
+  
   const peerRoleLabel = currentRoleLabel === "Administrador" ? "Docente" : "Administrador";
- 
   const recipientRoleCode = peerRoleLabel.toLowerCase();
- 
+
+  // Escuchar eventos de actualización de avatar
+  useEffect(() => {
+    const handleAvatarUpdate = () => {
+      setAvatarVersion(prev => prev + 1);
+      loadConversations();
+    };
+    
+    window.addEventListener('ut-avatar-updated', handleAvatarUpdate);
+    
+    return () => {
+      window.removeEventListener('ut-avatar-updated', handleAvatarUpdate);
+    };
+  }, []);
+
   const loadRecipientUsers = useCallback(async () => {
     try {
       setIsLoadingRecipients(true);
@@ -381,12 +414,12 @@ export function Messages(props: Readonly<{
       setIsLoadingRecipients(false);
     }
   }, [recipientRoleCode, user?.id]);
- 
+
   useEffect(() => {
     if (!newConversationOpen) return;
     void loadRecipientUsers();
   }, [newConversationOpen, loadRecipientUsers]);
- 
+
   const filteredRecipientUsers = useMemo(() => {
     const normalizedSearch = recipientQuery.trim().toLowerCase();
     return recipientUsers.filter((recipient) => {
@@ -394,7 +427,7 @@ export function Messages(props: Readonly<{
       return !normalizedSearch || fullName.includes(normalizedSearch);
     });
   }, [recipientQuery, recipientUsers]);
- 
+
   const handleCreateConversation = async (recipient: any) => {
     try {
       const normalizedRecipientName = ((recipient.full_name ?? recipient.name ?? '') as string).trim().toLowerCase();
@@ -406,7 +439,7 @@ export function Messages(props: Readonly<{
         await loadMessages(existingConversation.id);
         return;
       }
- 
+
       const created = (await apiFetch('/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -423,7 +456,7 @@ export function Messages(props: Readonly<{
       toast.error('No fue posible crear la conversación');
     }
   };
- 
+
   // Recuperar conversaciones guardadas al montar
   useEffect(() => {
     const savedConversations = sessionStorage.getItem('chat_conversations');
@@ -442,59 +475,87 @@ export function Messages(props: Readonly<{
       setSelectedChat(Number(savedSelectedChat));
     }
   }, []);
- 
+
   // Guardar conversaciones en sessionStorage
   useEffect(() => {
     if (conversations.length > 0 && !isInitialLoad) {
       sessionStorage.setItem('chat_conversations', JSON.stringify(conversations));
     }
   }, [conversations, isInitialLoad]);
- 
+
   // Guardar selectedChat en sessionStorage
   useEffect(() => {
     if (selectedChat !== null) {
       sessionStorage.setItem('chat_selected_chat', String(selectedChat));
     }
   }, [selectedChat]);
- 
-  const getInitials = (name?: string) => {
-    if (!name) return "CH";
-    return name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((p) => p[0]?.toUpperCase() ?? "")
-      .join("") || "CH";
-  };
- 
+
   const normalizeConversation = useCallback((raw: any): Conversation => {
-    const avatarValue = getAbsoluteUrl(raw.avatar_url) ?? getInitials(raw.name ?? raw.display_name);
+    // Extraer el nombre y rol del otro participante
+    let displayName = raw.name;
+    let participantRole = raw.role;
+    let avatarUrl = raw.avatar_url || raw.avatar;
+    
+    // Si hay participantes, obtener la información del otro participante
+    if (raw.participants && Array.isArray(raw.participants) && user) {
+      const otherParticipant = raw.participants.find((p: any) => p.id !== Number(user.id));
+      if (otherParticipant) {
+        displayName = otherParticipant.name;
+        const otherRole = otherParticipant.role === 'administrador' ? 'Administrador' : 
+                         otherParticipant.role === 'tutor' ? 'Tutor' : 'Docente';
+        participantRole = otherRole;
+        if (otherParticipant.avatar_url) {
+          avatarUrl = otherParticipant.avatar_url;
+        }
+      }
+    }
+    
+    // Determinar el valor del avatar
+    let avatarValue;
+    if (avatarUrl && isImageUrl(avatarUrl)) {
+      avatarValue = getAvatarUrlWithTimestamp(avatarUrl);
+    } else {
+      avatarValue = getInitials(displayName);
+    }
     
     return {
       id: raw.id,
-      name: raw.name ?? raw.display_name ?? 'Conversación',
-      role: raw.role ?? 'Docente',
-      lastMessage: raw.lastMessage ?? raw.last_message ?? raw.lastMessage ?? 'Nuevo chat',
+      name: displayName ?? 'Conversación',
+      role: participantRole ?? 'Docente',
+      lastMessage: raw.lastMessage ?? raw.last_message ?? 'Nuevo chat',
       timestamp: raw.timestamp ?? raw.lastMessageAt ?? raw.updated_at ?? '',
       unread: Number(raw.unread ?? 0),
       avatar: avatarValue,
-      status: 'offline',
+      status: raw.status ?? 'offline',
       messages: [],
     };
-  }, []);
- 
-  const normalizeMessage = useCallback((raw: any): ChatMessage => ({
-    id: raw.id,
-    sender: raw.sender ?? raw.user_name ?? 'Usuario',
-    content: raw.content ?? raw.body ?? '',
-    timestamp: raw.timestamp ?? raw.created_at ?? new Date().toISOString(),
-    isOwn: Boolean(raw.isOwn || raw.is_own || raw.sender_id === Number(user?.id)),
-    avatar: getAbsoluteUrl(raw.avatar_url ?? raw.avatar),
-    attachments: raw.attachments ?? [],
-    replyTo: raw.replyTo ?? null,
-  }), [user?.id]);
- 
-  // FIX: loadConversations sin selectedChat en dependencias para evitar loop infinito
+  }, [user]);
+
+  const normalizeMessage = useCallback((raw: any): ChatMessage => {
+    let avatarValue;
+    const avatarUrl = raw.avatar_url ?? raw.avatar;
+    
+    if (avatarUrl && isImageUrl(avatarUrl)) {
+      avatarValue = getAvatarUrlWithTimestamp(avatarUrl);
+    } else if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.length <= 3) {
+      avatarValue = avatarUrl;
+    } else {
+      avatarValue = getInitials(raw.sender);
+    }
+    
+    return {
+      id: raw.id,
+      sender: raw.sender ?? raw.user_name ?? 'Usuario',
+      content: raw.content ?? raw.body ?? '',
+      timestamp: raw.timestamp ?? raw.created_at ?? new Date().toISOString(),
+      isOwn: Boolean(raw.isOwn || raw.is_own || raw.sender_id === Number(user?.id)),
+      avatar: avatarValue,
+      attachments: raw.attachments ?? [],
+      replyTo: raw.replyTo ?? null,
+    };
+  }, [user?.id]);
+
+  // loadConversations
   const loadConversations = useCallback(async () => {
     try {
       const payload = (await apiFetch('/conversations', { method: 'GET' })) as { data?: any[] };
@@ -507,7 +568,6 @@ export function Messages(props: Readonly<{
         });
         return merged;
       });
-      // FIX: Leer selectedChat desde el estado funcional en lugar del closure
       setSelectedChat((prev) => {
         if (prev !== null) return prev;
         const saved = sessionStorage.getItem('chat_selected_chat');
@@ -522,8 +582,8 @@ export function Messages(props: Readonly<{
       setIsInitialLoad(false);
       return [];
     }
-  }, [normalizeConversation]); // FIX: eliminado selectedChat de dependencias
- 
+  }, [normalizeConversation]);
+
   const loadMessages = useCallback(async (conversationId: number) => {
     try {
       const payload = (await apiFetch(`/conversations/${conversationId}/messages`, { method: 'GET' })) as { data?: any[] };
@@ -536,7 +596,7 @@ export function Messages(props: Readonly<{
       return [];
     }
   }, [normalizeMessage]);
- 
+
   const markConversationAsRead = useCallback(async (conversationId: number) => {
     try {
       await apiFetch(`/conversations/${conversationId}/read`, { method: 'PATCH' });
@@ -545,28 +605,26 @@ export function Messages(props: Readonly<{
       // ignore
     }
   }, []);
- 
-  // FIX: Refs para que el polling siempre use la versión más reciente de las funciones
-  // sin necesidad de recrear el intervalo cuando cambian
+
+  // Refs para polling
   const loadMessagesRef = useRef(loadMessages);
   const loadConversationsRef = useRef(loadConversations);
- 
+
   useEffect(() => { loadMessagesRef.current = loadMessages; }, [loadMessages]);
   useEffect(() => { loadConversationsRef.current = loadConversations; }, [loadConversations]);
- 
-  // FIX: Polling estable — el intervalo solo se recrea cuando cambia selectedChat,
-  // no en cada render ni cuando se recrean las funciones
+
+  // Polling
   useEffect(() => {
     if (!selectedChat) return;
- 
+
     const interval = setInterval(() => {
       void loadMessagesRef.current(selectedChat);
       void loadConversationsRef.current();
     }, 3000);
- 
+
     return () => clearInterval(interval);
-  }, [selectedChat]); // FIX: solo selectedChat como dependencia
- 
+  }, [selectedChat]);
+
   const processInitialOpen = useCallback((detail: NonNullable<typeof initialOpen>) => {
     const { conversationId, recipientName, recipientRole, document } = detail;
     const buildDocumentAttachment = (doc: { id: number; title: string }): AttachmentItem => ({
@@ -574,7 +632,7 @@ export function Messages(props: Readonly<{
       sizeLabel: "—",
       typeLabel: "Documento PDF",
     });
- 
+
     const appendDocumentToConversation = (conv: Conversation, doc: { id: number; title: string }): Conversation => {
       const documentMessage: ChatMessage = {
         id: Date.now(),
@@ -584,7 +642,7 @@ export function Messages(props: Readonly<{
         isOwn: true,
         attachments: [buildDocumentAttachment(doc)],
       };
- 
+
       return {
         ...conv,
         messages: [...conv.messages, documentMessage],
@@ -592,7 +650,7 @@ export function Messages(props: Readonly<{
         timestamp: "Ahora",
       };
     };
- 
+
     if (conversationId) {
       setSelectedChat(conversationId);
       if (document) {
@@ -605,9 +663,9 @@ export function Messages(props: Readonly<{
       onConsume?.();
       return;
     }
- 
+
     if (!recipientName) return;
- 
+
     (async () => {
       try {
         const normalizedRecipientName = recipientName.trim().toLowerCase();
@@ -617,7 +675,7 @@ export function Messages(props: Readonly<{
           availableConversations = await loadConversations();
           found = availableConversations.find((c) => c.name.trim().toLowerCase() === normalizedRecipientName);
         }
- 
+
         if (found) {
           setSelectedChat(found.id);
           if (document) await apiFetch(`/conversations/${found.id}/messages`, {
@@ -629,7 +687,7 @@ export function Messages(props: Readonly<{
           onConsume?.();
           return;
         }
- 
+
         const usersPayload = (await apiFetch('/users', { method: 'GET' })) as { data?: any[] } | null;
         const users = usersPayload?.data ?? [];
         const recipient = users.find((u) => {
@@ -637,7 +695,7 @@ export function Messages(props: Readonly<{
           const roleMatches = recipientRole && (u.roles ?? []).some((r: any) => (r.code ?? r).toString().toLowerCase().includes(recipientRole.toLowerCase()));
           return fullName === normalizedRecipientName || roleMatches;
         });
- 
+
         let conversationId: number | null = null;
         if (recipient) {
           const created = (await apiFetch('/conversations', {
@@ -647,7 +705,7 @@ export function Messages(props: Readonly<{
           })) as { data?: any };
           conversationId = created?.data?.id ?? null;
         }
- 
+
         if (conversationId) {
           await loadConversations();
           setSelectedChat(conversationId);
@@ -658,40 +716,42 @@ export function Messages(props: Readonly<{
           });
           await loadMessages(conversationId);
         }
- 
+
         onConsume?.();
       } catch (err) {
         console.error('openInitialConversation error', err);
       }
     })();
   }, [conversations, loadConversations, loadMessages, onConsume]);
- 
+
   React.useEffect(() => {
     if (!initialOpen) return;
     processInitialOpen(initialOpen);
   }, [initialOpen, processInitialOpen]);
- 
+
   useEffect(() => {
     if (!isReady) return;
     void loadConversations();
   }, [isReady, loadConversations]);
- 
+
   const filteredConversations = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
- 
+
     return conversations.filter((conversation) => {
       const matchesRole = conversation.role === peerRoleLabel;
       const matchesSearch =
         !normalizedSearch ||
-        [conversation.name, conversation.role, conversation.lastMessage].some((value) => value.toLowerCase().includes(normalizedSearch));
- 
+        [conversation.name, conversation.role, conversation.lastMessage].some((value) => 
+          value?.toLowerCase().includes(normalizedSearch)
+        );
+
       return matchesRole && matchesSearch;
     });
   }, [conversations, peerRoleLabel, search]);
- 
+
   const activeConversation = filteredConversations.find((conversation) => conversation.id === selectedChat) ?? filteredConversations[0];
- 
-  // Scroll al final cuando se selecciona una conversación o cambian los mensajes
+
+  // Scroll al final
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (messagesEndRef.current) {
@@ -700,29 +760,29 @@ export function Messages(props: Readonly<{
     }, 100);
     return () => clearTimeout(timeoutId);
   }, [selectedChat, activeConversation?.messages.length]);
- 
+
   useEffect(() => {
     if (!activeConversation) return;
     if (selectedChat !== activeConversation.id) {
       setSelectedChat(activeConversation.id);
     }
   }, [activeConversation, selectedChat]);
- 
+
   const updateConversation = (conversationId: number, updater: (conversation: Conversation) => Conversation) => {
     setConversations((current) => current.map((conversation) => (conversation.id === conversationId ? updater(conversation) : conversation)));
   };
- 
+
   const handleConversationSelect = (conversationId: number) => {
     setSelectedChat(conversationId);
     setReplyingTo(null);
     updateConversation(conversationId, (conversation) => ({ ...conversation, unread: 0 }));
     void Promise.all([loadMessages(conversationId), markConversationAsRead(conversationId)]);
   };
- 
+
   const handleRemoveAttachment = (removeIndex: number) => {
     setPendingAttachments((current) => current.filter((_, currentIndex) => currentIndex !== removeIndex));
   };
- 
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     const attachments = files.map((file) => ({
@@ -730,26 +790,26 @@ export function Messages(props: Readonly<{
       sizeLabel: formatSize(file.size),
       typeLabel: file.type || "Archivo",
     }));
- 
+
     setPendingAttachments((current) => [...current, ...attachments]);
     event.target.value = "";
   };
- 
+
   const addFiles = (files: File[]) => {
     const attachments = files.map((file) => ({
       name: file.name,
       sizeLabel: formatSize(file.size),
       typeLabel: file.type || "Archivo",
     }));
- 
+
     setPendingAttachments((current) => [...current, ...attachments]);
   };
- 
+
   const handleSend = () => {
     const trimmedMessage = message.trim();
- 
+
     if (!trimmedMessage && pendingAttachments.length === 0) return;
- 
+
     const currentConversation = filteredConversations.find((conversation) => conversation.id === selectedChat);
     if (!currentConversation) return;
     (async () => {
@@ -769,7 +829,7 @@ export function Messages(props: Readonly<{
       }
     })();
   };
- 
+
   const handleDeleteMessage = async (messageId: number) => {
     if (!selectedChat) return;
     try {
@@ -782,7 +842,7 @@ export function Messages(props: Readonly<{
       toast.error(err?.message ?? 'No fue posible eliminar el mensaje');
     }
   };
- 
+
   const handleEditMessage = async (messageId: number, body: string) => {
     if (!selectedChat) return;
     try {
@@ -799,20 +859,20 @@ export function Messages(props: Readonly<{
       toast.error(err?.message ?? 'No fue posible editar el mensaje');
     }
   };
- 
+
   useEffect(() => {
     if (!message) return;
     setIsTyping(true);
     const t = setTimeout(() => setIsTyping(false), 1200);
     return () => clearTimeout(t);
   }, [message]);
- 
+
   const handleDropFiles = (e: React.DragEvent) => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer?.files ?? []);
     if (files.length > 0) addFiles(files as File[]);
   };
- 
+
   return (
     <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-5 overflow-hidden">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -821,7 +881,7 @@ export function Messages(props: Readonly<{
           <p className="max-w-2xl text-sm text-muted-foreground hidden sm:block">Mensajería interna: mensajes, archivos y seguimiento.</p>
         </div>
       </div>
- 
+
       <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
         <Card className="hidden sm:flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
           <CardHeader className="space-y-4 border-b border-border/60 pb-4">
@@ -843,14 +903,14 @@ export function Messages(props: Readonly<{
               )}
             </div>
           </CardHeader>
- 
+
           <CardContent className="min-h-0 flex-1 p-0">
             <ScrollArea className="h-full pr-1">
               {filteredConversations.length > 0 ? (
                 <div className="space-y-1.5 py-2">
                   {filteredConversations.map((conversation) => (
                     <ConversationRow
-                      key={conversation.id}
+                      key={`${conversation.id}-${avatarVersion}`}
                       conversation={conversation}
                       active={selectedChat === conversation.id}
                       onSelect={handleConversationSelect}
@@ -866,7 +926,7 @@ export function Messages(props: Readonly<{
             </ScrollArea>
           </CardContent>
         </Card>
- 
+
         <Dialog open={newConversationOpen} onOpenChange={setNewConversationOpen}>
           <DialogContent>
             <DialogHeader>
@@ -914,16 +974,22 @@ export function Messages(props: Readonly<{
             </div>
           </DialogContent>
         </Dialog>
- 
+
         <Card className="flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
           <CardHeader className="border-b border-border/60 bg-background/80 pb-4">
             {activeConversation ? (
               <div className="flex items-start gap-3">
                 <Avatar className="h-11 w-11 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
-                  {activeConversation.avatar?.startsWith('http') || activeConversation.avatar?.startsWith('/') ? (
-                    <img src={activeConversation.avatar} alt={activeConversation.name} className="h-full w-full object-cover" />
+                  {activeConversation.avatar && isImageUrl(activeConversation.avatar) ? (
+                    <AvatarImage 
+                      src={getAvatarUrlWithTimestamp(activeConversation.avatar)} 
+                      alt={activeConversation.name} 
+                      className="h-full w-full object-cover" 
+                    />
                   ) : (
-                    <AvatarFallback className="bg-success/10 text-success">{activeConversation.avatar}</AvatarFallback>
+                    <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-medium">
+                      {getInitials(activeConversation.name)}
+                    </AvatarFallback>
                   )}
                 </Avatar>
                 <div className="min-w-0 flex-1 space-y-1">
@@ -948,14 +1014,20 @@ export function Messages(props: Readonly<{
               </div>
             )}
           </CardHeader>
- 
+
           <CardContent className="min-h-0 flex-1 p-0">
             {activeConversation ? (
               <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 px-3 py-4 pr-2 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
                 <div className="space-y-4 pb-2 pt-1">
                   {activeConversation.messages.length > 0 ? (
                     activeConversation.messages.map((messageItem) => (
-                      <MessageBubble key={messageItem.id} message={messageItem} onReply={setReplyingTo} onDelete={handleDeleteMessage} onEdit={handleEditMessage} />
+                      <MessageBubble 
+                        key={messageItem.id}
+                        message={messageItem} 
+                        onReply={setReplyingTo} 
+                        onDelete={handleDeleteMessage} 
+                        onEdit={handleEditMessage} 
+                      />
                     ))
                   ) : (
                     <EmptyConversationState
@@ -973,7 +1045,7 @@ export function Messages(props: Readonly<{
               />
             )}
           </CardContent>
- 
+
           <div className="shrink-0 border-t border-border/60 bg-background/95 p-4 shadow-[0_-12px_30px_rgba(16,185,129,0.06)] backdrop-blur-sm">
             {replyingTo && (
               <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
@@ -992,7 +1064,7 @@ export function Messages(props: Readonly<{
               </div>
             )}
             {pendingAttachments.length > 0 && <PendingAttachmentsBar attachments={pendingAttachments} onRemove={handleRemoveAttachment} />}
- 
+
             <div className="space-y-3">
               <Textarea
                 placeholder="Escribe un mensaje..."
@@ -1006,7 +1078,7 @@ export function Messages(props: Readonly<{
                   }
                 }}
               />
- 
+
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
@@ -1021,7 +1093,7 @@ export function Messages(props: Readonly<{
                   </Button>
                   <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
                 </div>
- 
+
                 <Button variant="success" className="rounded-full px-5 shadow-md shadow-emerald-500/20" onClick={handleSend}>
                   <Send className="h-4 w-4 mr-2" />
                   Enviar mensaje

@@ -6,6 +6,8 @@ import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import apiFetch from "../lib/api";
+import { resolveApiAssetUrl } from "../lib/env";
+import { getAvatarUrlWithTimestamp, getInitials } from "../lib/avatar";
 import {
   FileText,
   BarChart3,
@@ -25,6 +27,17 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+
+// Función para resolver URLs de avatar
+const getAvatarUrl = (url?: string | null): string | undefined => {
+  if (!url) return undefined;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  if (url.startsWith('/')) {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
+    return `${baseUrl}${url}`;
+  }
+  return url;
+};
 
 interface SidebarProps {
   currentView: string;
@@ -239,7 +252,6 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const { currentView, onNavigate, mobileOpen, onMobileOpenChange } = props;
   const { user, logout } = useAuth();
   const { theme } = useTheme();
-  // Sidebar starts expanded for both admin and docente.
   const [collapsed, setCollapsed] = useState(false);
   const logoSrc = theme === "dark" ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
@@ -309,9 +321,6 @@ export function Sidebar(props: Readonly<SidebarProps>) {
 
   const handleMenuItemClick = React.useCallback((itemId: string, isMobile = false) => {
     onNavigate(itemId);
-    // Al navegar a cualquier otro apartado, el currentView cambiará y los
-    // padres se marcarán/desmarcarán según la nueva vista.
-    // Cerrar submenus de instrumentos cuando se navega a otro top-level
     setInstrumento3040Open(false);
     setInstrumento6070Open(false);
     if (isMobile) {
@@ -373,7 +382,6 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     menuItems = docenteMenuItems.filter((item) => item.id !== "tutorias");
   }
 
-  // Parent is active when the currentView is the parent id OR any of its children
   const isInstrumento3040Active = currentView === "instrumento-3040" || instrumento3040Children.some((item) => item.id === currentView);
   const isInstrumento6070Active = currentView === "instrumento-6070" || instrumento6070Children.some((item) => item.id === currentView);
 
@@ -403,84 +411,84 @@ export function Sidebar(props: Readonly<SidebarProps>) {
 
     return (
       <div className={containerClass}>
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-emerald-400/10 to-transparent dark:from-emerald-500/10" />
-      <div className="p-4 border-b border-sidebar-border/70 bg-background/60 backdrop-blur-sm">
-        <div className="relative flex items-center justify-end">
-          {!isCollapsedLocal && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-emerald-400/10 to-transparent dark:from-emerald-500/10" />
+        <div className="p-4 border-b border-sidebar-border/70 bg-background/60 backdrop-blur-sm">
+          <div className="relative flex items-center justify-end">
+            {!isCollapsedLocal && (
               <div className="absolute left-1/2 -translate-x-1/2">
-              <img
-                src={logoSrc}
-                alt="Logo"
-                className="h-10 w-auto object-contain"
-              />
-            </div>
-          )}
+                <img
+                  src={logoSrc}
+                  alt="Logo"
+                  className="h-10 w-auto object-contain"
+                />
+              </div>
+            )}
             <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
+              variant="ghost"
+              size="icon"
+              onClick={() => {
                 setCollapsed((prev) => !prev);
-            }}
-            aria-label={isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
-            title={isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
-            className="h-8 w-8 rounded-full border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
-          >
-            <ChevronLeft className={cn("h-4 w-4 transition-transform", isCollapsedLocal && "rotate-180")} />
-          </Button>
+              }}
+              aria-label={isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
+              title={isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
+              className="h-8 w-8 rounded-full border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
+            >
+              <ChevronLeft className={cn("h-4 w-4 transition-transform", isCollapsedLocal && "rotate-180")} />
+            </Button>
+          </div>
         </div>
-      </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto py-4">
-        <nav className="space-y-1 px-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = isMenuItemActive(item.id);
-            return (
-              <div key={item.id} className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => handleMenuItemClick(item.id, isMobile)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
-                    isActive
-                      ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
-                      : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
-                  )}
-                >
-                  <span className="relative flex shrink-0 items-center justify-center">
-                    <Icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
-                    {item.id === "mensajes" && <MessageBadge count={unreadMessagesCount} collapsed={isCollapsedLocal} />}
-                  </span>
-                  {!isCollapsedLocal && <span className="font-medium">{item.label}</span>}
-                </button>
+          <nav className="space-y-1 px-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = isMenuItemActive(item.id);
+              return (
+                <div key={item.id} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => handleMenuItemClick(item.id, isMobile)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
+                      isActive
+                        ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
+                        : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
+                    )}
+                  >
+                    <span className="relative flex shrink-0 items-center justify-center">
+                      <Icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
+                      {item.id === "mensajes" && <MessageBadge count={unreadMessagesCount} collapsed={isCollapsedLocal} />}
+                    </span>
+                    {!isCollapsedLocal && <span className="font-medium">{item.label}</span>}
+                  </button>
 
-                {item.id === "planeacion" && (
-                  <SidebarInstrumentSection
-                    currentView={currentView}
-                    isCollapsedLocal={isCollapsedLocal}
-                    isMobile={isMobile}
-                    canAccessTutorias={user?.role !== "administrador"}
-                    instrumento3040Children={instrumento3040Children}
-                    instrumento6070Children={instrumento6070Children}
-                    instrumento3040Open={instrumento3040Open}
-                    instrumento6070Open={instrumento6070Open}
-                    isInstrumento3040Active={isInstrumento3040Active}
-                    isInstrumento6070Active={isInstrumento6070Active}
-                    onNavigate={onNavigate}
-                    onMobileOpenChange={onMobileOpenChange}
-                    onCloseCollapse={() => setCollapsed(false)}
-                    onToggle3040={handleInstrumento3040Click}
-                    onToggle6070={handleInstrumento6070Click}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </nav>
-      </div>
+                  {item.id === "planeacion" && (
+                    <SidebarInstrumentSection
+                      currentView={currentView}
+                      isCollapsedLocal={isCollapsedLocal}
+                      isMobile={isMobile}
+                      canAccessTutorias={user?.role !== "administrador"}
+                      instrumento3040Children={instrumento3040Children}
+                      instrumento6070Children={instrumento6070Children}
+                      instrumento3040Open={instrumento3040Open}
+                      instrumento6070Open={instrumento6070Open}
+                      isInstrumento3040Active={isInstrumento3040Active}
+                      isInstrumento6070Active={isInstrumento6070Active}
+                      onNavigate={onNavigate}
+                      onMobileOpenChange={onMobileOpenChange}
+                      onCloseCollapse={() => setCollapsed(false)}
+                      onToggle3040={handleInstrumento3040Click}
+                      onToggle6070={handleInstrumento6070Click}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+        </div>
 
         <div className="p-4 border-t border-sidebar-border/70 space-y-3 bg-background/60 backdrop-blur-sm">
-        {!isCollapsedLocal && (
+          {!isCollapsedLocal && (
             <button
               type="button"
               onClick={() => {
@@ -490,10 +498,10 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               }}
               className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 to-cyan-50 shadow-sm transition-colors hover:bg-emerald-100/70 dark:border-slate-700 dark:from-slate-900 dark:to-slate-950 dark:hover:bg-slate-800 text-left"
             >
-            <Avatar className="h-8 w-8 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
+              <Avatar className="h-8 w-8 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
                 {user?.avatar && (
                   <AvatarImage
-                    src={user.avatar}
+                    src={getAvatarUrl(user.avatar)}
                     alt={user.name}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -504,40 +512,40 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                     className="cursor-pointer"
                   />
                 )}
-              <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                {user?.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-foreground">{user?.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{user?.role}</p>
-            </div>
+                <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                  {user?.name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate text-foreground">{user?.name}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {user?.role === "administrador" ? "Administrador" : user?.role === "tutor" ? "Tutor" : "Docente"}
+                </p>
+              </div>
             </button>
-        )}
-        <Button
-          variant="ghost"
-          size={isCollapsedLocal ? "icon" : "default"}
-          onClick={() => {
-            logout();
-            if (onMobileOpenChange) onMobileOpenChange(false);
-          }}
-          aria-label="Cerrar sesión"
-          className="w-full shrink-0 justify-start rounded-xl border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
-        >
-          <LogOut className="h-5 w-5" />
-          {!isCollapsedLocal && <span className="ml-3">Cerrar Sesión</span>}
-        </Button>
+          )}
+          <Button
+            variant="ghost"
+            size={isCollapsedLocal ? "icon" : "default"}
+            onClick={() => {
+              logout();
+              if (onMobileOpenChange) onMobileOpenChange(false);
+            }}
+            aria-label="Cerrar sesión"
+            className="w-full shrink-0 justify-start rounded-xl border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
+          >
+            <LogOut className="h-5 w-5" />
+            {!isCollapsedLocal && <span className="ml-3">Cerrar Sesión</span>}
+          </Button>
+        </div>
       </div>
-    </div>
     );
   };
 
-  // Render: desktop hidden on small screens, mobile drawer when `mobileOpen` is true
   return (
     <>
       <div className="hidden md:flex">{renderContent(false)}</div>
 
-      {/* Mobile drawer */}
       <div className={cn("md:hidden fixed inset-0 z-40", mobileOpen ? "" : "hidden")}>
         <button
           type="button"
@@ -549,6 +557,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
           {renderContent(true)}
         </div>
       </div>
+      
       <Dialog open={isAvatarOpen} onOpenChange={setIsAvatarOpen}>
         <DialogContent>
           <DialogHeader>
@@ -557,11 +566,14 @@ export function Sidebar(props: Readonly<SidebarProps>) {
           </DialogHeader>
           <div className="mt-4 flex justify-center">
             {user?.avatar ? (
-              // eslint-disable-next-line jsx-a11y/img-redundant-alt
-              <img src={user.avatar} alt={`Foto de perfil de ${user?.name}`} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
+              <img 
+                src={getAvatarUrl(user.avatar)} 
+                alt={`Foto de perfil de ${user?.name}`} 
+                className="max-h-[70vh] max-w-full rounded-lg object-contain" 
+              />
             ) : (
               <div className="h-40 w-40 rounded-lg bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-2xl">
-                {user?.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                {user?.name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "U"}
               </div>
             )}
           </div>

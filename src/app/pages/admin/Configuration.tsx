@@ -14,6 +14,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar"
 import { CalendarDays, ChevronDown, ChevronUp, FileText, Grid2x2, Moon, PencilLine, Search, Sun, Trash2, Users, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { carrieras } from "../../data/curricula";
+import { clearAvatarCache, getAvatarUrlWithTimestamp, getInitials } from "../../lib/avatar";
+
+// Función para resolver URLs de avatar
+const getAbsoluteUrl = (url?: string | null): string | undefined => {
+  if (!url) return undefined;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  if (url.startsWith('/')) {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
+    return `${baseUrl}${url}`;
+  }
+  return url;
+};
 
 type ConfigTab = "formularios" | "grupos" | "cuenta";
 
@@ -78,7 +90,7 @@ const FORM_ROLE_LABELS: Record<FormRole, string> = {
 
 export function Configuration(props: Readonly<ConfigurationProps>) {
   const { initialTab = "formularios" } = props;
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, refreshUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
   const [formConfig, setFormConfig] = useState(getFormConfig());
@@ -107,6 +119,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const [profileLastNames, setProfileLastNames] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
   const [profileAvatar, setProfileAvatar] = useState<string | undefined>(undefined);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -179,7 +192,6 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
         const res = await apiFetch('/groups');
         setGroups(res?.data ?? []);
       } catch (err: any) {
-        // keep empty list on error
         console.error('Failed to load groups', err);
         setGroups([]);
       }
@@ -454,80 +466,119 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   };
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const file = event.target.files?.[0];
+  if (!file) return;
 
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      toast.error("Solo se permiten imágenes PNG, JPG o WEBP");
-      return;
-    }
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    toast.error("Solo se permiten imágenes PNG, JPG o WEBP");
+    event.target.value = "";
+    return;
+  }
 
-    if (file.size > 4 * 1024 * 1024) {
-      toast.error("La imagen no debe superar 4 MB");
-      return;
-    }
+  if (file.size > 4 * 1024 * 1024) {
+    toast.error("La imagen no debe superar 4 MB");
+    event.target.value = "";
+    return;
+  }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : undefined;
-      setProfileAvatar(result);
-    };
-    reader.readAsDataURL(file);
+  setSelectedAvatarFile(file);
+  
+  const reader = new FileReader();
+  reader.onload = () => {
+    const result = typeof reader.result === "string" ? reader.result : undefined;
+    setProfileAvatar(result);
   };
+  reader.readAsDataURL(file);
+};
 
-  const handleSaveProfile = async () => {
-    if (!user) {
-      toast.error("No se pudo cargar el usuario actual");
-      return;
-    }
+// Modificar handleSaveProfile
+const handleSaveProfile = async () => {
+  if (!user) {
+    toast.error("No se pudo cargar el usuario actual");
+    return;
+  }
 
-    const firstNames = profileFirstNames.trim();
-    const lastNames = profileLastNames.trim();
-    const normalizedPhone = profilePhone.replace(/\D/g, "").slice(0, 10);
+  const firstNames = profileFirstNames.trim();
+  const lastNames = profileLastNames.trim();
+  const normalizedPhone = profilePhone.replace(/\D/g, "").slice(0, 10);
 
-    if (!firstNames || !lastNames) {
-      toast.error("Debes escribir nombres y apellidos");
-      return;
-    }
+  if (!firstNames || !lastNames) {
+    toast.error("Debes escribir nombres y apellidos");
+    return;
+  }
 
-    if (normalizedPhone.length !== 10) {
-      toast.error("El teléfono debe contener exactamente 10 números");
-      return;
-    }
+  if (normalizedPhone.length !== 10) {
+    toast.error("El teléfono debe contener exactamente 10 números");
+    return;
+  }
 
-    const fullName = `${firstNames} ${lastNames}`.trim();
+  const fullName = `${firstNames} ${lastNames}`.trim();
 
-    setIsSavingProfile(true);
+  setIsSavingProfile(true);
 
-    try {
-      await apiFetch(`/users/${user.id}`, {
-        method: "PATCH",
+  try {
+    if (selectedAvatarFile) {
+      const formData = new FormData();
+      formData.append("full_name", fullName);
+      formData.append("first_names", firstNames);
+      formData.append("last_names", lastNames);
+      formData.append("phone", normalizedPhone);
+      formData.append("avatar", selectedAvatarFile);
+      
+      await apiFetch("/auth/profile", {
+        method: "POST",
+        body: formData,
+      });
+    } else {
+      await apiFetch("/auth/profile", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: fullName,
           first_names: firstNames,
           last_names: lastNames,
           phone: normalizedPhone,
-          avatar_url: profileAvatar ?? null,
         }),
       });
+    }
 
+    // Limpiar caché de avatares
+    clearAvatarCache();
+    
+    // Refrescar usuario
+    const refreshedUser = await refreshUser();
+    
+    if (refreshedUser) {
       updateProfile({
         name: fullName,
         firstNames,
         lastNames,
         phone: normalizedPhone,
-        avatar: profileAvatar,
+        avatar: refreshedUser.avatar,
       });
-
-      toast.success("Configuración de cuenta actualizada");
-    } catch (error: any) {
-      toast.error(error instanceof Error ? error.message : "No fue posible guardar la configuración");
-    } finally {
-      setIsSavingProfile(false);
+      
+      setProfileAvatar(refreshedUser.avatar);
     }
-  };
+    
+    setSelectedAvatarFile(null);
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    
+    // Disparar evento para actualizar otros componentes
+    window.dispatchEvent(new CustomEvent('ut-avatar-updated', { 
+      detail: { userId: user.id, avatarUrl: refreshedUser?.avatar } 
+    }));
 
+    toast.success("Configuración de cuenta actualizada");
+  } catch (error: any) {
+    console.error("Error saving profile:", error);
+    toast.error(error instanceof Error ? error.message : "No fue posible guardar la configuración");
+  } finally {
+    setIsSavingProfile(false);
+  }
+};
   const handleSavePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       toast.error("Completa todos los campos de contraseña");
@@ -595,6 +646,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const softSubpanelClass = theme === "dark"
     ? "rounded-2xl border border-white/5 bg-slate-950/20 dark:border-emerald-900/20 dark:bg-slate-950/25"
     : "rounded-2xl border border-emerald-200/35 bg-white/35";
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const formSections = useMemo(
     () => [
@@ -699,7 +752,13 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                   </Avatar>
                   <div className="space-y-2">
                     <Label htmlFor="avatar">Foto de perfil</Label>
-                    <Input id="avatar" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} />
+                    <Input 
+                      ref={fileInputRef}
+                      id="avatar" 
+                      type="file" 
+                      accept="image/png,image/jpeg,image/webp" 
+                      onChange={handleAvatarChange} 
+                    />
                     <p className="text-xs text-muted-foreground">Formatos: PNG/JPG/WEBP. Tamaño máximo: 4MB.</p>
                   </div>
                 </div>
@@ -904,8 +963,6 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                                   <Checkbox
                                                     checked={config.dueAt === null}
                                                     onCheckedChange={(val) => {
-                                                      // If checked -> 'sin límite' => store null
-                                                      // If unchecked -> allow editing by setting empty string for this form only
                                                       updateFormAccess(form.id, (current) => ({ ...current, dueAt: val ? null : "" }));
                                                     }}
                                                   />

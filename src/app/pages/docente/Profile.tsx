@@ -9,11 +9,12 @@ import { Badge } from "../../components/ui/badge";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { resolveApiAssetUrl } from "../../lib/env";
+import { clearAvatarCache, getInitials } from "../../lib/avatar";
 import { Calendar, Eye, EyeOff, Key, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 export function Profile() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -136,12 +137,12 @@ export function Profile() {
         formData.append("full_name", fullName);
         formData.append("avatar", selectedAvatarFile);
         requestOptions = {
-          method: "PATCH",
+          method: "POST",
           body: formData,
         };
       } else {
         requestOptions = {
-          method: "PATCH",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             full_name: fullName,
@@ -149,37 +150,37 @@ export function Profile() {
         };
       }
 
-      const response = (await apiFetch("/auth/profile", requestOptions)) as {
-        user: {
-          full_name: string;
-          first_names?: string | null;
-          last_names?: string | null;
-          phone?: string | null;
-          area?: string | null;
-          avatar_url?: string | null;
-        };
-      };
+      await apiFetch("/auth/profile", requestOptions);
+      
+      // Limpiar caché de avatares
+      clearAvatarCache();
+      
+      // Refrescar usuario para obtener los nuevos datos
+      const refreshedUser = await refreshUser();
+      
+      if (refreshedUser) {
+        updateProfile({
+          name: refreshedUser.name,
+          firstNames: refreshedUser.firstNames,
+          lastNames: refreshedUser.lastNames,
+          avatar: refreshedUser.avatar,
+          phone: refreshedUser.phone,
+          area: refreshedUser.area,
+        });
 
-      // Resolver la URL del avatar
-      const resolvedAvatar = resolveApiAssetUrl(response.user.avatar_url ?? undefined);
-
-      // Actualizar el estado local Y el contexto
-      updateProfile({
-        name: response.user.full_name,
-        firstNames: response.user.first_names ?? firstName.trim(),
-        lastNames: response.user.last_names ?? lastName.trim(),
-        avatar: resolvedAvatar,
-        phone: response.user.phone ?? undefined,
-        area: response.user.area ?? undefined,
-      });
-
-      // Actualizar la vista previa local con la URL real
-      setAvatarPreview(resolvedAvatar);
+        setAvatarPreview(refreshedUser.avatar);
+      }
+      
       setSelectedAvatarFile(null);
       
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+
+      // Disparar evento para actualizar otros componentes
+      window.dispatchEvent(new CustomEvent('ut-avatar-updated', { 
+        detail: { userId: user.id, avatarUrl: refreshedUser?.avatar } 
+      }));
 
       toast.success("Perfil actualizado correctamente");
     } catch (error: any) {
@@ -247,12 +248,7 @@ export function Profile() {
     }
   };
 
-  const avatarInitials = [firstName, lastName]
-    .map((value) => value.trim().charAt(0))
-    .filter(Boolean)
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const avatarInitials = getInitials(`${firstName} ${lastName}`);
     
   const memberSinceLabel = useMemo(() => {
     if (!user?.createdAt) return "Sin datos";
@@ -382,7 +378,6 @@ export function Profile() {
             </CardContent>
           </Card>
 
-          {/* Avatar preview dialog */}
           <Dialog open={isAvatarOpen} onOpenChange={setIsAvatarOpen}>
             <DialogContent>
               <DialogHeader>
