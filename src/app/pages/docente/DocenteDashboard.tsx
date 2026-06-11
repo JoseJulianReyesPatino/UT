@@ -210,7 +210,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             <CardDescription>Últimos documentos enviados</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="max-h-[24rem] space-y-4 overflow-y-auto pr-2">
               {recentDocuments.map((doc) => {
                 let docStatusVariant: "success" | "warning" | "outline" = "outline";
                 let docStatusLabel = "Pendiente";
@@ -256,7 +256,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             <CardDescription>Fechas límite importantes</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="max-h-[24rem] space-y-4 overflow-y-auto pr-2">
               {proximasEntregas.map((entrega) => (
                 <div
                   key={entrega.titulo}

@@ -100,6 +100,7 @@ const splitNameParts = (fullName: string) => {
 };
 
 const profileCacheKey = (userId: string) => `utslrc-profile:${userId}`;
+const defaultProfileAvatar = "/src/assets/profile.webp";
 
 const loadCachedProfile = (userId: string) => {
   try {
@@ -146,9 +147,11 @@ const mapApiUser = (apiUser: ApiLoginResponse["user"]): User => {
   const fallbackNames = splitNameParts(apiUser.full_name);
   const cachedProfile = loadCachedProfile(String(apiUser.id));
 
-  const avatarUrl = apiUser.avatar_url 
+  const avatarUrl = apiUser.avatar_url && apiUser.avatar_url !== "/api/default-avatar"
     ? resolveApiAssetUrl(apiUser.avatar_url)
-    : (cachedProfile?.avatar ? resolveApiAssetUrl(cachedProfile.avatar) : undefined);
+    : cachedProfile?.avatar && cachedProfile.avatar !== "/api/default-avatar"
+      ? resolveApiAssetUrl(cachedProfile.avatar)
+      : defaultProfileAvatar;
 
   return {
     id: String(apiUser.id),

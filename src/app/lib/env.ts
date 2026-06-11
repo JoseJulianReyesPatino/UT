@@ -24,7 +24,20 @@ export const resolveApiAssetUrl = (value?: string | null) => {
   if (!value) return undefined;
 
   // Si ya es una URL completa, devolverla directamente
-  if (/^https?:\/\//i.test(value)) {
+  if (
+    /^https?:\/\//i.test(value) ||
+    /^data:/i.test(value) ||
+    /^blob:/i.test(value)
+  ) {
+    return value;
+  }
+
+  // Rutas servidas por Vite en el frontend
+  if (
+    value.startsWith("/assets/") ||
+    value.startsWith("/src/assets/") ||
+    value.includes("?import")
+  ) {
     return value;
   }
 

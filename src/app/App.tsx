@@ -41,6 +41,7 @@ function AppContent() {
   const { isAuthenticated, isReady, user, notice } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const logoSrc = theme === "dark" ? "/src/assets/Logotipo UTSLRC-BLANCO.png" : "/src/assets/Logotipo  UTSLRC.png";
+  const showReloadLoader = typeof window !== "undefined" && window.performance.getEntriesByType("navigation")[0]?.type === "reload";
   const currentViewStorageKey = "utslrc-current-view";
   const [currentView, setCurrentView] = useState(() => sessionStorage.getItem(currentViewStorageKey) ?? "dashboard");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -173,8 +174,8 @@ function AppContent() {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         <div className="flex flex-col items-center gap-2 text-center">
-          <img src={Charging2} alt="Cargando sesión" className="h-48 w-auto" />
-          <div>Cargando sesión...</div>
+          {showReloadLoader ? <img src={Charging2} alt="Cargando sesión" className="h-48 w-auto" /> : null}
+          <div>Cargando...</div>
         </div>
       </div>
     );

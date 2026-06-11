@@ -14,7 +14,6 @@ import { carrieras } from "../../data/curricula";
 import apiFetch from "../../lib/api";
 import { formatGroupCode } from "../../../lib/utils";
 import ChargingImg from "../../../assets/Form_Not_Found.png";
-import Charging2 from "../../../assets/CHARGING_2.png";
 import { useAuth } from "../../context/AuthContext";
 import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
 
@@ -606,10 +605,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			if (isLoading) {
 					return (
 						<div className="rounded-lg border border-dashed border-border p-4 text-center text-muted-foreground">
-							<div className="flex flex-col items-center gap-2">
-								<img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
-								<p>Cargando documentos</p>
-							</div>
+							<p>Cargando...</p>
 						</div>
 					);
 			}
@@ -787,10 +783,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 								</div>
 								{previewLoading ? (
 									<div className="flex h-[70vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
-										<div className="flex flex-col items-center gap-2">
-											<img src={Charging2} alt="Cargando PDF" className="h-48 w-auto" />
-											<p>Cargando PDF...</p>
-										</div>
+										<p>Cargando...</p>
 									</div>
 								) : previewError ? (
 									<div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">

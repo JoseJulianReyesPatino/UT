@@ -6,8 +6,7 @@ import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import apiFetch from "../lib/api";
-import { resolveApiAssetUrl } from "../lib/env";
-import { getAvatarUrlWithTimestamp, getInitials } from "../lib/avatar";
+import { getInitials, useResolvedAvatarUrl } from "../lib/avatar";
 import {
   FileText,
   BarChart3,
@@ -28,16 +27,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-// Función para resolver URLs de avatar
-const getAvatarUrl = (url?: string | null): string | undefined => {
-  if (!url) return undefined;
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
-  if (url.startsWith('/')) {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
-    return `${baseUrl}${url}`;
-  }
-  return url;
-};
+const defaultProfileAvatar = "/src/assets/profile.webp";
 
 interface SidebarProps {
   currentView: string;
@@ -259,6 +249,8 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const [instrumento3040Open, setInstrumento3040Open] = useState(true);
   const [instrumento6070Open, setInstrumento6070Open] = useState(true);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const sidebarResolvedAvatar = useResolvedAvatarUrl(user?.avatar && user.avatar !== "/api/default-avatar" ? user.avatar : undefined);
+  const sidebarAvatarUrl = sidebarResolvedAvatar || defaultProfileAvatar;
 
   useEffect(() => {
     let isMounted = true;
@@ -499,19 +491,17 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 to-cyan-50 shadow-sm transition-colors hover:bg-emerald-100/70 dark:border-slate-700 dark:from-slate-900 dark:to-slate-950 dark:hover:bg-slate-800 text-left"
             >
               <Avatar className="h-8 w-8 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
-                {user?.avatar && (
-                  <AvatarImage
-                    src={getAvatarUrl(user.avatar)}
-                    alt={user.name}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsAvatarOpen(true);
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    className="cursor-pointer"
-                  />
-                )}
+                <AvatarImage
+                  src={sidebarAvatarUrl}
+                  alt={user?.name ?? "Foto de perfil"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsAvatarOpen(true);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  className="cursor-pointer"
+                />
                 <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                   {user?.name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "U"}
                 </AvatarFallback>
@@ -565,17 +555,11 @@ export function Sidebar(props: Readonly<SidebarProps>) {
             <DialogDescription>Vista previa de tu imagen de perfil</DialogDescription>
           </DialogHeader>
           <div className="mt-4 flex justify-center">
-            {user?.avatar ? (
-              <img 
-                src={getAvatarUrl(user.avatar)} 
-                alt={`Foto de perfil de ${user?.name}`} 
-                className="max-h-[70vh] max-w-full rounded-lg object-contain" 
-              />
-            ) : (
-              <div className="h-40 w-40 rounded-lg bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-2xl">
-                {user?.name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "U"}
-              </div>
-            )}
+            <img 
+              src={sidebarAvatarUrl} 
+              alt={`Foto de perfil de ${user?.name}`} 
+              className="max-h-[70vh] max-w-full rounded-lg object-contain" 
+            />
           </div>
         </DialogContent>
       </Dialog>

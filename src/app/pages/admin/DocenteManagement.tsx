@@ -7,13 +7,15 @@ import { Label } from "../../components/ui/label";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
-import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { UserPlus, Search, Edit, Key, UserCheck, UserX, ShieldAlert, Mail, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
-import Charging2 from "../../../assets/CHARGING_2.png";
+import { useResolvedAvatarUrl } from "../../lib/avatar";
+
+const defaultAvatar = new URL("../../../assets/profile.webp", import.meta.url).href;
 
 type UserRole = "docente" | "tutor" | "administrador";
 type StatusFilter = "all" | "activo" | "inactivo";
@@ -93,10 +95,26 @@ const splitFullName = (fullName: string) => {
   };
 };
 
+function DocenteAvatar({ name, avatar, className }: Readonly<{ name: string; avatar: string; className?: string }>) {
+  const resolvedAvatar = useResolvedAvatarUrl(avatar);
+
+  return (
+    <Avatar className={className}>
+      {resolvedAvatar ? <AvatarImage src={resolvedAvatar} alt={name} className="h-full w-full object-cover" /> : null}
+      <AvatarFallback className="bg-success/10 text-success">
+        {getInitials(name)}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
 const mapApiUser = (user: ApiUser): Docente => {
   const roles = (user.roles ?? [])
     .map(normalizeRole)
     .filter((role): role is UserRole => role !== null);
+  const avatarUrl = user.avatar_url && user.avatar_url !== "/api/default-avatar"
+    ? user.avatar_url
+    : defaultAvatar;
 
   return {
     id: Number(user.id),
@@ -107,7 +125,7 @@ const mapApiUser = (user: ApiUser): Docente => {
     roles,
     documentos: Number(user.documents_count ?? 0),
     status: user.is_active ? "activo" : "inactivo",
-    avatar: user.avatar_url ?? getInitials(user.full_name),
+    avatar: avatarUrl,
   };
 };
 
@@ -163,11 +181,7 @@ function StatusConfirmationDialog({
         {selectedDocente && (
           <div className={`rounded-2xl border p-4 text-sm shadow-sm ${isDeactivating ? "border-destructive/15 bg-destructive/5" : "border-success/15 bg-success/5"}`}>
             <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className={isDeactivating ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}>
-                  {selectedDocente.avatar}
-                </AvatarFallback>
-              </Avatar>
+              <DocenteAvatar name={selectedDocente.nombre} avatar={selectedDocente.avatar} className="h-10 w-10" />
               <div className="min-w-0">
                 <p className="font-semibold text-foreground truncate">{selectedDocente.nombre}</p>
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -312,10 +326,7 @@ export function DocenteManagement() {
   if (isLoadingUsers) {
     usersListContent = (
       <div className="rounded-xl border border-dashed border-border bg-background/80 p-8 text-center text-sm text-muted-foreground">
-        <div className="flex flex-col items-center gap-2">
-          <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
-          <div>Cargando usuarios desde la API...</div>
-        </div>
+        Cargando...
       </div>
     );
   } else if (usersError) {
@@ -349,11 +360,7 @@ export function DocenteManagement() {
           className="flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-background/80 p-4 transition-colors hover:bg-accent/60 dark:bg-slate-950/60 dark:hover:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex min-w-0 flex-1 items-center gap-4">
-            <Avatar className="h-12 w-12 flex-shrink-0">
-              <AvatarFallback className="bg-success/10 text-success">
-                {docente.avatar}
-              </AvatarFallback>
-            </Avatar>
+            <DocenteAvatar name={docente.nombre} avatar={docente.avatar} className="h-12 w-12 flex-shrink-0" />
             <div className="min-w-0">
               <p className="break-words font-medium sm:truncate">{docente.nombre}</p>
               <p className="break-words text-sm text-muted-foreground sm:truncate">{docente.email}</p>
@@ -473,9 +480,9 @@ export function DocenteManagement() {
     }
 
     const roles: UserRole[] = [
-      ...(editDocente.roles.docente ? ["docente"] : []),
-      ...(editDocente.roles.tutor ? ["tutor"] : []),
-      ...(editDocente.roles.administrador ? ["administrador"] : []),
+      ...(editDocente.roles.docente ? (["docente"] as UserRole[]) : []),
+      ...(editDocente.roles.tutor ? (["tutor"] as UserRole[]) : []),
+      ...(editDocente.roles.administrador ? (["administrador"] as UserRole[]) : []),
     ];
 
     setIsSavingEdit(true);
@@ -553,9 +560,9 @@ export function DocenteManagement() {
     const toastId = toast.loading("Creando usuario...");
 
     const roles: UserRole[] = [
-      ...(newDocente.roles.docente ? ["docente"] : []),
-      ...(newDocente.roles.tutor ? ["tutor"] : []),
-      ...(newDocente.roles.administrador ? ["administrador"] : []),
+      ...(newDocente.roles.docente ? (["docente"] as UserRole[]) : []),
+      ...(newDocente.roles.tutor ? (["tutor"] as UserRole[]) : []),
+      ...(newDocente.roles.administrador ? (["administrador"] as UserRole[]) : []),
     ];
 
     try {

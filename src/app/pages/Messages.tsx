@@ -12,8 +12,10 @@ import { cn } from "../../lib/utils";
 import apiFetch from "../lib/api";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
-import { getAvatarUrlWithTimestamp, getInitials, isImageUrl } from "../lib/avatar";
-import Charging2 from "../../assets/CHARGING_2.png";
+import { getInitials, isImageUrl, useResolvedAvatarUrl } from "../lib/avatar";
+import defaultAvatar from "../../assets/profile.webp";
+
+const DEFAULT_AVATAR_PATH = defaultAvatar;
 
 type AttachmentItem = {
   name: string;
@@ -43,7 +45,8 @@ type Conversation = {
   lastMessage: string;
   timestamp: string;
   unread: number;
-  avatar: string;
+  avatar?: string | null;
+  avatarFallback: string;
   status: "online" | "offline" | "away";
   messages: ChatMessage[];
 };
@@ -121,16 +124,10 @@ const ConversationRow = React.memo(({
   active: boolean;
   onSelect: (conversationId: number) => void;
 }) => {
-  // Calcular la URL de la imagen UNA SOLA VEZ y memoizarla
-  const imageUrl = useMemo(() => {
-    if (conversation.avatar && isImageUrl(conversation.avatar)) {
-      return getAvatarUrlWithTimestamp(conversation.avatar);
-    }
-    return undefined;
-  }, [conversation.avatar]); // Solo se recalcula si cambia el avatar
+  const imageUrl = useResolvedAvatarUrl(conversation.avatar);
   
   const showImage = !!imageUrl;
-  const initials = getInitials(conversation.name);
+  const initials = conversation.avatarFallback || getInitials(conversation.name);
   
   return (
     <button
@@ -198,13 +195,7 @@ const MessageBubble = React.memo(({
   const [editBody, setEditBody] = useState(message.content);
   const editable = message.isOwn && canEditMessage(message.timestamp);
   
-  // Calcular la URL de la imagen UNA SOLA VEZ
-  const imageUrl = useMemo(() => {
-    if (message.avatar && isImageUrl(message.avatar)) {
-      return getAvatarUrlWithTimestamp(message.avatar);
-    }
-    return undefined;
-  }, [message.avatar]);
+  const imageUrl = useResolvedAvatarUrl(message.avatar);
   
   const showImage = !!imageUrl;
   const senderInitials = getInitials(message.sender);
@@ -464,7 +455,12 @@ export function Messages(props: Readonly<{
       try {
         const parsed = JSON.parse(savedConversations);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setConversations(parsed);
+          setConversations(parsed.map((conversation: any) => ({
+            ...normalizeConversation(conversation),
+            messages: Array.isArray(conversation.messages)
+              ? conversation.messages.map((message: any) => normalizeMessage(message))
+              : [],
+          })));
         }
       } catch (e) {
         console.error('Error loading cached conversations', e);
@@ -495,6 +491,7 @@ export function Messages(props: Readonly<{
     let displayName = raw.name;
     let participantRole = raw.role;
     let avatarUrl = raw.avatar_url || raw.avatar;
+    let avatarFallback = raw.avatar_fallback || '';
     
     // Si hay participantes, obtener la información del otro participante
     if (raw.participants && Array.isArray(raw.participants) && user) {
@@ -507,16 +504,15 @@ export function Messages(props: Readonly<{
         if (otherParticipant.avatar_url) {
           avatarUrl = otherParticipant.avatar_url;
         }
+        if (otherParticipant.avatar_fallback) {
+          avatarFallback = otherParticipant.avatar_fallback;
+        }
       }
     }
     
     // Determinar el valor del avatar
-    let avatarValue;
-    if (avatarUrl && isImageUrl(avatarUrl)) {
-      avatarValue = getAvatarUrlWithTimestamp(avatarUrl);
-    } else {
-      avatarValue = getInitials(displayName);
-    }
+    const resolvedAvatarFallback = avatarFallback || getInitials(displayName);
+    const avatarValue = avatarUrl && isImageUrl(avatarUrl) ? avatarUrl : DEFAULT_AVATAR_PATH;
     
     return {
       id: raw.id,
@@ -526,22 +522,18 @@ export function Messages(props: Readonly<{
       timestamp: raw.timestamp ?? raw.lastMessageAt ?? raw.updated_at ?? '',
       unread: Number(raw.unread ?? 0),
       avatar: avatarValue,
+      avatarFallback: resolvedAvatarFallback,
       status: raw.status ?? 'offline',
       messages: [],
     };
   }, [user]);
 
   const normalizeMessage = useCallback((raw: any): ChatMessage => {
-    let avatarValue;
     const avatarUrl = raw.avatar_url ?? raw.avatar;
-    
-    if (avatarUrl && isImageUrl(avatarUrl)) {
-      avatarValue = getAvatarUrlWithTimestamp(avatarUrl);
-    } else if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.length <= 3) {
-      avatarValue = avatarUrl;
-    } else {
-      avatarValue = getInitials(raw.sender);
-    }
+    const avatarFallback = raw.avatar_fallback || getInitials(raw.sender);
+    const avatarValue = avatarUrl && isImageUrl(avatarUrl)
+      ? avatarUrl
+      : DEFAULT_AVATAR_PATH;
     
     return {
       id: raw.id,
@@ -750,6 +742,7 @@ export function Messages(props: Readonly<{
   }, [conversations, peerRoleLabel, search]);
 
   const activeConversation = filteredConversations.find((conversation) => conversation.id === selectedChat) ?? filteredConversations[0];
+  const activeConversationAvatarUrl = useResolvedAvatarUrl(activeConversation?.avatar);
 
   // Scroll al final
   useEffect(() => {
@@ -945,10 +938,7 @@ export function Messages(props: Readonly<{
               </div>
               {isLoadingRecipients ? (
                 <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
-                    <div>Cargando usuarios...</div>
-                  </div>
+                  Cargando...
                 </div>
               ) : recipientFetchError ? (
                 <p className="text-sm text-destructive">{recipientFetchError}</p>
@@ -980,15 +970,15 @@ export function Messages(props: Readonly<{
             {activeConversation ? (
               <div className="flex items-start gap-3">
                 <Avatar className="h-11 w-11 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
-                  {activeConversation.avatar && isImageUrl(activeConversation.avatar) ? (
+                  {activeConversationAvatarUrl ? (
                     <AvatarImage 
-                      src={getAvatarUrlWithTimestamp(activeConversation.avatar)} 
+                      src={activeConversationAvatarUrl} 
                       alt={activeConversation.name} 
                       className="h-full w-full object-cover" 
                     />
                   ) : (
                     <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-medium">
-                      {getInitials(activeConversation.name)}
+                      {activeConversation.avatarFallback || getInitials(activeConversation.name)}
                     </AvatarFallback>
                   )}
                 </Avatar>

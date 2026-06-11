@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import apiFetch from "../../lib/api";
 import { getDocumentFileUrl } from "../../lib/documents";
 import ChargingImg from "../../../assets/Form_Not_Found.png";
-import Charging2 from "../../../assets/CHARGING_2.png";
 import { formatGroupCode } from "../../../lib/utils";
 import { useAuth } from "../../context/AuthContext";
 
@@ -496,10 +495,7 @@ export default function Estadias() {
               <div className="space-y-3">
                 {isLoading && (
                   <div className="rounded-lg border border-dashed border-border p-4 text-center text-muted-foreground">
-                    <div className="flex flex-col items-center gap-2">
-                      <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
-                      <p>Cargando documentos</p>
-                    </div>
+                    <p>Cargando...</p>
                   </div>
                 )}
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
@@ -626,10 +622,7 @@ export default function Estadias() {
               <div className="space-y-3">
                 {isLoading && (
                   <div className="rounded-lg border border-dashed border-border p-4 text-center text-muted-foreground">
-                    <div className="flex flex-col items-center gap-2">
-                      <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
-                      <p>Cargando documentos</p>
-                    </div>
+                    <p>Cargando...</p>
                   </div>
                 )}
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}

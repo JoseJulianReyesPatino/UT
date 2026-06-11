@@ -13,6 +13,8 @@ import { clearAvatarCache, getInitials } from "../../lib/avatar";
 import { Calendar, Eye, EyeOff, Key, Upload } from "lucide-react";
 import { toast } from "sonner";
 
+const defaultProfileAvatar = "/src/assets/profile.webp";
+
 export function Profile() {
   const { user, updateProfile, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -42,7 +44,7 @@ export function Profile() {
 
     setFirstName(user.firstNames ?? "");
     setLastName(user.lastNames ?? "");
-    setAvatarPreview(user.avatar);
+    setAvatarPreview(user.avatar && user.avatar !== "/api/default-avatar" ? user.avatar : defaultProfileAvatar);
   }, [user]);
 
   useEffect(() => {
@@ -168,7 +170,7 @@ export function Profile() {
           area: refreshedUser.area,
         });
 
-        setAvatarPreview(refreshedUser.avatar);
+        setAvatarPreview(refreshedUser.avatar && refreshedUser.avatar !== "/api/default-avatar" ? refreshedUser.avatar : defaultProfileAvatar);
       }
       
       setSelectedAvatarFile(null);
@@ -196,7 +198,7 @@ export function Profile() {
 
     setFirstName(user.firstNames ?? "");
     setLastName(user.lastNames ?? "");
-    setAvatarPreview(user.avatar);
+    setAvatarPreview(user.avatar && user.avatar !== "/api/default-avatar" ? user.avatar : defaultProfileAvatar);
     setSelectedAvatarFile(null);
 
     if (fileInputRef.current) {
@@ -249,6 +251,7 @@ export function Profile() {
   };
 
   const avatarInitials = getInitials(`${firstName} ${lastName}`);
+  const visibleAvatar = avatarPreview && avatarPreview !== "/api/default-avatar" ? avatarPreview : defaultProfileAvatar;
     
   const memberSinceLabel = useMemo(() => {
     if (!user?.createdAt) return "Sin datos";
@@ -293,21 +296,18 @@ export function Profile() {
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
-                  {avatarPreview ? (
-                    <AvatarImage
-                      src={avatarPreview}
-                      alt={user?.name ?? "Foto de perfil"}
-                      onClick={() => setIsAvatarOpen(true)}
-                      className="cursor-pointer"
-                    />
-                  ) : (
-                    <AvatarFallback
-                      className="bg-success/10 text-success text-xl cursor-pointer"
-                      onClick={() => setIsAvatarOpen(true)}
-                    >
-                      {avatarInitials || "--"}
-                    </AvatarFallback>
-                  )}
+                  <AvatarImage
+                    src={visibleAvatar}
+                    alt={user?.name ?? "Foto de perfil"}
+                    onClick={() => setIsAvatarOpen(true)}
+                    className="cursor-pointer"
+                  />
+                  <AvatarFallback
+                    className="bg-success/10 text-success text-xl cursor-pointer"
+                    onClick={() => setIsAvatarOpen(true)}
+                  >
+                    {avatarInitials || "--"}
+                  </AvatarFallback>
                 </Avatar>
                 <div>
                   <Button
@@ -385,13 +385,7 @@ export function Profile() {
                 <DialogDescription>Vista previa de tu imagen de perfil</DialogDescription>
               </DialogHeader>
               <div className="mt-4 flex justify-center">
-                {avatarPreview ? (
-                  <img src={avatarPreview} alt={`Foto de perfil de ${user?.name}`} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
-                ) : (
-                  <div className="h-40 w-40 rounded-lg bg-success/10 flex items-center justify-center text-2xl">
-                    {avatarInitials || "--"}
-                  </div>
-                )}
+                <img src={visibleAvatar} alt={`Foto de perfil de ${user?.name}`} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
               </div>
             </DialogContent>
           </Dialog>

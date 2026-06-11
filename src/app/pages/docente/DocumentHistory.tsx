@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import Charging2 from "../../../assets/CHARGING_2.png";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -241,13 +240,10 @@ export function DocumentHistory() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="max-h-[34rem] space-y-3 overflow-y-auto pr-2">
             {isLoading && (
               <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                <div className="flex flex-col items-center gap-2">
-                  <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
-                  <div>Cargando documentos</div>
-                </div>
+                Cargando...
               </div>
             )}
 

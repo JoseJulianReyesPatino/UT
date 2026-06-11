@@ -13,7 +13,6 @@ import {
   Eye,
   CheckCircle2,
 } from "lucide-react";
-import Charging2 from "../../../assets/CHARGING_2.png";
 
 type AdminView = "dashboard" | "docentes" | "documentos" | "documentos-revisados" | "documentos-revisados-hoy";
 
@@ -174,6 +173,12 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   const [docentesTotal, setDocentesTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isReviewing, setIsReviewing] = useState(false);
+  const showReloadLoader = useMemo(() => {
+    if (typeof window === "undefined") return false;
+
+    const navigationEntry = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    return navigationEntry?.type === "reload";
+  }, []);
 
   const [selectedDocument, setSelectedDocument] = useState<null | {
     id: number;
@@ -337,7 +342,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
 
   const PendingList = React.memo(function PendingList({ items, onOpen }: { items: typeof pendingDocuments; onOpen: (doc: any) => void }) {
     return (
-      <div className="space-y-4">
+      <div className="max-h-[22rem] space-y-4 overflow-y-auto pr-2 sm:max-h-[24rem]">
         {items.filter((doc) => !doc.revisado).map((doc) => (
           <div
             key={doc.id}
@@ -382,7 +387,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
 
   const ActivityList = React.memo(function ActivityList({ items, onOpen }: { items: typeof recentActivity; onOpen: (a: any) => void }) {
     return (
-      <div className="space-y-4">
+      <div className="max-h-[22rem] space-y-4 overflow-y-auto pr-2 sm:max-h-[24rem]">
         {items.map((activity) => (
           <button
             key={activity.id}
@@ -460,13 +465,12 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
             <CardDescription>Requieren tu aprobación</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {isLoading && showReloadLoader ? (
               <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                <div className="flex flex-col items-center gap-2">
-                  <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
-                  <div>Cargando documentos pendientes...</div>
-                </div>
+                Cargando...
               </div>
+            ) : isLoading ? (
+              <p className="text-sm text-muted-foreground">Cargando...</p>
             ) : pendingDocuments.length === 0 ? (
               <p className="text-sm text-muted-foreground">No hay documentos pendientes por revisar.</p>
             ) : (
@@ -481,13 +485,12 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
             <CardDescription>Últimas acciones en el sistema</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {isLoading && showReloadLoader ? (
               <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                <div className="flex flex-col items-center gap-2">
-                  <img src={Charging2} alt="Cargando" className="h-48 w-auto mx-auto" />
-                  <div>Cargando actividad reciente...</div>
-                </div>
+                Cargando...
               </div>
+            ) : isLoading ? (
+              <p className="text-sm text-muted-foreground">Cargando...</p>
             ) : recentActivity.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin actividad reciente.</p>
             ) : (
