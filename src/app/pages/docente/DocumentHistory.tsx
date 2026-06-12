@@ -4,10 +4,11 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { FileText, Search, Download, Eye, Filter } from "lucide-react";
+import { FileText, Search, Download, Eye, Filter, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import apiFetch from "../../lib/api";
 import { getDocumentDownloadUrl, getDocumentFileUrl } from "../../lib/documents";
+import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
 
 type ApiDocument = {
   id: number | string;
@@ -40,7 +41,6 @@ const normalizeTipoFilter = (value: string) => {
     portafolio: "portafolio-digital",
     acta: "acta-final",
   };
-
   return legacyMap[value] ?? value;
 };
 
@@ -63,74 +63,21 @@ export function DocumentHistory() {
       return "all";
     }
   });
+  
   const statusOptions = [
     { value: "all", label: "Todos los estados" },
     { value: "revisado", label: "Revisados" },
     { value: "pendiente", label: "Pendientes" },
     { value: "devuelto", label: "Devueltos" },
   ];
+  
   const [openPreview, setOpenPreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string | undefined>(undefined);
+  // Cambiar a un Map para manejar carga individual por documento
+  const [loadingPdfId, setLoadingPdfId] = useState<number | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadDocuments = async () => {
-      setIsLoading(true);
-      setLoadError(null);
-
-      try {
-        const allDocuments: ApiDocument[] = [];
-        let page = 1;
-        const perPage = 100;
-
-        while (true) {
-          const response = (await apiFetch("/documents", {
-            query: { page, per_page: perPage },
-          })) as {
-            data?: {
-              data?: ApiDocument[];
-              current_page?: number;
-              last_page?: number;
-            };
-          };
-
-          const pageData = response?.data?.data ?? [];
-          allDocuments.push(...pageData);
-
-          const currentPage = response?.data?.current_page ?? page;
-          const lastPage = response?.data?.last_page ?? currentPage;
-
-          if (currentPage >= lastPage) {
-            break;
-          }
-
-          page += 1;
-        }
-
-        if (!isMounted) return;
-
-        setDocuments(allDocuments);
-      } catch {
-        if (!isMounted) return;
-
-        setLoadError("No fue posible cargar el historial de documentos");
-        setDocuments([]);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void loadDocuments();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
+  // Tus typeOptions originales
   const typeOptions = useMemo(
     () => [
       { value: "all", label: "Todos los apartados" },
@@ -156,12 +103,138 @@ export function DocumentHistory() {
     []
   );
 
+  // Función para obtener el tipo real del documento para filtrar
+  const getDocumentTipoForFilter = (doc: ApiDocument): string => {
+    // Primero intentar con el tipo que ya tenemos
+    if (doc.tipo && doc.tipo !== "documento") return doc.tipo;
+    // Si no, intentar derivar del nombre u otros campos
+    if (doc.nombre.toLowerCase().includes("planeación")) return "planeacion";
+    if (doc.nombre.toLowerCase().includes("instrumento")) return "instrumento-3040";
+    if (doc.nombre.toLowerCase().includes("lista")) return "lista-concentrada";
+    if (doc.nombre.toLowerCase().includes("asesoría")) return "asesoria";
+    if (doc.nombre.toLowerCase().includes("portafolio")) return "portafolio-digital";
+    if (doc.nombre.toLowerCase().includes("acta")) return "acta-final";
+    if (doc.nombre.toLowerCase().includes("remedial")) return "remedial";
+    if (doc.nombre.toLowerCase().includes("estadías")) return "estadias";
+    return "planeacion"; // default
+  };
+
+  // Función para abrir el PDF con autenticación
+  const openDocumentWithAuth = async (documentId: number, title: string, action: "view" | "download") => {
+    setLoadingPdfId(documentId);
+    try {
+      const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      const baseUrl = API_BASE_URL.replace(/\/api\/?$/, "");
+      const url = `${baseUrl}/api/documents/${documentId}/file`;
+      
+      const response = await fetch(url, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "ngrok-skip-browser-warning": "true",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      if (action === "view") {
+        setPreviewUrl(blobUrl);
+        setPreviewTitle(title);
+        setOpenPreview(true);
+      } else {
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = `${title}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      }
+    } catch (error: any) {
+      console.error("Error loading document:", error);
+      alert(`No se pudo ${action === "view" ? "abrir" : "descargar"} el documento: ${error.message}`);
+    } finally {
+      setLoadingPdfId(null);
+    }
+  };
+
+  // Cargar documentos
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadDocuments = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const response = await apiFetch("/documents", {
+          query: {
+            per_page: 100,
+          },
+        }) as any;
+
+        if (!isMounted) return;
+
+        const docsBackend = response?.data || [];
+
+        const transformedDocs: ApiDocument[] = docsBackend.map((doc: any) => {
+          // Determinar el tipo basado en form_code o apartado_label
+          let tipo = "planeacion";
+          if (doc.form_code) {
+            tipo = doc.form_code;
+          } else if (doc.apartado_label) {
+            tipo = doc.apartado_label.toLowerCase().replace(/\s+/g, '-');
+          }
+          
+          return {
+            id: doc.id,
+            nombre: doc.title,
+            tipo: tipo,
+            tipoLabel: doc.form_title || doc.apartado_label || "Planeación",
+            materia: doc.materia || "Sin materia",
+            parcial: doc.parcial || "N/A",
+            grupo: doc.group_code || `Grupo ${doc.group_id || "?"}`,
+            fecha: doc.submitted_at,
+            hora: doc.submitted_at ? new Date(doc.submitted_at).toLocaleTimeString() : null,
+            status: doc.status,
+            observaciones: null,
+            fileUrl: doc.file_path ? getDocumentFileUrl(doc.id) : null,
+            downloadUrl: doc.file_path ? getDocumentDownloadUrl(doc.id) : null,
+          };
+        });
+
+        setDocuments(transformedDocs);
+      } catch (err: any) {
+        console.error("Error loading documents:", err);
+        if (!isMounted) return;
+        setLoadError(err.message || "No fue posible cargar el historial de documentos");
+        setDocuments([]);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadDocuments();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const filteredDocuments = documents.filter((doc) => {
     const matchesSearch =
       doc.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.materia.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === "all" || doc.status === filterStatus;
-    const matchesTipo = filterTipo === "all" || doc.tipo === filterTipo;
+    // Usar la función para obtener el tipo correcto para filtrar
+    const docTipo = getDocumentTipoForFilter(doc);
+    const matchesTipo = filterTipo === "all" || docTipo === filterTipo;
     return matchesSearch && matchesStatus && matchesTipo;
   });
 
@@ -304,23 +377,16 @@ export function DocumentHistory() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => {
-                      setPreviewUrl(doc.fileUrl ?? null);
-                      setPreviewTitle(doc.nombre);
-                      setOpenPreview(true);
-                    }}
-                    disabled={!doc.fileUrl}
+                    onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "view")}
+                    disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
                   >
-                    <Eye className="h-4 w-4" />
+                    {loadingPdfId === Number(doc.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => {
-                      if (!doc.downloadUrl) return;
-                      window.open(doc.downloadUrl, "_blank", "noopener,noreferrer");
-                    }}
-                    disabled={!doc.downloadUrl}
+                    onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "download")}
+                    disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
                   >
                     <Download className="h-4 w-4" />
                   </Button>
@@ -331,19 +397,29 @@ export function DocumentHistory() {
         </CardContent>
       </Card>
 
-      <Dialog open={openPreview} onOpenChange={(val) => setOpenPreview(val)}>
-        <DialogContent>
+      <Dialog open={openPreview} onOpenChange={(val) => {
+        if (!val && previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+          setPreviewUrl(null);
+        }
+        setOpenPreview(val);
+      }}>
+        <DialogContent className="max-w-4xl w-full">
           <DialogHeader>
             <DialogTitle>{previewTitle}</DialogTitle>
             <DialogDescription>Vista previa del documento</DialogDescription>
           </DialogHeader>
           {previewUrl ? (
             <iframe
-              src={`${previewUrl}#toolbar=1&navpanes=0`}
+              src={previewUrl}
               className="h-[70vh] w-full rounded-lg border border-border"
               title={previewTitle}
             />
-          ) : null}
+          ) : (
+            <div className="h-[70vh] w-full flex items-center justify-center text-muted-foreground">
+              Cargando documento...
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

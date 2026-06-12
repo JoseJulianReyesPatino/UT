@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "../../components/ui/carousel";
 import { StatsCard } from "../../components/StatsCard";
 import { 
   FileText, 
@@ -14,6 +15,29 @@ import {
   ChevronDown,
 } from "lucide-react";
 
+const introSlides = [
+  {
+    src: new URL("../../../assets/ut_imagen1.webp", import.meta.url).href,
+    alt: "Pre-registro nuevo ingreso 1",
+  },
+  {
+    src: new URL("../../../assets/ut_imagen2.webp", import.meta.url).href,
+    alt: "Pre-registro nuevo ingreso 2",
+  },
+  {
+    src: new URL("../../../assets/ut_imagen3.webp", import.meta.url).href,
+    alt: "Pre-registro nuevo ingreso 3",
+  },
+  {
+    src: new URL("../../../assets/ut_imagen4.webp", import.meta.url).href,
+    alt: "Pre-registro nuevo ingreso 4",
+  },
+  {
+    src: new URL("../../../assets/ut_imagen5.webp", import.meta.url).href,
+    alt: "Pre-registro nuevo ingreso 5",
+  },
+];
+
 interface DocenteDashboardProps {
   onNavigate?: (view: string) => void;
 }
@@ -22,6 +46,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const { onNavigate } = props;
   const manualDocenteUrl = new URL("../../../assets/Manual de Usuario del Docente.pdf", import.meta.url).href;
   const [isIntroOpen, setIsIntroOpen] = useState(true);
+  const [introCarouselApi, setIntroCarouselApi] = useState<CarouselApi | null>(null);
+  const [introSlide, setIntroSlide] = useState(0);
 
   const { isReady } = useAuth();
 
@@ -108,6 +134,26 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     void load();
   }, [isReady]);
 
+  useEffect(() => {
+    if (!introCarouselApi || !isIntroOpen) return;
+
+    const onSelect = () => {
+      setIntroSlide(introCarouselApi.selectedScrollSnap());
+    };
+
+    onSelect();
+    introCarouselApi.on("select", onSelect);
+
+    const intervalId = window.setInterval(() => {
+      introCarouselApi.scrollNext();
+    }, 5500);
+
+    return () => {
+      window.clearInterval(intervalId);
+      introCarouselApi.off("select", onSelect);
+    };
+  }, [introCarouselApi, isIntroOpen]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -143,25 +189,116 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           </div>
 
           {isIntroOpen && (
-            <div className="space-y-6 text-base leading-relaxed text-foreground/80">
-              <div className="space-y-2">
-                <p>
-                  Es fundamental leer la documentación proporcionada, ya que explica detalladamente el funcionamiento completo del sistema. Además, es necesario completar la configuración de su perfil antes de proceder con otras acciones.
-                </p>
-              </div>
+            <div className="relative h-[320px] overflow-hidden rounded-[20px] border border-emerald-200/70 shadow-[0_14px_28px_rgba(15,23,42,0.10)] dark:border-emerald-900/60 sm:h-[360px] lg:h-[400px]">
+              <div className="relative h-full">
+                <Carousel
+                  setApi={setIntroCarouselApi}
+                  opts={{ loop: true }}
+                  className="h-full w-full"
+                >
+                  <CarouselContent className="ml-0 h-full">
+                    {introSlides.map((slide, index) => (
+                      <CarouselItem key={slide.src} className="h-full pl-0">
+                        <div className="relative h-full">
+                          <img
+                            src={slide.src}
+                            alt={slide.alt}
+                            className="h-full w-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-br from-[#08302c]/80 via-[#0a3f39]/50 to-[#051915]/80 dark:from-black/78 dark:via-black/45 dark:to-black/75" />
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.22),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(45,212,191,0.16),transparent_30%)]" />
+                          <div className="absolute left-4 top-4 rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">
+                            {index + 1}/{introSlides.length}
+                          </div>
+                        </div>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
 
-              <p>
-                Tiene permitido el acceso a todos los módulos disponibles en el menú de navegación para explorar las distintas funcionalidades, incluyendo la carga de archivos. Tenga en cuenta que algunos envíos están sujetos a fechas límite. En caso de que se cierre el plazo sin que haya subido los archivos requeridos, puede ponerse en contacto con el administrador del sistema.
-              </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => introCarouselApi?.scrollPrev()}
+                    aria-label="Imagen anterior"
+                    className="absolute left-4 top-1/2 z-30 h-12 w-12 -translate-y-1/2 rounded-full border border-white/15 bg-black/25 text-white backdrop-blur-md hover:bg-black/45 hover:text-white"
+                  >
+                    <span className="text-2xl leading-none">‹</span>
+                  </Button>
 
-              <p>Gracias por su atención y colaboración.</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => introCarouselApi?.scrollNext()}
+                    aria-label="Siguiente imagen"
+                    className="absolute right-4 top-1/2 z-30 h-12 w-12 -translate-y-1/2 rounded-full border border-white/15 bg-black/25 text-white backdrop-blur-md hover:bg-black/45 hover:text-white"
+                  >
+                    <span className="text-2xl leading-none">›</span>
+                  </Button>
+                </Carousel>
 
-              <div className="flex justify-end">
-                <Button asChild variant="outline" className="rounded-none border-[#00A86B] px-8 text-[#00A86B] hover:bg-[#00A86B]/5">
-                  <a href={manualDocenteUrl} target="_blank" rel="noreferrer">
-                    Manual Docente
-                  </a>
-                </Button>
+                <div className="absolute inset-0 z-20 flex items-center justify-center px-3 py-2 sm:px-4">
+                  <div className="w-full max-w-xl rounded-[18px] border border-white/12 bg-white/10 p-3 text-white shadow-[0_10px_22px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:p-4">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-white/75">
+                          <span className="h-2 w-2 rounded-full bg-emerald-300" />
+                          Nuevo ingreso
+                        </span>
+                        <span className="rounded-full border border-white/12 bg-black/20 px-3 py-1 text-xs font-medium text-white/75 backdrop-blur-sm">
+                          Guía inicial
+                        </span>
+                      </div>
+
+                      <div className="max-w-xl space-y-1">
+                        <h2 className="text-base font-black tracking-tight text-white sm:text-xl lg:text-2xl">
+                          Antes de comenzar
+                        </h2>
+                        <p className="text-[10px] leading-4 text-white/80 sm:text-[11px]">
+                          Revisa la guía inicial y completa la configuración antes de empezar a cargar documentos.
+                        </p>
+                      </div>
+
+                      <div className="grid gap-2 lg:grid-cols-[1.35fr_0.9fr] lg:items-end">
+                        <div className="space-y-2 rounded-[16px] border border-white/12 bg-black/18 p-2.5 backdrop-blur-md sm:p-3">
+                          <p className="text-[10px] leading-4 text-white/92 sm:text-[11px]">
+                            Es fundamental leer la documentación proporcionada, ya que explica detalladamente el funcionamiento completo del sistema.
+                          </p>
+
+                          <p className="hidden text-[10px] leading-4 text-white/92 sm:block sm:text-[11px]">
+                            Además, es necesario completar la configuración de su perfil antes de proceder con otras acciones.
+                          </p>
+
+                          <p className="hidden text-[10px] font-medium text-white/90 sm:block sm:text-[11px]">Gracias por su atención y colaboración.</p>
+                        </div>
+
+                        <div className="flex flex-col gap-2 lg:items-end">
+                          <Button asChild className="w-full rounded-full bg-emerald-400 px-4 py-1.5 text-[10px] font-semibold text-slate-950 shadow-[0_8px_18px_rgba(16,185,129,0.30)] hover:bg-emerald-300 lg:w-auto">
+                            <a href={manualDocenteUrl} target="_blank" rel="noreferrer">
+                              Manual Docente
+                            </a>
+                          </Button>
+
+                          <div className="flex items-center gap-2 rounded-full border border-white/12 bg-black/20 px-2 py-0.5 backdrop-blur-sm">
+                            {introSlides.map((slide, index) => (
+                              <button
+                                key={slide.src}
+                                type="button"
+                                onClick={() => introCarouselApi?.scrollTo(index)}
+                                className={`h-1 rounded-full transition-all duration-200 ${
+                                  introSlide === index ? "w-5 bg-white" : "w-1.5 bg-white/40 hover:bg-white/75"
+                                }`}
+                                aria-label={`Ir a la imagen ${index + 1}`}
+                                aria-pressed={introSlide === index}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

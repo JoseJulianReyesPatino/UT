@@ -12,6 +12,8 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { apiFetch } from "../../lib/api";
+import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { carrieras } from "../../data/curricula";
 
 type CycleStatus = "activo" | "cerrado";
 
@@ -86,6 +88,7 @@ type DocumentRecord = {
   parcial: string;
   grupo: string;
   tipo: "planeacion" | "instrumento-30" | "instrumento-40" | "instrumento-60" | "instrumento-70" | "instrumento-30-40" | "instrumento-60-70" | "lista-concentrada" | "asesoria" | "portafolio" | "acta-final";
+  pdfUrl?: string;
 };
 
 type TutorDocumentRecord = {
@@ -99,9 +102,35 @@ type TutorDocumentRecord = {
   parcial?: string;
   carrera?: string;
   plan?: string;
+  pdfUrl?: string;
 };
 
 type TutorDocumentType = TutorDocumentRecord["tipo"];
+
+type ApiDocument = {
+  id: number;
+  nombre?: string;
+  title?: string;
+  tipo?: string;
+  form_code?: string;
+  apartado_label?: string;
+  materia?: string | null;
+  parcial?: string | null;
+  grupo?: string | null;
+  group_code?: string | null;
+  plan?: string | null;
+  cuatrimestre?: string | null;
+  carrera?: string | null;
+  carrera_label?: string | null;
+  docente?: string | null;
+  uploaded_by_name?: string | null;
+  fileUrl?: string | null;
+  downloadUrl?: string | null;
+  file_path?: string | null;
+  partial?: string | null;
+  parcial_label?: string | null;
+  partial_label?: string | null;
+};
 
 const tutorDocumentTitles: Record<TutorDocumentType, string> = {
   "carga-academica": "Carga académica",
@@ -132,16 +161,19 @@ type DocumentPreviewDialogProps = {
   document: DocumentRecord | TutorDocumentRecord | null;
   onOpenChange: (open: boolean) => void;
   onOpenPdf: () => void;
+  previewLoading: boolean;
+  previewError: string | null;
+  previewBlobUrl: string | null;
 };
 
-function DocumentPreviewDialog({ open, document, onOpenChange, onOpenPdf }: Readonly<DocumentPreviewDialogProps>) {
+function DocumentPreviewDialog({ open, document, onOpenChange, onOpenPdf, previewLoading, previewError, previewBlobUrl }: Readonly<DocumentPreviewDialogProps>) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] w-[95vw] max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Vista previa del documento</DialogTitle>
           <DialogDescription>
-            Simulación de lectura del archivo PDF del documento seleccionado.
+            Vista real del archivo PDF almacenado para el documento seleccionado.
           </DialogDescription>
         </DialogHeader>
         {document && (
@@ -152,24 +184,25 @@ function DocumentPreviewDialog({ open, document, onOpenChange, onOpenPdf }: Read
               {"tipo" in document && <Badge variant="outline">{document.tipo.replaceAll("-", " ")}</Badge>}
             </div>
             <div className="rounded-lg border border-border bg-muted/30 p-4 md:p-6">
-              <div className="mx-auto flex min-h-[70vh] w-full max-w-[1100px] flex-col justify-between rounded-lg border border-border bg-background p-6 md:p-10 shadow-sm">
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Documento PDF</p>
-                    <h3 className="mt-2 text-2xl font-semibold md:text-3xl">{document.documento}</h3>
-                    <p className="text-base text-muted-foreground">{document.docente}</p>
-                  </div>
-                  <div className="grid gap-3 text-sm md:grid-cols-2 md:gap-4">
-                    <p><span className="font-medium">Ciclo:</span> {document.ciclo}</p>
-                    <p><span className="font-medium">Carrera:</span> {"carrera" in document ? document.carrera : "N/D"}</p>
-                    <p><span className="font-medium">Plan:</span> {"plan" in document ? document.plan : "N/D"}</p>
-                    <p><span className="font-medium">Tipo:</span> {"tipo" in document ? document.tipo.replaceAll("-", " ") : "N/D"}</p>
-                  </div>
+              {previewLoading ? (
+                <div className="flex h-[72vh] items-center justify-center text-sm text-muted-foreground">
+                  Cargando PDF...
                 </div>
-                <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  Esta es una vista previa simulada del PDF asociado al documento.
+              ) : previewError ? (
+                <div className="flex h-[72vh] items-center justify-center text-sm text-destructive">
+                  {previewError}
                 </div>
-              </div>
+              ) : previewBlobUrl ? (
+                <iframe
+                  src={previewBlobUrl}
+                  title={document.documento}
+                  className="h-[72vh] w-full rounded-md border border-border bg-background"
+                />
+              ) : (
+                <div className="flex h-[72vh] items-center justify-center text-sm text-muted-foreground">
+                  No hay vista previa disponible para este PDF.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -183,24 +216,8 @@ function DocumentPreviewDialog({ open, document, onOpenChange, onOpenPdf }: Read
 
 const initialCycles: AcademicCycle[] = [];
 
-const initialDocuments: DocumentRecord[] = [
-  { id: 1, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Planeación - Programación Web", docente: "Mtro. Juan Pérez", carrera: "Ingeniería en Sistemas", plan: "Plan Nuevo Modelo", cuatrimestre: "5", materia: "Programación Web", parcial: "Parcial 1", grupo: "ITIID-8", tipo: "planeacion" },
-  { id: 2, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Instrumento 60% - Programación Web", docente: "Dra. María González", carrera: "Ingeniería en Sistemas", plan: "Plan Nuevo Modelo", cuatrimestre: "8", materia: "Programación Web", parcial: "Parcial 2", grupo: "ITIID-8", tipo: "instrumento-60" },
-  { id: 3, ciclo: "Cuatrimestre Septiembre-Diciembre 2025", documento: "Lista Concentrada - Redes", docente: "Mtro. Carlos López", carrera: "Ingeniería en Redes", plan: "Plan Normal", cuatrimestre: "9", materia: "Redes de Computadoras", parcial: "Parcial 1", grupo: "ILI-9", tipo: "lista-concentrada" },
-  { id: 4, ciclo: "Cuatrimestre Mayo-Agosto 2025", documento: "Instrumento 30% - Redes", docente: "Mtro. Carlos López", carrera: "Ingeniería en Redes", plan: "Plan Normal", cuatrimestre: "7", materia: "Infraestructura", parcial: "Parcial 3", grupo: "IME-7", tipo: "instrumento-30" },
-  { id: 5, ciclo: "Cuatrimestre Mayo-Agosto 2025", documento: "Instrumento 40% - Bases", docente: "Dra. Ana Martínez", carrera: "TSU Desarrollo Software", plan: "Plan Nuevo Modelo", cuatrimestre: "4", materia: "Bases de Datos", parcial: "Parcial 2", grupo: "DSM-4", tipo: "instrumento-40" },
-  { id: 6, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Asesoría - Métodos de Investigación", docente: "Dra. Ana Martínez", carrera: "TSU Desarrollo Software", plan: "Plan Nuevo Modelo", cuatrimestre: "3", materia: "Métodos de Investigación", parcial: "Parcial 1", grupo: "DSM-3", tipo: "asesoria" },
-  { id: 7, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Instrumento 70% - Redes", docente: "Mtro. Juan Pérez", carrera: "Ingeniería en Redes", plan: "Plan Normal", cuatrimestre: "8", materia: "Redes de Computadoras", parcial: "Parcial 3", grupo: "IRE-8", tipo: "instrumento-70" },
-  { id: 8, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Portafolio Digital - Programación", docente: "Mtro. Roberto Silva", carrera: "TSU Automatización", plan: "Plan Nuevo Modelo", cuatrimestre: "5", materia: "Programación Estructurada", parcial: "Final", grupo: "AUT-5", tipo: "portafolio" },
-];
-
-const initialTutorDocuments: TutorDocumentRecord[] = [
-  { id: 101, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Carga Académica Q1 2026", docente: "Mtro. Juan Pérez", tipo: "carga-academica", cuatrimestre: "1", grupo: "A", parcial: "Parcial 1" },
-  { id: 102, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Reporte de Bajas Enero 2026", docente: "Dra. María González", tipo: "reporte-bajas", cuatrimestre: "1", grupo: "B", parcial: "Parcial 1" },
-  { id: 103, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Concentrado Asesorías y Bajas", docente: "Mtro. Carlos López", tipo: "concentrado-asesorias", cuatrimestre: "1", grupo: "C", parcial: "Parcial 2" },
-  { id: 104, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Acta Asistencia Grupal - Turno Matutino", docente: "Dra. Ana Martínez", tipo: "acta-asistencia", cuatrimestre: "1", grupo: "A", parcial: "Parcial 1" },
-  { id: 105, ciclo: "Cuatrimestre Enero-Abril 2026", documento: "Ficha Técnica Tutoría Virtual", docente: "Mtro. Roberto Silva", tipo: "ficha-tecnica", cuatrimestre: "1", grupo: "D", parcial: "Final" },
-];
+const initialDocuments: DocumentRecord[] = [];
+const initialTutorDocuments: TutorDocumentRecord[] = [];
 
 export function CiclosEscolares() {
   const [showNewDialog, setShowNewDialog] = useState(false);
@@ -214,6 +231,9 @@ export function CiclosEscolares() {
   const [selectedDocumentCategory, setSelectedDocumentCategory] = useState<DocumentRecord["tipo"] | null>(null);
   const [selectedTutorCategory, setSelectedTutorCategory] = useState<TutorDocumentType | null>(null);
   const [previewDocument, setPreviewDocument] = useState<DocumentRecord | TutorDocumentRecord | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; type?: "close" | "activate"; ciclo?: AcademicCycle }>({ open: false });
   const [deleteConfirmationName, setDeleteConfirmationName] = useState("");
   const [newCycleForm, setNewCycleForm] = useState<CycleFormState>({
@@ -237,7 +257,332 @@ export function CiclosEscolares() {
 
   const [ciclos, setCiclos] = useState<AcademicCycle[]>(initialCycles);
   const [documents, setDocuments] = useState<DocumentRecord[]>(initialDocuments);
-  const [tutorDocuments] = useState<TutorDocumentRecord[]>(initialTutorDocuments);
+  const [tutorDocuments, setTutorDocuments] = useState<TutorDocumentRecord[]>(initialTutorDocuments);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const [documentCountByCycleId, setDocumentCountByCycleId] = useState<Record<number, number>>({});
+
+  const docenteTypes: DocumentRecord["tipo"][] = [
+    "planeacion",
+    "instrumento-30",
+    "instrumento-40",
+    "instrumento-60",
+    "instrumento-70",
+    "instrumento-30-40",
+    "instrumento-60-70",
+    "lista-concentrada",
+    "asesoria",
+    "portafolio",
+    "acta-final",
+  ];
+
+  const tutorTypes: TutorDocumentType[] = [
+    "carga-academica",
+    "reporte-bajas",
+    "concentrado-asesorias",
+    "acta-asistencia",
+    "ficha-tecnica",
+  ];
+
+  const normalizeTipo = (tipo: string | null | undefined): string => {
+    if (!tipo) return "";
+
+    return tipo
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replaceAll("_", "-")
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .trim();
+  };
+
+  const normalizeText = (value?: string | null) =>
+    (value ?? "")
+      .toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+  const resolveRowTipo = (row: ApiDocument): string => {
+    return normalizeTipo(row.tipo ?? row.form_code ?? row.apartado_label);
+  };
+
+  const formatPlanLabel = (plan?: string | null, carrera?: string | null): string => {
+    const normalizedPlan = normalizeText(plan);
+    const normalizedCareer = normalizeText(carrera);
+
+    const nuevoModeloCareers = [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria];
+    const planNormalCareers = [...carrieras["plan-normal"].ingenieria];
+
+    const careerMatchesCatalog = (catalogCareer: { codigo: string; nombre: string }) => {
+      const code = normalizeText(catalogCareer.codigo);
+      const name = normalizeText(catalogCareer.nombre);
+      return (
+        normalizedCareer === code
+        || normalizedCareer.includes(`(${code})`)
+        || normalizedCareer.includes(` ${code}`)
+        || normalizedCareer === name
+        || normalizedCareer.includes(name)
+      );
+    };
+
+    const isNuevoModeloByCatalog = nuevoModeloCareers.some(careerItem => careerMatchesCatalog(careerItem));
+    const isPlanNormalByCatalog = planNormalCareers.some(careerItem => careerMatchesCatalog(careerItem));
+
+    // PN in career → Plan Normal
+    const hasPnInCareer = /(^|[^a-z0-9])pn([^a-z0-9]|$)/.test(normalizedCareer);
+    // NM in career or career starts with TSU → Plan Nuevo Modelo
+    const hasNmOrTsuInCareer =
+      /(^|[^a-z0-9])nm([^a-z0-9]|$)/.test(normalizedCareer) ||
+      normalizedCareer.startsWith("tsu ") ||
+      normalizedCareer.includes(" tsu ") ||
+      normalizedCareer.includes("(tsu)");
+    if (normalizedPlan.includes("nuevo") || normalizedCareer.includes("nuevo") || hasNmOrTsuInCareer || isNuevoModeloByCatalog) return "Plan Nuevo Modelo";
+    if (normalizedPlan.includes("plan normal") || normalizedPlan.includes("normal") || normalizedPlan === "plan" || hasPnInCareer || isPlanNormalByCatalog) return "Plan Normal";
+    return plan && plan.trim() ? plan : "Plan";
+  };
+
+  const getCuatrimestreFromRow = (row: ApiDocument): string => {
+    const value = (row.cuatrimestre ?? "").toString().trim();
+    if (value && value !== "-") return value;
+    return (row.parcial ?? "").toString().trim() || "-";
+  };
+
+  const PARCIAL_FILTER_OPTIONS = [
+    { value: "1", label: "Parcial 1" },
+    { value: "2", label: "Parcial 2" },
+    { value: "3", label: "Parcial 3" },
+  ] as const;
+
+  const getParcialFilterValue = (value: string | null | undefined): "1" | "2" | "3" | null => {
+    const raw = (value ?? "").toString().trim();
+    if (!raw) return null;
+    const match = raw.match(/\b([123])\b/);
+    if (!match) return null;
+    return match[1] as "1" | "2" | "3";
+  };
+
+  const getRawParcialFromRow = (row: ApiDocument): string => {
+    const directCandidates = [
+      row.parcial,
+      row.partial,
+      row.parcial_label,
+      row.partial_label,
+    ];
+
+    for (const candidate of directCandidates) {
+      const value = (candidate ?? "").toString().trim();
+      if (value && value !== "-") {
+        return value;
+      }
+    }
+
+    const cuatrimestreCandidate = (row.cuatrimestre ?? "").toString().trim();
+    if (getParcialFilterValue(cuatrimestreCandidate)) {
+      return cuatrimestreCandidate;
+    }
+
+    return "";
+  };
+
+  const getParcialFromRow = (row: ApiDocument): string => {
+    const partial = getParcialFilterValue(getRawParcialFromRow(row));
+    if (!partial) return "-";
+    return `Parcial ${partial}`;
+  };
+
+  const getTipoBadgeLabel = (tipo: DocumentRecord["tipo"]): string => {
+    switch (tipo) {
+      case "planeacion":
+        return "Planeación";
+      case "instrumento-30":
+        return "Instrumento 30%";
+      case "instrumento-40":
+        return "Instrumento 40%";
+      case "instrumento-60":
+        return "Instrumento 60%";
+      case "instrumento-70":
+        return "Instrumento 70%";
+      case "instrumento-30-40":
+        return "Instrumento 30/40%";
+      case "instrumento-60-70":
+        return "Instrumento 60/70%";
+      case "lista-concentrada":
+        return "Lista Concentrada";
+      case "asesoria":
+        return "Asesoría";
+      case "portafolio":
+        return "Portafolio Digital";
+      case "acta-final":
+        return "Acta Final";
+      default:
+        return "Documento";
+    }
+  };
+
+  const getCuatrimestresForPlanCarrera = (plan: string, carrera: string): string[] => {
+    const isNuevo = plan === "Plan Nuevo Modelo";
+    const isNormal = plan === "Plan Normal";
+    const carreraNorm = carrera.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const isTSU = carreraNorm.includes("tsu") || (isNuevo && !carreraNorm.includes("ingenieria") && !carreraNorm.includes("ing."));
+
+    if (isNuevo && isTSU) return ["1", "2", "3", "4", "5", "6"];
+    if (isNuevo && !isTSU) return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+    if (isNormal) return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"];
+    // All if no plan/carrera selected
+    return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"];
+  };
+
+  const canonicalApartadoForDisplay = (tipo: string | null | undefined): string => {
+    const norm = (tipo ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replaceAll("-", " ").trim();
+    switch (norm) {
+      case "planeacion": return "PLANEACIÓN";
+      case "instrumento 30%": return "INSTRUMENTO 30%";
+      case "instrumento 40%": return "INSTRUMENTO 40%";
+      case "instrumento 60%": return "INSTRUMENTO 60%";
+      case "instrumento 70%": return "INSTRUMENTO 70%";
+      case "lista concentrada": return "LISTA CONCENTRADA";
+      case "asesoria": return "ASESORÍA";
+      case "portafolio": return "PORTAFOLIO DIGITAL";
+      case "acta final": return "ACTA FINAL";
+      default: return (tipo ?? "DOCUMENTO").toUpperCase();
+    }
+  };
+
+  const getDocumentTitle = (row: ApiDocument, tipo: string): string => {
+    const title = (row.title ?? row.nombre ?? "").trim();
+    const path = (row.file_path ?? "").toString();
+    // Extract clean filename without the doc_UUID_ prefix
+    const rawName = path ? (path.split("/").pop() ?? path).replace(/^doc_[^_]+_/, "") : "";
+    const fileName = rawName || title;
+    const apartadoLabel = canonicalApartadoForDisplay(tipo);
+    return fileName ? `${apartadoLabel} - ${fileName}` : apartadoLabel;
+  };
+
+  const getCareerFilterOptions = (plan: string) => {
+    const nuevoModelo = [
+      ...carrieras["nuevo-modelo"].tsu,
+      ...carrieras["nuevo-modelo"].ingenieria,
+    ].map((career) => ({ value: career.nombre, label: career.nombre }));
+    const planNormal = carrieras["plan-normal"].ingenieria.map((career) => ({
+      value: career.nombre,
+      label: career.nombre,
+    }));
+    if (plan === "Plan Nuevo Modelo") return nuevoModelo;
+    if (plan === "Plan Normal") return planNormal;
+    return [...nuevoModelo, ...planNormal];
+  };
+
+  const inferCuatrimestre = (parcial: string | null | undefined): string => {
+    if (!parcial) return "-";
+    const match = parcial.match(/\d+/);
+    return match ? match[0] : "-";
+  };
+
+  const getDocumentsTotalFromResponse = (response: any, fallbackLength: number): number => {
+    if (typeof response?.meta?.total === "number") {
+      return response.meta.total;
+    }
+
+    if (typeof response?.data?.total === "number") {
+      return response.data.total;
+    }
+
+    if (typeof response?.total === "number") {
+      return response.total;
+    }
+
+    if (Array.isArray(response?.data)) {
+      return response.data.length;
+    }
+
+    if (Array.isArray(response)) {
+      return response.length;
+    }
+
+    return fallbackLength;
+  };
+
+  const loadCycleDocumentCounts = async (cycleList: AcademicCycle[]) => {
+    if (cycleList.length === 0) {
+      setDocumentCountByCycleId({});
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      cycleList.map(async (cycle) => {
+        const response = await apiFetch(`/documents?cycle_id=${cycle.id}&per_page=1`, { method: "GET" });
+        const total = getDocumentsTotalFromResponse(response, 0);
+        return { cycleId: cycle.id, total };
+      })
+    );
+
+    const nextCounts: Record<number, number> = {};
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        nextCounts[result.value.cycleId] = result.value.total;
+      }
+    }
+
+    setDocumentCountByCycleId(nextCounts);
+  };
+
+  const loadDocumentsForCycle = async (cycle: AcademicCycle): Promise<void> => {
+    setIsLoadingDocuments(true);
+    try {
+      const response = await apiFetch(`/documents?cycle_id=${cycle.id}&per_page=200`, { method: "GET" });
+      const rows = ((response.data?.data ?? response.data) as ApiDocument[]) ?? [];
+      const totalInCycle = getDocumentsTotalFromResponse(response, rows.length);
+      setDocumentCountByCycleId((current) => ({ ...current, [cycle.id]: totalInCycle }));
+
+      const docentes: DocumentRecord[] = rows
+        .filter((row) => docenteTypes.includes(resolveRowTipo(row) as DocumentRecord["tipo"]))
+        .map((row) => {
+          const tipo = resolveRowTipo(row) as DocumentRecord["tipo"];
+          return {
+            id: row.id,
+            ciclo: cycle.nombre,
+            documento: getDocumentTitle(row, tipo),
+            docente: row.docente ?? row.uploaded_by_name ?? "Sin docente",
+            carrera: row.carrera ?? row.carrera_label ?? "Sin carrera",
+            plan: formatPlanLabel(row.plan, row.carrera ?? row.carrera_label),
+            cuatrimestre: getCuatrimestreFromRow(row),
+            materia: row.materia ?? "Sin materia",
+            parcial: getParcialFromRow(row),
+            grupo: row.grupo ?? row.group_code ?? "-",
+            tipo,
+            pdfUrl: row.downloadUrl ?? row.fileUrl ?? `/documents/${row.id}/file`,
+          };
+        });
+
+      const tutores: TutorDocumentRecord[] = rows
+        .filter((row) => tutorTypes.includes(resolveRowTipo(row) as TutorDocumentType))
+        .map((row) => ({
+          id: row.id,
+          ciclo: cycle.nombre,
+          documento: getDocumentTitle(row, resolveRowTipo(row)),
+          docente: row.docente ?? row.uploaded_by_name ?? "Sin docente",
+          tipo: resolveRowTipo(row) as TutorDocumentType,
+          cuatrimestre: getCuatrimestreFromRow(row),
+          grupo: row.grupo ?? row.group_code ?? "-",
+          parcial: getParcialFromRow(row),
+          carrera: row.carrera ?? row.carrera_label ?? undefined,
+          plan: formatPlanLabel(row.plan, row.carrera ?? row.carrera_label),
+          pdfUrl: row.downloadUrl ?? row.fileUrl ?? `/documents/${row.id}/file`,
+        }));
+
+      setDocuments(docentes);
+      setTutorDocuments(tutores);
+    } catch (error) {
+      setDocuments([]);
+      setTutorDocuments([]);
+      toast.error("No fue posible cargar los documentos del ciclo");
+    } finally {
+      setIsLoadingDocuments(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -246,7 +591,9 @@ export function CiclosEscolares() {
       try {
         const response = await apiFetch("/cycles", { method: "GET" });
         if (cancelled) return;
-        setCiclos(response.data.map(mapApiCycle));
+        const mappedCycles = response.data.map(mapApiCycle);
+        setCiclos(mappedCycles);
+        void loadCycleDocumentCounts(mappedCycles);
       } catch (error) {
         toast.error("No fue posible cargar los ciclos escolares");
       }
@@ -262,11 +609,26 @@ export function CiclosEscolares() {
   const [filterPlan, setFilterPlan] = useState("all");
   const [filterCarrera, setFilterCarrera] = useState("all");
   const [filterCuatrimestre, setFilterCuatrimestre] = useState("all");
+  const [filterMateria, setFilterMateria] = useState("all");
+  const [filterDocente, setFilterDocente] = useState("all");
+  const [filterParcial, setFilterParcial] = useState("all");
   const [filterTutorDocente, setFilterTutorDocente] = useState("all");
+  const [filterTutorPlan, setFilterTutorPlan] = useState("all");
+  const [filterTutorCarrera, setFilterTutorCarrera] = useState("all");
+  const [filterTutorCuatrimestre, setFilterTutorCuatrimestre] = useState("all");
+  const [filterTutorParcial, setFilterTutorParcial] = useState("all");
 
   const cycleDocumentCount = useMemo(
-    () => (cycleName: string) => documents.filter((document) => document.ciclo === cycleName).length + tutorDocuments.filter((document) => document.ciclo === cycleName).length,
-    [documents, tutorDocuments]
+    () => (cycle: AcademicCycle) => {
+      const countFromApi = documentCountByCycleId[cycle.id];
+      if (typeof countFromApi === "number") {
+        return countFromApi;
+      }
+
+      return documents.filter((document) => document.ciclo === cycle.nombre).length
+        + tutorDocuments.filter((document) => document.ciclo === cycle.nombre).length;
+    },
+    [documentCountByCycleId, documents, tutorDocuments]
   );
 
   const getActiveCycle = () => ciclos.find((cycle) => cycle.status === "activo");
@@ -276,6 +638,7 @@ export function CiclosEscolares() {
     setSelectedDocumentType(null);
     setSelectedDocumentCategory(null);
     setSelectedTutorCategory(null);
+    void loadDocumentsForCycle(ciclo);
     setShowDocTypeDialog(true);
   };
 
@@ -342,6 +705,7 @@ export function CiclosEscolares() {
 
       const nextCycle: ApiCycle = response.data;
       setCiclos((current) => [mapApiCycle(nextCycle), ...current]);
+      setDocumentCountByCycleId((current) => ({ ...current, [nextCycle.id]: 0 }));
       toast.success("Ciclo escolar creado correctamente");
       setNewCycleForm({
         nombre: "",
@@ -429,6 +793,11 @@ export function CiclosEscolares() {
         method: "DELETE",
       });
       setCiclos((current) => current.filter((cycle) => cycle.id !== selectedCycle.id));
+      setDocumentCountByCycleId((current) => {
+        const next = { ...current };
+        delete next[selectedCycle.id];
+        return next;
+      });
       setDocuments((current) => current.filter((document) => document.ciclo !== selectedCycle.nombre));
       toast.success(`Ciclo ${selectedCycle.nombre} eliminado correctamente`);
       setShowDeleteDialog(false);
@@ -504,24 +873,45 @@ export function CiclosEscolares() {
 
   const handleSelectDocumentCategory = (category: DocumentRecord["tipo"]) => {
     setSelectedDocumentCategory(category);
+    setSelectedTutorCategory(null);
     setShowDocumentTypeSelector(false);
     setShowDocumentsModal(true);
     setFilterPlan("all");
     setFilterCarrera("all");
     setFilterCuatrimestre("all");
+    setFilterMateria("all");
+    setFilterDocente("all");
+    setFilterParcial("all");
   };
 
   const handleSelectTutorCategory = (category: TutorDocumentType) => {
     setSelectedTutorCategory(category);
+    setSelectedDocumentCategory(null);
     setShowDocumentTypeSelector(false);
     setShowDocumentsModal(true);
     setFilterTutorDocente("all");
+    setFilterTutorPlan("all");
+    setFilterTutorCarrera("all");
+    setFilterTutorCuatrimestre("all");
+    setFilterTutorParcial("all");
   };
 
   const closeDocumentsModal = () => {
     setShowDocumentsModal(false);
     setSelectedDocumentType(null);
     setSelectedDocumentCategory(null);
+    setSelectedTutorCategory(null);
+    setFilterPlan("all");
+    setFilterCarrera("all");
+    setFilterCuatrimestre("all");
+    setFilterMateria("all");
+    setFilterDocente("all");
+    setFilterParcial("all");
+    setFilterTutorDocente("all");
+    setFilterTutorPlan("all");
+    setFilterTutorCarrera("all");
+    setFilterTutorCuatrimestre("all");
+    setFilterTutorParcial("all");
   };
 
   const openDocumentPreview = (document: DocumentRecord | TutorDocumentRecord) => {
@@ -529,21 +919,177 @@ export function CiclosEscolares() {
   };
 
   const closeDocumentPreview = () => {
+    if (previewBlobUrl) {
+      URL.revokeObjectURL(previewBlobUrl);
+    }
+    setPreviewBlobUrl(null);
+    setPreviewError(null);
+    setPreviewLoading(false);
     setPreviewDocument(null);
   };
 
-  const plansAvailable = Array.from(new Set(documents.map((document) => document.plan)));
-  const carrerasAvailable = Array.from(new Set(documents.map((document) => document.carrera)));
-  const cuatrimestresAvailable = useMemo(() => {
-    if (filterPlan === "Plan Normal") {
-      return ["6", "11"];
+  useEffect(() => {
+    if (!previewDocument) {
+      return;
     }
-    if (filterPlan === "Plan Nuevo Modelo") {
-      return ["6", "10"];
-    }
-    return ["6", "10", "11"];
-  }, [filterPlan]);
-  const tutorDocentesAvailable = Array.from(new Set(tutorDocuments.map((document) => document.docente)));
+
+    let cancelled = false;
+
+    const loadPreview = async () => {
+      setPreviewLoading(true);
+      setPreviewError(null);
+
+      try {
+        const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+        const endpoint = previewDocument.pdfUrl ?? `/documents/${previewDocument.id}/file`;
+        const absoluteUrl = endpoint.startsWith("http")
+          ? endpoint
+          : `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+
+        const response = await fetch(absoluteUrl, {
+          method: "GET",
+          headers: {
+            Accept: "application/pdf",
+            "ngrok-skip-browser-warning": "true",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: "include",
+          mode: "cors",
+        });
+
+        if (!response.ok) {
+          throw new Error(`No se pudo abrir el PDF (${response.status})`);
+        }
+
+        const blob = await response.blob();
+        if (blob.type && !blob.type.includes("pdf")) {
+          throw new Error("El archivo recibido no es un PDF válido.");
+        }
+
+        const blobUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          if (previewBlobUrl) {
+            URL.revokeObjectURL(previewBlobUrl);
+          }
+          setPreviewBlobUrl(blobUrl);
+        } else {
+          URL.revokeObjectURL(blobUrl);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : "No se pudo cargar la vista previa del PDF.";
+          setPreviewError(message);
+          setPreviewBlobUrl(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setPreviewLoading(false);
+        }
+      }
+    };
+
+    void loadPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewDocument]);
+
+  const plansAvailable = useMemo(
+    () => {
+      const plans = Array.from(new Set(documents.map((document) => document.plan).filter((value): value is string => Boolean(value))));
+      return plans.length > 0 ? plans : ["Plan Nuevo Modelo", "Plan Normal", "Plan"];
+    },
+    [documents]
+  );
+
+  // Carreras depend on the selected plan, same pattern as DocumentReview
+  const carrerasAvailable = useMemo(
+    () => getCareerFilterOptions(filterPlan),
+    [filterPlan]
+  );
+
+  const cuatrimestresAvailable = useMemo(
+    () => {
+      const fromCatalog = getCuatrimestresForPlanCarrera(filterPlan, filterCarrera);
+      const fromDocs = Array.from(new Set(documents
+        .filter((document) => (selectedDocumentCategory === null || document.tipo === selectedDocumentCategory)
+          && (filterPlan === "all" || document.plan === filterPlan)
+          && (filterCarrera === "all" || document.carrera === filterCarrera))
+        .map((document) => document.cuatrimestre)))
+        .filter((value) => value !== "-");
+      // Merge catalog (all possible) with what's actually uploaded, keeping catalog order
+      const merged = [...fromCatalog];
+      for (const c of fromDocs) {
+        if (!merged.includes(c)) merged.push(c);
+      }
+      return merged;
+    },
+    [documents, selectedDocumentCategory, filterPlan, filterCarrera]
+  );
+
+  const docentesAvailable = useMemo(
+    () => Array.from(new Set(documents
+      .filter((document) => (selectedDocumentCategory === null || document.tipo === selectedDocumentCategory)
+        && (filterPlan === "all" || document.plan === filterPlan)
+        && (filterCarrera === "all" || document.carrera === filterCarrera)
+        && (filterCuatrimestre === "all" || document.cuatrimestre === filterCuatrimestre)
+        && (filterMateria === "all" || document.materia === filterMateria))
+      .map((document) => document.docente))),
+    [documents, selectedDocumentCategory, filterPlan, filterCarrera, filterCuatrimestre, filterMateria]
+  );
+
+  const materiasAvailable = useMemo(
+    () => Array.from(new Set(documents
+      .filter((document) => (selectedDocumentCategory === null || document.tipo === selectedDocumentCategory)
+        && (filterPlan === "all" || document.plan === filterPlan)
+        && (filterCarrera === "all" || document.carrera === filterCarrera)
+        && (filterCuatrimestre === "all" || document.cuatrimestre === filterCuatrimestre))
+      .map((document) => document.materia)))
+      .filter((value) => Boolean(value) && value !== "Sin materia"),
+    [documents, selectedDocumentCategory, filterPlan, filterCarrera, filterCuatrimestre]
+  );
+
+  const parcialesAvailable = PARCIAL_FILTER_OPTIONS;
+
+  // Tutor plans also static
+  const tutorPlansAvailable = ["Plan Nuevo Modelo", "Plan Normal"];
+
+  // Tutor carreras depend on selected tutor plan
+  const tutorCarrerasAvailable = useMemo(
+    () => getCareerFilterOptions(filterTutorPlan),
+    [filterTutorPlan]
+  );
+
+  const tutorCuatrimestresAvailable = useMemo(
+    () => {
+      const fromCatalog = getCuatrimestresForPlanCarrera(filterTutorPlan, filterTutorCarrera);
+      const fromDocs = Array.from(new Set(tutorDocuments
+        .filter((document) => (selectedTutorCategory === null || document.tipo === selectedTutorCategory)
+          && (filterTutorPlan === "all" || (document.plan ?? "Plan") === filterTutorPlan)
+          && (filterTutorCarrera === "all" || (document.carrera ?? "Sin carrera") === filterTutorCarrera))
+        .map((document) => document.cuatrimestre ?? "-")))
+        .filter((value) => value !== "-");
+      const merged = [...fromCatalog];
+      for (const c of fromDocs) {
+        if (!merged.includes(c)) merged.push(c);
+      }
+      return merged;
+    },
+    [tutorDocuments, selectedTutorCategory, filterTutorPlan, filterTutorCarrera]
+  );
+
+  const tutorDocentesAvailable = useMemo(
+    () => Array.from(new Set(tutorDocuments
+      .filter((document) => (selectedTutorCategory === null || document.tipo === selectedTutorCategory)
+        && (filterTutorPlan === "all" || (document.plan ?? "Plan") === filterTutorPlan)
+        && (filterTutorCarrera === "all" || (document.carrera ?? "Sin carrera") === filterTutorCarrera)
+        && (filterTutorCuatrimestre === "all" || (document.cuatrimestre ?? "-") === filterTutorCuatrimestre))
+      .map((document) => document.docente))),
+    [tutorDocuments, selectedTutorCategory, filterTutorPlan, filterTutorCarrera, filterTutorCuatrimestre]
+  );
+
+  const tutorParcialesAvailable = PARCIAL_FILTER_OPTIONS;
 
   React.useEffect(() => {
     if (filterCuatrimestre !== "all" && !cuatrimestresAvailable.includes(filterCuatrimestre)) {
@@ -551,22 +1097,114 @@ export function CiclosEscolares() {
     }
   }, [filterCuatrimestre, cuatrimestresAvailable]);
 
+  React.useEffect(() => {
+    if (filterCarrera !== "all" && !carrerasAvailable.some((c) => c.value === filterCarrera)) {
+      setFilterCarrera("all");
+    }
+  }, [filterCarrera, carrerasAvailable]);
+
+  React.useEffect(() => {
+    if (filterMateria !== "all" && !materiasAvailable.includes(filterMateria)) {
+      setFilterMateria("all");
+    }
+  }, [filterMateria, materiasAvailable]);
+
+  React.useEffect(() => {
+    if (filterDocente !== "all" && !docentesAvailable.includes(filterDocente)) {
+      setFilterDocente("all");
+    }
+  }, [filterDocente, docentesAvailable]);
+
+  React.useEffect(() => {
+    if (filterParcial !== "all" && !parcialesAvailable.some((option) => option.value === filterParcial)) {
+      setFilterParcial("all");
+    }
+  }, [filterParcial, parcialesAvailable]);
+
+  React.useEffect(() => {
+    if (filterTutorCarrera !== "all" && !tutorCarrerasAvailable.some((c) => c.value === filterTutorCarrera)) {
+      setFilterTutorCarrera("all");
+    }
+  }, [filterTutorCarrera, tutorCarrerasAvailable]);
+
+  React.useEffect(() => {
+    if (filterTutorCuatrimestre !== "all" && !tutorCuatrimestresAvailable.includes(filterTutorCuatrimestre)) {
+      setFilterTutorCuatrimestre("all");
+    }
+  }, [filterTutorCuatrimestre, tutorCuatrimestresAvailable]);
+
+  React.useEffect(() => {
+    if (filterTutorDocente !== "all" && !tutorDocentesAvailable.includes(filterTutorDocente)) {
+      setFilterTutorDocente("all");
+    }
+  }, [filterTutorDocente, tutorDocentesAvailable]);
+
+  React.useEffect(() => {
+    if (filterTutorParcial !== "all" && !tutorParcialesAvailable.some((option) => option.value === filterTutorParcial)) {
+      setFilterTutorParcial("all");
+    }
+  }, [filterTutorParcial, tutorParcialesAvailable]);
+
   const filteredDocuments = useMemo(
     () => documents.filter((document) => (
+      (selectedDocumentCategory === null || document.tipo === selectedDocumentCategory)
+      &&
       (filterPlan === "all" || document.plan === filterPlan)
       && (filterCarrera === "all" || document.carrera === filterCarrera)
       && (filterCuatrimestre === "all" || document.cuatrimestre === filterCuatrimestre)
+      && (filterMateria === "all" || document.materia === filterMateria)
+      && (filterDocente === "all" || document.docente === filterDocente)
+      && (filterParcial === "all" || getParcialFilterValue(document.parcial) === filterParcial)
     )),
-    [documents, filterPlan, filterCarrera, filterCuatrimestre]
+    [documents, selectedDocumentCategory, filterPlan, filterCarrera, filterCuatrimestre, filterMateria, filterDocente, filterParcial]
   );
 
   const filteredTutorDocuments = useMemo(
     () => tutorDocuments.filter((document) => (
       (selectedTutorCategory === null || document.tipo === selectedTutorCategory)
+      && (filterTutorPlan === "all" || (document.plan ?? "Plan") === filterTutorPlan)
+      && (filterTutorCarrera === "all" || (document.carrera ?? "Sin carrera") === filterTutorCarrera)
+      && (filterTutorCuatrimestre === "all" || (document.cuatrimestre ?? "-") === filterTutorCuatrimestre)
       && (filterTutorDocente === "all" || document.docente === filterTutorDocente)
+      && (filterTutorParcial === "all" || getParcialFilterValue(document.parcial) === filterTutorParcial)
     )),
-    [tutorDocuments, selectedTutorCategory, filterTutorDocente]
+    [tutorDocuments, selectedTutorCategory, filterTutorPlan, filterTutorCarrera, filterTutorCuatrimestre, filterTutorDocente, filterTutorParcial]
   );
+
+  const docenteCountByType = useMemo(() => {
+    return documents.reduce<Record<DocumentRecord["tipo"], number>>((acc, document) => {
+      acc[document.tipo] = (acc[document.tipo] ?? 0) + 1;
+      return acc;
+    }, {
+      "planeacion": 0,
+      "instrumento-30": 0,
+      "instrumento-40": 0,
+      "instrumento-60": 0,
+      "instrumento-70": 0,
+      "instrumento-30-40": 0,
+      "instrumento-60-70": 0,
+      "lista-concentrada": 0,
+      "asesoria": 0,
+      "portafolio": 0,
+      "acta-final": 0,
+    });
+  }, [documents]);
+
+  const tutorCountByType = useMemo(() => {
+    return tutorDocuments.reduce<Record<TutorDocumentType, number>>((acc, document) => {
+      acc[document.tipo] = (acc[document.tipo] ?? 0) + 1;
+      return acc;
+    }, {
+      "carga-academica": 0,
+      "reporte-bajas": 0,
+      "concentrado-asesorias": 0,
+      "acta-asistencia": 0,
+      "ficha-tecnica": 0,
+    });
+  }, [tutorDocuments]);
+
+  const totalDocenteDocuments = documents.length;
+  const totalTutorDocuments = tutorDocuments.length;
 
   const documentsModalTitle = getDocumentsModalTitle(selectedDocumentType, selectedDocumentCategory, selectedTutorCategory);
 
@@ -596,7 +1234,7 @@ export function CiclosEscolares() {
 
       <div className="grid gap-4">
         {ciclos.map((ciclo) => {
-          const documentsCount = cycleDocumentCount(ciclo.nombre);
+          const documentsCount = cycleDocumentCount(ciclo);
 
           return (
             <Card
@@ -828,7 +1466,7 @@ export function CiclosEscolares() {
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100">
               <strong>Ciclo:</strong> {selectedCycle?.nombre}
               <br />
-              <strong>Documentos asociados:</strong> {selectedCycle ? cycleDocumentCount(selectedCycle.nombre) : 0}
+              <strong>Documentos asociados:</strong> {selectedCycle ? cycleDocumentCount(selectedCycle) : 0}
             </div>
             <div className="space-y-2">
               <Label>Escribe el nombre exacto del ciclo</Label>
@@ -851,25 +1489,31 @@ export function CiclosEscolares() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-2xl">Seleccionar Tipo de Documentos</DialogTitle>
-            <DialogDescription className="text-base mt-2">¿Qué documentos deseas revisar para {selectedCycle?.nombre}?</DialogDescription>
+            <DialogDescription className="text-base mt-2">
+              {isLoadingDocuments
+                ? "Cargando documentos del ciclo..."
+                : `¿Qué documentos deseas revisar para ${selectedCycle?.nombre}?`}
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 mt-6">
             <Button
               onClick={() => handleSelectDocType("docentes")}
               className="justify-start h-28 text-left flex flex-col items-start p-5 border-2 rounded-lg transition-all hover:shadow-lg"
               variant="outline"
+              disabled={isLoadingDocuments || totalDocenteDocuments === 0}
             >
               <FileText className="h-6 w-6 mb-3" />
-              <span className="font-semibold text-lg">Documentos Docentes</span>
+              <span className="font-semibold text-lg">Documentos Docentes ({totalDocenteDocuments})</span>
               <span className="text-sm text-muted-foreground">Planeación, instrumentos, listas, asesorías y más.</span>
             </Button>
             <Button
               onClick={() => handleSelectDocType("tutores")}
               className="justify-start h-28 text-left flex flex-col items-start p-5 border-2 rounded-lg transition-all hover:shadow-lg"
               variant="outline"
+              disabled={isLoadingDocuments || totalTutorDocuments === 0}
             >
               <FileText className="h-6 w-6 mb-3" />
-              <span className="font-semibold text-lg">Documentos Tutores</span>
+              <span className="font-semibold text-lg">Documentos Tutores ({totalTutorDocuments})</span>
               <span className="text-sm text-muted-foreground">Carga académica, reportes, concentrados y fichas.</span>
             </Button>
           </div>
@@ -897,25 +1541,25 @@ export function CiclosEscolares() {
           </DialogHeader>
           {selectedDocumentType === "tutores" ? (
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
-              <Button onClick={() => handleSelectTutorCategory("carga-academica")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Carga académica</Button>
-              <Button onClick={() => handleSelectTutorCategory("reporte-bajas")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Reporte de bajas</Button>
-              <Button onClick={() => handleSelectTutorCategory("concentrado-asesorias")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Concentrado de asesorías y bajas</Button>
-              <Button onClick={() => handleSelectTutorCategory("acta-asistencia")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Acta de asistencia grupal</Button>
-              <Button onClick={() => handleSelectTutorCategory("ficha-tecnica")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Ficha técnica</Button>
+              <Button disabled={tutorCountByType["carga-academica"] === 0} onClick={() => handleSelectTutorCategory("carga-academica")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Carga académica ({tutorCountByType["carga-academica"]})</Button>
+              <Button disabled={tutorCountByType["reporte-bajas"] === 0} onClick={() => handleSelectTutorCategory("reporte-bajas")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Reporte de bajas ({tutorCountByType["reporte-bajas"]})</Button>
+              <Button disabled={tutorCountByType["concentrado-asesorias"] === 0} onClick={() => handleSelectTutorCategory("concentrado-asesorias")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Concentrado de asesorías y bajas ({tutorCountByType["concentrado-asesorias"]})</Button>
+              <Button disabled={tutorCountByType["acta-asistencia"] === 0} onClick={() => handleSelectTutorCategory("acta-asistencia")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Acta de asistencia grupal ({tutorCountByType["acta-asistencia"]})</Button>
+              <Button disabled={tutorCountByType["ficha-tecnica"] === 0} onClick={() => handleSelectTutorCategory("ficha-tecnica")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Ficha técnica ({tutorCountByType["ficha-tecnica"]})</Button>
             </div>
           ) : (
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
-              <Button onClick={() => handleSelectDocumentCategory("planeacion")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Planeación</Button>
-              <Button onClick={() => handleSelectDocumentCategory("instrumento-30")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 30%</Button>
-              <Button onClick={() => handleSelectDocumentCategory("instrumento-40")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 40%</Button>
-              <Button onClick={() => handleSelectDocumentCategory("instrumento-60")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 60%</Button>
-              <Button onClick={() => handleSelectDocumentCategory("instrumento-70")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 70%</Button>
-              <Button onClick={() => handleSelectDocumentCategory("instrumento-30-40")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 30/40% (legacy)</Button>
-              <Button onClick={() => handleSelectDocumentCategory("instrumento-60-70")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 60/70% (legacy)</Button>
-              <Button onClick={() => handleSelectDocumentCategory("lista-concentrada")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Lista Concentrada</Button>
-              <Button onClick={() => handleSelectDocumentCategory("asesoria")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Asesoría</Button>
-              <Button onClick={() => handleSelectDocumentCategory("portafolio")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Portafolio Digital</Button>
-              <Button onClick={() => handleSelectDocumentCategory("acta-final")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Acta Final</Button>
+              <Button disabled={docenteCountByType["planeacion"] === 0} onClick={() => handleSelectDocumentCategory("planeacion")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Planeación ({docenteCountByType["planeacion"]})</Button>
+              <Button disabled={docenteCountByType["instrumento-30"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-30")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 30% ({docenteCountByType["instrumento-30"]})</Button>
+              <Button disabled={docenteCountByType["instrumento-40"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-40")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 40% ({docenteCountByType["instrumento-40"]})</Button>
+              <Button disabled={docenteCountByType["instrumento-60"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-60")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 60% ({docenteCountByType["instrumento-60"]})</Button>
+              <Button disabled={docenteCountByType["instrumento-70"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-70")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 70% ({docenteCountByType["instrumento-70"]})</Button>
+              <Button disabled={docenteCountByType["instrumento-30-40"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-30-40")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 30/40% (legacy) ({docenteCountByType["instrumento-30-40"]})</Button>
+              <Button disabled={docenteCountByType["instrumento-60-70"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-60-70")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 60/70% (legacy) ({docenteCountByType["instrumento-60-70"]})</Button>
+              <Button disabled={docenteCountByType["lista-concentrada"] === 0} onClick={() => handleSelectDocumentCategory("lista-concentrada")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Lista Concentrada ({docenteCountByType["lista-concentrada"]})</Button>
+              <Button disabled={docenteCountByType["asesoria"] === 0} onClick={() => handleSelectDocumentCategory("asesoria")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Asesoría ({docenteCountByType["asesoria"]})</Button>
+              <Button disabled={docenteCountByType["portafolio"] === 0} onClick={() => handleSelectDocumentCategory("portafolio")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Portafolio Digital ({docenteCountByType["portafolio"]})</Button>
+              <Button disabled={docenteCountByType["acta-final"] === 0} onClick={() => handleSelectDocumentCategory("acta-final")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Acta Final ({docenteCountByType["acta-final"]})</Button>
             </div>
           )}
         </DialogContent>
@@ -944,10 +1588,14 @@ export function CiclosEscolares() {
           </DialogHeader>
 
           <ScrollArea className="flex-1 pr-4">
-            {selectedDocumentType === "docentes" ? (
+            {isLoadingDocuments ? (
+              <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                Cargando documentos del ciclo...
+              </div>
+            ) : selectedDocumentType === "docentes" ? (
               <>
-                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 py-4 border-b">
-                  <Select value={filterPlan} onValueChange={setFilterPlan}>
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 py-4 border-b">
+                  <Select value={filterPlan} onValueChange={(v) => { setFilterPlan(v); setFilterCarrera("all"); }}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Plan" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los planes</SelectItem>
@@ -958,7 +1606,7 @@ export function CiclosEscolares() {
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Carrera" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas las carreras</SelectItem>
-                      {carrerasAvailable.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
+                      {carrerasAvailable.map((carrera) => <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
@@ -966,6 +1614,27 @@ export function CiclosEscolares() {
                     <SelectContent>
                       <SelectItem value="all">Todos los cuatrimestres</SelectItem>
                       {cuatrimestresAvailable.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterMateria} onValueChange={setFilterMateria}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Materia" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las materias</SelectItem>
+                      {materiasAvailable.map((materia) => <SelectItem key={materia} value={materia}>{materia}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterDocente} onValueChange={setFilterDocente}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Docente" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los docentes</SelectItem>
+                      {docentesAvailable.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterParcial} onValueChange={setFilterParcial}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Parcial" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los parciales</SelectItem>
+                      {parcialesAvailable.map((parcial) => <SelectItem key={parcial.value} value={parcial.value}>{parcial.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -991,11 +1660,12 @@ export function CiclosEscolares() {
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm truncate">{doc.documento}</p>
                             <p className="text-xs text-muted-foreground">{doc.docente} • {doc.carrera}</p>
+                            <p className="text-xs text-muted-foreground">Materia: {doc.materia}</p>
                             <div className="flex flex-wrap gap-1 mt-1">
                               <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
-                              <Badge variant="outline" className="text-xs">Q{doc.cuatrimestre}</Badge>
-                              <Badge variant="outline" className="text-xs">{doc.grupo}</Badge>
-                              <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>
+                              <Badge variant="outline" className="text-xs">Cuatrimestre {doc.cuatrimestre}</Badge>
+                              <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
+                              {doc.parcial !== "-" && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
                             </div>
                           </div>
                           <ResponsiveActionButton
@@ -1015,12 +1685,40 @@ export function CiclosEscolares() {
               </>
             ) : (
               <>
-                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 py-4 border-b">
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5 py-4 border-b">
+                  <Select value={filterTutorPlan} onValueChange={(v) => { setFilterTutorPlan(v); setFilterTutorCarrera("all"); }}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Plan" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los planes</SelectItem>
+                      {tutorPlansAvailable.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterTutorCarrera} onValueChange={setFilterTutorCarrera}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Carrera" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las carreras</SelectItem>
+                      {tutorCarrerasAvailable.map((carrera) => <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterTutorCuatrimestre} onValueChange={setFilterTutorCuatrimestre}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Cuatrimestre" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los cuatrimestres</SelectItem>
+                      {tutorCuatrimestresAvailable.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                   <Select value={filterTutorDocente} onValueChange={setFilterTutorDocente}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Docente" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los docentes</SelectItem>
                       {tutorDocentesAvailable.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterTutorParcial} onValueChange={setFilterTutorParcial}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Parcial" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los parciales</SelectItem>
+                      {tutorParcialesAvailable.map((parcial) => <SelectItem key={parcial.value} value={parcial.value}>{parcial.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1049,7 +1747,7 @@ export function CiclosEscolares() {
                             <div className="mt-1 flex flex-wrap gap-1">
                               {doc.cuatrimestre && <Badge variant="outline" className="text-xs">Q{doc.cuatrimestre}</Badge>}
                               {doc.grupo && <Badge variant="outline" className="text-xs">{doc.grupo}</Badge>}
-                              {doc.parcial && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
+                              {doc.parcial && doc.parcial !== "-" && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
                               <Badge variant="outline" className="text-xs">{doc.tipo.replaceAll("-", " ")}</Badge>
                             </div>
                           </div>
@@ -1085,7 +1783,17 @@ export function CiclosEscolares() {
             closeDocumentPreview();
           }
         }}
-        onOpenPdf={() => toast("Abrir PDF - simulación")}
+        onOpenPdf={() => {
+          if (!previewBlobUrl) {
+            toast.error("El PDF aún no está disponible para abrirse.");
+            return;
+          }
+
+          window.open(previewBlobUrl, "_blank", "noopener,noreferrer");
+        }}
+        previewLoading={previewLoading}
+        previewError={previewError}
+        previewBlobUrl={previewBlobUrl}
       />
 
       <Dialog open={confirmDialog.open} onOpenChange={(open) => { if (!open) setConfirmDialog({ open: false }); }}>

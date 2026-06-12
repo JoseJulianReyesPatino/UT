@@ -9,9 +9,9 @@ import { Button } from "../../components/ui/button";
 import { CalendarDays, History, Sparkles, Upload } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetDescription, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { ScrollArea } from "../../components/ui/scroll-area";
-import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuatrimestre } from "../../data/curricula";
+import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
 import { getCalendarFileUrl } from "../../lib/calendar";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
@@ -23,6 +23,7 @@ interface PlaneacionFormData {
   carrera: string;
   cuatrimestre: Cuatrimestre | "";
   materia: string;
+  parcial: string;
   grupo: string;
   archivos: File[];
   docente: string;
@@ -35,6 +36,7 @@ const initialFormData: PlaneacionFormData = {
   carrera: "",
   cuatrimestre: "",
   materia: "",
+  parcial: "",
   grupo: "",
   archivos: [],
   docente: "",
@@ -93,7 +95,7 @@ export default function PlaneacionPage() {
   }, [formData.carrera, formData.cuatrimestre]);
 
   useEffect(() => {
-    setFormData((current) => ({ ...current, grupo: "" }));
+    setFormData((current) => ({ ...current, grupo: "", parcial: "" }));
   }, [formData.carrera, formData.cuatrimestre]);
 
   useEffect(() => {
@@ -143,6 +145,7 @@ export default function PlaneacionPage() {
       formData.carrera &&
       formData.cuatrimestre &&
       formData.materia &&
+      formData.parcial &&
       validarGrupo &&
       formData.archivos.length > 0 &&
       user &&
@@ -212,6 +215,12 @@ export default function PlaneacionPage() {
   const selectedMateriaLabel = formData.materia || "Sin materia";
   const canOpenHistory = history.length > 0 || formData.archivos.length > 0;
 
+  const normalizeParcialForForm = (value: unknown): string => {
+    const raw = String(value ?? "").trim();
+    const match = raw.match(/\b([123])\b/);
+    return match ? `Parcial ${match[1]}` : "";
+  };
+
   const findCareerCodeByLabel = (label: string, planType: Plan | "") => {
     if (!label || !planType) return "";
     const candidates = planType === "nuevo-modelo"
@@ -236,12 +245,20 @@ export default function PlaneacionPage() {
 
     const planKey = normalizePlanKey(document.plan ?? "");
     const careerCode = findCareerCodeByLabel(document.carrera_label ?? "", planKey as any);
+    const allowedCuatrimestres = new Set(Object.keys(cuatrimestresLabels));
+    const rawCuatrimestre = String(document.cuatrimestre ?? "").trim();
+    const fallbackParcial = String(document.parcial ?? "").trim();
+    const resolvedCuatrimestre = allowedCuatrimestres.has(rawCuatrimestre)
+      ? rawCuatrimestre
+      : (allowedCuatrimestres.has(fallbackParcial) ? fallbackParcial : "");
+
     setEditingDocumentId(document.id);
     setFormData({
       plan: planKey as Plan,
       carrera: careerCode,
-      cuatrimestre: String(document.parcial || "") as Cuatrimestre,
+      cuatrimestre: resolvedCuatrimestre as Cuatrimestre,
       materia: document.materia ?? "",
+      parcial: normalizeParcialForForm(document.parcial),
       grupo: document.group_code ? formatGroupCode(document.group_code) : String(document.group_id ?? ""),
       archivos: [],
       docente: user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() : "",
@@ -334,7 +351,7 @@ export default function PlaneacionPage() {
 
       if (formData.plan) payload.plan = formData.plan;
       if (formData.materia) payload.materia = formData.materia;
-      if (formData.cuatrimestre) payload.parcial = String(formData.cuatrimestre);
+      if (formData.parcial) payload.parcial = formData.parcial;
       if (formData.grupo) {
         const sel = groupsOptions.find((g) => formatGroupCode(g.group_code) === formData.grupo || String(g.id) === formData.grupo);
         if (sel) {
@@ -367,104 +384,90 @@ export default function PlaneacionPage() {
   };
 
   return (
-    <div className="relative overflow-hidden bg-slate-50">
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.06),transparent_32%)]" />
-      <div className="relative mx-auto max-w-7xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-emerald-700">
-              <Sparkles className="h-3.5 w-3.5" />
-              Planeación docente
-            </div>
+    <div className="mx-auto max-w-4xl space-y-6">
+      <header>
+        <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
-              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Planeación</h1>
-              <p className="max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-                Captura tu planeación en una interfaz limpia, con contexto lateral y un flujo de trabajo más claro.
+              <h1 className="text-3xl font-bold">Planeación</h1>
+              <p className="text-muted-foreground">
+                Captura tu planeación en una interfaz limpia y enfocada en el formulario principal.
               </p>
             </div>
-          </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Button variant="outline" className="rounded-2xl border-slate-200 bg-white px-4 py-5 text-slate-700 hover:bg-slate-100" onClick={() => window.open(calendarioUrl, "_blank") }>
-              <CalendarDays className="mr-2 h-4 w-4" />
-              Calendario
-            </Button>
-            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" className="rounded-2xl border-slate-200 bg-white px-4 py-5 text-slate-700 hover:bg-slate-100">
-                  <History className="mr-2 h-4 w-4" />
-                  Historial
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right">
-                <SheetHeader>
-                  <SheetTitle>Historial de archivos</SheetTitle>
-                  <SheetDescription>Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
-                </SheetHeader>
-                <div className="mt-4 space-y-4">
-                  {history && history.length > 0 ? (
-                    <div className="space-y-3">
-                      <p className="mb-2 text-sm font-medium">Historial de planeaciones</p>
-                      <div className="relative">
-                        <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-slate-200/70 bg-white/40 pr-2 dark:border-slate-700 dark:bg-slate-900/30">
-                          <div className="grid gap-3 p-1">
-                            {history.map((h) => (
-                              <div key={h.id} className="rounded-lg border border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                  <div>
-                                    <p className="text-sm font-semibold">{h.title ?? h.file_path}</p>
-                                    <p className="break-all text-xs text-muted-foreground">PDF: {getUploadedFileName(h)}</p>
-                                    <p className="text-xs text-muted-foreground">{h.materia ?? "Planeación"}</p>
-                                  </div>
-                                  <p className="text-xs text-muted-foreground">{new Date(h.submitted_at).toLocaleString()}</p>
+            <div className="flex flex-wrap gap-3">
+              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" className="rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent">
+                    <History className="mr-2 h-4 w-4" />
+                    Historial
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right">
+                  <SheetHeader>
+                    <SheetTitle>Historial de archivos</SheetTitle>
+                    <SheetDescription>Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
+                  </SheetHeader>
+                  <div className="mt-4 space-y-4">
+                    {history.length > 0 ? (
+                      <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:bg-slate-900/30">
+                        <div className="grid gap-3 p-1">
+                          {history.map((h) => (
+                            <div key={h.id} className="rounded-lg border border-border bg-card p-4 shadow-sm dark:bg-slate-900">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                  <p className="text-sm font-semibold">{h.title ?? h.file_path}</p>
+                                  <p className="break-all text-xs text-muted-foreground">PDF: {getUploadedFileName(h)}</p>
+                                  <p className="text-xs text-muted-foreground">{h.materia ?? "Planeación"}</p>
                                 </div>
-
-                                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                  <div className="flex flex-wrap gap-2">
-                                    <Button size="sm" variant="outline" onClick={() => openDocument(h.id, "view")}>Ver</Button>
-                                    <Button size="sm" variant="secondary" onClick={() => populateFormForEdit(h)} disabled={isReplacing}>Editar documento</Button>
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">Estatus: {h.status ?? "Pendiente"}</span>
-                                </div>
+                                <p className="text-xs text-muted-foreground">{new Date(h.submitted_at).toLocaleString()}</p>
                               </div>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      </div>
-                    </div>
-                  ) : formData.archivos.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión ni en el historial.</p>
-                  ) : (
-                    <div>
-                      <p className="mb-2 text-sm font-medium">Archivos en esta sesión</p>
-                      <ul className="space-y-2">
-                        {formData.archivos.map((f, i) => (
-                          <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-        </header>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
-          <div ref={formRef}>
-            <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
-              <CardHeader className="border-b border-slate-200/80 bg-white pb-5">
+                              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex flex-wrap gap-2">
+                                  <Button size="sm" variant="outline" onClick={() => openDocument(h.id, "view")}>Ver</Button>
+                                  <Button size="sm" variant="secondary" onClick={() => populateFormForEdit(h)} disabled={isReplacing}>Editar documento</Button>
+                                </div>
+                                <span className="text-xs text-muted-foreground">Estatus: {h.status ?? "Pendiente"}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : formData.archivos.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión ni en el historial.</p>
+                    ) : (
+                      <div>
+                        <p className="mb-2 text-sm font-medium">Archivos en esta sesión</p>
+                        <ul className="space-y-2">
+                          {formData.archivos.map((f, i) => (
+                            <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+        </div>
+      </header>
+
+      <div className="flex items-center justify-between rounded-md border-l-4 border-emerald-300 bg-emerald-50 p-3 dark:border-emerald-300 dark:bg-emerald-900/10">
+        <p className="text-sm font-medium text-black dark:text-white">Recordatorio: Se sube 3 días después de la aplicación de cada parcial.</p>
+        <Button variant="outline" size="sm" onClick={() => window.open(calendarioUrl, "_blank")}>Calendario</Button>
+      </div>
+
+      <div ref={formRef}>
+            <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card">
+              <CardHeader className="border-b border-border/80 bg-card pb-5 dark:border-border/80 dark:bg-card">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <CardTitle>Formulario de Planeación</CardTitle>
                     <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
                   </div>
-                  <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                    {formData.archivos.length}/3 archivos
-                  </div>
                 </div>
                 {editingDocumentId ? (
-                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
                     Estás editando la planeación existente #{editingDocumentId}. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
                   </div>
                 ) : null}
@@ -527,32 +530,48 @@ export default function PlaneacionPage() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Grupo *</Label>
-                    {groupsOptions.length > 0 ? (
-                      <Select value={formData.grupo} onValueChange={(v) => setFormData((c) => ({ ...c, grupo: v }))}>
+                  <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Parcial *</Label>
+                      <Select value={formData.parcial} onValueChange={(value) => setFormData((current) => ({ ...current, parcial: value }))}>
                         <SelectTrigger className="rounded-2xl">
-                          <SelectValue placeholder="Selecciona el grupo" />
+                          <SelectValue placeholder="Selecciona el parcial" />
                         </SelectTrigger>
                         <SelectContent>
-                          {groupsOptions.map((g) => (
-                            <SelectItem key={g.id} value={String(g.id)}>{formatGroupCode(g.group_code)}</SelectItem>
+                          {parciales.map((parcial) => (
+                            <SelectItem key={parcial} value={parcial}>{parcial}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    ) : (
-                      <Input value={formData.grupo} onChange={(e) => setFormData((current) => ({ ...current, grupo: e.target.value.toUpperCase() }))} placeholder="Ej. JTH-01" maxLength={7} className="rounded-2xl" />
-                    )}
-                    <p className="text-xs text-muted-foreground">Formato: Ej. JTH-01 o selección automática</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Grupo *</Label>
+                      {groupsOptions.length > 0 ? (
+                        <Select value={formData.grupo} onValueChange={(v) => setFormData((c) => ({ ...c, grupo: v }))}>
+                          <SelectTrigger className="rounded-2xl">
+                            <SelectValue placeholder="Selecciona el grupo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {groupsOptions.map((g) => (
+                              <SelectItem key={g.id} value={String(g.id)}>{formatGroupCode(g.group_code)}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input value={formData.grupo} onChange={(e) => setFormData((current) => ({ ...current, grupo: e.target.value.toUpperCase() }))} placeholder="Ej. JTH-01" maxLength={7} className="rounded-2xl" />
+                      )}
+                      <p className="text-xs text-muted-foreground">Formato: Ej. JTH-01 o selección automática</p>
+                    </div>
                   </div>
 
                   <div className="space-y-2 md:col-span-2">
                     <Label>Documentos (PDF) *</Label>
                     <p className="text-sm text-muted-foreground">Adjunta documentos PDF de hasta 5 MB por archivo. Puedes cargar hasta tres archivos en total.</p>
-                    <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center transition-colors hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-emerald-700/70 dark:hover:bg-slate-900">
+                    <div className="rounded-3xl border border-dashed border-border bg-background/60 p-6 text-center transition-colors hover:border-primary/50 hover:bg-primary/5 dark:border-border dark:bg-slate-950/40 dark:hover:border-primary/50 dark:hover:bg-primary/10">
                       <input type="file" accept=".pdf" multiple className="hidden" id="planeacion-pdf-upload" onChange={handleFileChange} disabled={formData.archivos.length >= 3} />
                       <label htmlFor="planeacion-pdf-upload" className="block cursor-pointer space-y-3">
-                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary/80">
                           <Upload className="h-6 w-6" />
                         </div>
                         <div>
@@ -573,7 +592,7 @@ export default function PlaneacionPage() {
 
                   <div className="space-y-2 md:col-span-2">
                     <Label>Nombre del docente</Label>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                    <div className="rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground dark:border-border dark:bg-slate-900 dark:text-slate-200">
                       {user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name : "Inicia sesión para continuar"}
                     </div>
                   </div>
@@ -592,57 +611,12 @@ export default function PlaneacionPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row dark:border-slate-800">
+                <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row dark:border-border">
                   <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6">Limpiar</Button>
                   <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="rounded-2xl sm:px-6">{isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar planeación" : "Enviar planeación"}</Button>
                 </div>
               </CardContent>
             </Card>
-          </div>
-
-          <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
-            <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
-              <CardHeader className="border-b border-slate-200/80 bg-white">
-                <CardTitle className="text-base">Resumen</CardTitle>
-                <CardDescription>Estado actual del formulario</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 p-5">
-                {[
-                  { label: "Plan", value: selectedPlanLabel },
-                  { label: "Carrera", value: selectedCareerLabel },
-                  { label: "Cuatrimestre", value: selectedCuatrimestreLabel },
-                  { label: "Materia", value: selectedMateriaLabel },
-                  { label: "Grupo", value: formData.grupo || "Sin grupo" },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-                    <span className="text-muted-foreground">{item.label}</span>
-                    <span className="max-w-[55%] truncate font-medium text-foreground">{item.value}</span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
-              <CardHeader className="border-b border-slate-200/80 bg-white">
-                <CardTitle className="text-base">Acciones rápidas</CardTitle>
-                <CardDescription>Herramientas auxiliares</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 p-5">
-                <Button variant="outline" className="w-full justify-between rounded-2xl" onClick={() => window.open(calendarioUrl, "_blank") }>
-                  <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4" />Calendario académico</span>
-                  <span className="text-xs text-muted-foreground">Abrir</span>
-                </Button>
-                <Button variant="outline" className="w-full justify-between rounded-2xl" onClick={() => setSheetOpen(true)} disabled={!canOpenHistory && history.length === 0 && formData.archivos.length === 0}>
-                  <span className="flex items-center gap-2"><History className="h-4 w-4" />Historial de planeaciones</span>
-                  <span className="text-xs text-muted-foreground">{history.length}</span>
-                </Button>
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/60">
-                  Recomendación: redacta con títulos breves, estructura clara y documentos PDF en orden para acelerar la revisión.
-                </div>
-              </CardContent>
-            </Card>
-          </aside>
-        </div>
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ import { clearAvatarCache, getInitials } from "../../lib/avatar";
 import { Calendar, Eye, EyeOff, Key, Upload } from "lucide-react";
 import { toast } from "sonner";
 
-const defaultProfileAvatar = "/src/assets/profile.webp";
+const defaultProfileAvatar = "/src/assets/perfil2.png";
 
 export function Profile() {
   const { user, updateProfile, refreshUser } = useAuth();

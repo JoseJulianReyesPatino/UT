@@ -100,6 +100,8 @@ export const isImageUrl = (value?: string | null): boolean => {
     value.startsWith("https") ||
     value.startsWith("/api/users/") ||
     value.startsWith("/assets/") ||
+    value.startsWith("/uploads/") ||
+    value.startsWith("uploads/") ||
     value.startsWith("/storage/") ||
     value.startsWith("data:")
   );

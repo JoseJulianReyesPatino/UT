@@ -46,13 +46,24 @@ type CareerOption = {
   label: string;
 };
 
+const tutoriasApartadosPermitidos = new Set([
+  "carga-academica",
+  "reporte-bajas",
+  "concentrado-asesorias",
+  "acta-asistencia",
+  "acta-asistencia-grupal",
+  "ficha-tecnica",
+]);
+
+const normalizeApartado = (value: string) => value.toLowerCase().replaceAll("_", "-").trim();
+
 const mapApiDocumentToTutorDocument = (doc: any): TutorDocument => ({
   id: Number(doc.id ?? 0),
   ciclo: doc.cycle_name ?? "N/D",
   plan: doc.plan ?? "N/D",
   tutor: doc.uploaded_by_name ?? "N/D",
   documento: doc.title ?? "Documento",
-  apartado: doc.apartado_label ?? "N/D",
+  apartado: normalizeApartado(doc.apartado_label ?? "N/D"),
   carrera: doc.carrera_label ?? "N/D",
   materia: doc.materia || undefined,
   cuatrimestre: doc.group_id ? String(doc.group_id) : undefined,
@@ -106,7 +117,7 @@ export default function Tutores() {
   const [total, setTotal] = useState<number>(0);
 
   const buildQueryFromFilters = () => {
-    const q: Record<string, any> = { uploader_role: 'tutor', page, per_page: perPage };
+    const q: Record<string, any> = { uploader_role: 'tutor', tutorias_only: 1, page, per_page: perPage };
     if (filterCarrera !== 'all') q.carrera_label = filterCarrera;
     if (filterTutor !== 'all') q.uploaded_by_name = filterTutor;
     if (filterApartado !== 'all') q.apartado_label = filterApartado;
@@ -128,7 +139,11 @@ export default function Tutores() {
 
     try {
       const response = await apiFetch('/documents', { query: buildQueryFromFilters() });
-      const documents = Array.isArray(response?.data) ? response.data.map(mapApiDocumentToTutorDocument) : [];
+      const documents = Array.isArray(response?.data)
+        ? response.data
+            .map(mapApiDocumentToTutorDocument)
+            .filter((doc) => tutoriasApartadosPermitidos.has(normalizeApartado(doc.apartado)))
+        : [];
       setPendingDocuments(documents.filter((doc) => doc.status === 'pendiente'));
       setReviewedDocuments(documents.filter((doc) => doc.status !== 'pendiente'));
       if (response?.meta) {

@@ -2,6 +2,7 @@
 
 :root {
   --font-size: 16px;
+  --app-background-image: url("../assets/presentacion_utslrc.webp");
   --background: #ffffff;
   --foreground: #0a0a0a;
   --card: #ffffff;
@@ -49,6 +50,7 @@
 }
 
 .dark {
+  --app-background-image: url("../assets/presentacion_ut_black.webp");
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.145 0 0);
@@ -149,6 +151,46 @@
 
   body {
     @apply bg-background text-foreground;
+    position: relative;
+    isolation: isolate;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 18% 16%, rgba(16, 185, 129, 0.22), transparent 28%),
+      radial-gradient(circle at 82% 18%, rgba(59, 130, 246, 0.16), transparent 24%),
+      linear-gradient(135deg, rgba(2, 6, 23, 0.12), rgba(255, 255, 255, 0.04)),
+      var(--app-background-image);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    filter: blur(4px) saturate(1.04) contrast(1.02) brightness(0.96);
+    transform: scale(1.08);
+    opacity: 0.44;
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.34), transparent 42%),
+      radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.18), transparent 40%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.5));
+  }
+
+  .dark body::after {
+    background:
+      radial-gradient(circle at top left, rgba(15, 23, 42, 0.22), transparent 42%),
+      radial-gradient(circle at bottom right, rgba(2, 6, 23, 0.38), transparent 40%),
+      linear-gradient(180deg, rgba(2, 6, 23, 0.44), rgba(2, 6, 23, 0.64));
   }
 
   html,

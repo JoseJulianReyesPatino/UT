@@ -27,7 +27,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const defaultProfileAvatar = "/src/assets/profile.webp";
+const defaultProfileAvatar = "/src/assets/perfil2.png";
 
 interface SidebarProps {
   currentView: string;
@@ -397,14 +397,13 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const renderContent = (isMobile: boolean = false) => {
     const isCollapsedLocal = isMobile ? false : collapsed;
     const containerClass = cn(
-      "relative h-full overflow-hidden flex flex-col border-r border-emerald-200/70 bg-gradient-to-b from-emerald-50 via-white to-cyan-50/60 text-sidebar-foreground shadow-[0_12px_40px_rgba(16,185,129,0.08)] transition-all duration-300 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900",
+      "relative h-full overflow-hidden flex flex-col border-r border-border bg-card text-sidebar-foreground shadow-[0_12px_40px_rgba(15,23,42,0.08)] transition-all duration-300 dark:border-slate-800 dark:bg-slate-950",
       isCollapsedLocal ? "w-16" : "w-64"
     );
 
     return (
       <div className={containerClass}>
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-emerald-400/10 to-transparent dark:from-emerald-500/10" />
-        <div className="p-4 border-b border-sidebar-border/70 bg-background/60 backdrop-blur-sm">
+        <div className="p-4 border-b border-sidebar-border/70 bg-card dark:bg-slate-950">
           <div className="relative flex items-center justify-end">
             {!isCollapsedLocal && (
               <div className="absolute left-1/2 -translate-x-1/2">
@@ -479,7 +478,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
           </nav>
         </div>
 
-        <div className="p-4 border-t border-sidebar-border/70 space-y-3 bg-background/60 backdrop-blur-sm">
+        <div className="p-4 border-t border-sidebar-border/70 space-y-3 bg-card dark:bg-slate-950">
           {!isCollapsedLocal && (
             <button
               type="button"

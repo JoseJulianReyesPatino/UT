@@ -80,10 +80,12 @@ type ApiDocument = {
 	title?: string | null;
 	form_title?: string | null;
 	apartado_label?: string | null;
+	cycle_name?: string | null;
 	carrera_label?: string | null;
 	uploaded_by_name?: string | null;
 	materia?: string | null;
 	parcial?: string | null;
+	cuatrimestre?: string | number | null;
 	file_path?: string | null;
 	group_code?: string | null;
 	group?: { group_code?: string | null } | null;
@@ -183,8 +185,27 @@ const friendlyApartado = (value?: string | null) => {
 const formatPlanLabel = (value?: string | null, career?: string | null) => {
 	const normalized = normalizeText(value);
 	const normalizedCareer = normalizeText(career);
-	if (normalized.includes("nuevo") || normalizedCareer.includes("nuevo")) return "Nuevo Modelo";
-	if (normalized.includes("plan normal") || normalized.includes("normal") || normalized === "plan" || normalizedCareer.includes("pn")) return "Plan Normal";
+
+	const nuevoModeloCareers = [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria];
+	const planNormalCareers = [...carrieras["plan-normal"].ingenieria];
+
+	const careerMatchesCatalog = (catalogCareer: { codigo: string; nombre: string }) => {
+		const code = normalizeText(catalogCareer.codigo);
+		const name = normalizeText(catalogCareer.nombre);
+		return (
+			normalizedCareer === code
+			|| normalizedCareer.includes(`(${code})`)
+			|| normalizedCareer.includes(` ${code}`)
+			|| normalizedCareer === name
+			|| normalizedCareer.includes(name)
+		);
+	};
+
+	const isNuevoModeloByCatalog = nuevoModeloCareers.some(careerItem => careerMatchesCatalog(careerItem));
+	const isPlanNormalByCatalog = planNormalCareers.some(careerItem => careerMatchesCatalog(careerItem));
+
+	if (normalized.includes("nuevo") || normalizedCareer.includes("nuevo") || isNuevoModeloByCatalog) return "Nuevo Modelo";
+	if (normalized.includes("plan normal") || normalized.includes("normal") || normalized === "plan" || normalizedCareer.includes("pn") || isPlanNormalByCatalog) return "Plan Normal";
 	return value ? value : "Plan";
 };
 
@@ -196,15 +217,31 @@ const getDocumentFileName = (doc: ApiDocument) => {
 };
 
 const getDocumentCuatrimestre = (doc: ApiDocument) => {
-	const value = doc.cuatrimestre?.trim();
+	const value = doc.cuatrimestre !== null && doc.cuatrimestre !== undefined
+		? String(doc.cuatrimestre).trim()
+		: "";
 	if (value && value !== "-") return value;
 	return doc.parcial?.trim() || "-";
 };
 
+const PARCIAL_FILTER_OPTIONS = [
+	{ value: "1", label: "Parcial 1" },
+	{ value: "2", label: "Parcial 2" },
+	{ value: "3", label: "Parcial 3" },
+] as const;
+
+const getParcialFilterValue = (value?: string | null): "1" | "2" | "3" | null => {
+	const raw = value?.trim() || "";
+	if (!raw) return null;
+	const match = raw.match(/\b([123])\b/);
+	if (!match) return null;
+	return match[1] as "1" | "2" | "3";
+};
+
 const getDocumentParcial = (doc: ApiDocument) => {
-	const value = doc.parcial?.trim();
-	if (!value || value === "-") return "-";
-	return value.toLowerCase().startsWith("parcial") ? value : `Parcial ${value}`;
+	const parcial = getParcialFilterValue(doc.parcial);
+	if (!parcial) return "-";
+	return `Parcial ${parcial}`;
 };
 
 const formatDateOnlyFromKey = (dateKey: string) => {
@@ -251,6 +288,28 @@ const getPreviewUrl = (documentId: number) => {
 	return `${baseUrl}/api/documents/${documentId}/file`;
 };
 
+const normalizeInitialApartadoFilter = (value?: string) => {
+	if (!value) return "all";
+	const normalized = normalizeText(value);
+	if (normalized === "all") return "all";
+	const found = apartadoFilterOptions.find((option) => normalizeText(option.value) === normalized || normalizeText(option.label) === normalized);
+	return found?.label ?? "all";
+};
+
+const getForcedApartadoForRoute = (value?: string): string | null => {
+	const normalized = normalizeText(value);
+	if (normalized === "remedial" || normalized === "remediales") return "Remedial";
+	return null;
+};
+
+const extractApiDocuments = (payload: unknown): ApiDocument[] => {
+	if (Array.isArray(payload)) return payload as ApiDocument[];
+	if (payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown }).data)) {
+		return (payload as { data: ApiDocument[] }).data;
+	}
+	return [];
+};
+
 export default function DocumentReview({ initialSection = "all", initialForm }: DocumentReviewProps) {
 	const { isReady, isAuthenticated } = useAuth();
 	const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
@@ -265,7 +324,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const [filterGrupo, setFilterGrupo] = useState("all");
 	const [filterDocente, setFilterDocente] = useState("all");
 	const [filterParcial, setFilterParcial] = useState("all");
-	const [filterApartado, setFilterApartado] = useState(initialForm ?? "all");
+	const [filterApartado, setFilterApartado] = useState(() => normalizeInitialApartadoFilter(initialForm));
 	const [activeSection, setActiveSection] = useState<ReviewSection>(initialSection);
 	const [previewDocument, setPreviewDocument] = useState<DocumentItem | null>(null);
 	const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
@@ -275,7 +334,9 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 
 	const allDocuments = [...pendingDocuments, ...reviewedDocuments];
 	const todayKey = new Date().toISOString().slice(0, 10);
-	const defaultApartadoFilter = initialForm ?? "all";
+	const defaultApartadoFilter = normalizeInitialApartadoFilter(initialForm);
+	const forcedApartado = getForcedApartadoForRoute(initialForm);
+	const forcedApartadoNormalized = forcedApartado ? normalizeText(forcedApartado) : null;
 
 	const headingText = (() => {
 		if (initialForm) {
@@ -303,22 +364,41 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			setLoadError(null);
 
 			try {
-				const [pendingResponse, reviewedResponse, returnedResponse] = await Promise.all([
-					apiFetch("/documents", { query: { status: "pendiente" } }),
-					apiFetch("/documents", { query: { status: "revisado" } }),
-					apiFetch("/documents", { query: { status: "devuelto" } }),
-				]);
-
-				const pendingItems = ((pendingResponse?.data ?? []) as ApiDocument[]).map((doc) => mapApiDocument(doc, "pending"));
-				const reviewedItems = [
-					...((reviewedResponse?.data ?? []) as ApiDocument[]).map((doc) => mapApiDocument(doc, "reviewed")),
-					...((returnedResponse?.data ?? []) as ApiDocument[]).map((doc) => mapApiDocument(doc, "reviewed")),
-				];
+				const statuses = ["pendiente", "revisado", "devuelto"] as const;
+				const responses = await Promise.allSettled(
+					statuses.map((status) => apiFetch("/documents", {
+						query: {
+							status,
+							...(forcedApartado ? { apartado_label: forcedApartado } : {}),
+						},
+					}))
+				);
 
 				if (!isMounted) return;
 
+				const pendingPayload = responses[0].status === "fulfilled" ? responses[0].value : null;
+				const reviewedPayload = responses[1].status === "fulfilled" ? responses[1].value : null;
+				const returnedPayload = responses[2].status === "fulfilled" ? responses[2].value : null;
+
+				const pendingItems = extractApiDocuments(pendingPayload).map((doc) => mapApiDocument(doc, "pending"));
+				const reviewedItems = [
+					...extractApiDocuments(reviewedPayload).map((doc) => mapApiDocument(doc, "reviewed")),
+					...extractApiDocuments(returnedPayload).map((doc) => mapApiDocument(doc, "reviewed")),
+				];
+
 				setPendingDocuments(pendingItems);
 				setReviewedDocuments(reviewedItems);
+
+				const failedStatuses = responses
+					.map((result, index) => (result.status === "rejected" ? statuses[index] : null))
+					.filter((status): status is (typeof statuses)[number] => Boolean(status));
+
+				if (failedStatuses.length > 0) {
+					setLoadError(`No fue posible cargar: ${failedStatuses.join(", ")}. Se muestran los documentos disponibles.`);
+					console.warn("DocumentReview: fallaron consultas de estado", { failedStatuses });
+				} else if (pendingItems.length === 0 && reviewedItems.length === 0) {
+					setLoadError("No se encontraron documentos para el ciclo visible actual.");
+				}
 			} catch {
 				if (!isMounted) return;
 				setLoadError("No fue posible cargar los documentos desde el backend");
@@ -333,7 +413,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		return () => {
 			isMounted = false;
 		};
-	}, [isAuthenticated, isReady]);
+	}, [forcedApartado, isAuthenticated, isReady]);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -405,16 +485,16 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const docsByMateria = useMemo(() => docsByCuatrimestre.filter((doc) => matchesNormalized(doc.materia, filterMateria)), [docsByCuatrimestre, filterMateria]);
 	const docsByGrupo = useMemo(() => docsByMateria.filter((doc) => matchesNormalized(doc.grupo, filterGrupo)), [docsByMateria, filterGrupo]);
 	const docsByDocente = useMemo(() => docsByGrupo.filter((doc) => matchesNormalized(doc.docente, filterDocente)), [docsByGrupo, filterDocente]);
-	const docsByParcial = useMemo(() => docsByDocente.filter((doc) => matchesNormalized(getDocumentParcial(doc), filterParcial)), [docsByDocente, filterParcial]);
+	const docsByParcial = useMemo(() => docsByDocente.filter((doc) => filterParcial === "all" || getParcialFilterValue(doc.parcial) === filterParcial), [docsByDocente, filterParcial]);
 
 	const ciclosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.ciclo).filter((value): value is string => Boolean(value))));
-	const planesDisponibles = Array.from(new Set(docsByCiclo.map((doc) => formatPlanLabel(doc.plan, doc.carrera_label)).filter((value): value is string => Boolean(value))));
+	const planesDisponibles = Array.from(new Set(docsByCiclo.map((doc) => formatPlanLabel(doc.plan, doc.carrera)).filter((value): value is string => Boolean(value))));
 	const carrerasDisponibles = useMemo(() => getCareerFilterOptions(filterPlan), [filterPlan]);
 	const cuatrimestresDisponibles = Array.from(new Set(docsByCarrera.map((doc) => getDocumentCuatrimestre(doc)).filter((value): value is string => Boolean(value) && value !== "-")));
 	const materiasDisponibles = Array.from(new Set(docsByCuatrimestre.map((doc) => doc.materia).filter((value): value is string => Boolean(value) && normalizeText(value) !== "sin materia")));
 	const gruposDisponibles = Array.from(new Set(docsByMateria.map((doc) => doc.grupo).filter((value): value is string => Boolean(value) && normalizeText(value) !== "grupo -" && normalizeText(value) !== "-")));
 	const docentesDisponibles = Array.from(new Set(docsByGrupo.map((doc) => doc.docente).filter((value): value is string => Boolean(value))));
-	const parcialesDisponibles = Array.from(new Set(docsByDocente.map((doc) => getDocumentParcial(doc)).filter((value): value is string => Boolean(value) && value !== "-")));
+	const parcialesDisponibles = PARCIAL_FILTER_OPTIONS;
 	const apartadosDisponibles = Array.from(new Set(docsByParcial.map((doc) => friendlyApartado(doc.apartado)).filter((value): value is string => Boolean(value))));
 
 	useEffect(() => {
@@ -484,8 +564,9 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	}, [filterParcial]);
 
 	const matchesFilters = (doc: DocumentItem) => {
-		const base = doc as DocumentFilterTarget;
+		const base = doc;
 		return (
+			(!forcedApartadoNormalized || normalizeText(friendlyApartado(base.apartado)) === forcedApartadoNormalized) &&
 			matchesNormalized(base.ciclo, filterCiclo) &&
 			matchesNormalized(base.plan, filterPlan) &&
 			matchesNormalized(base.carrera, filterCarrera) &&
@@ -493,7 +574,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			matchesNormalized(base.materia, filterMateria) &&
 			matchesNormalized(base.grupo, filterGrupo) &&
 			matchesNormalized(base.docente, filterDocente) &&
-			matchesNormalized(getDocumentParcial(base), filterParcial) &&
+			(filterParcial === "all" || getParcialFilterValue(base.parcial) === filterParcial) &&
 			matchesNormalized(friendlyApartado(base.apartado), filterApartado)
 		);
 	};
@@ -626,7 +707,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			<Select value={filterMateria} onValueChange={setFilterMateria}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Materia" /></SelectTrigger><SelectContent><SelectItem value="all">Todas las materias</SelectItem>{materiasDisponibles.map((materia) => <SelectItem key={materia} value={materia}>{materia}</SelectItem>)}</SelectContent></Select>
 			<Select value={filterGrupo} onValueChange={setFilterGrupo}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Grupo" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los grupos</SelectItem>{gruposDisponibles.map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}</SelectContent></Select>
 			<Select value={filterDocente} onValueChange={setFilterDocente}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Docente" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los docentes</SelectItem>{docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}</SelectContent></Select>
-			<Select value={filterParcial} onValueChange={setFilterParcial}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Parcial" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los parciales</SelectItem>{parcialesDisponibles.map((parcial) => <SelectItem key={parcial} value={parcial}>{parcial}</SelectItem>)}</SelectContent></Select>
+			<Select value={filterParcial} onValueChange={setFilterParcial}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Parcial" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los parciales</SelectItem>{parcialesDisponibles.map((parcial) => <SelectItem key={parcial.value} value={parcial.value}>{parcial.label}</SelectItem>)}</SelectContent></Select>
 			<Select value={filterApartado} onValueChange={setFilterApartado}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Apartado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los apartados</SelectItem>{apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}</SelectContent></Select>
 		</div>
 	);
@@ -634,7 +715,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const mapApiDocument = (doc: ApiDocument, kind: "pending" | "reviewed"): PendingDocument | ReviewedDocument => {
 		const base = {
 			id: Number(doc.id),
-			ciclo: "Ciclo Escolar 2026",
+			ciclo: doc.cycle_name?.trim() || "Sin ciclo",
 			plan: formatPlanLabel(doc.plan, doc.carrera_label),
 			docente: doc.uploaded_by_name ?? "Docente",
 			documento: doc.title ?? "Documento sin título",

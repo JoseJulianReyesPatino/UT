@@ -4,7 +4,9 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import apiFetch from "../../lib/api";
+import { AUTH_TOKEN_STORAGE_KEY, API_BASE_URL } from "../../lib/env";
 import { toast } from "sonner";
 import { 
   Users,
@@ -29,6 +31,7 @@ type PendingDocument = {
   fecha: string;
   revisado: boolean;
   submittedAt: string;
+  filePath?: string | null;
 };
 
 type ReviewedDocument = {
@@ -40,6 +43,7 @@ type ReviewedDocument = {
   fecha: string;
   reviewedAt: string;
   reviewedAtIso: string;
+  filePath?: string | null;
 };
 
 type ActivityItem = {
@@ -49,6 +53,7 @@ type ActivityItem = {
   description: string;
   time: string;
   related: string;
+  relatedDocumentId: number;
 };
 
 type ApiDocument = {
@@ -61,6 +66,7 @@ type ApiDocument = {
   submitted_at?: string;
   reviewed_at?: string | null;
   status?: string;
+  file_path?: string | null;
 };
 
 type ApiUserRole = string | { code?: string | null };
@@ -111,6 +117,7 @@ const mapPendingDocument = (doc: ApiDocument): PendingDocument => ({
   fecha: formatDate(doc.submitted_at),
   revisado: false,
   submittedAt: doc.submitted_at ?? "",
+  filePath: doc.file_path ?? null,
 });
 
 const mapReviewedDocument = (doc: ApiDocument): ReviewedDocument => {
@@ -124,6 +131,7 @@ const mapReviewedDocument = (doc: ApiDocument): ReviewedDocument => {
     fecha: formatDate(doc.submitted_at),
     reviewedAt: formatDate(reviewedAtIso),
     reviewedAtIso,
+    filePath: doc.file_path ?? null,
   };
 };
 
@@ -147,6 +155,7 @@ const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocum
     description: doc.documento,
     time: formatRelativeTime(doc.reviewedAtIso),
     related: doc.documento,
+    relatedDocumentId: doc.id,
     sortAt: new Date(doc.reviewedAtIso.replace(" ", "T")).getTime() || 0,
   }));
 
@@ -157,6 +166,7 @@ const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocum
     description: doc.documento,
     time: formatRelativeTime(doc.submittedAt),
     related: doc.documento,
+    relatedDocumentId: doc.id,
     sortAt: new Date(doc.submittedAt.replace(" ", "T")).getTime() || 0,
   }));
 
@@ -196,7 +206,16 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     description: string;
     time: string;
     related: string;
+    relatedDocumentId: number;
   }>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  const getPreviewUrl = useCallback((documentId: number) => {
+    const baseUrl = API_BASE_URL.replace(/\/api\/?$/, "");
+    return `${baseUrl}/api/documents/${documentId}/file`;
+  }, []);
 
   const loadDashboard = useCallback(async () => {
     setIsLoading(true);
@@ -302,9 +321,63 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     setSelectedDocument(doc);
   }, []);
 
-  const openActivity = useCallback((activity: { id: number; type: string; title: string; description: string; time: string; related: string }) => {
+  const openActivity = useCallback((activity: { id: number; type: string; title: string; description: string; time: string; related: string; relatedDocumentId: number }) => {
     setSelectedActivity(activity);
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadPreview = async () => {
+      if (!selectedDocument) {
+        setPreviewBlobUrl(null);
+        setPreviewLoading(false);
+        setPreviewError(null);
+        return;
+      }
+
+      setPreviewLoading(true);
+      setPreviewError(null);
+      setPreviewBlobUrl(null);
+
+      try {
+        const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+        const headers: Record<string, string> = {
+          Accept: "application/pdf",
+          "ngrok-skip-browser-warning": "true",
+        };
+
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const response = await fetch(getPreviewUrl(selectedDocument.id), {
+          method: "GET",
+          headers,
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          throw new Error(`No fue posible abrir el PDF (${response.status})`);
+        }
+
+        const blob = await response.blob();
+        if (!isMounted) return;
+        setPreviewBlobUrl(URL.createObjectURL(blob));
+      } catch (error) {
+        if (!isMounted) return;
+        setPreviewError(error instanceof Error ? error.message : "No fue posible abrir el PDF");
+      } finally {
+        if (isMounted) setPreviewLoading(false);
+      }
+    };
+
+    void loadPreview();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [getPreviewUrl, selectedDocument]);
 
   /* Small memoized presentational components to reduce re-renders */
   const StatsGrid = React.memo(function StatsGrid({ stats, onNavigate }: { stats: any[]; onNavigate: (view: AdminView) => void }) {
@@ -439,6 +512,12 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     setSelectedActivity(null);
   };
 
+  const selectedActivityDocument = selectedActivity
+    ? pendingDocuments.find((item) => item.id === selectedActivity.relatedDocumentId)
+      ?? reviewedDocuments.find((item) => item.id === selectedActivity.relatedDocumentId)
+      ?? null
+    : null;
+
   return (
     <div className="relative space-y-6 overflow-hidden">
 
@@ -501,7 +580,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
       </div>
 
       <Dialog open={Boolean(selectedDocument)} onOpenChange={(open) => !open && setSelectedDocument(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>Documento abierto</DialogTitle>
             <DialogDescription>
@@ -509,17 +588,40 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
             </DialogDescription>
           </DialogHeader>
           {selectedDocument && (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-sm font-medium">{selectedDocument.documento}</p>
-                <p className="text-xs text-muted-foreground">{selectedDocument.docente}</p>
-                <p className="text-xs text-muted-foreground">{selectedDocument.carrera}</p>
-                <p className="text-xs text-muted-foreground">{selectedDocument.tipo}</p>
-              </div>
-              <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
-                Vista previa simulada del documento. Aquí puede ir un visor PDF, modal o iframe.
-              </div>
-            </div>
+            <Tabs defaultValue="preview" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="preview">Vista previa</TabsTrigger>
+                <TabsTrigger value="details">Detalles</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="preview" className="space-y-3">
+                <div className="rounded-lg border border-border p-2 sm:p-3">
+                  {previewLoading ? (
+                    <p className="text-sm text-muted-foreground">Cargando vista previa...</p>
+                  ) : previewError ? (
+                    <p className="text-sm text-destructive">{previewError}</p>
+                  ) : previewBlobUrl ? (
+                    <iframe
+                      src={previewBlobUrl}
+                      title={selectedDocument.documento}
+                      className="h-[60vh] w-full rounded-md border border-border"
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No hay vista previa disponible.</p>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="details" className="space-y-3">
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-sm font-medium">{selectedDocument.documento}</p>
+                  <p className="text-xs text-muted-foreground">{selectedDocument.docente}</p>
+                  <p className="text-xs text-muted-foreground">{selectedDocument.carrera}</p>
+                  <p className="text-xs text-muted-foreground">{selectedDocument.tipo}</p>
+                  <p className="text-xs text-muted-foreground">Fecha: {selectedDocument.fecha}</p>
+                </div>
+              </TabsContent>
+            </Tabs>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedDocument(null)}>
@@ -541,7 +643,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
       </Dialog>
 
       <Dialog open={Boolean(selectedActivity)} onOpenChange={(open) => !open && setSelectedActivity(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Detalle de actividad</DialogTitle>
             <DialogDescription>
@@ -549,24 +651,47 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
             </DialogDescription>
           </DialogHeader>
           {selectedActivity && (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-sm font-medium">{selectedActivity.title}</p>
-                <p className="text-xs text-muted-foreground">{selectedActivity.description}</p>
-                <p className="text-xs text-muted-foreground">{selectedActivity.time}</p>
-                <p className="text-xs text-muted-foreground">Relacionado: {selectedActivity.related}</p>
-              </div>
-              <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
-                Aquí puede mostrarse la trazabilidad del evento, el documento abierto o el cambio realizado por el docente.
-              </div>
-            </div>
+            <Tabs defaultValue="activity" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="activity">Actividad</TabsTrigger>
+                <TabsTrigger value="document">Documento</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="activity" className="space-y-3">
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-sm font-medium">{selectedActivity.title}</p>
+                  <p className="text-xs text-muted-foreground">{selectedActivity.description}</p>
+                  <p className="text-xs text-muted-foreground">{selectedActivity.time}</p>
+                  <p className="text-xs text-muted-foreground">Relacionado: {selectedActivity.related}</p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="document" className="space-y-3">
+                {selectedActivityDocument ? (
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-border p-3">
+                      <p className="text-sm font-medium">{selectedActivityDocument.documento}</p>
+                      <p className="text-xs text-muted-foreground">{selectedActivityDocument.docente}</p>
+                      <p className="text-xs text-muted-foreground">{selectedActivityDocument.carrera}</p>
+                      <p className="text-xs text-muted-foreground">{selectedActivityDocument.tipo}</p>
+                      <p className="text-xs text-muted-foreground">Fecha: {selectedActivityDocument.fecha}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+                      Desde aquí puedes abrir el documento relacionado y revisar su contenido real.
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No se encontró un documento relacionado.</p>
+                )}
+              </TabsContent>
+            </Tabs>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedActivity(null)}>
               Cerrar
             </Button>
             <Button onClick={openRelatedDocument}>
-              Abrir relacionado
+              Abrir documento relacionado
             </Button>
           </DialogFooter>
         </DialogContent>

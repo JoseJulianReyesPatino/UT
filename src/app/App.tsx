@@ -32,6 +32,7 @@ import { FormAccessGuard } from "./components/FormAccessGuard";
 import { Alert, AlertDescription } from "./components/ui/alert";
 import { getFormConfig, saveFormConfig, type FormId } from "../lib/formConfig";
 import { apiFetch } from "./lib/api";
+import PresentationBg from "../assets/presentacion_utslrc.webp";
 
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
@@ -287,7 +288,7 @@ function AppContent() {
   return (
     <>
       {noticeBanner}
-      <div className={`flex h-screen overflow-hidden bg-background ${isLoggingOut ? "animate-page-exit" : "animate-page-enter"} motion-reduce:animate-none`}>
+      <div className={`flex h-screen overflow-hidden bg-transparent ${isLoggingOut ? "animate-page-exit" : "animate-page-enter"} motion-reduce:animate-none`}>
         <Sidebar
           currentView={currentView}
           onNavigate={(view) => {
@@ -297,8 +298,8 @@ function AppContent() {
           mobileOpen={mobileSidebarOpen}
           onMobileOpenChange={setMobileSidebarOpen}
         />
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-emerald-50 via-background to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950">
-          <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur md:hidden">
+        <main className="relative z-10 flex-1 overflow-y-auto bg-transparent">
+          <div className="sticky top-0 z-20 border-b border-border bg-background/75 backdrop-blur-md md:hidden dark:bg-slate-950/70">
             <div className="flex items-center justify-between px-4 py-3">
               <Button
                 type="button"
@@ -333,7 +334,7 @@ function AppContent() {
             onClick={toggleTheme}
             aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
             title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
+            className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-primary/25 bg-background/75 text-foreground shadow-lg backdrop-blur-md hover:bg-background/90 dark:bg-slate-950/75 dark:text-slate-100 dark:hover:bg-slate-950/90"
           >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
