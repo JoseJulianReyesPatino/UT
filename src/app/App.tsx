@@ -32,7 +32,6 @@ import { FormAccessGuard } from "./components/FormAccessGuard";
 import { Alert, AlertDescription } from "./components/ui/alert";
 import { getFormConfig, saveFormConfig, type FormId } from "../lib/formConfig";
 import { apiFetch } from "./lib/api";
-import PresentationBg from "../assets/presentacion_utslrc.webp";
 
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
@@ -41,8 +40,7 @@ import { Menu, Sun, Moon } from "lucide-react";
 function AppContent() {
   const { isAuthenticated, isReady, user, notice } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const logoSrc = theme === "dark" ? "/src/assets/Logotipo UTSLRC-BLANCO.png" : "/src/assets/Logotipo  UTSLRC.png";
-  const showReloadLoader = typeof window !== "undefined" && window.performance.getEntriesByType("navigation")[0]?.type === "reload";
+  const logoSrc = theme === "dark" ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
   const currentViewStorageKey = "utslrc-current-view";
   const [currentView, setCurrentView] = useState(() => sessionStorage.getItem(currentViewStorageKey) ?? "dashboard");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -175,8 +173,8 @@ function AppContent() {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         <div className="flex flex-col items-center gap-2 text-center">
-          {showReloadLoader ? <img src={Charging2} alt="Cargando sesión" className="h-48 w-auto" /> : null}
-          <div>Cargando...</div>
+          <img src={Charging2} alt="Cargando sesión" className="h-48 w-auto" />
+          <div>Cargando sesión...</div>
         </div>
       </div>
     );
@@ -288,7 +286,7 @@ function AppContent() {
   return (
     <>
       {noticeBanner}
-      <div className={`flex h-screen overflow-hidden bg-transparent ${isLoggingOut ? "animate-page-exit" : "animate-page-enter"} motion-reduce:animate-none`}>
+      <div className={`flex h-screen overflow-hidden bg-background ${isLoggingOut ? "animate-page-exit" : "animate-page-enter"} motion-reduce:animate-none`}>
         <Sidebar
           currentView={currentView}
           onNavigate={(view) => {
@@ -298,8 +296,8 @@ function AppContent() {
           mobileOpen={mobileSidebarOpen}
           onMobileOpenChange={setMobileSidebarOpen}
         />
-        <main className="relative z-10 flex-1 overflow-y-auto bg-transparent">
-          <div className="sticky top-0 z-20 border-b border-border bg-background/75 backdrop-blur-md md:hidden dark:bg-slate-950/70">
+        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-emerald-50 via-background to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950">
+          <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur md:hidden">
             <div className="flex items-center justify-between px-4 py-3">
               <Button
                 type="button"
@@ -334,7 +332,7 @@ function AppContent() {
             onClick={toggleTheme}
             aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
             title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-primary/25 bg-background/75 text-foreground shadow-lg backdrop-blur-md hover:bg-background/90 dark:bg-slate-950/75 dark:text-slate-100 dark:hover:bg-slate-950/90"
+            className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
           >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
@@ -355,3 +353,4 @@ export default function App() {
     </ThemeProvider>
   );
 }
+

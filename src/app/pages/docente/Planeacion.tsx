@@ -1,12 +1,11 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { Checkbox } from "../../components/ui/checkbox";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Button } from "../../components/ui/button";
-import { CalendarDays, History, Sparkles, Upload } from "lucide-react";
+import { History, Upload } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
@@ -27,7 +26,6 @@ interface PlaneacionFormData {
   grupo: string;
   archivos: File[];
   docente: string;
-  autorizacion: boolean;
   nota: string;
 }
 
@@ -40,14 +38,12 @@ const initialFormData: PlaneacionFormData = {
   grupo: "",
   archivos: [],
   docente: "",
-  autorizacion: false,
   nota: "",
 };
 
 export default function PlaneacionPage() {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isReplacing = false;
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
   const [formData, setFormData] = useState<PlaneacionFormData>(initialFormData);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -56,15 +52,20 @@ export default function PlaneacionPage() {
   const [history, setHistory] = useState<any[]>([]);
   const calendarioUrl = getCalendarFileUrl();
 
+  useEffect(() => {
+    if (user && !formData.docente) {
+      const nombreCompleto = `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "";
+      setFormData(prev => ({ ...prev, docente: nombreCompleto }));
+    }
+  }, [user]);
+
   const carrerasDisponibles = useMemo(() => {
     if (!formData.plan) return [];
-
     if (formData.plan === "nuevo-modelo") {
       const tsu = carrieras["nuevo-modelo"].tsu.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
       const ing = carrieras["nuevo-modelo"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
       return [...tsu, ...ing];
     }
-
     return carrieras["plan-normal"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
   }, [formData.plan]);
 
@@ -118,27 +119,28 @@ export default function PlaneacionPage() {
 
   const cuatrimestresDisponibles = useMemo(() => {
     if (!formData.carrera || !formData.plan) return [];
-
     const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
     const carrera = plan[formData.carrera];
     if (!carrera) return [];
-
     return Object.keys(carrera.cuatrimestres);
   }, [formData.carrera, formData.plan]);
 
   const materiasDisponibles = useMemo(() => {
     if (!formData.carrera || !formData.cuatrimestre || !formData.plan) return [];
-
     const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
     const carrera = plan[formData.carrera];
     if (!carrera) return [];
-
     return carrera.cuatrimestres[formData.cuatrimestre] || [];
   }, [formData.carrera, formData.cuatrimestre, formData.plan]);
 
   const isValid = useMemo(() => {
-    const validarGrupoPattern = /^[A-Z]{2,4}-\d{2}$/i.test(formData.grupo);
-    const validarGrupo = groupsOptions.length > 0 ? formData.grupo !== "" : validarGrupoPattern;
+    let grupoValido = false;
+    
+    if (groupsOptions.length > 0) {
+      grupoValido = groupsOptions.some(g => formatGroupCode(g.group_code) === formData.grupo);
+    } else {
+      grupoValido = false;
+    }
 
     return Boolean(
       formData.plan &&
@@ -146,12 +148,12 @@ export default function PlaneacionPage() {
       formData.cuatrimestre &&
       formData.materia &&
       formData.parcial &&
-      validarGrupo &&
+      grupoValido &&
       formData.archivos.length > 0 &&
       user &&
-      formData.autorizacion
+      formData.docente.trim()
     );
-  }, [formData, user, groupsOptions.length]);
+  }, [formData, user, groupsOptions]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -187,7 +189,8 @@ export default function PlaneacionPage() {
   };
 
   const resetForm = () => {
-    setFormData(initialFormData);
+    setFormData({ ...initialFormData, docente: user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "" : "" });
+    setEditingDocumentId(null);
   };
 
   const getArchivosLabel = () => {
@@ -202,23 +205,6 @@ export default function PlaneacionPage() {
     if (espacios === 0) return "Máximo alcanzado";
     const plural = espacios > 1 ? "s" : "";
     return `${espacios} espacio${plural} disponible${plural}`;
-  };
-
-  const selectedPlanLabel = formData.plan === "nuevo-modelo"
-    ? "Nuevo Modelo"
-    : formData.plan === "plan-normal"
-      ? "Plan Normal"
-      : "Sin plan";
-
-  const selectedCareerLabel = carrerasDisponibles.find((c) => c.codigo === formData.carrera)?.nombre ?? "Sin carrera";
-  const selectedCuatrimestreLabel = formData.cuatrimestre ? cuatrimestresLabels[formData.cuatrimestre as keyof typeof cuatrimestresLabels] : "Sin cuatrimestre";
-  const selectedMateriaLabel = formData.materia || "Sin materia";
-  const canOpenHistory = history.length > 0 || formData.archivos.length > 0;
-
-  const normalizeParcialForForm = (value: unknown): string => {
-    const raw = String(value ?? "").trim();
-    const match = raw.match(/\b([123])\b/);
-    return match ? `Parcial ${match[1]}` : "";
   };
 
   const findCareerCodeByLabel = (label: string, planType: Plan | "") => {
@@ -252,6 +238,12 @@ export default function PlaneacionPage() {
       ? rawCuatrimestre
       : (allowedCuatrimestres.has(fallbackParcial) ? fallbackParcial : "");
 
+    const normalizeParcialForForm = (value: unknown): string => {
+      const raw = String(value ?? "").trim();
+      const match = raw.match(/\b([123])\b/);
+      return match ? `Parcial ${match[1]}` : "";
+    };
+
     setEditingDocumentId(document.id);
     setFormData({
       plan: planKey as Plan,
@@ -259,10 +251,9 @@ export default function PlaneacionPage() {
       cuatrimestre: resolvedCuatrimestre as Cuatrimestre,
       materia: document.materia ?? "",
       parcial: normalizeParcialForForm(document.parcial),
-      grupo: document.group_code ? formatGroupCode(document.group_code) : String(document.group_id ?? ""),
+      grupo: document.group_code ? formatGroupCode(document.group_code) : "",
       archivos: [],
-      docente: user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() : "",
-      autorizacion: true,
+      docente: document.docente ?? (user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() : ""),
       nota: document.note ?? document.nota ?? "",
     });
     setSheetOpen(false);
@@ -308,23 +299,11 @@ export default function PlaneacionPage() {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!isValid) {
-      toast.error("Completa todos los campos obligatorios");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      if (formData.archivos.length === 0) {
-        throw new Error("No hay archivos para subir");
-      }
-
-      const carreraEntry = carrerasDisponibles.find((c) => c.codigo === formData.carrera);
-      const carreraLabel = carreraEntry ? carreraEntry.nombre : formData.carrera;
-      const file = formData.archivos[0];
-      if (!file) throw new Error("Selecciona un archivo PDF");
-
+  const uploadMultipleFiles = async (files: File[], basePayload: any) => {
+    const uploadedIds = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       const toBase64 = (f: File) => new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
@@ -337,41 +316,80 @@ export default function PlaneacionPage() {
       });
 
       const fileBase64 = await toBase64(file);
-
-      const payload: any = {
-        form_id: 1,
-        title: `${formData.materia} - Planeación`,
-        apartado_label: "Planeacion",
-        carrera_label: carreraLabel,
+      
+      const cleanFileName = file.name.replace(/\.pdf$/i, '').substring(0, 50);
+      const payload = {
+        form_id: basePayload.form_id,
+        apartado_label: basePayload.apartado_label,
+        carrera_label: basePayload.carrera_label,
+        plan: basePayload.plan,
+        materia: basePayload.materia,
+        parcial: basePayload.parcial,
+        docente: basePayload.docente,
+        nota: basePayload.nota,
+        group_id: basePayload.group_id,
+        group_code: basePayload.group_code,
         file_base64: fileBase64,
         file_name: file.name,
         file_type: file.type,
         file_size: file.size,
+        title: `${basePayload.materia || "Planeación"} - ${basePayload.parcial || ""} - ${cleanFileName}`.trim(),
+      };
+      
+      if (basePayload.original_document_id) {
+        payload.original_document_id = basePayload.original_document_id;
+      }
+      
+      const result = await apiFetch("/documents", { method: "POST", body: JSON.stringify(payload) });
+      uploadedIds.push(result?.data?.id);
+    }
+    
+    return uploadedIds;
+  };
+
+  const handleSubmit = async () => {
+    if (!isValid) {
+      toast.error("Completa todos los campos obligatorios");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const carreraEntry = carrerasDisponibles.find((c) => c.codigo === formData.carrera);
+      const carreraLabel = carreraEntry ? carreraEntry.nombre : formData.carrera;
+      
+      let selectedGroup = null;
+      if (formData.grupo && groupsOptions.length > 0) {
+        selectedGroup = groupsOptions.find(g => formatGroupCode(g.group_code) === formData.grupo);
+      }
+      
+      const basePayload: any = {
+        form_id: 1,
+        apartado_label: "Planeacion",
+        carrera_label: carreraLabel,
+        plan: formData.plan,
+        materia: formData.materia,
+        parcial: formData.parcial,
+        docente: formData.docente,
+        nota: formData.nota,
       };
 
-      if (formData.plan) payload.plan = formData.plan;
-      if (formData.materia) payload.materia = formData.materia;
-      if (formData.parcial) payload.parcial = formData.parcial;
-      if (formData.grupo) {
-        const sel = groupsOptions.find((g) => formatGroupCode(g.group_code) === formData.grupo || String(g.id) === formData.grupo);
-        if (sel) {
-          payload.group_id = Number(sel.id);
-          payload.group_code = formatGroupCode(sel.group_code);
-        } else {
-          const numeric = Number(formData.grupo);
-          payload.group_id = Number.isFinite(numeric) && numeric > 0 ? numeric : null;
-          payload.group_code = formatGroupCode(formData.grupo);
-        }
+      if (selectedGroup) {
+        basePayload.group_id = selectedGroup.id;
+        basePayload.group_code = formatGroupCode(selectedGroup.group_code);
       }
-      if (editingDocumentId) payload.original_document_id = String(editingDocumentId);
+      
+      if (editingDocumentId) basePayload.original_document_id = String(editingDocumentId);
 
-      await apiFetch("/documents", { method: "POST", body: JSON.stringify(payload) });
+      await uploadMultipleFiles(formData.archivos, basePayload);
 
-      toast.success(editingDocumentId ? "Planeación actualizada correctamente" : "Planeacion enviada correctamente", {
-        description: editingDocumentId ? "Tu documento ha sido actualizado." : "Tu documento fue enviado para revision administrativa.",
+      toast.success(editingDocumentId ? "Planeación actualizada correctamente" : "Planeación enviada correctamente", {
+        description: editingDocumentId ? "Tus documentos han sido actualizados." : "Tus documentos fueron enviados para revisión administrativa.",
       });
+      
       setEditingDocumentId(null);
       resetForm();
+      
       if (user) {
         const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 1, per_page: 50 } });
         setHistory(Array.isArray(res?.data) ? res.data : []);
@@ -387,68 +405,65 @@ export default function PlaneacionPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <header>
         <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <h1 className="text-3xl font-bold">Planeación</h1>
-              <p className="text-muted-foreground">
-                Captura tu planeación en una interfaz limpia y enfocada en el formulario principal.
-              </p>
-            </div>
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold">Planeación</h1>
+            <p className="text-muted-foreground">Captura tu planeación en una interfaz limpia y enfocada en el formulario principal.</p>
+          </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" className="rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent">
-                    <History className="mr-2 h-4 w-4" />
-                    Historial
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right">
-                  <SheetHeader>
-                    <SheetTitle>Historial de archivos</SheetTitle>
-                    <SheetDescription>Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
-                  </SheetHeader>
-                  <div className="mt-4 space-y-4">
-                    {history.length > 0 ? (
-                      <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:bg-slate-900/30">
-                        <div className="grid gap-3 p-1">
-                          {history.map((h) => (
-                            <div key={h.id} className="rounded-lg border border-border bg-card p-4 shadow-sm dark:bg-slate-900">
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                  <p className="text-sm font-semibold">{h.title ?? h.file_path}</p>
-                                  <p className="break-all text-xs text-muted-foreground">PDF: {getUploadedFileName(h)}</p>
-                                  <p className="text-xs text-muted-foreground">{h.materia ?? "Planeación"}</p>
-                                </div>
-                                <p className="text-xs text-muted-foreground">{new Date(h.submitted_at).toLocaleString()}</p>
+          <div className="flex flex-wrap gap-3">
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent">
+                  <History className="mr-2 h-4 w-4" />
+                  Historial
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right">
+                <SheetHeader>
+                  <SheetTitle>Historial de archivos</SheetTitle>
+                  <SheetDescription>Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-4">
+                  {history.length > 0 ? (
+                    <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:bg-slate-900/30">
+                      <div className="grid gap-3 p-1">
+                        {history.map((h) => (
+                          <div key={h.id} className="rounded-lg border border-border bg-card p-4 shadow-sm dark:bg-slate-900">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <p className="text-sm font-semibold">{h.title ?? h.file_path}</p>
+                                <p className="break-all text-xs text-muted-foreground">PDF: {getUploadedFileName(h)}</p>
+                                <p className="text-xs text-muted-foreground">{h.materia ?? "Planeación"}</p>
                               </div>
-
-                              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="flex flex-wrap gap-2">
-                                  <Button size="sm" variant="outline" onClick={() => openDocument(h.id, "view")}>Ver</Button>
-                                  <Button size="sm" variant="secondary" onClick={() => populateFormForEdit(h)} disabled={isReplacing}>Editar documento</Button>
-                                </div>
-                                <span className="text-xs text-muted-foreground">Estatus: {h.status ?? "Pendiente"}</span>
-                              </div>
+                              <p className="text-xs text-muted-foreground">{new Date(h.submitted_at).toLocaleString()}</p>
                             </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    ) : formData.archivos.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión ni en el historial.</p>
-                    ) : (
-                      <div>
-                        <p className="mb-2 text-sm font-medium">Archivos en esta sesión</p>
-                        <ul className="space-y-2">
-                          {formData.archivos.map((f, i) => (
-                            <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
-                          ))}
-                        </ul>
+                            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex flex-wrap gap-2">
+                                <Button size="sm" variant="outline" onClick={() => openDocument(h.id, "view")}>Ver</Button>
+                                <Button size="sm" variant="secondary" onClick={() => populateFormForEdit(h)}>Editar documento</Button>
+                              </div>
+                              <span className="text-xs text-muted-foreground">Estatus: {h.status ?? "Pendiente"}</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    )}
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </div>
+                    </ScrollArea>
+                  ) : formData.archivos.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión ni en el historial.</p>
+                  ) : (
+                    <div>
+                      <p className="mb-2 text-sm font-medium">Archivos en esta sesión</p>
+                      <ul className="space-y-2">
+                        {formData.archivos.map((f, i) => (
+                          <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </header>
 
@@ -458,165 +473,173 @@ export default function PlaneacionPage() {
       </div>
 
       <div ref={formRef}>
-            <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card">
-              <CardHeader className="border-b border-border/80 bg-card pb-5 dark:border-border/80 dark:bg-card">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <CardTitle>Formulario de Planeación</CardTitle>
-                    <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
-                  </div>
+        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card">
+          <CardHeader className="border-b border-border/80 bg-card pb-5 dark:border-border/80 dark:bg-card">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle>Formulario de Planeación</CardTitle>
+                <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
+              </div>
+            </div>
+            {editingDocumentId && (
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                Estás editando la planeación existente #{editingDocumentId}. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+              </div>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-6 p-6 sm:p-8">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label className="text-sm font-medium">Plan *</Label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button variant={formData.plan === "nuevo-modelo" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))} className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left">
+                    <span className="text-base font-semibold">Plan Nuevo Modelo</span>
+                    <span className="text-xs text-muted-foreground">TSU e Ingeniería</span>
+                  </Button>
+                  <Button variant={formData.plan === "plan-normal" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))} className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left">
+                    <span className="text-base font-semibold">Plan Normal</span>
+                    <span className="text-xs text-muted-foreground">Ingenierías</span>
+                  </Button>
                 </div>
-                {editingDocumentId ? (
-                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-                    Estás editando la planeación existente #{editingDocumentId}. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
-                  </div>
-                ) : null}
-              </CardHeader>
-              <CardContent className="space-y-6 p-6 sm:p-8">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="text-sm font-medium">Plan *</Label>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Button variant={formData.plan === "nuevo-modelo" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))} className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left">
-                        <span className="text-base font-semibold">Plan Nuevo Modelo</span>
-                        <span className="text-xs text-muted-foreground">TSU e Ingeniería</span>
-                      </Button>
-                      <Button variant={formData.plan === "plan-normal" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))} className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left">
-                        <span className="text-base font-semibold">Plan Normal</span>
-                        <span className="text-xs text-muted-foreground">Ingenierías</span>
-                      </Button>
-                    </div>
-                  </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label>Carrera *</Label>
-                    <Select value={formData.carrera} onValueChange={(value) => setFormData((current) => ({ ...current, carrera: value, cuatrimestre: "", materia: "" }))} disabled={!formData.plan}>
+              <div className="space-y-2">
+                <Label>Carrera *</Label>
+                <Select value={formData.carrera} onValueChange={(value) => setFormData((current) => ({ ...current, carrera: value, cuatrimestre: "", materia: "" }))} disabled={!formData.plan}>
+                  <SelectTrigger className="rounded-2xl">
+                    <SelectValue placeholder="Selecciona la carrera" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {carrerasDisponibles.map((carrera) => (
+                      <SelectItem key={carrera.codigo} value={carrera.codigo}>{carrera.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Cuatrimestre *</Label>
+                <Select value={formData.cuatrimestre} onValueChange={(value) => setFormData((current) => ({ ...current, cuatrimestre: value as Cuatrimestre, materia: "" }))} disabled={!formData.carrera}>
+                  <SelectTrigger className="rounded-2xl">
+                    <SelectValue placeholder="Selecciona el cuatrimestre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cuatrimestresDisponibles.map((cuatri) => (
+                      <SelectItem key={cuatri} value={cuatri}>{cuatrimestresLabels[cuatri as keyof typeof cuatrimestresLabels]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>Materia *</Label>
+                <Select value={formData.materia} onValueChange={(value) => setFormData((current) => ({ ...current, materia: value }))} disabled={!formData.cuatrimestre}>
+                  <SelectTrigger className="rounded-2xl">
+                    <SelectValue placeholder="Selecciona la materia" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {materiasDisponibles.map((materia, index) => (
+                      <SelectItem key={`${materia.nombre}-${index}`} value={materia.nombre}>{materia.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Parcial *</Label>
+                  <Select value={formData.parcial} onValueChange={(value) => setFormData((current) => ({ ...current, parcial: value }))}>
+                    <SelectTrigger className="rounded-2xl">
+                      <SelectValue placeholder="Selecciona el parcial" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {parciales.map((parcial) => (
+                        <SelectItem key={parcial} value={parcial}>{parcial}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Grupo *</Label>
+                  {groupsOptions.length > 0 ? (
+                    <Select value={formData.grupo} onValueChange={(value) => setFormData((c) => ({ ...c, grupo: value }))}>
                       <SelectTrigger className="rounded-2xl">
-                        <SelectValue placeholder="Selecciona la carrera" />
+                        <SelectValue placeholder="Selecciona el grupo" />
                       </SelectTrigger>
                       <SelectContent>
-                        {carrerasDisponibles.map((carrera) => (
-                          <SelectItem key={carrera.codigo} value={carrera.codigo}>{carrera.nombre}</SelectItem>
+                        {groupsOptions.map((g) => (
+                          <SelectItem key={g.id} value={formatGroupCode(g.group_code)}>
+                            {formatGroupCode(g.group_code)}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Cuatrimestre *</Label>
-                    <Select value={formData.cuatrimestre} onValueChange={(value) => setFormData((current) => ({ ...current, cuatrimestre: value as Cuatrimestre, materia: "" }))} disabled={!formData.carrera}>
-                      <SelectTrigger className="rounded-2xl">
-                        <SelectValue placeholder="Selecciona el cuatrimestre" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {cuatrimestresDisponibles.map((cuatri) => (
-                          <SelectItem key={cuatri} value={cuatri}>{cuatrimestresLabels[cuatri as keyof typeof cuatrimestresLabels]}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Materia *</Label>
-                    <Select value={formData.materia} onValueChange={(value) => setFormData((current) => ({ ...current, materia: value }))} disabled={!formData.cuatrimestre}>
-                      <SelectTrigger className="rounded-2xl">
-                        <SelectValue placeholder="Selecciona la materia" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {materiasDisponibles.map((materia, index) => (
-                          <SelectItem key={`${materia.nombre}-${index}`} value={materia.nombre}>{materia.nombre}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Parcial *</Label>
-                      <Select value={formData.parcial} onValueChange={(value) => setFormData((current) => ({ ...current, parcial: value }))}>
-                        <SelectTrigger className="rounded-2xl">
-                          <SelectValue placeholder="Selecciona el parcial" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {parciales.map((parcial) => (
-                            <SelectItem key={parcial} value={parcial}>{parcial}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-300">
+                      ⚠️ No hay grupos disponibles para esta carrera y cuatrimestre. Contacta al administrador.
                     </div>
+                  )}
+                </div>
+              </div>
 
-                    <div className="space-y-2">
-                      <Label>Grupo *</Label>
-                      {groupsOptions.length > 0 ? (
-                        <Select value={formData.grupo} onValueChange={(v) => setFormData((c) => ({ ...c, grupo: v }))}>
-                          <SelectTrigger className="rounded-2xl">
-                            <SelectValue placeholder="Selecciona el grupo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {groupsOptions.map((g) => (
-                              <SelectItem key={g.id} value={String(g.id)}>{formatGroupCode(g.group_code)}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input value={formData.grupo} onChange={(e) => setFormData((current) => ({ ...current, grupo: e.target.value.toUpperCase() }))} placeholder="Ej. JTH-01" maxLength={7} className="rounded-2xl" />
-                      )}
-                      <p className="text-xs text-muted-foreground">Formato: Ej. JTH-01 o selección automática</p>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Documentos (PDF) *</Label>
+                <p className="text-sm text-muted-foreground">Adjunta documentos PDF de hasta 5 MB por archivo. Puedes cargar hasta tres archivos en total.</p>
+                <div className="rounded-3xl border border-dashed border-border bg-background/60 p-6 text-center transition-colors hover:border-primary/50 hover:bg-primary/5">
+                  <input type="file" accept=".pdf" multiple className="hidden" id="planeacion-pdf-upload" onChange={handleFileChange} disabled={formData.archivos.length >= 3} />
+                  <label htmlFor="planeacion-pdf-upload" className="block cursor-pointer space-y-3">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Upload className="h-6 w-6" />
                     </div>
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Documentos (PDF) *</Label>
-                    <p className="text-sm text-muted-foreground">Adjunta documentos PDF de hasta 5 MB por archivo. Puedes cargar hasta tres archivos en total.</p>
-                    <div className="rounded-3xl border border-dashed border-border bg-background/60 p-6 text-center transition-colors hover:border-primary/50 hover:bg-primary/5 dark:border-border dark:bg-slate-950/40 dark:hover:border-primary/50 dark:hover:bg-primary/10">
-                      <input type="file" accept=".pdf" multiple className="hidden" id="planeacion-pdf-upload" onChange={handleFileChange} disabled={formData.archivos.length >= 3} />
-                      <label htmlFor="planeacion-pdf-upload" className="block cursor-pointer space-y-3">
-                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary/80">
-                          <Upload className="h-6 w-6" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{getArchivosLabel()}</p>
-                          <p className="text-xs text-muted-foreground">{getEspaciosLabel()}</p>
-                        </div>
-                      </label>
+                    <div>
+                      <p className="text-sm font-medium">{getArchivosLabel()}</p>
+                      <p className="text-xs text-muted-foreground">{getEspaciosLabel()}</p>
                     </div>
-
-                    {formData.archivos.length > 0 && (
-                      <div className="space-y-2 pt-2">
-                        {formData.archivos.map((archivo, index) => (
-                          <PdfPreview key={`${archivo.name}-${archivo.size}-${index}`} file={archivo} title="Documento cargado" onRemove={() => removeFile(index)} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Nombre del docente</Label>
-                    <div className="rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground dark:border-border dark:bg-slate-900 dark:text-slate-200">
-                      {user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name : "Inicia sesión para continuar"}
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 md:col-span-2">
-                    <Checkbox checked={formData.autorizacion} onCheckedChange={(value) => setFormData((current) => ({ ...current, autorizacion: Boolean(value) }))} id="autorizacion" />
-                    <div className="space-y-2 text-sm">
-                      <Label htmlFor="autorizacion" className="font-medium">Declaración de autorización</Label>
-                      <p className="text-muted-foreground">Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Nota para administración (opcional)</Label>
-                    <Textarea value={formData.nota} onChange={(e) => setFormData((current) => ({ ...current, nota: e.target.value }))} placeholder="Agrega una nota para revisión" className="min-h-[9rem] rounded-2xl" />
-                  </div>
+                  </label>
                 </div>
 
-                <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row dark:border-border">
-                  <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6">Limpiar</Button>
-                  <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="rounded-2xl sm:px-6">{isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar planeación" : "Enviar planeación"}</Button>
-                </div>
-              </CardContent>
-            </Card>
+                {formData.archivos.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    {formData.archivos.map((archivo, index) => (
+                      <PdfPreview key={`${archivo.name}-${archivo.size}-${index}`} file={archivo} title="Documento cargado" onRemove={() => removeFile(index)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>Nombre del docente</Label>
+                <Input
+                  value={formData.docente}
+                  onChange={(e) => setFormData(prev => ({ ...prev, docente: e.target.value }))}
+                  placeholder="Nombre del docente"
+                  className="rounded-2xl"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <p className="text-sm font-medium">Declaración de autorización</p>
+                <p className="text-sm text-muted-foreground">
+                  Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares 
+                  y confirmo la veracidad de la información proporcionada.
+                </p>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>Nota para administración (opcional)</Label>
+                <Textarea value={formData.nota} onChange={(e) => setFormData((current) => ({ ...current, nota: e.target.value }))} placeholder="Agrega una nota para revisión" className="min-h-[9rem] rounded-2xl" />
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row">
+              <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6">Limpiar</Button>
+              <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="rounded-2xl sm:px-6">
+                {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar planeación" : "Enviar planeación"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -1,27 +1,34 @@
-import React, { useMemo, useState } from "react";
-import { ArrowLeft, ChevronRight, FileText, Upload, X } from "lucide-react";
-import { toast } from "sonner";
-
-import { Button } from "../../components/ui/button";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Button } from "../../components/ui/button";
+import { Upload, FileText, History, X, ArrowLeft, ChevronRight } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
+import { toast } from "sonner";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
+import { ScrollArea } from "../../components/ui/scroll-area";
 import { carrieras, Plan } from "../../data/curricula";
+import { useAuth } from "../../context/AuthContext";
+import { apiFetch } from "../../lib/api";
+import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { formatGroupCode } from "../../../lib/utils";
 
-type DocumentoCarta = "carta-presentacion" | "carta-aceptacion" | "carta-terminacion" | "acta-final";
+type DocumentoEstadia = "carta-presentacion" | "carta-aceptacion" | "carta-terminacion" | "acta-final-estadias";
 
 interface DocumentoConfig {
-  id: DocumentoCarta;
+  id: DocumentoEstadia;
   boton: string;
   titulo: string;
   descripcion: string;
   etiquetaCarga: string;
+  formId: number;
+  apartadoLabel: string;
 }
 
-interface CartaFormData {
+interface EstadiaFormData {
   plan: Plan | "";
   carrera: string;
   grupo: string;
@@ -31,22 +38,73 @@ interface CartaFormData {
 }
 
 const documentTypes: DocumentoConfig[] = [
-  { id: "carta-presentacion", boton: "Carta de Presentación", titulo: "CARTA DE PRESENTACIÓN", descripcion: "Sube la carta de presentación correspondiente.", etiquetaCarga: "Subir Carta de Presentación" },
-  { id: "carta-aceptacion", boton: "Carta de Aceptación", titulo: "CARTA DE ACEPTACIÓN", descripcion: "Adjunta la carta de aceptación en PDF.", etiquetaCarga: "Subir Carta de Aceptación" },
-  { id: "carta-terminacion", boton: "Carta de Terminación", titulo: "CARTA DE TERMINACIÓN", descripcion: "Sube la carta de terminación.", etiquetaCarga: "Subir Carta de Terminación" },
-  { id: "acta-final", boton: "Acta final", titulo: "ACTA FINAL", descripcion: "Adjunta el acta final en PDF.", etiquetaCarga: "Subir Acta Final" },
+  { 
+    id: "carta-presentacion", 
+    boton: "Carta de Presentación", 
+    titulo: "CARTA DE PRESENTACIÓN", 
+    descripcion: "Sube la carta de presentación correspondiente.", 
+    etiquetaCarga: "Subir Carta de Presentación",
+    formId: 13,
+    apartadoLabel: "carta-presentacion",
+  },
+  { 
+    id: "carta-aceptacion", 
+    boton: "Carta de Aceptación", 
+    titulo: "CARTA DE ACEPTACIÓN", 
+    descripcion: "Adjunta la carta de aceptación en PDF.", 
+    etiquetaCarga: "Subir Carta de Aceptación",
+    formId: 14,
+    apartadoLabel: "carta-aceptacion",
+  },
+  { 
+    id: "carta-terminacion", 
+    boton: "Carta de Terminación", 
+    titulo: "CARTA DE TERMINACIÓN", 
+    descripcion: "Sube la carta de terminación.", 
+    etiquetaCarga: "Subir Carta de Terminación",
+    formId: 15,
+    apartadoLabel: "carta-terminacion",
+  },
+  { 
+    id: "acta-final-estadias", 
+    boton: "Acta Final", 
+    titulo: "ACTA FINAL", 
+    descripcion: "Adjunta el acta final en PDF.", 
+    etiquetaCarga: "Subir Acta Final",
+    formId: 16,
+    apartadoLabel: "estadias",
+  },
 ];
 
-const initialFormData: CartaFormData = { plan: "", carrera: "", grupo: "", archivos: [], nota: "", docente: "" };
+const initialFormData: EstadiaFormData = { 
+  plan: "", 
+  carrera: "", 
+  grupo: "", 
+  archivos: [], 
+  nota: "",
+  docente: "",
+};
 
 export default function EstadiasPage() {
-  const [selectedType, setSelectedType] = useState<DocumentoCarta | null>(null);
-  const [formData, setFormData] = useState<CartaFormData>(initialFormData);
+  const { user } = useAuth();
+  const [selectedType, setSelectedType] = useState<DocumentoEstadia | null>(null);
+  const [formData, setFormData] = useState<EstadiaFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const formRef = useRef<HTMLDivElement | null>(null);
+  const [groupsOptions, setGroupsOptions] = useState<Array<{ id: number; group_code: string; group_number: number }>>([]);
+  const [history, setHistory] = useState<any[]>([]);
 
   const selectedConfig = useMemo(() => documentTypes.find((d) => d.id === selectedType) ?? null, [selectedType]);
 
-  // Carreras según plan
+  useEffect(() => {
+    if (user && !formData.docente) {
+      const nombreCompleto = `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "";
+      setFormData(prev => ({ ...prev, docente: nombreCompleto }));
+    }
+  }, [user]);
+
   const carrerasDisponibles = useMemo(() => {
     if (!formData.plan) return [];
     if (formData.plan === "nuevo-modelo") {
@@ -57,32 +115,117 @@ export default function EstadiasPage() {
     return carrieras["plan-normal"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
   }, [formData.plan]);
 
-  const isValid = useMemo(() => {
-    const validarGrupo = /^[A-Z]{2,4}-\d{2}$/i.test(formData.grupo);
-    return Boolean(formData.plan && formData.carrera && validarGrupo && formData.archivos.length > 0 && formData.docente.trim());
-  }, [formData]);
-
-  const handleSelectType = (t: DocumentoCarta) => {
-    setFormData(initialFormData);
-    setSelectedType(t);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    const newFiles = Array.from(files);
-    const total = formData.archivos.length + newFiles.length;
-    if (total > 3) { toast.error("Máximo 3 archivos permitidos"); return; }
-    for (const f of newFiles) {
-      if (f.size > 2 * 1024 * 1024) { toast.error(`${f.name} excede el límite de 2 MB`); return; }
-      if (f.type !== "application/pdf") { toast.error(`${f.name} debe ser un archivo PDF`); return; }
+  useEffect(() => {
+    const career = formData.carrera;
+    if (!career) {
+      setGroupsOptions([]);
+      return;
     }
-    setFormData((c) => ({ ...c, archivos: [...c.archivos, ...newFiles] }));
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await apiFetch("/groups", { query: { career_code: career } });
+        if (cancelled) return;
+        const data = Array.isArray(res?.data) ? res.data : [];
+        setGroupsOptions(data.map((g: any) => ({ id: Number(g.id), group_code: g.group_code, group_number: Number(g.group_number) })));
+      } catch (error) {
+        console.error("Could not load groups", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.carrera]);
+
+  useEffect(() => {
+    if (!selectedConfig || !user) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await apiFetch("/documents", {
+          query: {
+            uploaded_by: user.id,
+            form_id: selectedConfig.formId,
+            per_page: 50,
+          },
+        });
+        if (cancelled) return;
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      } catch (error) {
+        console.error("Could not load history", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedConfig, user]);
+
+  const isValid = useMemo(() => {
+    let grupoValido = false;
+    
+    if (groupsOptions.length > 0) {
+      grupoValido = groupsOptions.some(g => formatGroupCode(g.group_code) === formData.grupo);
+    } else {
+      grupoValido = false;
+    }
+
+    return Boolean(
+      formData.plan &&
+      formData.carrera &&
+      grupoValido &&
+      formData.archivos.length > 0 &&
+      user &&
+      formData.docente.trim()
+    );
+  }, [formData, user, groupsOptions]);
+
+  const handleSelectType = (type: DocumentoEstadia) => {
+    setFormData({ ...initialFormData, docente: user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "" : "" });
+    setEditingDocumentId(null);
+    setSelectedType(type);
   };
 
-  const removeFile = (index: number) => setFormData((c) => ({ ...c, archivos: c.archivos.filter((_, i) => i !== index) }));
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
 
-  const resetForm = () => setFormData(initialFormData);
+    const newFiles = Array.from(files);
+    const totalFiles = formData.archivos.length + newFiles.length;
+
+    if (totalFiles > 3) {
+      toast.error("Máximo 3 archivos permitidos");
+      return;
+    }
+
+    for (const file of newFiles) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} excede el límite de 5 MB`);
+        return;
+      }
+      if (file.type !== "application/pdf") {
+        toast.error(`${file.name} debe ser un archivo PDF`);
+        return;
+      }
+    }
+
+    setFormData((current) => ({ ...current, archivos: [...current.archivos, ...newFiles] }));
+  };
+
+  const removeFile = (index: number) => {
+    setFormData((current) => ({
+      ...current,
+      archivos: current.archivos.filter((_, i) => i !== index),
+    }));
+  };
+
+  const resetForm = () => {
+    setFormData({ ...initialFormData, docente: user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "" : "" });
+    setEditingDocumentId(null);
+  };
 
   const getArchivosLabel = () => {
     if (formData.archivos.length === 0) return "Selecciona tus archivos PDF";
@@ -98,21 +241,254 @@ export default function EstadiasPage() {
     return `${espacios} espacio${plural} disponible${plural}`;
   };
 
-  const handleSubmit = async () => {
-    if (!isValid || !selectedConfig) { toast.error("Completa todos los campos obligatorios"); return; }
-    setIsSubmitting(true); await new Promise((r) => setTimeout(r, 1000)); toast.success(`${selectedConfig.titulo} enviada correctamente`); setIsSubmitting(false); resetForm();
+  const findCareerCodeByLabel = (label: string, planType: Plan | "") => {
+    if (!label || !planType) return "";
+    const candidates = planType === "nuevo-modelo"
+      ? [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria]
+      : carrieras["plan-normal"].ingenieria;
+
+    const searchLabel = label.toLowerCase();
+    let found = candidates.find((c) => c.nombre.toLowerCase() === searchLabel);
+    if (!found) {
+      found = candidates.find((c) => c.nombre.toLowerCase().includes(searchLabel) || searchLabel.includes(c.nombre.toLowerCase()));
+    }
+    return found?.codigo ?? "";
   };
 
-  // Texto de cuatrimestres aplicables por plan
-  let cuatrimestresTexto = "";
-  if (formData.plan === "nuevo-modelo") cuatrimestresTexto = "Aplicable en cuatrimestres 6 y 10";
-  else if (formData.plan === "plan-normal") cuatrimestresTexto = "Aplicable en cuatrimestre 6 y 11";
+  const populateFormForEdit = (document: any) => {
+    const normalizePlanKey = (p: any) => {
+      if (!p) return "plan-normal";
+      const s = String(p).toLowerCase();
+      if (s.includes("nuevo")) return "nuevo-modelo";
+      return "plan-normal";
+    };
+
+    const planKey = normalizePlanKey(document.plan ?? "");
+    const careerCode = findCareerCodeByLabel(document.carrera_label ?? "", planKey as any);
+
+    setEditingDocumentId(document.id);
+    setFormData({
+      plan: planKey as Plan,
+      carrera: careerCode,
+      grupo: document.group_code ? formatGroupCode(document.group_code) : "",
+      archivos: [],
+      nota: document.note ?? document.nota ?? "",
+      docente: document.docente ?? (user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() : ""),
+    });
+    setSheetOpen(false);
+  };
+
+  const documentFileUrl = (id: number) => `${API_BASE_URL.replace(/\/+$/, "")}/documents/${id}/file`;
+
+  const getUploadedFileName = (doc: any) => {
+    const path = String(doc?.file_path ?? "");
+    if (!path) return "Documento sin nombre";
+    const base = path.split("/").pop() ?? path;
+    return base.replace(/^doc_[^_]+_/, "");
+  };
+
+  const openDocument = async (id: number, action: "view" | "download") => {
+    try {
+      const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      headers["ngrok-skip-browser-warning"] = "true";
+      headers["Accept"] = "application/pdf";
+
+      const res = await fetch(documentFileUrl(id), { method: "GET", headers });
+      if (!res.ok) throw new Error(res.statusText || "Error al abrir documento");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      if (action === "view") {
+        window.open(blobUrl, "_blank");
+      } else {
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = "";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch {
+      toast.error("No fue posible abrir el documento");
+    }
+  };
+
+  const uploadMultipleFiles = async (files: File[], basePayload: any) => {
+    const uploadedIds = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const toBase64 = (f: File) => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const parts = result.split(",");
+          resolve(parts[1] ?? "");
+        };
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(f);
+      });
+
+      const fileBase64 = await toBase64(file);
+      
+      const cleanFileName = file.name.replace(/\.pdf$/i, '').substring(0, 50);
+      const payload = {
+        form_id: basePayload.form_id,
+        apartado_label: basePayload.apartado_label,
+        carrera_label: basePayload.carrera_label,
+        plan: basePayload.plan,
+        docente: basePayload.docente,
+        nota: basePayload.nota,
+        group_id: basePayload.group_id,
+        group_code: basePayload.group_code,
+        file_base64: fileBase64,
+        file_name: file.name,
+        file_type: file.type,
+        file_size: file.size,
+        title: `${basePayload.titulo || selectedConfig?.titulo || "Documento"} - ${cleanFileName}`.trim(),
+      };
+      
+      if (basePayload.original_document_id) {
+        payload.original_document_id = basePayload.original_document_id;
+      }
+      
+      const result = await apiFetch("/documents", { method: "POST", body: JSON.stringify(payload) });
+      uploadedIds.push(result?.data?.id);
+    }
+    
+    return uploadedIds;
+  };
+
+  const handleSubmit = async () => {
+    if (!isValid || !selectedConfig) {
+      toast.error("Completa todos los campos obligatorios");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const carreraEntry = carrerasDisponibles.find((c) => c.codigo === formData.carrera);
+      const carreraLabel = carreraEntry ? carreraEntry.nombre : formData.carrera;
+      
+      let selectedGroup = null;
+      if (formData.grupo && groupsOptions.length > 0) {
+        selectedGroup = groupsOptions.find(g => formatGroupCode(g.group_code) === formData.grupo);
+      }
+      
+      const basePayload: any = {
+        form_id: selectedConfig.formId,
+        apartado_label: selectedConfig.apartadoLabel,
+        carrera_label: carreraLabel,
+        plan: formData.plan,
+        docente: formData.docente,
+        nota: formData.nota,
+        titulo: selectedConfig.titulo,
+      };
+
+      if (selectedGroup) {
+        basePayload.group_id = selectedGroup.id;
+        basePayload.group_code = formatGroupCode(selectedGroup.group_code);
+      }
+      
+      if (editingDocumentId) basePayload.original_document_id = String(editingDocumentId);
+
+      await uploadMultipleFiles(formData.archivos, basePayload);
+
+      toast.success(editingDocumentId ? "Documento actualizado correctamente" : "Documento enviado correctamente", {
+        description: editingDocumentId ? "Tus documentos han sido actualizados." : "Tus documentos fueron enviados para revisión administrativa.",
+      });
+
+      setEditingDocumentId(null);
+      resetForm();
+
+      if (user && selectedConfig) {
+        const res = await apiFetch("/documents", {
+          query: {
+            uploaded_by: user.id,
+            form_id: selectedConfig.formId,
+            per_page: 50,
+          },
+        });
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      }
+    } catch (error: any) {
+      toast.error(error?.message ?? "No fue posible subir el documento");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getCuatrimestresTexto = () => {
+    if (formData.plan === "nuevo-modelo") return "Aplicable en cuatrimestres 6 y 10";
+    if (formData.plan === "plan-normal") return "Aplicable en cuatrimestre 6 y 11";
+    return "";
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Cartas y Acta</h1>
-        <p className="text-muted-foreground">Seleccione el tipo de archivo que desea subir.</p>
+      <div className="flex items-start justify-between">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold">Cartas y Acta</h1>
+          <p className="text-muted-foreground">Seleccione el tipo de archivo que desea subir.</p>
+        </div>
+
+        {selectedConfig && (
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent">
+                <History className="mr-2 h-4 w-4" />
+                Historial
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Historial de archivos</SheetTitle>
+                <SheetDescription>Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
+              </SheetHeader>
+              <div className="mt-4 space-y-4">
+                {history.length > 0 ? (
+                  <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:bg-slate-900/30">
+                    <div className="grid gap-3 p-1">
+                      {history.map((h) => (
+                        <div key={h.id} className="rounded-lg border border-border bg-card p-4 shadow-sm dark:bg-slate-900">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold">{h.title ?? h.file_path}</p>
+                              <p className="break-all text-xs text-muted-foreground">PDF: {getUploadedFileName(h)}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{new Date(h.submitted_at).toLocaleString()}</p>
+                          </div>
+                          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-wrap gap-2">
+                              <Button size="sm" variant="outline" onClick={() => openDocument(h.id, "view")}>Ver</Button>
+                              <Button size="sm" variant="secondary" onClick={() => populateFormForEdit(h)}>Editar documento</Button>
+                            </div>
+                            <span className="text-xs text-muted-foreground">Estatus: {h.status ?? "Pendiente"}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                ) : formData.archivos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión ni en el historial.</p>
+                ) : (
+                  <div>
+                    <p className="mb-2 text-sm font-medium">Archivos en esta sesión</p>
+                    <ul className="space-y-2">
+                      {formData.archivos.map((f, i) => (
+                        <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
 
       {selectedConfig === null ? (
@@ -124,8 +500,16 @@ export default function EstadiasPage() {
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
               {documentTypes.map((type) => (
-                <Button key={type.id} variant="outline" onClick={() => handleSelectType(type.id)} className="h-auto min-h-24 justify-between rounded-2xl border-border bg-background px-4 py-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
-                  <span className="flex flex-col items-start gap-1 whitespace-normal pr-3"><span className="text-sm font-semibold leading-snug">{type.boton}</span><span className="text-xs text-muted-foreground">Abrir formulario</span></span>
+                <Button
+                  key={type.id}
+                  variant="outline"
+                  onClick={() => handleSelectType(type.id)}
+                  className="h-auto min-h-24 justify-between rounded-2xl border-border bg-background px-4 py-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+                >
+                  <span className="flex flex-col items-start gap-1 whitespace-normal pr-3">
+                    <span className="text-sm font-semibold leading-snug">{type.boton}</span>
+                    <span className="text-xs text-muted-foreground">Abrir formulario</span>
+                  </span>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </Button>
               ))}
@@ -133,70 +517,160 @@ export default function EstadiasPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card ref={formRef}>
           <CardHeader>
             <div className="flex items-start justify-between">
               <div>
                 <CardTitle className="text-2xl">{selectedConfig.titulo}</CardTitle>
                 <CardDescription>{selectedConfig.descripcion}</CardDescription>
+                {editingDocumentId && (
+                  <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                    Estás editando el documento #{editingDocumentId}. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+                  </div>
+                )}
               </div>
-              <Button variant="outline" onClick={() => setSelectedType(null)}><ArrowLeft className="mr-2 h-4 w-4"/>Cambiar tipo</Button>
+              <Button variant="outline" onClick={() => { setSelectedType(null); setEditingDocumentId(null); }}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Cambiar tipo
+              </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <Label>Plan *</Label>
-              <div className="flex gap-2">
-                <Button variant={formData.plan === "nuevo-modelo" ? "success" : "outline"} onClick={() => setFormData((c)=>({...c, plan: "nuevo-modelo", carrera: ""}))}>Plan Nuevo Modelo</Button>
-                <Button variant={formData.plan === "plan-normal" ? "success" : "outline"} onClick={() => setFormData((c)=>({...c, plan: "plan-normal", carrera: ""}))}>Plan Normal</Button>
-              </div>
-              {cuatrimestresTexto && <p className="text-xs text-muted-foreground mt-2">{cuatrimestresTexto}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Carrera *</Label>
-              <Select value={formData.carrera} onValueChange={(v)=>setFormData((c)=>({...c, carrera: v}))} disabled={!formData.plan}>
-                <SelectTrigger><SelectValue placeholder="Selecciona la carrera"/></SelectTrigger>
-                <SelectContent>{carrerasDisponibles.map((c)=>(<SelectItem key={c.codigo} value={c.codigo}>{c.nombre}</SelectItem>))}</SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Grupo *</Label>
-              <Input value={formData.grupo} onChange={(e)=>setFormData((c)=>({...c, grupo: e.target.value.toUpperCase()}))} placeholder="Ej. JTH-01" maxLength={7} />
-              <p className="text-xs text-muted-foreground">Ejemplo: JTH-01</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>{selectedConfig.etiquetaCarga} *</Label>
-              <p className="text-sm text-muted-foreground">Adjuntar el documento en formato PDF, con un límite de 2 MB por archivo. Hasta 3 archivos.</p>
-              <div className="rounded-2xl border border-dashed border-border p-6 text-center">
-                <input type="file" accept=".pdf" multiple className="hidden" id="carta-pdf-upload" onChange={handleFileChange} disabled={formData.archivos.length>=3} />
-                <label htmlFor="carta-pdf-upload" className="block cursor-pointer space-y-2"><Upload className="mx-auto h-8 w-8 text-muted-foreground"/><p className="text-sm font-medium">{getArchivosLabel()}</p><p className="text-xs text-muted-foreground">{getEspaciosLabel()}</p></label>
+          <CardContent className="space-y-6 p-6 sm:p-8">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label className="text-sm font-medium">Plan *</Label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button 
+                    variant={formData.plan === "nuevo-modelo" ? "success" : "outline"} 
+                    onClick={() => setFormData((c) => ({ ...c, plan: "nuevo-modelo", carrera: "" }))}
+                    className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left"
+                  >
+                    <span className="text-base font-semibold">Plan Nuevo Modelo</span>
+                    <span className="text-xs text-muted-foreground">TSU e Ingeniería</span>
+                  </Button>
+                  <Button 
+                    variant={formData.plan === "plan-normal" ? "success" : "outline"} 
+                    onClick={() => setFormData((c) => ({ ...c, plan: "plan-normal", carrera: "" }))}
+                    className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left"
+                  >
+                    <span className="text-base font-semibold">Plan Normal</span>
+                    <span className="text-xs text-muted-foreground">Ingenierías</span>
+                  </Button>
+                </div>
+                {getCuatrimestresTexto() && (
+                  <p className="text-xs text-muted-foreground mt-2">{getCuatrimestresTexto()}</p>
+                )}
               </div>
 
-              {formData.archivos.length>0 && (<div className="space-y-2">{formData.archivos.map((archivo,index)=>(<div key={`${archivo.name}-${archivo.size}-${index}`} className="flex items-center justify-between rounded-lg border border-success/20 bg-success/10 p-3"><div className="flex items-center gap-2 text-sm flex-1"><FileText className="h-4 w-4 text-success"/><span className="font-medium">{archivo.name}</span></div><Button variant="ghost" size="sm" onClick={()=>removeFile(index)} className="h-6 w-6 p-0"><X className="h-4 w-4"/></Button></div>))}</div>)}
+              <div className="space-y-2">
+                <Label>Carrera *</Label>
+                <Select 
+                  value={formData.carrera} 
+                  onValueChange={(v) => setFormData((c) => ({ ...c, carrera: v, grupo: "" }))} 
+                  disabled={!formData.plan}
+                >
+                  <SelectTrigger className="rounded-2xl">
+                    <SelectValue placeholder="Selecciona la carrera" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {carrerasDisponibles.map((c) => (
+                      <SelectItem key={c.codigo} value={c.codigo}>{c.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              {formData.archivos.length>0 && (<div className="space-y-2 pt-2">{formData.archivos.map((archivo,index)=>(<PdfPreview key={`preview-${archivo.name}-${archivo.size}-${index}`} file={archivo} title={`Vista previa - ${archivo.name}`}/>))}</div>)}
+              <div className="space-y-2 md:col-span-2">
+                <Label>Grupo *</Label>
+                {groupsOptions.length > 0 ? (
+                  <Select value={formData.grupo} onValueChange={(value) => setFormData((c) => ({ ...c, grupo: value }))}>
+                    <SelectTrigger className="rounded-2xl">
+                      <SelectValue placeholder="Selecciona el grupo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {groupsOptions.map((g) => (
+                        <SelectItem key={g.id} value={formatGroupCode(g.group_code)}>
+                          {formatGroupCode(g.group_code)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-300">
+                    ⚠️ No hay grupos disponibles para esta carrera. Contacta al administrador.
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>{selectedConfig.etiquetaCarga} *</Label>
+                <p className="text-sm text-muted-foreground">
+                  Adjuntar el documento en formato PDF, con un límite de 5 MB por archivo. Hasta 3 archivos.
+                </p>
+                <div className="rounded-3xl border border-dashed border-border bg-background/60 p-6 text-center transition-colors hover:border-primary/50 hover:bg-primary/5">
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    multiple
+                    className="hidden"
+                    id="estadia-pdf-upload"
+                    onChange={handleFileChange}
+                    disabled={formData.archivos.length >= 3}
+                  />
+                  <label htmlFor="estadia-pdf-upload" className="block cursor-pointer space-y-3">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Upload className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{getArchivosLabel()}</p>
+                      <p className="text-xs text-muted-foreground">{getEspaciosLabel()}</p>
+                    </div>
+                  </label>
+                </div>
+
+                {formData.archivos.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    {formData.archivos.map((archivo, index) => (
+                      <PdfPreview key={`${archivo.name}-${archivo.size}-${index}`} file={archivo} title="Documento cargado" onRemove={() => removeFile(index)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>Nota para administrador (opcional)</Label>
+                <Textarea
+                  value={formData.nota}
+                  onChange={(e) => setFormData((c) => ({ ...c, nota: e.target.value }))}
+                  placeholder="Agrega una nota para revisión"
+                  className="min-h-[9rem] rounded-2xl"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>Nombre del docente *</Label>
+                <Input
+                  value={formData.docente}
+                  onChange={(e) => setFormData(prev => ({ ...prev, docente: e.target.value }))}
+                  placeholder="Nombre del docente"
+                  className="rounded-2xl"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <p className="text-sm font-medium">Declaración de autorización</p>
+                <p className="text-sm text-muted-foreground">
+                  Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares 
+                  y confirmo la veracidad de la información proporcionada.
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Nota para administrador (Opcional)</Label>
-              <Textarea value={formData.nota} onChange={(e)=>setFormData((c)=>({...c, nota: e.target.value}))} placeholder="Agrega una nota para revisión" />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Nombre del docente (Obligatorio)</Label>
-              <Input value={formData.docente} onChange={(e)=>setFormData((c)=>({...c, docente: e.target.value}))} placeholder="Primer Nombre y Apellidos Completos" />
-            </div>
-
-            <div className="space-y-2 text-sm">
-              <p>Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.</p>
-            </div>
-
-            <div className="flex gap-3 pt-4 border-t">
-              <Button variant="outline" onClick={resetForm} disabled={isSubmitting}>Limpiar</Button>
-              <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting}>{isSubmitting?"Enviando...":"Enviar"}</Button>
+            <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row">
+              <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6">Limpiar</Button>
+              <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="rounded-2xl sm:px-6">
+                {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar documento" : "Enviar"}
+              </Button>
             </div>
           </CardContent>
         </Card>

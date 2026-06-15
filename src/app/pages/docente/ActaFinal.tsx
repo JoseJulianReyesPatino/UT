@@ -1,16 +1,20 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Button } from "../../components/ui/button";
-import { Upload, FileText, Menu, X } from "lucide-react";
+import { Upload, FileText, History, X } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
+import { ScrollArea } from "../../components/ui/scroll-area";
 import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuatrimestre } from "../../data/curricula";
-import { getGroups } from "../../../lib/formConfig";
 import { getCalendarFileUrl } from "../../lib/calendar";
+import { useAuth } from "../../context/AuthContext";
+import { apiFetch } from "../../lib/api";
+import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { formatGroupCode } from "../../../lib/utils";
 
 const calendarioPdf = getCalendarFileUrl();
 
@@ -22,6 +26,7 @@ interface ActaFinalFormData {
   grupo: string;
   archivos: File[];
   docente: string;
+  nota: string;
 }
 
 const initialFormData: ActaFinalFormData = {
@@ -32,60 +37,120 @@ const initialFormData: ActaFinalFormData = {
   grupo: "",
   archivos: [],
   docente: "",
+  nota: "",
 };
 
 export default function ActaFinalPage() {
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
   const [formData, setFormData] = useState<ActaFinalFormData>(initialFormData);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const formRef = useRef<HTMLDivElement | null>(null);
+  const [groupsOptions, setGroupsOptions] = useState<Array<{ id: number; group_code: string; group_number: number }>>([]);
+  const [history, setHistory] = useState<any[]>([]);
 
-  // Obtener carreras disponibles según el plan
+  useEffect(() => {
+    if (user && !formData.docente) {
+      const nombreCompleto = `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "";
+      setFormData(prev => ({ ...prev, docente: nombreCompleto }));
+    }
+  }, [user]);
+
   const carrerasDisponibles = useMemo(() => {
     if (!formData.plan) return [];
-    
     if (formData.plan === "nuevo-modelo") {
-      const tsu = carrieras["nuevo-modelo"].tsu.map(c => ({ codigo: c.codigo, nombre: c.nombre, tipo: "TSU" }));
-      const ing = carrieras["nuevo-modelo"].ingenieria.map(c => ({ codigo: c.codigo, nombre: c.nombre, tipo: "Ingeniería" }));
+      const tsu = carrieras["nuevo-modelo"].tsu.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
+      const ing = carrieras["nuevo-modelo"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
       return [...tsu, ...ing];
-    } else {
-      return carrieras["plan-normal"].ingenieria.map(c => ({ codigo: c.codigo, nombre: c.nombre, tipo: "Plan Normal" }));
     }
+    return carrieras["plan-normal"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
   }, [formData.plan]);
 
-  // Obtener cuatrimestres disponibles según carrera
+  useEffect(() => {
+    const career = formData.carrera;
+    const cuatri = formData.cuatrimestre;
+
+    if (!career || !cuatri) {
+      setGroupsOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await apiFetch("/groups", { query: { career_code: career, cuatrimestre: cuatri } });
+        if (cancelled) return;
+        const data = Array.isArray(res?.data) ? res.data : [];
+        setGroupsOptions(data.map((g: any) => ({ id: Number(g.id), group_code: g.group_code, group_number: Number(g.group_number) })));
+      } catch (error) {
+        console.error("Could not load groups", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.carrera, formData.cuatrimestre]);
+
+  useEffect(() => {
+    setFormData((current) => ({ ...current, grupo: "" }));
+  }, [formData.carrera, formData.cuatrimestre]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (!user) return;
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 7, per_page: 50 } });
+        if (cancelled) return;
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      } catch (error) {
+        console.error("Could not load history", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   const cuatrimestresDisponibles = useMemo(() => {
     if (!formData.carrera || !formData.plan) return [];
-    
     const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
     const carrera = plan[formData.carrera];
-    
     if (!carrera) return [];
     return Object.keys(carrera.cuatrimestres);
   }, [formData.carrera, formData.plan]);
 
-  // Obtener materias disponibles según carrera y cuatrimestre
   const materiasDisponibles = useMemo(() => {
     if (!formData.carrera || !formData.cuatrimestre || !formData.plan) return [];
-    
     const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
     const carrera = plan[formData.carrera];
-    
     if (!carrera) return [];
     return carrera.cuatrimestres[formData.cuatrimestre] || [];
   }, [formData.carrera, formData.cuatrimestre, formData.plan]);
 
   const isValid = useMemo(() => {
-    const validarGrupo = /^[A-Z]{2,4}-\d{2}$/i.test(formData.grupo);
-    return (
+    let grupoValido = false;
+    
+    if (groupsOptions.length > 0) {
+      grupoValido = groupsOptions.some(g => formatGroupCode(g.group_code) === formData.grupo);
+    } else {
+      grupoValido = false;
+    }
+
+    return Boolean(
       formData.plan &&
       formData.carrera &&
       formData.cuatrimestre &&
       formData.materia &&
-      validarGrupo &&
+      grupoValido &&
       formData.archivos.length > 0 &&
+      user &&
       formData.docente.trim()
     );
-  }, [formData]);
+  }, [formData, user, groupsOptions]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -99,9 +164,9 @@ export default function ActaFinalPage() {
       return;
     }
 
-    for (let file of newFiles) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error(`${file.name} excede el límite de 2 MB`);
+    for (const file of newFiles) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} excede el límite de 5 MB`);
         return;
       }
       if (file.type !== "application/pdf") {
@@ -121,7 +186,8 @@ export default function ActaFinalPage() {
   };
 
   const resetForm = () => {
-    setFormData(initialFormData);
+    setFormData({ ...initialFormData, docente: user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "" : "" });
+    setEditingDocumentId(null);
   };
 
   const getArchivosLabel = () => {
@@ -131,15 +197,142 @@ export default function ActaFinalPage() {
     return `${count} archivo${plural} cargado${plural}`;
   };
 
-  const getCuatrimestreLabel = (k: string) => {
-    return cuatrimestresLabels[k as keyof typeof cuatrimestresLabels] ?? k;
-  };
-
   const getEspaciosLabel = () => {
     const espacios = 3 - formData.archivos.length;
     if (espacios === 0) return "Máximo alcanzado";
     const plural = espacios > 1 ? "s" : "";
     return `${espacios} espacio${plural} disponible${plural}`;
+  };
+
+  const getCuatrimestreLabel = (k: string) => cuatrimestresLabels[k as keyof typeof cuatrimestresLabels] ?? String(k);
+
+  const findCareerCodeByLabel = (label: string, planType: Plan | "") => {
+    if (!label || !planType) return "";
+    const candidates = planType === "nuevo-modelo"
+      ? [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria]
+      : carrieras["plan-normal"].ingenieria;
+
+    const searchLabel = label.toLowerCase();
+    let found = candidates.find((c) => c.nombre.toLowerCase() === searchLabel);
+    if (!found) {
+      found = candidates.find((c) => c.nombre.toLowerCase().includes(searchLabel) || searchLabel.includes(c.nombre.toLowerCase()));
+    }
+    return found?.codigo ?? "";
+  };
+
+  const populateFormForEdit = (document: any) => {
+    const normalizePlanKey = (p: any) => {
+      if (!p) return "plan-normal";
+      const s = String(p).toLowerCase();
+      if (s.includes("nuevo")) return "nuevo-modelo";
+      return "plan-normal";
+    };
+
+    const planKey = normalizePlanKey(document.plan ?? "");
+    const careerCode = findCareerCodeByLabel(document.carrera_label ?? "", planKey as any);
+    const allowedCuatrimestres = new Set(Object.keys(cuatrimestresLabels));
+    const rawCuatrimestre = String(document.cuatrimestre ?? "").trim();
+    const resolvedCuatrimestre = allowedCuatrimestres.has(rawCuatrimestre) ? rawCuatrimestre : "";
+
+    setEditingDocumentId(document.id);
+    setFormData({
+      plan: planKey as Plan,
+      carrera: careerCode,
+      cuatrimestre: resolvedCuatrimestre as Cuatrimestre,
+      materia: document.materia ?? "",
+      grupo: document.group_code ? formatGroupCode(document.group_code) : "",
+      archivos: [],
+      docente: document.docente ?? (user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() : ""),
+      nota: document.note ?? document.nota ?? "",
+    });
+    setSheetOpen(false);
+    formRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const documentFileUrl = (id: number) => `${API_BASE_URL.replace(/\/+$/, "")}/documents/${id}/file`;
+
+  const getUploadedFileName = (doc: any) => {
+    const path = String(doc?.file_path ?? "");
+    if (!path) return "Documento sin nombre";
+    const base = path.split("/").pop() ?? path;
+    return base.replace(/^doc_[^_]+_/, "");
+  };
+
+  const openDocument = async (id: number, action: "view" | "download") => {
+    try {
+      const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      headers["ngrok-skip-browser-warning"] = "true";
+      headers["Accept"] = "application/pdf";
+
+      const res = await fetch(documentFileUrl(id), { method: "GET", headers });
+      if (!res.ok) throw new Error(res.statusText || "Error al abrir documento");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      if (action === "view") {
+        window.open(blobUrl, "_blank");
+      } else {
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = "";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch {
+      toast.error("No fue posible abrir el documento");
+    }
+  };
+
+  const uploadMultipleFiles = async (files: File[], basePayload: any) => {
+    const uploadedIds = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const toBase64 = (f: File) => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const parts = result.split(",");
+          resolve(parts[1] ?? "");
+        };
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(f);
+      });
+
+      const fileBase64 = await toBase64(file);
+      
+      const cleanFileName = file.name.replace(/\.pdf$/i, '').substring(0, 50);
+      const payload = {
+        form_id: basePayload.form_id,
+        apartado_label: basePayload.apartado_label,
+        carrera_label: basePayload.carrera_label,
+        plan: basePayload.plan,
+        materia: basePayload.materia,
+        docente: basePayload.docente,
+        nota: basePayload.nota,
+        group_id: basePayload.group_id,
+        group_code: basePayload.group_code,
+        file_base64: fileBase64,
+        file_name: file.name,
+        file_type: file.type,
+        file_size: file.size,
+        title: `${basePayload.materia || "Acta Final"} - ${cleanFileName}`.trim(),
+      };
+      
+      if (basePayload.original_document_id) {
+        payload.original_document_id = basePayload.original_document_id;
+      }
+      
+      const result = await apiFetch("/documents", { method: "POST", body: JSON.stringify(payload) });
+      uploadedIds.push(result?.data?.id);
+    }
+    
+    return uploadedIds;
   };
 
   const handleSubmit = async () => {
@@ -149,43 +342,109 @@ export default function ActaFinalPage() {
     }
 
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    toast.success("Acta final enviada correctamente", {
-      description: "Tu documento fue enviado para revision administrativa.",
-    });
-    setIsSubmitting(false);
-    resetForm();
+    try {
+      const carreraEntry = carrerasDisponibles.find((c) => c.codigo === formData.carrera);
+      const carreraLabel = carreraEntry ? carreraEntry.nombre : formData.carrera;
+      
+      let selectedGroup = null;
+      if (formData.grupo && groupsOptions.length > 0) {
+        selectedGroup = groupsOptions.find(g => formatGroupCode(g.group_code) === formData.grupo);
+      }
+      
+      const basePayload: any = {
+        form_id: 7,
+        apartado_label: "acta-final",
+        carrera_label: carreraLabel,
+        plan: formData.plan,
+        materia: formData.materia,
+        docente: formData.docente,
+        nota: formData.nota,
+      };
+
+      if (selectedGroup) {
+        basePayload.group_id = selectedGroup.id;
+        basePayload.group_code = formatGroupCode(selectedGroup.group_code);
+      }
+      
+      if (editingDocumentId) basePayload.original_document_id = String(editingDocumentId);
+
+      await uploadMultipleFiles(formData.archivos, basePayload);
+
+      toast.success(editingDocumentId ? "Acta final actualizada correctamente" : "Acta final enviada correctamente", {
+        description: editingDocumentId ? "Tus documentos han sido actualizados." : "Tus documentos fueron enviados para revisión administrativa.",
+      });
+
+      setEditingDocumentId(null);
+      resetForm();
+
+      if (user) {
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 7, per_page: 50 } });
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      }
+    } catch (error: any) {
+      toast.error(error?.message ?? "No fue posible subir el acta final");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6" ref={formRef}>
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold">Acta Final</h1>
           <p className="text-muted-foreground">Captura y envía el acta final de cierre de asignatura.</p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Menú de hamburguesa para seleccionar Plan */}
+        <div className="flex flex-wrap gap-3">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Menu className="h-5 w-5" />
+              <Button variant="outline" className="rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent">
+                <History className="mr-2 h-4 w-4" />
+                Historial
               </Button>
             </SheetTrigger>
             <SheetContent side="right">
               <SheetHeader>
                 <SheetTitle>Historial de archivos</SheetTitle>
+                <SheetDescription>Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
               </SheetHeader>
-              <div className="mt-4">
-                {formData.archivos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión.</p>
+              <div className="mt-4 space-y-4">
+                {history.length > 0 ? (
+                  <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:bg-slate-900/30">
+                    <div className="grid gap-3 p-1">
+                      {history.map((h) => (
+                        <div key={h.id} className="rounded-lg border border-border bg-card p-4 shadow-sm dark:bg-slate-900">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold">{h.title ?? h.file_path}</p>
+                              <p className="break-all text-xs text-muted-foreground">PDF: {getUploadedFileName(h)}</p>
+                              <p className="text-xs text-muted-foreground">{h.materia ?? "Acta Final"}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{new Date(h.submitted_at).toLocaleString()}</p>
+                          </div>
+                          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-wrap gap-2">
+                              <Button size="sm" variant="outline" onClick={() => openDocument(h.id, "view")}>Ver</Button>
+                              <Button size="sm" variant="secondary" onClick={() => populateFormForEdit(h)}>Editar documento</Button>
+                            </div>
+                            <span className="text-xs text-muted-foreground">Estatus: {h.status ?? "Pendiente"}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                ) : formData.archivos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión ni en el historial.</p>
                 ) : (
-                  <ul className="space-y-2">
-                    {formData.archivos.map((f, i) => (
-                      <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
-                    ))}
-                  </ul>
+                  <div>
+                    <p className="mb-2 text-sm font-medium">Archivos en esta sesión</p>
+                    <ul className="space-y-2">
+                      {formData.archivos.map((f, i) => (
+                        <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
             </SheetContent>
@@ -202,219 +461,150 @@ export default function ActaFinalPage() {
         <CardHeader>
           <CardTitle>Formulario de Acta Final</CardTitle>
           <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {/* Plan selection inside form */}
-          <div className="space-y-2">
-            <Label>Plan *</Label>
-            <div className="flex gap-2">
-                <Button variant={formData.plan === "nuevo-modelo" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Nuevo Modelo</Button>
-                <Button variant={formData.plan === "plan-normal" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))}>Plan Normal</Button>
-            </div>
-          </div>
-
-          {/* Carrera */}
-          <div className="space-y-2">
-            <Label>Carrera *</Label>
-            <Select
-              value={formData.carrera}
-              onValueChange={(value) =>
-                setFormData((current) => ({
-                  ...current,
-                  carrera: value,
-                  cuatrimestre: "",
-                  materia: "",
-                }))
-              }
-              disabled={!formData.plan}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona la carrera" />
-              </SelectTrigger>
-              <SelectContent>
-                {carrerasDisponibles.map((carrera) => (
-                  <SelectItem key={carrera.codigo} value={carrera.codigo}>
-                    {carrera.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Cuatrimestre */}
-          <div className="space-y-2">
-            <Label>Cuatrimestre *</Label>
-            <Select
-              value={formData.cuatrimestre}
-              onValueChange={(value) =>
-                setFormData((current) => ({
-                  ...current,
-                  cuatrimestre: value as Cuatrimestre,
-                  materia: "",
-                }))
-              }
-              disabled={!formData.carrera}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona el cuatrimestre" />
-              </SelectTrigger>
-              <SelectContent>
-                {cuatrimestresDisponibles.map((cuatri) => (
-                  <SelectItem key={cuatri} value={cuatri}>
-                    {getCuatrimestreLabel(cuatri)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Materia */}
-          <div className="space-y-2">
-            <Label>Materia *</Label>
-            <Select
-              value={formData.materia}
-              onValueChange={(value) => setFormData((current) => ({ ...current, materia: value }))}
-              disabled={!formData.cuatrimestre}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona la materia" />
-              </SelectTrigger>
-              <SelectContent>
-                {materiasDisponibles.map((materia, index) => (
-                  <SelectItem key={`${materia.nombre}-${index}`} value={materia.nombre}>
-                    {materia.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Grupo *</Label>
-                      {(() => {
-                        const groups = getGroups().filter((g) => {
-                          // try to match by plan and cuatrimestre if available
-                          if (!formData.plan) return false;
-                          if (g.plan !== formData.plan) return false;
-                          if (formData.cuatrimestre) return g.cuatrimestre === Number(formData.cuatrimestre);
-                          return true;
-                        });
-
-                        if (groups.length > 0) {
-                          return (
-                            <Select value={formData.grupo} onValueChange={(value) => setFormData((current) => ({ ...current, grupo: value }))}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecciona un grupo" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {groups.map((g) => (
-                                  <SelectItem key={g.id} value={g.name}>{g.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          );
-                        }
-
-                        return (
-                          <>
-                            <Input
-                              value={formData.grupo}
-                              onChange={(e) => setFormData((current) => ({ ...current, grupo: e.target.value.toUpperCase() }))}
-                              placeholder="Ej. JTH-01"
-                              maxLength={7}
-                            />
-                            <p className="text-xs text-muted-foreground">Formato: Ej. JTH-01</p>
-                          </>
-                        );
-                      })()}
-            </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* Espacio reservado: Fecha de cierre y Estatus eliminados por requerimiento */}
-          </div>
-
-          {/* Observaciones eliminadas por requerimiento */}
-
-          {/* Archivos */}
-          <div className="space-y-2">
-            <Label>Acta Final (PDF) *</Label>
-            <p className="text-sm text-muted-foreground">
-              Adjuntar el documento en formato PDF, con un límite de 2 MB por archivo. En caso de ser necesario, se permite la carga simultánea de hasta tres archivos.
-            </p>
-            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-success/50 transition-colors">
-              <input
-                type="file"
-                accept=".pdf"
-                multiple
-                className="hidden"
-                id="acta-final-pdf-upload"
-                onChange={handleFileChange}
-                disabled={formData.archivos.length >= 3}
-              />
-              <label htmlFor="acta-final-pdf-upload" className="cursor-pointer block space-y-2">
-                <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
-                <p className="text-sm font-medium">
-                  {getArchivosLabel()}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {getEspaciosLabel()}
-                </p>
-              </label>
-            </div>
-
-            {formData.archivos.length > 0 && (
-              <div className="space-y-2">
-                {formData.archivos.map((archivo, index) => (
-                  <div key={`${archivo.name}-${archivo.size}-${index}`} className="p-3 bg-success/10 border border-success/20 rounded-lg flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm flex-1">
-                      <FileText className="h-4 w-4 text-success" />
-                      <span className="font-medium">{archivo.name}</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeFile(index)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Vista previa de archivos */}
-          {formData.archivos.length > 0 && (
-            <div className="space-y-2">
-              {formData.archivos.map((archivo, index) => (
-                <PdfPreview key={`preview-${archivo.name}-${archivo.size}-${index}`} file={archivo} title={`Vista previa - ${archivo.name}`} />
-              ))}
+          {editingDocumentId && (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+              Estás editando el acta final existente #{editingDocumentId}. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
             </div>
           )}
+        </CardHeader>
+        <CardContent className="space-y-6 p-6 sm:p-8">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2 md:col-span-2">
+              <Label className="text-sm font-medium">Plan *</Label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Button variant={formData.plan === "nuevo-modelo" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))} className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left">
+                  <span className="text-base font-semibold">Plan Nuevo Modelo</span>
+                  <span className="text-xs text-muted-foreground">TSU e Ingeniería</span>
+                </Button>
+                <Button variant={formData.plan === "plan-normal" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))} className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left">
+                  <span className="text-base font-semibold">Plan Normal</span>
+                  <span className="text-xs text-muted-foreground">Ingenierías</span>
+                </Button>
+              </div>
+            </div>
 
-          {/* Nombre del docente */}
-          <div className="space-y-2">
-            <Label>Nombre del docente *</Label>
-            <Input
-              value={formData.docente}
-              onChange={(e) => setFormData((current) => ({ ...current, docente: e.target.value }))}
-              placeholder="Primer nombre y apellidos completos"
-            />
+            <div className="space-y-2">
+              <Label>Carrera *</Label>
+              <Select value={formData.carrera} onValueChange={(value) => setFormData((current) => ({ ...current, carrera: value, cuatrimestre: "", materia: "" }))} disabled={!formData.plan}>
+                <SelectTrigger className="rounded-2xl">
+                  <SelectValue placeholder="Selecciona la carrera" />
+                </SelectTrigger>
+                <SelectContent>
+                  {carrerasDisponibles.map((carrera) => (
+                    <SelectItem key={carrera.codigo} value={carrera.codigo}>{carrera.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Cuatrimestre *</Label>
+              <Select value={formData.cuatrimestre} onValueChange={(value) => setFormData((current) => ({ ...current, cuatrimestre: value as Cuatrimestre, materia: "" }))} disabled={!formData.carrera}>
+                <SelectTrigger className="rounded-2xl">
+                  <SelectValue placeholder="Selecciona el cuatrimestre" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cuatrimestresDisponibles.map((cuatri) => (
+                    <SelectItem key={cuatri} value={cuatri}>{getCuatrimestreLabel(cuatri)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>Materia *</Label>
+              <Select value={formData.materia} onValueChange={(value) => setFormData((current) => ({ ...current, materia: value }))} disabled={!formData.cuatrimestre}>
+                <SelectTrigger className="rounded-2xl">
+                  <SelectValue placeholder="Selecciona la materia" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materiasDisponibles.map((materia, index) => (
+                    <SelectItem key={`${materia.nombre}-${index}`} value={materia.nombre}>{materia.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>Grupo *</Label>
+              {groupsOptions.length > 0 ? (
+                <Select value={formData.grupo} onValueChange={(value) => setFormData((c) => ({ ...c, grupo: value }))}>
+                  <SelectTrigger className="rounded-2xl">
+                    <SelectValue placeholder="Selecciona el grupo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groupsOptions.map((g) => (
+                      <SelectItem key={g.id} value={formatGroupCode(g.group_code)}>
+                        {formatGroupCode(g.group_code)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-300">
+                  ⚠️ No hay grupos disponibles para esta carrera y cuatrimestre. Contacta al administrador.
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>Acta Final (PDF) *</Label>
+              <p className="text-sm text-muted-foreground">Adjunta documentos PDF de hasta 5 MB por archivo. Puedes cargar hasta tres archivos en total.</p>
+              <div className="rounded-3xl border border-dashed border-border bg-background/60 p-6 text-center transition-colors hover:border-primary/50 hover:bg-primary/5">
+                <input type="file" accept=".pdf" multiple className="hidden" id="acta-final-pdf-upload" onChange={handleFileChange} disabled={formData.archivos.length >= 3} />
+                <label htmlFor="acta-final-pdf-upload" className="block cursor-pointer space-y-3">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <Upload className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{getArchivosLabel()}</p>
+                    <p className="text-xs text-muted-foreground">{getEspaciosLabel()}</p>
+                  </div>
+                </label>
+              </div>
+
+              {formData.archivos.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  {formData.archivos.map((archivo, index) => (
+                    <PdfPreview key={`${archivo.name}-${archivo.size}-${index}`} file={archivo} title="Documento cargado" onRemove={() => removeFile(index)} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>Nombre del docente</Label>
+              <Input
+                value={formData.docente}
+                onChange={(e) => setFormData(prev => ({ ...prev, docente: e.target.value }))}
+                placeholder="Nombre del docente"
+                className="rounded-2xl"
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <p className="text-sm font-medium">Declaración de autorización</p>
+              <p className="text-sm text-muted-foreground">
+                Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares 
+                y confirmo la veracidad de la información proporcionada.
+              </p>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>Nota para administración (opcional)</Label>
+              <textarea
+                value={formData.nota}
+                onChange={(e) => setFormData((c) => ({ ...c, nota: e.target.value }))}
+                placeholder="Agrega una nota para revisión"
+                className="min-h-[9rem] w-full rounded-2xl border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
           </div>
 
-          {/* Declaración de autorización (texto estático) */}
-          <div className="space-y-2">
-            <p className="font-medium">Declaración de autorización</p>
-            <p className="text-sm">Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.</p>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t">
-            <Button variant="outline" onClick={resetForm} disabled={isSubmitting}>
-              Limpiar
-            </Button>
-            <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting}>
-              {isSubmitting ? "Enviando..." : "Enviar acta final"}
+          <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row">
+            <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6">Limpiar</Button>
+            <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="rounded-2xl sm:px-6">
+              {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar acta final" : "Enviar acta final"}
             </Button>
           </div>
         </CardContent>
