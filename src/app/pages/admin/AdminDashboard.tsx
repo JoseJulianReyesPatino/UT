@@ -14,6 +14,12 @@ import {
   Clock,
   Eye,
   CheckCircle2,
+  GraduationCap,
+  School,
+  BookOpenText,
+  Landmark,
+  Building2,
+  NotebookPen,
 } from "lucide-react";
 
 type AdminView = "dashboard" | "docentes" | "documentos" | "documentos-revisados" | "documentos-revisados-hoy";
@@ -175,6 +181,15 @@ const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocum
     .slice(0, 8)
     .map(({ sortAt, ...item }) => item);
 };
+
+const backgroundIcons = [
+  { icon: GraduationCap, className: "left-[6%] top-[18%] h-12 w-12 rotate-[-12deg]" },
+  { icon: School, className: "right-[8%] top-[10%] h-14 w-14 rotate-[10deg]" },
+  { icon: BookOpenText, className: "left-[18%] top-[58%] h-10 w-10 rotate-[8deg]" },
+  { icon: Landmark, className: "right-[22%] top-[52%] h-11 w-11 rotate-[-6deg]" },
+  { icon: Building2, className: "left-[48%] top-[12%] h-9 w-9 rotate-[14deg]" },
+  { icon: NotebookPen, className: "right-[5%] bottom-[10%] h-10 w-10 rotate-[-10deg]" },
+];
 
 export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
@@ -519,9 +534,21 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     : null;
 
   return (
-    <div className="relative space-y-6 overflow-hidden">
+    <div className="relative z-0 space-y-6 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -right-12 top-8 h-40 w-40 rounded-full bg-emerald-100/20 blur-3xl dark:bg-emerald-500/5" />
+        <div className="absolute -left-10 bottom-0 h-52 w-52 rounded-full bg-sky-100/10 blur-3xl dark:bg-sky-500/5" />
+        {backgroundIcons.map(({ icon: Icon, className }, index) => (
+          <span
+            key={`${Icon.displayName ?? "icon"}-${index}`}
+            className={`absolute text-emerald-300/15 dark:text-emerald-200/10 ${className}`}
+          >
+            <Icon className="h-full w-full" />
+          </span>
+        ))}
+      </div>
 
-      <div className="flex items-center justify-between">
+      <div className="relative z-10 flex items-center justify-between">
         <div>
           <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">
             Panel Administrativo

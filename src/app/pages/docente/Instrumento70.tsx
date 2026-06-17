@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+﻿import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
@@ -16,6 +16,7 @@ import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
 import { ScrollArea } from "../../components/ui/scroll-area";
+import { DocumentHistoryCard } from "../../components/DocumentHistoryCard";
 import { formatGroupCode } from "../../../lib/utils";
 
 interface InstrumentoFormData {
@@ -395,24 +396,18 @@ export default function Instrumento70Page() {
                 <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:bg-slate-900/30">
                   <div className="grid gap-3 p-1">
                     {history.map((h) => (
-                      <div key={h.id} className="rounded-lg border border-border bg-card p-4 shadow-sm dark:bg-slate-900">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <p className="text-sm font-semibold">{h.title ?? h.file_path}</p>
-                            <p className="break-all text-xs text-muted-foreground">PDF: {getUploadedFileName(h)}</p>
-                            <p className="text-xs text-muted-foreground">{h.materia ?? "Instrumento 70%"}</p>
-                          </div>
-                          <p className="text-xs text-muted-foreground">{new Date(h.submitted_at).toLocaleString()}</p>
-                        </div>
-                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex flex-wrap gap-2">
-                            <Button size="sm" variant="outline" onClick={() => openDocument(h.id, "view")}>Ver</Button>
-                            <Button size="sm" variant="secondary" onClick={() => populateFormForEdit(h)}>Editar documento</Button>
-                          </div>
-                          <span className="text-xs text-muted-foreground">Estatus: {h.status ?? "Pendiente"}</span>
-                        </div>
-                      </div>
-                    ))}
+  <DocumentHistoryCard
+    key={h.id}
+    title={h.title ?? h.file_path}
+    fileName={getUploadedFileName(h)}
+    subject={h.materia}
+    submittedAt={new Date(h.submitted_at).toLocaleString()}
+    status={h.status}
+    returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
+    onView={() => openDocument(h.id, "view")}
+    onEdit={() => populateFormForEdit(h)}
+  />
+))}
                   </div>
                 </ScrollArea>
               ) : formData.archivos.length === 0 ? (
@@ -628,3 +623,5 @@ export default function Instrumento70Page() {
     </div>
   );
 }
+
+

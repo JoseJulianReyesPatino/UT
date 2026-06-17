@@ -35,7 +35,70 @@ import { apiFetch } from "./lib/api";
 
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
-import { Menu, Sun, Moon } from "lucide-react";
+import {
+  Menu,
+  Sun,
+  Moon,
+  GraduationCap,
+  School,
+  BookOpenText,
+  Landmark,
+  Building2,
+  NotebookPen,
+  Backpack,
+  PencilLine,
+  ClipboardList,
+  HeartHandshake,
+  ScrollText,
+  CircleDollarSign,
+  Trophy,
+  Microscope,
+  Atom,
+  BriefcaseBusiness,
+  BadgeCheck,
+  Presentation,
+  Library,
+  Shapes,
+  Compass,
+  Badge,
+  Sparkles,
+  ClipboardCheck,
+  Users2,
+  Star,
+  FileBadge,
+  ShieldCheck,
+} from "lucide-react";
+
+const pageDecorIcons = [
+  { icon: GraduationCap, className: "left-[3%] top-[8%] h-14 w-14 rotate-[-11deg]" },
+  { icon: School, className: "right-[5%] top-[6%] h-16 w-16 rotate-[10deg]" },
+  { icon: BookOpenText, className: "left-[18%] top-[58%] h-11 w-11 rotate-[7deg]" },
+  { icon: Landmark, className: "right-[20%] top-[52%] h-12 w-12 rotate-[-6deg]" },
+  { icon: Building2, className: "left-[48%] top-[9%] h-10 w-10 rotate-[15deg]" },
+  { icon: NotebookPen, className: "right-[6%] bottom-[12%] h-11 w-11 rotate-[-10deg]" },
+  { icon: Backpack, className: "left-[2%] bottom-[8%] h-10 w-10 rotate-[6deg]" },
+  { icon: PencilLine, className: "right-[36%] top-[18%] h-9 w-9 rotate-[-8deg]" },
+  { icon: ClipboardList, className: "left-[62%] bottom-[15%] h-9 w-9 rotate-[7deg]" },
+  { icon: HeartHandshake, className: "left-[70%] top-[22%] h-10 w-10 rotate-[5deg]" },
+  { icon: ScrollText, className: "left-[30%] top-[4%] h-9 w-9 rotate-[11deg]" },
+  { icon: CircleDollarSign, className: "right-[42%] top-[63%] h-10 w-10 rotate-[-9deg]" },
+  { icon: Trophy, className: "left-[74%] bottom-[18%] h-10 w-10 rotate-[14deg]" },
+  { icon: Microscope, className: "left-[56%] top-[72%] h-9 w-9 rotate-[-7deg]" },
+  { icon: Atom, className: "right-[28%] top-[2%] h-8 w-8 rotate-[18deg]" },
+  { icon: BriefcaseBusiness, className: "left-[88%] top-[33%] h-9 w-9 rotate-[-5deg]" },
+  { icon: BadgeCheck, className: "left-[42%] bottom-[3%] h-9 w-9 rotate-[10deg]" },
+  { icon: Presentation, className: "left-[24%] bottom-[18%] h-10 w-10 rotate-[-11deg]" },
+  { icon: Library, className: "right-[12%] top-[35%] h-9 w-9 rotate-[8deg]" },
+  { icon: Shapes, className: "left-[80%] top-[68%] h-8 w-8 rotate-[-12deg]" },
+  { icon: Compass, className: "left-[12%] top-[32%] h-8 w-8 rotate-[14deg]" },
+  { icon: Badge, className: "right-[2%] top-[44%] h-8 w-8 rotate-[6deg]" },
+  { icon: Sparkles, className: "left-[66%] top-[3%] h-7 w-7 rotate-[-14deg]" },
+  { icon: ClipboardCheck, className: "left-[7%] top-[74%] h-9 w-9 rotate-[9deg]" },
+  { icon: Users2, className: "right-[48%] bottom-[6%] h-9 w-9 rotate-[12deg]" },
+  { icon: Star, className: "left-[38%] top-[82%] h-7 w-7 rotate-[-10deg]" },
+  { icon: FileBadge, className: "right-[15%] top-[78%] h-9 w-9 rotate-[13deg]" },
+  { icon: ShieldCheck, className: "left-[84%] bottom-[5%] h-8 w-8 rotate-[-8deg]" },
+];
 
 function AppContent() {
   const { isAuthenticated, isReady, user, notice } = useAuth();
@@ -296,7 +359,19 @@ function AppContent() {
           mobileOpen={mobileSidebarOpen}
           onMobileOpenChange={setMobileSidebarOpen}
         />
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-emerald-50 via-background to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950">
+        <main className="relative flex-1 overflow-y-auto bg-gradient-to-br from-emerald-50 via-background to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="absolute -right-12 top-8 h-44 w-44 rounded-full bg-emerald-100/20 blur-3xl dark:bg-emerald-500/5" />
+            <div className="absolute -left-10 bottom-0 h-56 w-56 rounded-full bg-sky-100/10 blur-3xl dark:bg-sky-500/5" />
+            {pageDecorIcons.map(({ icon: Icon, className }, index) => (
+              <span
+                key={`${Icon.displayName ?? "icon"}-${index}`}
+                className={`absolute text-emerald-300/12 dark:text-emerald-200/8 ${className}`}
+              >
+                <Icon className="h-full w-full" />
+              </span>
+            ))}
+          </div>
           <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur md:hidden">
             <div className="flex items-center justify-between px-4 py-3">
               <Button

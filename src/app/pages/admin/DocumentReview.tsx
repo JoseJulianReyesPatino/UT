@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Textarea } from "../../components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { carrieras } from "../../data/curricula";
@@ -370,6 +371,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState<string | null>(null);
 	const [pendingAction, setPendingAction] = useState<{ type: "review" | "send" | "return"; document: DocumentItem } | null>(null);
+	const [returnComment, setReturnComment] = useState("");
 
 	const allDocuments = [...pendingDocuments, ...reviewedDocuments];
 	const todayKey = new Date().toISOString().slice(0, 10);
@@ -669,9 +671,13 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		}
 	};
 
-	const handleReturnDocument = async (documentId: number) => {
+	const handleReturnDocument = async (documentId: number, comment: string) => {
 		try {
-			await apiFetch(`/documents/${documentId}/return`, { method: "PATCH" });
+			await apiFetch(`/documents/${documentId}/return`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ notes: comment.trim() }),
+			});
 			setPendingDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt: new Date().toISOString(), resubmittedAt: undefined } : doc)));
 			setReviewedDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt: new Date().toISOString(), resubmittedAt: undefined } : doc)));
 			toast.success("Documento marcado como devuelto");
@@ -687,20 +693,29 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const confirmPendingAction = () => {
 		if (!pendingAction) return;
 		const { type, document } = pendingAction;
-		setPendingAction(null);
 
 		if (type === "review") {
+			setPendingAction(null);
 			void handleReviewDocument(document.id);
 			return;
 		}
 
 		if (type === "send") {
+			setPendingAction(null);
 			handleShareToMessages(document);
 			toast.success("Documento enviado a mensajes");
 			return;
 		}
 
-		void handleReturnDocument(document.id);
+		const trimmedComment = returnComment.trim();
+		if (!trimmedComment) {
+			toast.error("Agrega un comentario para devolver el documento");
+			return;
+		}
+
+		setPendingAction(null);
+		setReturnComment("");
+		void handleReturnDocument(document.id, trimmedComment);
 	};
 
 	const getStatusVariant = (doc: DocumentItem) => {
@@ -833,8 +848,12 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 
 					  <Badge variant={statusVariant}>{statusLabel}</Badge>
 
-					{isReviewed && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}><MessageSquare className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Enviar</TooltipContent></Tooltip>}
-					{doc.returned && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} aria-label="Cancelar devolución"><Undo2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Cancelar devolución</TooltipContent></Tooltip>}
+					<Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}><MessageSquare className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Enviar</TooltipContent></Tooltip>
+					{doc.returned ? (
+						<Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} aria-label="Cancelar devolución"><Undo2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Cancelar devolución</TooltipContent></Tooltip>
+					) : (
+						<Tooltip><TooltipTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} aria-label="Devolver documento"><Undo2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Devolver</TooltipContent></Tooltip>
+					)}
 				</div>
 			</div>
 		);
@@ -929,10 +948,20 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 				</DialogContent>
 			</Dialog>
 
-			<Dialog open={pendingAction !== null} onOpenChange={(open) => { if (!open) setPendingAction(null); }}>
+			<Dialog open={pendingAction !== null} onOpenChange={(open) => { if (!open) { setPendingAction(null); setReturnComment(""); } }}>
 				<DialogContent>
 					  <DialogHeader><DialogTitle>¿Estás seguro?</DialogTitle><DialogDescription>{pendingActionDescription}</DialogDescription></DialogHeader>
-					<DialogFooter><Button variant="outline" onClick={() => setPendingAction(null)}>Cancelar</Button><Button variant={pendingAction?.type === "return" ? "destructive" : "default"} onClick={confirmPendingAction} disabled={!pendingAction}>Confirmar</Button></DialogFooter>
+					{pendingAction?.type === "return" && (
+						<div className="space-y-2">
+							<p className="text-sm font-medium">Comentario para el docente</p>
+							<Textarea
+								value={returnComment}
+								onChange={(event) => setReturnComment(event.target.value)}
+								placeholder="Escribe la razón de devolución del documento"
+							/>
+						</div>
+					)}
+					<DialogFooter><Button variant="outline" onClick={() => { setPendingAction(null); setReturnComment(""); }}>Cancelar</Button><Button variant={pendingAction?.type === "return" ? "destructive" : "default"} onClick={confirmPendingAction} disabled={!pendingAction}>Confirmar</Button></DialogFooter>
 				</DialogContent>
 			</Dialog>
 		</div>

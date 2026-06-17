@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/too
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Textarea } from "../../components/ui/textarea";
 import apiFetch from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
 import ChargingImg from "../../../assets/Form_Not_Found.png";
@@ -104,6 +105,7 @@ export default function Estadias() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [reviewConfirmation, setReviewConfirmation] = useState<EstadiaPendingDocument | null>(null);
   const [returnConfirmation, setReturnConfirmation] = useState<{ type: "return" | "cancel-return"; document: EstadiaDocumentItem } | null>(null);
+  const [returnComment, setReturnComment] = useState("");
 
   const allDocuments = [...pendingDocuments, ...reviewedDocuments];
   const todayKey = new Date().toISOString().slice(0, 10);
@@ -380,9 +382,13 @@ export default function Estadias() {
     }
   };
 
-  const handleReturnDocument = async (documentId: number) => {
+  const handleReturnDocument = async (documentId: number, comment: string) => {
     try {
-      await apiFetch(`/documents/${documentId}/return`, { method: "PATCH" });
+      await apiFetch(`/documents/${documentId}/return`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: comment.trim() }),
+      });
       const returnedAt = new Date().toISOString();
       setPendingDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt, resubmittedAt: undefined } : doc)));
       setReviewedDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt, resubmittedAt: undefined } : doc)));
@@ -475,11 +481,17 @@ export default function Estadias() {
   const handleConfirmReturnAction = () => {
     if (!returnConfirmation) return;
     if (returnConfirmation.type === "return") {
-      void handleReturnDocument(returnConfirmation.document.id);
+      const trimmedComment = returnComment.trim();
+      if (!trimmedComment) {
+        toast.error("Agrega un comentario para devolver el documento");
+        return;
+      }
+      void handleReturnDocument(returnConfirmation.document.id, trimmedComment);
     } else {
       setDocumentReturnedState(returnConfirmation.document.id, false);
       toast.success("Devolución cancelada correctamente");
     }
+    setReturnComment("");
     setReturnConfirmation(null);
   };
 
@@ -636,6 +648,32 @@ export default function Estadias() {
                         </Tooltip>
 
                         {isReturned ? <Badge variant="destructive">Devuelto</Badge> : <Badge variant={isReviewed ? "success" : "warning"}>{isReviewed ? "Revisado" : "Pendiente"}</Badge>}
+
+                        {doc.returned ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                                onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
+                                aria-label="Cancelar devolución"
+                              >
+                                <Undo2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Cancelar devolución</TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="destructive" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }} aria-label="Devolver documento">
+                                <Undo2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Devolver</TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
                     </div>
                   );
@@ -1151,7 +1189,10 @@ export default function Estadias() {
       <Dialog
         open={returnConfirmation !== null}
         onOpenChange={(open) => {
-          if (!open) setReturnConfirmation(null);
+          if (!open) {
+            setReturnConfirmation(null);
+            setReturnComment("");
+          }
         }}
       >
         <DialogContent>
@@ -1171,8 +1212,19 @@ export default function Estadias() {
             </div>
           )}
 
+          {returnConfirmation?.type === "return" && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Comentario para el docente</p>
+              <Textarea
+                value={returnComment}
+                onChange={(event) => setReturnComment(event.target.value)}
+                placeholder="Escribe la razón de devolución del documento"
+              />
+            </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReturnConfirmation(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setReturnConfirmation(null); setReturnComment(""); }}>Cancelar</Button>
             <Button variant={returnConfirmation?.type === "return" ? "destructive" : "success"} onClick={handleConfirmReturnAction}>
               {returnConfirmation?.type === "return" ? "Sí, devolver" : "Sí, cancelar devolución"}
             </Button>

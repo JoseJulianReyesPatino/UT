@@ -8,6 +8,7 @@ import { FileText, Eye, MessageSquare, Check, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Textarea } from "../../components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob, getDocumentDisplayFileName } from "../../lib/documents";
@@ -138,6 +139,7 @@ export default function Tutores() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [returnConfirmation, setReturnConfirmation] = useState<ReturnConfirmation | null>(null);
+  const [returnComment, setReturnComment] = useState("");
   const [reviewConfirmation, setReviewConfirmation] = useState<TutorPendingDocument | null>(null);
   const [page, setPage] = useState<number>(1);
   const [perPage, setPerPage] = useState<number>(20);
@@ -318,13 +320,16 @@ export default function Tutores() {
     }
   };
 
-  const setDocumentReturnedState = async (documentId: number, returned: boolean) => {
+  const setDocumentReturnedState = async (documentId: number, returned: boolean, comment?: string) => {
     try {
       const targetStatus = returned ? 'devuelto' : 'revisado';
       const response = await apiFetch(`/documents/${documentId}/review`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: targetStatus, notes: returned ? 'Documento devuelto' : 'Devolución cancelada' }),
+        body: JSON.stringify({
+          status: targetStatus,
+          notes: returned ? (comment?.trim() || 'Documento devuelto') : 'Devolución cancelada',
+        }),
       });
 
       const updated = mapApiDocumentToTutorDocument(response.data);
@@ -341,7 +346,17 @@ export default function Tutores() {
     if (!returnConfirmation) return;
 
     const shouldReturn = returnConfirmation.type === 'return';
-    await setDocumentReturnedState(returnConfirmation.document.id, shouldReturn);
+    if (shouldReturn) {
+      const trimmedComment = returnComment.trim();
+      if (!trimmedComment) {
+        toast.error("Agrega un comentario para devolver el documento");
+        return;
+      }
+      await setDocumentReturnedState(returnConfirmation.document.id, true, trimmedComment);
+    } else {
+      await setDocumentReturnedState(returnConfirmation.document.id, false);
+    }
+    setReturnComment("");
     setReturnConfirmation(null);
   };
 
@@ -1112,6 +1127,7 @@ export default function Tutores() {
         onOpenChange={(open) => {
           if (!open) {
             setReturnConfirmation(null);
+            setReturnComment("");
           }
         }}
       >
@@ -1134,8 +1150,19 @@ export default function Tutores() {
             </div>
           )}
 
+          {returnConfirmation?.type === "return" && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Comentario para el tutor</p>
+              <Textarea
+                value={returnComment}
+                onChange={(event) => setReturnComment(event.target.value)}
+                placeholder="Escribe la razón de devolución del documento"
+              />
+            </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReturnConfirmation(null)}>
+            <Button variant="outline" onClick={() => { setReturnConfirmation(null); setReturnComment(""); }}>
               Cancelar
             </Button>
             <Button

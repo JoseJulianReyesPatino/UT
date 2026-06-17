@@ -415,7 +415,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const renderContent = (isMobile: boolean = false) => {
     const isCollapsedLocal = isMobile ? false : collapsed;
     const containerClass = cn(
-      "relative h-full overflow-hidden flex flex-col border-r border-border bg-card text-sidebar-foreground shadow-[0_12px_40px_rgba(15,23,42,0.08)] transition-all duration-300 dark:border-slate-800 dark:bg-slate-950",
+      "relative mx-3 my-3 flex h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[28px] border border-emerald-200/70 bg-card text-sidebar-foreground shadow-[0_18px_45px_rgba(15,23,42,0.12)] transition-all duration-300 dark:border-slate-700 dark:bg-slate-950",
       isCollapsedLocal ? "w-16" : "w-64"
     );
 
