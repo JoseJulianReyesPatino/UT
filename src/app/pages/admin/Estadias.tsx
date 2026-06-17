@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import apiFetch from "../../lib/api";
-import { getDocumentFileUrl } from "../../lib/documents";
+import { fetchDocumentBlob } from "../../lib/documents";
 import ChargingImg from "../../../assets/Form_Not_Found.png";
 import { formatGroupCode } from "../../../lib/utils";
 import { useAuth } from "../../context/AuthContext";
@@ -52,11 +52,13 @@ type EstadiaDocumentItem = EstadiaPendingDocument | EstadiaReviewedDocument;
 
 type ApiDocument = {
   id: number;
+  form_id?: number;
   nombre?: string;
   title?: string | null;
   tipo?: string | null;
   tipoLabel?: string | null;
   form_title?: string | null;
+  cycle_name?: string | null;
   apartado_label?: string | null;
   carrera_label?: string | null;
   uploaded_by_name?: string | null;
@@ -74,6 +76,14 @@ type ApiDocument = {
   fileUrl?: string | null;
 };
 
+const extractApiDocuments = (payload: unknown): ApiDocument[] => {
+  if (Array.isArray(payload)) return payload as ApiDocument[];
+  if (payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown }).data)) {
+    return (payload as { data: ApiDocument[] }).data;
+  }
+  return [];
+};
+
 export default function Estadias() {
   const { isReady, isAuthenticated } = useAuth();
   const [pendingDocuments, setPendingDocuments] = useState<EstadiaPendingDocument[]>([]);
@@ -89,6 +99,9 @@ export default function Estadias() {
   const [filterReturned, setFilterReturned] = useState("all");
   const [activeSection, setActiveSection] = useState<ReviewSection>("all");
   const [previewDocument, setPreviewDocument] = useState<EstadiaDocumentItem | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [reviewConfirmation, setReviewConfirmation] = useState<EstadiaPendingDocument | null>(null);
   const [returnConfirmation, setReturnConfirmation] = useState<{ type: "return" | "cancel-return"; document: EstadiaDocumentItem } | null>(null);
 
@@ -149,22 +162,42 @@ export default function Estadias() {
   };
 
   const isEstadiasDocument = (doc: ApiDocument) => {
-    const tipo = (doc.tipo ?? doc.tipoLabel ?? doc.form_title ?? "").toLowerCase();
-    const label = (doc.tipoLabel ?? doc.apartado_label ?? doc.form_title ?? "").toLowerCase();
-    return ["estadias", "carta-presentacion", "carta-aceptacion", "carta-terminacion", "acta-final"].some((value) => tipo.includes(value) || label.includes(value))
-      || /estad[ií]a|carta de/i.test(label);
+    const formId = Number(doc.form_id ?? 0);
+    if ([13, 14, 15, 16].includes(formId)) return true;
+
+    const normalize = (value?: string | null) =>
+      (value ?? "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[_\s]+/g, "-")
+        .replace(/-+/g, "-")
+        .trim();
+
+    const tipo = normalize(doc.tipo ?? doc.tipoLabel ?? doc.form_title);
+    const label = normalize(doc.apartado_label ?? doc.tipoLabel ?? doc.form_title);
+
+    const allowed = new Set([
+      "carta-presentacion",
+      "carta-aceptacion",
+      "carta-terminacion",
+      "estadias",
+      "acta-final-estadias",
+    ]);
+
+    return allowed.has(tipo) || allowed.has(label);
   };
 
   const mapApiDocument = (doc: ApiDocument, kind: "pending" | "reviewed"): EstadiaPendingDocument | EstadiaReviewedDocument => {
     const base = {
       id: Number(doc.id),
-      ciclo: "Ciclo Escolar 2026",
-      plan: doc.plan ?? "Plan Nuevo Modelo",
+      ciclo: doc.cycle_name?.trim() || "Sin ciclo",
+      plan: doc.plan?.trim() || "Plan Nuevo Modelo",
       cuatrimestre: doc.parcial ?? "-",
-      docente: doc.uploaded_by_name ?? "Docente",
+      docente: doc.uploaded_by_name?.trim() || "Docente",
       documento: doc.title ?? doc.nombre ?? "Documento sin título",
       apartado: doc.apartado_label ?? doc.tipoLabel ?? doc.form_title ?? "Documento",
-      carrera: doc.carrera_label ?? "Sin carrera",
+      carrera: doc.carrera_label?.trim() || "Sin carrera",
       grupo: formatGroupCode(doc.group?.group_code ?? doc.group_code ?? "-"),
       fecha: doc.submitted_at ?? "",
       returned: doc.status === "devuelto",
@@ -253,18 +286,18 @@ export default function Estadias() {
 
       try {
         const [pendingResponse, reviewedResponse, returnedResponse] = await Promise.all([
-          apiFetch("/documents", { query: { status: "pendiente" } }),
-          apiFetch("/documents", { query: { status: "revisado" } }),
-          apiFetch("/documents", { query: { status: "devuelto" } }),
+          apiFetch("/documents", { query: { status: "pendiente", include_all_cycles: "1", per_page: "500" } }),
+          apiFetch("/documents", { query: { status: "revisado", include_all_cycles: "1", per_page: "500" } }),
+          apiFetch("/documents", { query: { status: "devuelto", include_all_cycles: "1", per_page: "500" } }),
         ]);
 
-        const pendingItems = ((pendingResponse?.data?.data ?? []) as ApiDocument[])
+        const pendingItems = extractApiDocuments(pendingResponse)
           .filter(isEstadiasDocument)
           .map((doc) => mapApiDocument(doc, "pending"));
 
         const reviewedItems = [
-          ...((reviewedResponse?.data?.data ?? []) as ApiDocument[]).filter(isEstadiasDocument).map((doc) => mapApiDocument(doc, "reviewed")),
-          ...((returnedResponse?.data?.data ?? []) as ApiDocument[]).filter(isEstadiasDocument).map((doc) => mapApiDocument(doc, "reviewed")),
+          ...extractApiDocuments(reviewedResponse).filter(isEstadiasDocument).map((doc) => mapApiDocument(doc, "reviewed")),
+          ...extractApiDocuments(returnedResponse).filter(isEstadiasDocument).map((doc) => mapApiDocument(doc, "reviewed")),
         ];
 
         if (!isMounted) return;
@@ -296,9 +329,11 @@ export default function Estadias() {
     }, {});
   }, [filteredReviewed]);
 
-  const ciclosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.ciclo)));
-  const planesDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.plan)));
-  const carrerasDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.carrera)));
+  const nonEmptyOptions = (values: string[]) => Array.from(new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)));
+
+  const ciclosDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.ciclo));
+  const planesDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.plan));
+  const carrerasDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.carrera));
   const cuatrimestresDisponibles = useMemo(() => {
     if (filterPlan === "Plan Normal") {
       return ["6", "11"];
@@ -308,8 +343,9 @@ export default function Estadias() {
     }
     return ["6", "10", "11"];
   }, [filterPlan]);
-  const docentesDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.docente)));
-  const apartadosDisponibles = ["Carta de Presentación", "Carta de Aceptación", "Carta de Terminación", "Acta Final"];
+  const docentesDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.docente));
+  const apartadosDisponibles = nonEmptyOptions(["Carta de Presentación", "Carta de Aceptación", "Carta de Terminación", "Acta Final"]);
+  const renderSelectItems = (values: string[]) => nonEmptyOptions(values).map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>);
 
   React.useEffect(() => {
     if (filterCuatrimestre !== "all" && !cuatrimestresDisponibles.includes(filterCuatrimestre)) {
@@ -387,7 +423,54 @@ export default function Estadias() {
     );
   };
 
-  const closePreview = () => setPreviewDocument(null);
+  const closePreview = () => {
+    if (previewBlobUrl) {
+      URL.revokeObjectURL(previewBlobUrl);
+    }
+    setPreviewBlobUrl(null);
+    setPreviewError(null);
+    setPreviewLoading(false);
+    setPreviewDocument(null);
+  };
+
+  useEffect(() => {
+    if (!previewDocument) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadPreview = async () => {
+      setPreviewLoading(true);
+      setPreviewError(null);
+
+      if (previewBlobUrl) {
+        URL.revokeObjectURL(previewBlobUrl);
+        setPreviewBlobUrl(null);
+      }
+
+      try {
+        const blob = await fetchDocumentBlob(previewDocument.id);
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        setPreviewBlobUrl(url);
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "No se pudo cargar la vista previa del PDF";
+        setPreviewError(message);
+      } finally {
+        if (!cancelled) {
+          setPreviewLoading(false);
+        }
+      }
+    };
+
+    void loadPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewDocument]);
 
   const handleConfirmReturnAction = () => {
     if (!returnConfirmation) return;
@@ -443,42 +526,42 @@ export default function Estadias() {
                     <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
+                    {renderSelectItems(ciclosDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
-                    {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                    {renderSelectItems(planesDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
-                    {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
+                    {renderSelectItems(carrerasDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los cuatrimestres</SelectItem>
-                    {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                    {renderSelectItems(cuatrimestresDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Docente" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los docentes</SelectItem>
-                    {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                    {renderSelectItems(docentesDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
+                    {renderSelectItems(apartadosDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterReturned} onValueChange={setFilterReturned}>
@@ -570,42 +653,42 @@ export default function Estadias() {
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
+                    {renderSelectItems(ciclosDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
-                    {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                    {renderSelectItems(planesDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
-                    {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
+                    {renderSelectItems(carrerasDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los cuatrimestres</SelectItem>
-                    {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                    {renderSelectItems(cuatrimestresDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por docente" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los docentes</SelectItem>
-                    {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                    {renderSelectItems(docentesDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
+                    {renderSelectItems(apartadosDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterReturned} onValueChange={setFilterReturned}>
@@ -717,42 +800,42 @@ export default function Estadias() {
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
+                    {renderSelectItems(ciclosDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
-                    {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                    {renderSelectItems(planesDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
-                    {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
+                    {renderSelectItems(carrerasDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los cuatrimestres</SelectItem>
-                    {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                    {renderSelectItems(cuatrimestresDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por docente" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los docentes</SelectItem>
-                    {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                    {renderSelectItems(docentesDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
+                    {renderSelectItems(apartadosDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterReturned} onValueChange={setFilterReturned}>
@@ -879,42 +962,42 @@ export default function Estadias() {
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
+                    {renderSelectItems(ciclosDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los planes</SelectItem>
-                    {planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                    {renderSelectItems(planesDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCarrera} onValueChange={setFilterCarrera}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las carreras</SelectItem>
-                    {carrerasDisponibles.map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
+                    {renderSelectItems(carrerasDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los cuatrimestres</SelectItem>
-                    {cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                    {renderSelectItems(cuatrimestresDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDocente} onValueChange={setFilterDocente}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por docente" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los docentes</SelectItem>
-                    {docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                    {renderSelectItems(docentesDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
+                    {renderSelectItems(apartadosDisponibles)}
                   </SelectContent>
                 </Select>
                 <Select value={filterReturned} onValueChange={setFilterReturned}>
@@ -999,7 +1082,7 @@ export default function Estadias() {
         <DialogContent className="max-w-[95vw] w-[95vw] max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Vista previa del documento</DialogTitle>
-            <DialogDescription>Simulación de lectura del archivo PDF del documento seleccionado.</DialogDescription>
+            <DialogDescription>Vista real del archivo PDF almacenado para el documento seleccionado.</DialogDescription>
           </DialogHeader>
           {previewDocument && (
             <div className="space-y-4">
@@ -1009,14 +1092,25 @@ export default function Estadias() {
                 <Badge variant="outline">{previewDocument.apartado}</Badge>
               </div>
               <div className="rounded-lg border border-border bg-muted/30 p-4 md:p-6">
-                <iframe
-                  src={getDocumentFileUrl(previewDocument.id)}
-                  className="h-[70vh] w-full rounded-lg border border-border bg-background"
-                  title={previewDocument.documento}
-                />
-                <div className="mt-4 rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  Vista previa directa del PDF desde la API de archivos.
-                </div>
+                {previewLoading ? (
+                  <div className="flex h-[70vh] items-center justify-center text-sm text-muted-foreground">
+                    Cargando PDF...
+                  </div>
+                ) : previewError ? (
+                  <div className="flex h-[70vh] items-center justify-center text-sm text-destructive">
+                    {previewError}
+                  </div>
+                ) : previewBlobUrl ? (
+                  <iframe
+                    src={previewBlobUrl}
+                    className="h-[70vh] w-full rounded-lg border border-border bg-background"
+                    title={previewDocument.documento}
+                  />
+                ) : (
+                  <div className="flex h-[70vh] items-center justify-center text-sm text-muted-foreground">
+                    No hay vista previa disponible para este PDF.
+                  </div>
+                )}
               </div>
             </div>
           )}

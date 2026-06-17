@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { Textarea } from "../../components/ui/textarea";
 import { PdfPreview } from "../../components/PdfPreview";
-import { carrieras, cuatrimestresLabels, parciales, planNuevoModelo, type Cuatrimestre } from "../../data/curricula";
+import { carrieras, cuatrimestresLabels, parciales, planNormal, type Cuatrimestre } from "../../data/curricula";
 import { Upload, FileText, History, X } from "lucide-react";
 import { toast } from "sonner";
 import { getCalendarFileUrl } from "../../lib/calendar";
@@ -40,7 +40,7 @@ const initialFormData: InstrumentoFormData = {
   nota: "",
 };
 
-export default function Instrumento60Page() {
+export default function Instrumento70Page() {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
@@ -60,9 +60,7 @@ export default function Instrumento60Page() {
   }, [user]);
 
   const carrerasDisponibles = useMemo(() => {
-    const tsu = carrieras["nuevo-modelo"].tsu.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
-    const ing = carrieras["nuevo-modelo"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
-    return [...tsu, ...ing];
+    return carrieras["plan-normal"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
   }, []);
 
   useEffect(() => {
@@ -100,7 +98,7 @@ export default function Instrumento60Page() {
     void (async () => {
       try {
         if (!user) return;
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 4, per_page: 50 } });
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 5, per_page: 50 } });
         if (cancelled) return;
         setHistory(Array.isArray(res?.data) ? res.data : []);
       } catch (error) {
@@ -115,14 +113,14 @@ export default function Instrumento60Page() {
 
   const cuatrimestresDisponibles = useMemo(() => {
     if (!formData.carrera) return [];
-    const carrera = planNuevoModelo[formData.carrera];
+    const carrera = planNormal[formData.carrera];
     if (!carrera) return [];
     return Object.keys(carrera.cuatrimestres);
   }, [formData.carrera]);
 
   const materiasDisponibles = useMemo(() => {
     if (!formData.carrera || !formData.cuatrimestre) return [];
-    const carrera = planNuevoModelo[formData.carrera];
+    const carrera = planNormal[formData.carrera];
     if (!carrera) return [];
     return carrera.cuatrimestres[formData.cuatrimestre] || [];
   }, [formData.carrera, formData.cuatrimestre]);
@@ -201,7 +199,7 @@ export default function Instrumento60Page() {
 
   const findCareerCodeByLabel = (label: string) => {
     if (!label) return "";
-    const candidates = [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria];
+    const candidates = carrieras["plan-normal"].ingenieria;
     const searchLabel = label.toLowerCase();
     let found = candidates.find((c) => c.nombre.toLowerCase() === searchLabel);
     if (!found) {
@@ -293,7 +291,7 @@ export default function Instrumento60Page() {
         form_id: basePayload.form_id,
         apartado_label: basePayload.apartado_label,
         carrera_label: basePayload.carrera_label,
-        plan: "nuevo-modelo",
+        plan: "plan-normal",
         materia: basePayload.materia,
         parcial: basePayload.parcial,
         docente: basePayload.docente,
@@ -304,7 +302,7 @@ export default function Instrumento60Page() {
         file_name: file.name,
         file_type: file.type,
         file_size: file.size,
-        title: `${basePayload.materia || "Instrumento 60%"} - ${basePayload.parcial || ""} - ${cleanFileName}`.trim(),
+        title: `${basePayload.materia || "Instrumento 70%"} - ${basePayload.parcial || ""} - ${cleanFileName}`.trim(),
       };
       
       if (basePayload.original_document_id) {
@@ -335,10 +333,10 @@ export default function Instrumento60Page() {
       }
       
       const basePayload: any = {
-        form_id: 4,
-        apartado_label: "instrumento-60-nuevo",
+        form_id: 5,
+        apartado_label: "instrumento-70-normal",
         carrera_label: carreraLabel,
-        plan: "nuevo-modelo",
+        plan: "plan-normal",
         materia: formData.materia,
         parcial: formData.parcial,
         docente: formData.docente,
@@ -354,7 +352,7 @@ export default function Instrumento60Page() {
 
       await uploadMultipleFiles(formData.archivos, basePayload);
 
-      toast.success(editingDocumentId ? "Instrumento 60% actualizado correctamente" : "Instrumento 60% enviado correctamente", {
+      toast.success(editingDocumentId ? "Instrumento 70% actualizado correctamente" : "Instrumento 70% enviado correctamente", {
         description: editingDocumentId ? "Tus documentos han sido actualizados." : "Tus documentos fueron enviados para revisión administrativa.",
       });
 
@@ -362,7 +360,7 @@ export default function Instrumento60Page() {
       resetForm();
 
       if (user) {
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 4, per_page: 50 } });
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 5, per_page: 50 } });
         setHistory(Array.isArray(res?.data) ? res.data : []);
       }
     } catch (error: any) {
@@ -376,8 +374,8 @@ export default function Instrumento60Page() {
     <div className="max-w-4xl mx-auto space-y-6" ref={formRef}>
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold">Instrumento 60%</h1>
-          <p className="text-muted-foreground">Captura y envía el instrumento de evaluación 60% del Plan Nuevo Modelo.</p>
+          <h1 className="text-3xl font-bold">Instrumento 70%</h1>
+          <p className="text-muted-foreground">Captura y envía el instrumento de evaluación 70% del Plan Normal.</p>
         </div>
 
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -402,7 +400,7 @@ export default function Instrumento60Page() {
                           <div>
                             <p className="text-sm font-semibold">{h.title ?? h.file_path}</p>
                             <p className="break-all text-xs text-muted-foreground">PDF: {getUploadedFileName(h)}</p>
-                            <p className="text-xs text-muted-foreground">{h.materia ?? "Instrumento 60%"}</p>
+                            <p className="text-xs text-muted-foreground">{h.materia ?? "Instrumento 70%"}</p>
                           </div>
                           <p className="text-xs text-muted-foreground">{new Date(h.submitted_at).toLocaleString()}</p>
                         </div>
@@ -441,7 +439,7 @@ export default function Instrumento60Page() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Formulario Instrumento 60%</CardTitle>
+          <CardTitle>Formulario Instrumento 70%</CardTitle>
           <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
           {editingDocumentId && (
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
@@ -454,7 +452,7 @@ export default function Instrumento60Page() {
             <div className="space-y-2 md:col-span-2">
               <Label className="text-sm font-medium">Plan *</Label>
               <div className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                Plan Nuevo Modelo
+                Plan Normal
               </div>
             </div>
 
@@ -564,11 +562,11 @@ export default function Instrumento60Page() {
                   accept=".pdf" 
                   multiple 
                   className="hidden" 
-                  id="instrumento-60-upload" 
+                  id="instrumento-70-upload" 
                   onChange={handleFileChange} 
                   disabled={formData.archivos.length >= 3} 
                 />
-                <label htmlFor="instrumento-60-upload" className="block cursor-pointer space-y-3">
+                <label htmlFor="instrumento-70-upload" className="block cursor-pointer space-y-3">
                   <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <Upload className="h-6 w-6" />
                   </div>

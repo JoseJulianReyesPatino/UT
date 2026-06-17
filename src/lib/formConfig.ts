@@ -11,8 +11,6 @@ export type FormRole = "docente" | "tutor";
 
 export type FormId =
   | "planeacion"
-  | "instrumento-3040"
-  | "instrumento-6070"
   | "instrumento-30-normal"
   | "instrumento-40-nuevo"
   | "instrumento-60-nuevo"
@@ -51,8 +49,6 @@ const FORM_CONFIG_KEY = "app:formConfig:v1";
 
 const DEFAULT_FORM_ACCESS: FormAccessConfig = {
   planeacion: { roles: ["docente"], dueAt: null },
-  "instrumento-3040": { roles: ["docente"], dueAt: null },
-  "instrumento-6070": { roles: ["docente"], dueAt: null },
   "instrumento-30-normal": { roles: ["docente"], dueAt: null },
   "instrumento-40-nuevo": { roles: ["docente"], dueAt: null },
   "instrumento-60-nuevo": { roles: ["docente"], dueAt: null },
@@ -82,8 +78,6 @@ const DEFAULT_FORM_CONFIG: FormConfig = {
 
 const cloneDefaultFormAccess = (): FormAccessConfig => ({
   planeacion: { ...DEFAULT_FORM_ACCESS["planeacion"] },
-  "instrumento-3040": { ...DEFAULT_FORM_ACCESS["instrumento-3040"] },
-  "instrumento-6070": { ...DEFAULT_FORM_ACCESS["instrumento-6070"] },
   "instrumento-30-normal": { ...DEFAULT_FORM_ACCESS["instrumento-30-normal"] },
   "instrumento-40-nuevo": { ...DEFAULT_FORM_ACCESS["instrumento-40-nuevo"] },
   "instrumento-60-nuevo": { ...DEFAULT_FORM_ACCESS["instrumento-60-nuevo"] },

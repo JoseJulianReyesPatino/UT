@@ -96,7 +96,6 @@ type SidebarInstrumentSectionProps = {
   onCloseCollapse: () => void;
   onToggle3040: () => void;
   onToggle6070: () => void;
-  
 };
 
 function SidebarInstrumentSection({
@@ -115,7 +114,6 @@ function SidebarInstrumentSection({
   onCloseCollapse,
   onToggle3040,
   onToggle6070,
- 
 }: Readonly<SidebarInstrumentSectionProps>) {
   if (isCollapsedLocal || !canAccessTutorias) {
     return null;
@@ -127,7 +125,6 @@ function SidebarInstrumentSection({
       onMobileOpenChange?.(false);
       return;
     }
-
     onCloseCollapse();
   };
 
@@ -146,12 +143,10 @@ function SidebarInstrumentSection({
         <BarChart3 className={cn("h-5 w-5 shrink-0", isInstrumento3040Active ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
         <span className="flex-1 whitespace-nowrap text-sm font-medium leading-none">Instrumento 30/40%</span>
         {instrumento3040Open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        
       </button>
 
       {instrumento3040Open && (
         <div className="ml-5 space-y-1 border-l border-emerald-200/70 pl-4 dark:border-slate-700">
-          
           {instrumento3040Children.map((child) => {
             const isChildActive = currentView === child.id;
             return (
@@ -197,12 +192,10 @@ function SidebarInstrumentSection({
         <BarChart3 className={cn("h-5 w-5 shrink-0", isInstrumento6070Active ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
         <span className="flex-1 whitespace-nowrap text-sm font-medium leading-none">Instrumento 60/70%</span>
         {instrumento6070Open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        
       </button>
 
       {instrumento6070Open && (
         <div className="ml-5 space-y-1 border-l border-emerald-200/70 pl-4 dark:border-slate-700">
-          
           {instrumento6070Children.map((child) => {
             const isChildActive = currentView === child.id;
             return (
@@ -246,11 +239,32 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const logoSrc = theme === "dark" ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
-  const [instrumento3040Open, setInstrumento3040Open] = useState(true);
-  const [instrumento6070Open, setInstrumento6070Open] = useState(true);
+  const [instrumento3040Open, setInstrumento3040Open] = useState(false);
+  const [instrumento6070Open, setInstrumento6070Open] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const sidebarResolvedAvatar = useResolvedAvatarUrl(user?.avatar && user.avatar !== "/api/default-avatar" ? user.avatar : undefined);
   const sidebarAvatarUrl = sidebarResolvedAvatar || defaultProfileAvatar;
+
+  // IDs de los hijos de instrumentos para saber si estamos en ellos
+  const instrumento3040Children = useMemo(
+    () => [
+      { id: "instrumento-30-normal", label: "Instrumento 30%", description: "Plan Normal" },
+      { id: "instrumento-40-nuevo", label: "Instrumento 40%", description: "Plan Nuevo Modelo" },
+    ],
+    [],
+  );
+
+  const instrumento6070Children = useMemo(
+    () => [
+      { id: "instrumento-60-nuevo", label: "Instrumento 60%", description: "Plan Nuevo Modelo" },
+      { id: "instrumento-70-normal", label: "Instrumento 70%", description: "Plan Normal" },
+    ],
+    [],
+  );
+
+  // Extraer los IDs en arrays para facilitar la comprobación
+  const instrumento3040Ids = useMemo(() => instrumento3040Children.map(item => item.id), [instrumento3040Children]);
+  const instrumento6070Ids = useMemo(() => instrumento6070Children.map(item => item.id), [instrumento6070Children]);
 
   useEffect(() => {
     let isMounted = true;
@@ -286,55 +300,59 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     };
   }, [user]);
 
-  const instrumento3040Children = useMemo(
-    () => [
-      { id: "instrumento-30-normal", label: "Instrumento 30%", description: "Plan Normal" },
-      { id: "instrumento-40-nuevo", label: "Instrumento 40%", description: "Plan Nuevo Modelo" },
-    ],
-    [],
-  );
-
-  const instrumento6070Children = useMemo(
-    () => [
-      { id: "instrumento-60-nuevo", label: "Instrumento 60%", description: "Plan Nuevo Modelo" },
-      { id: "instrumento-70-normal", label: "Instrumento 70%", description: "Plan Normal" },
-    ],
-    [],
-  );
-
+  // Solo abrir automáticamente si estamos en una vista hija de esos menús
   useEffect(() => {
-    if (instrumento3040Children.some((item) => item.id === currentView)) {
+    const isIn3040 = instrumento3040Children.some((item) => item.id === currentView);
+    const isIn6070 = instrumento6070Children.some((item) => item.id === currentView);
+
+    if (isIn3040) {
       setInstrumento3040Open(true);
+    } else {
+      setInstrumento3040Open(false);
     }
-    if (instrumento6070Children.some((item) => item.id === currentView)) {
+
+    if (isIn6070) {
       setInstrumento6070Open(true);
+    } else {
+      setInstrumento6070Open(false);
     }
   }, [currentView, instrumento3040Children, instrumento6070Children]);
 
   const handleMenuItemClick = React.useCallback((itemId: string, isMobile = false) => {
     onNavigate(itemId);
-    setInstrumento3040Open(false);
-    setInstrumento6070Open(false);
+    
+    // Si la vista a la que navegamos NO es un instrumento, cerramos los menús
+    const isInstrumento = instrumento3040Ids.includes(itemId) || instrumento6070Ids.includes(itemId);
+    if (!isInstrumento) {
+      setInstrumento3040Open(false);
+      setInstrumento6070Open(false);
+    }
+
     if (isMobile) {
       onMobileOpenChange?.(false);
       return;
     }
-
     setCollapsed(false);
-  }, [onMobileOpenChange, onNavigate]);
+  }, [onMobileOpenChange, onNavigate, instrumento3040Ids, instrumento6070Ids]);
 
   const handleInstrumento3040Click = React.useCallback(() => {
     const nextOpen = !instrumento3040Open;
     setInstrumento3040Open(nextOpen);
+    if (!nextOpen) {
+      return;
+    }
     setInstrumento6070Open(false);
-    onNavigate("instrumento-3040");
+    onNavigate("instrumento-30-normal");
   }, [instrumento3040Open, onNavigate]);
 
   const handleInstrumento6070Click = React.useCallback(() => {
     const nextOpen = !instrumento6070Open;
     setInstrumento6070Open(nextOpen);
+    if (!nextOpen) {
+      return;
+    }
     setInstrumento3040Open(false);
-    onNavigate("instrumento-6070");
+    onNavigate("instrumento-60-nuevo");
   }, [instrumento6070Open, onNavigate]);
 
   const docenteMenuItems = [
@@ -343,7 +361,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     { id: "remedial", label: "Remedial", icon: FileText },
     { id: "lista-concentrada", label: "Lista Concentrada", icon: FileStack },
     { id: "asesoria", label: "Asesoría", icon: Users },
-    { id: "portafolio", label: "Portafolio Digital", icon: FolderOpen },
+    { id: "portafolio", label: "Portafolio Digital Final", icon: FolderOpen },
     { id: "acta-final", label: "Acta Final", icon: FileText },
     { id: "estadias", label: "Estadías", icon: Briefcase },
     { id: "tutorias", label: "Tutorías", icon: CalendarDays },
@@ -374,8 +392,8 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     menuItems = docenteMenuItems.filter((item) => item.id !== "tutorias");
   }
 
-  const isInstrumento3040Active = currentView === "instrumento-3040" || instrumento3040Children.some((item) => item.id === currentView);
-  const isInstrumento6070Active = currentView === "instrumento-6070" || instrumento6070Children.some((item) => item.id === currentView);
+  const isInstrumento3040Active = instrumento3040Children.some((item) => item.id === currentView);
+  const isInstrumento6070Active = instrumento6070Children.some((item) => item.id === currentView);
 
   const isMenuItemActive = (itemId: string) => {
     if (itemId === "documentos") {

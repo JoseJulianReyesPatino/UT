@@ -13,7 +13,7 @@ import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuat
 import { getCalendarFileUrl } from "../../lib/calendar";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
-import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { fetchDocumentBlob, getDocumentDisplayFileName } from "../../lib/documents";
 import { formatGroupCode } from "../../../lib/utils";
 
 const calendarioPdf = getCalendarFileUrl();
@@ -249,26 +249,13 @@ export default function ActaFinalPage() {
     formRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const documentFileUrl = (id: number) => `${API_BASE_URL.replace(/\/+$/, "")}/documents/${id}/file`;
-
   const getUploadedFileName = (doc: any) => {
-    const path = String(doc?.file_path ?? "");
-    if (!path) return "Documento sin nombre";
-    const base = path.split("/").pop() ?? path;
-    return base.replace(/^doc_[^_]+_/, "");
+    return getDocumentDisplayFileName(doc?.title, doc?.file_path);
   };
 
   const openDocument = async (id: number, action: "view" | "download") => {
     try {
-      const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      headers["ngrok-skip-browser-warning"] = "true";
-      headers["Accept"] = "application/pdf";
-
-      const res = await fetch(documentFileUrl(id), { method: "GET", headers });
-      if (!res.ok) throw new Error(res.statusText || "Error al abrir documento");
-      const blob = await res.blob();
+      const blob = await fetchDocumentBlob(id, action === "download");
       const blobUrl = URL.createObjectURL(blob);
 
       if (action === "view") {
@@ -463,7 +450,7 @@ export default function ActaFinalPage() {
           <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
           {editingDocumentId && (
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-              Estás editando el acta final existente #{editingDocumentId}. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+              Estás editando el acta final existente. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
             </div>
           )}
         </CardHeader>
@@ -542,7 +529,7 @@ export default function ActaFinalPage() {
                 </Select>
               ) : (
                 <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-300">
-                  ⚠️ No hay grupos disponibles para esta carrera y cuatrimestre. Contacta al administrador.
+                  No hay grupos disponibles.
                 </div>
               )}
             </div>

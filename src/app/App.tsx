@@ -15,10 +15,10 @@ import EstadiasAdmin from "./pages/admin/Estadias";
 import CalendarioAdmin from "./pages/admin/Calendario";
 import { Profile } from "./pages/docente/Profile";
 import PlaneacionPage from "./pages/docente/Planeacion";
-import Instrumento3040Page from "./pages/docente/Instrumento3040";
+import Instrumento30Page from "./pages/docente/Instrumento30";
 import Instrumento40Page from "./pages/docente/Instrumento40";
-import Instrumento6070Page from "./pages/docente/Instrumento6070";
 import Instrumento60Page from "./pages/docente/Instrumento60";
+import Instrumento70Page from "./pages/docente/Instrumento70";
 import RemedialPage from "./pages/docente/Remedial";
 import Charging2 from "../assets/CHARGING_2.png";
 import ListaConcentradaPage from "./pages/docente/ListaConcentrada";
@@ -209,13 +209,13 @@ function AppContent() {
         case "planeacion":
           return wrapForm("planeacion", "Planeación", <PlaneacionPage />);
         case "instrumento-30-normal":
-          return wrapForm("instrumento-30-normal", "Instrumento 30%", <Instrumento3040Page />);
+          return wrapForm("instrumento-30-normal", "Instrumento 30%", <Instrumento30Page />);
         case "instrumento-40-nuevo":
           return wrapForm("instrumento-40-nuevo", "Instrumento 40%", <Instrumento40Page />);
         case "instrumento-60-nuevo":
           return wrapForm("instrumento-60-nuevo", "Instrumento 60%", <Instrumento60Page />);
         case "instrumento-70-normal":
-          return wrapForm("instrumento-70-normal", "Instrumento 70%", <Instrumento6070Page />);
+          return wrapForm("instrumento-70-normal", "Instrumento 70%", <Instrumento70Page />);
         case "remedial":
           return wrapForm("remedial", "Remedial", <RemedialPage />);
         case "lista-concentrada":
@@ -255,8 +255,8 @@ function AppContent() {
           return <AdminDashboard onNavigate={setCurrentView} />;
         case "docentes":
           return <DocenteManagement />;
-          case "tutores":
-            return <Tutores />;
+        case "tutores":
+          return <Tutores />;
         case "mensajes":
           return <Messages />;
         case "documentos":
@@ -353,4 +353,3 @@ export default function App() {
     </ThemeProvider>
   );
 }
-

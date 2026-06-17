@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
-import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { fetchDocumentBlob, getDocumentDisplayFileName } from "../../lib/documents";
 
 type DocumentoTutorias =
   | "carga-academica"
@@ -216,26 +216,13 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
     return `${espacios} espacio${plural} disponible${plural}`;
   };
 
-  const documentFileUrl = (id: number) => `${API_BASE_URL.replace(/\/+$/, "")}/documents/${id}/file`;
-
   const getUploadedFileName = (doc: any) => {
-    const path = String(doc?.file_path ?? "");
-    if (!path) return "Documento sin nombre";
-    const base = path.split("/").pop() ?? path;
-    return base.replace(/^doc_[^_]+_/, "");
+    return getDocumentDisplayFileName(doc?.title, doc?.file_path);
   };
 
   const openDocument = async (id: number, action: "view" | "download") => {
     try {
-      const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      headers["ngrok-skip-browser-warning"] = "true";
-      headers["Accept"] = "application/pdf";
-
-      const res = await fetch(documentFileUrl(id), { method: "GET", headers });
-      if (!res.ok) throw new Error(res.statusText || "Error al abrir documento");
-      const blob = await res.blob();
+      const blob = await fetchDocumentBlob(id, action === "download");
       const blobUrl = URL.createObjectURL(blob);
 
       if (action === "view") {
@@ -310,6 +297,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
       const basePayload: any = {
         form_id: selectedConfig.formId,
         apartado_label: selectedConfig.apartadoLabel,
+        title: selectedConfig.titulo,
       };
 
       if (formData.docente) basePayload.docente = formData.docente;
@@ -442,7 +430,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
                 <CardDescription>{selectedConfig.descripcion}</CardDescription>
                 {editingDocumentId && (
                   <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-                    Estás editando el documento #{editingDocumentId}. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+                    Estás editando el documento. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
                   </div>
                 )}
               </div>

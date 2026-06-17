@@ -13,7 +13,7 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { carrieras, Plan } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
-import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { fetchDocumentBlob, getDocumentDisplayFileName } from "../../lib/documents";
 import { formatGroupCode } from "../../../lib/utils";
 
 type DocumentoEstadia = "carta-presentacion" | "carta-aceptacion" | "carta-terminacion" | "acta-final-estadias";
@@ -31,6 +31,7 @@ interface DocumentoConfig {
 interface EstadiaFormData {
   plan: Plan | "";
   carrera: string;
+  materia: string;
   grupo: string;
   archivos: File[];
   nota: string;
@@ -79,6 +80,7 @@ const documentTypes: DocumentoConfig[] = [
 const initialFormData: EstadiaFormData = { 
   plan: "", 
   carrera: "", 
+  materia: "",
   grupo: "", 
   archivos: [], 
   nota: "",
@@ -176,6 +178,7 @@ export default function EstadiasPage() {
     return Boolean(
       formData.plan &&
       formData.carrera &&
+      formData.materia.trim() &&
       grupoValido &&
       formData.archivos.length > 0 &&
       user &&
@@ -270,6 +273,7 @@ export default function EstadiasPage() {
     setFormData({
       plan: planKey as Plan,
       carrera: careerCode,
+      materia: document.materia ?? "",
       grupo: document.group_code ? formatGroupCode(document.group_code) : "",
       archivos: [],
       nota: document.note ?? document.nota ?? "",
@@ -278,26 +282,13 @@ export default function EstadiasPage() {
     setSheetOpen(false);
   };
 
-  const documentFileUrl = (id: number) => `${API_BASE_URL.replace(/\/+$/, "")}/documents/${id}/file`;
-
   const getUploadedFileName = (doc: any) => {
-    const path = String(doc?.file_path ?? "");
-    if (!path) return "Documento sin nombre";
-    const base = path.split("/").pop() ?? path;
-    return base.replace(/^doc_[^_]+_/, "");
+    return getDocumentDisplayFileName(doc?.title, doc?.file_path);
   };
 
   const openDocument = async (id: number, action: "view" | "download") => {
     try {
-      const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      headers["ngrok-skip-browser-warning"] = "true";
-      headers["Accept"] = "application/pdf";
-
-      const res = await fetch(documentFileUrl(id), { method: "GET", headers });
-      if (!res.ok) throw new Error(res.statusText || "Error al abrir documento");
-      const blob = await res.blob();
+      const blob = await fetchDocumentBlob(id, action === "download");
       const blobUrl = URL.createObjectURL(blob);
 
       if (action === "view") {
@@ -384,6 +375,7 @@ export default function EstadiasPage() {
         apartado_label: selectedConfig.apartadoLabel,
         carrera_label: carreraLabel,
         plan: formData.plan,
+        materia: formData.materia,
         docente: formData.docente,
         nota: formData.nota,
         titulo: selectedConfig.titulo,
@@ -525,7 +517,7 @@ export default function EstadiasPage() {
                 <CardDescription>{selectedConfig.descripcion}</CardDescription>
                 {editingDocumentId && (
                   <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-                    Estás editando el documento #{editingDocumentId}. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+                    Estás editando el documento. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
                   </div>
                 )}
               </div>
@@ -597,9 +589,19 @@ export default function EstadiasPage() {
                   </Select>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-300">
-                    ⚠️ No hay grupos disponibles para esta carrera. Contacta al administrador.
+                    No hay grupos disponibles.
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>Materia *</Label>
+                <Input
+                  value={formData.materia}
+                  onChange={(e) => setFormData((c) => ({ ...c, materia: e.target.value }))}
+                  placeholder="Nombre de la materia"
+                  className="rounded-2xl"
+                />
               </div>
 
               <div className="space-y-2 md:col-span-2">

@@ -91,6 +91,20 @@ type DocumentRecord = {
   pdfUrl?: string;
 };
 
+type EstadiasDocumentType = "carta-presentacion" | "carta-aceptacion" | "carta-terminacion" | "estadias";
+
+type EstadiasDocumentRecord = {
+  id: number;
+  ciclo: string;
+  documento: string;
+  docente: string;
+  carrera: string;
+  plan: string;
+  grupo: string;
+  tipo: EstadiasDocumentType;
+  pdfUrl?: string;
+};
+
 type TutorDocumentRecord = {
   id: number;
   ciclo: string;
@@ -109,6 +123,7 @@ type TutorDocumentType = TutorDocumentRecord["tipo"];
 
 type ApiDocument = {
   id: number;
+  form_id?: number;
   nombre?: string;
   title?: string;
   tipo?: string;
@@ -140,11 +155,39 @@ const tutorDocumentTitles: Record<TutorDocumentType, string> = {
   "ficha-tecnica": "Ficha técnica",
 };
 
-const getDocumentsModalTitle = (selectedDocumentType: "docentes" | "tutores" | null, selectedDocumentCategory: DocumentRecord["tipo"] | null, selectedTutorCategory: TutorDocumentType | null) => {
+const estadiasDocumentTitles: Record<EstadiasDocumentType, string> = {
+  "carta-presentacion": "Carta de presentación",
+  "carta-aceptacion": "Carta de aceptación",
+  "carta-terminacion": "Carta de terminación",
+  estadias: "Acta final",
+};
+
+const getDocumentsModalTitle = (selectedDocumentType: "docentes" | "estadias" | "tutores" | null, selectedDocumentCategory: DocumentRecord["tipo"] | null, selectedEstadiasCategory: EstadiasDocumentType | null, selectedTutorCategory: TutorDocumentType | null) => {
   if (selectedDocumentType === "docentes") {
     let title = "Documentos de Docentes";
     if (selectedDocumentCategory) {
-      title = `${title} - ${selectedDocumentCategory}`;
+      const docLabels: Record<DocumentRecord["tipo"], string> = {
+        "planeacion": "Planeación",
+        "instrumento-30": "Instrumento 30%",
+        "instrumento-40": "Instrumento 40%",
+        "instrumento-60": "Instrumento 60%",
+        "instrumento-70": "Instrumento 70%",
+        "instrumento-30-40": "Instrumento 30/40%",
+        "instrumento-60-70": "Instrumento 60/70%",
+        "lista-concentrada": "Lista concentrada",
+        "asesoria": "Asesoría",
+        "portafolio": "Portafolio digital",
+        "acta-final": "Acta final",
+      };
+      title = `${title} - ${docLabels[selectedDocumentCategory]}`;
+    }
+    return title;
+  }
+
+  if (selectedDocumentType === "estadias") {
+    let title = "Documentos de Estadías";
+    if (selectedEstadiasCategory) {
+      title = `${title} - ${estadiasDocumentTitles[selectedEstadiasCategory]}`;
     }
     return title;
   }
@@ -227,10 +270,11 @@ export function CiclosEscolares() {
   const [showDocumentTypeSelector, setShowDocumentTypeSelector] = useState(false);
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [selectedCycle, setSelectedCycle] = useState<AcademicCycle | null>(null);
-  const [selectedDocumentType, setSelectedDocumentType] = useState<"docentes" | "tutores" | null>(null);
+  const [selectedDocumentType, setSelectedDocumentType] = useState<"docentes" | "estadias" | "tutores" | null>(null);
   const [selectedDocumentCategory, setSelectedDocumentCategory] = useState<DocumentRecord["tipo"] | null>(null);
+  const [selectedEstadiasCategory, setSelectedEstadiasCategory] = useState<EstadiasDocumentType | null>(null);
   const [selectedTutorCategory, setSelectedTutorCategory] = useState<TutorDocumentType | null>(null);
-  const [previewDocument, setPreviewDocument] = useState<DocumentRecord | TutorDocumentRecord | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<DocumentRecord | TutorDocumentRecord | EstadiasDocumentRecord | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -257,6 +301,7 @@ export function CiclosEscolares() {
 
   const [ciclos, setCiclos] = useState<AcademicCycle[]>(initialCycles);
   const [documents, setDocuments] = useState<DocumentRecord[]>(initialDocuments);
+  const [estadiasDocuments, setEstadiasDocuments] = useState<EstadiasDocumentRecord[]>([]);
   const [tutorDocuments, setTutorDocuments] = useState<TutorDocumentRecord[]>(initialTutorDocuments);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [documentCountByCycleId, setDocumentCountByCycleId] = useState<Record<number, number>>({});
@@ -273,6 +318,13 @@ export function CiclosEscolares() {
     "asesoria",
     "portafolio",
     "acta-final",
+  ];
+
+  const estadiasTypes: EstadiasDocumentType[] = [
+    "carta-presentacion",
+    "carta-aceptacion",
+    "carta-terminacion",
+    "estadias",
   ];
 
   const tutorTypes: TutorDocumentType[] = [
@@ -305,8 +357,31 @@ export function CiclosEscolares() {
       .toLowerCase()
       .trim();
 
+  const resolveEstadiasTipo = (row: ApiDocument): EstadiasDocumentType | null => {
+    const formId = Number(row.form_id ?? 0);
+    if (formId === 13) return "carta-presentacion";
+    if (formId === 14) return "carta-aceptacion";
+    if (formId === 15) return "carta-terminacion";
+    if (formId === 16) return "estadias";
+    return null;
+  };
+
   const resolveRowTipo = (row: ApiDocument): string => {
-    return normalizeTipo(row.tipo ?? row.form_code ?? row.apartado_label);
+    const estadiasTipo = resolveEstadiasTipo(row);
+    if (estadiasTipo) {
+      return estadiasTipo;
+    }
+
+    const normalized = normalizeTipo(row.tipo ?? row.form_code ?? row.apartado_label);
+
+    // Canonicalize historical variants so counters and filters remain consistent.
+    const aliasMap: Record<string, string> = {
+      "portafolio-digital": "portafolio",
+      "acta-asistencia-grupal": "acta-asistencia",
+      "acta-final-estadias": "estadias",
+    };
+
+    return aliasMap[normalized] ?? normalized;
   };
 
   const formatPlanLabel = (plan?: string | null, carrera?: string | null): string => {
@@ -417,6 +492,14 @@ export function CiclosEscolares() {
         return "Portafolio Digital";
       case "acta-final":
         return "Acta Final";
+      case "carta-presentacion":
+        return "Carta de presentación";
+      case "carta-aceptacion":
+        return "Carta de aceptación";
+      case "carta-terminacion":
+        return "Carta de terminación";
+      case "estadias":
+        return "Acta final de estadías";
       default:
         return "Documento";
     }
@@ -447,6 +530,10 @@ export function CiclosEscolares() {
       case "asesoria": return "ASESORÍA";
       case "portafolio": return "PORTAFOLIO DIGITAL";
       case "acta final": return "ACTA FINAL";
+      case "carta presentacion": return "CARTA DE PRESENTACION";
+      case "carta aceptacion": return "CARTA DE ACEPTACION";
+      case "carta terminacion": return "CARTA DE TERMINACION";
+      case "estadias": return "ACTA FINAL DE ESTADIAS";
       default: return (tipo ?? "DOCUMENTO").toUpperCase();
     }
   };
@@ -557,6 +644,23 @@ export function CiclosEscolares() {
           };
         });
 
+      const estadiasDocs: EstadiasDocumentRecord[] = rows
+        .filter((row) => estadiasTypes.includes(resolveRowTipo(row) as EstadiasDocumentType))
+        .map((row) => {
+          const tipo = resolveRowTipo(row) as EstadiasDocumentType;
+          return {
+            id: row.id,
+            ciclo: cycle.nombre,
+            documento: getDocumentTitle(row, tipo),
+            docente: row.docente ?? row.uploaded_by_name ?? "Sin docente",
+            carrera: row.carrera ?? row.carrera_label ?? "Sin carrera",
+            plan: formatPlanLabel(row.plan, row.carrera ?? row.carrera_label),
+            grupo: row.grupo ?? row.group_code ?? "-",
+            tipo,
+            pdfUrl: row.downloadUrl ?? row.fileUrl ?? `/documents/${row.id}/file`,
+          };
+        });
+
       const tutores: TutorDocumentRecord[] = rows
         .filter((row) => tutorTypes.includes(resolveRowTipo(row) as TutorDocumentType))
         .map((row) => ({
@@ -574,9 +678,11 @@ export function CiclosEscolares() {
         }));
 
       setDocuments(docentes);
+      setEstadiasDocuments(estadiasDocs);
       setTutorDocuments(tutores);
     } catch (error) {
       setDocuments([]);
+      setEstadiasDocuments([]);
       setTutorDocuments([]);
       toast.error("No fue posible cargar los documentos del ciclo");
     } finally {
@@ -612,11 +718,39 @@ export function CiclosEscolares() {
   const [filterMateria, setFilterMateria] = useState("all");
   const [filterDocente, setFilterDocente] = useState("all");
   const [filterParcial, setFilterParcial] = useState("all");
+  const [filterEstadiasPlan, setFilterEstadiasPlan] = useState("all");
+  const [filterEstadiasCarrera, setFilterEstadiasCarrera] = useState("all");
+  const [filterEstadiasGrupo, setFilterEstadiasGrupo] = useState("all");
+  const [filterEstadiasDocente, setFilterEstadiasDocente] = useState("all");
   const [filterTutorDocente, setFilterTutorDocente] = useState("all");
   const [filterTutorPlan, setFilterTutorPlan] = useState("all");
   const [filterTutorCarrera, setFilterTutorCarrera] = useState("all");
   const [filterTutorCuatrimestre, setFilterTutorCuatrimestre] = useState("all");
   const [filterTutorParcial, setFilterTutorParcial] = useState("all");
+
+  const resetDocenteFilters = () => {
+    setFilterPlan("all");
+    setFilterCarrera("all");
+    setFilterCuatrimestre("all");
+    setFilterMateria("all");
+    setFilterDocente("all");
+    setFilterParcial("all");
+  };
+
+  const resetTutorFilters = () => {
+    setFilterTutorDocente("all");
+    setFilterTutorPlan("all");
+    setFilterTutorCarrera("all");
+    setFilterTutorCuatrimestre("all");
+    setFilterTutorParcial("all");
+  };
+
+  const resetEstadiasFilters = () => {
+    setFilterEstadiasPlan("all");
+    setFilterEstadiasCarrera("all");
+    setFilterEstadiasGrupo("all");
+    setFilterEstadiasDocente("all");
+  };
 
   const cycleDocumentCount = useMemo(
     () => (cycle: AcademicCycle) => {
@@ -626,9 +760,10 @@ export function CiclosEscolares() {
       }
 
       return documents.filter((document) => document.ciclo === cycle.nombre).length
+        + estadiasDocuments.filter((document) => document.ciclo === cycle.nombre).length
         + tutorDocuments.filter((document) => document.ciclo === cycle.nombre).length;
     },
-    [documentCountByCycleId, documents, tutorDocuments]
+    [documentCountByCycleId, documents, estadiasDocuments, tutorDocuments]
   );
 
   const getActiveCycle = () => ciclos.find((cycle) => cycle.status === "activo");
@@ -637,6 +772,7 @@ export function CiclosEscolares() {
     setSelectedCycle(ciclo);
     setSelectedDocumentType(null);
     setSelectedDocumentCategory(null);
+    setSelectedEstadiasCategory(null);
     setSelectedTutorCategory(null);
     void loadDocumentsForCycle(ciclo);
     setShowDocTypeDialog(true);
@@ -855,14 +991,15 @@ export function CiclosEscolares() {
     setShowDocumentsModal(false);
     setSelectedDocumentType(null);
     setSelectedDocumentCategory(null);
+    setSelectedEstadiasCategory(null);
     setSelectedTutorCategory(null);
     setSelectedCycle(null);
   };
 
-  const handleSelectDocType = (type: "docentes" | "tutores") => {
+  const handleSelectDocType = (type: "docentes" | "estadias" | "tutores") => {
     setSelectedDocumentType(type);
     setShowDocTypeDialog(false);
-    if (type === "docentes") {
+    if (type === "docentes" || type === "estadias") {
       setShowDocumentTypeSelector(true);
       return;
     }
@@ -873,48 +1010,58 @@ export function CiclosEscolares() {
 
   const handleSelectDocumentCategory = (category: DocumentRecord["tipo"]) => {
     setSelectedDocumentCategory(category);
+    setSelectedEstadiasCategory(null);
     setSelectedTutorCategory(null);
     setShowDocumentTypeSelector(false);
     setShowDocumentsModal(true);
-    setFilterPlan("all");
-    setFilterCarrera("all");
-    setFilterCuatrimestre("all");
-    setFilterMateria("all");
-    setFilterDocente("all");
-    setFilterParcial("all");
+    resetDocenteFilters();
+  };
+
+  const handleSelectEstadiasCategory = (category: EstadiasDocumentType) => {
+    setSelectedEstadiasCategory(category);
+    setSelectedDocumentCategory(null);
+    setSelectedTutorCategory(null);
+    setShowDocumentTypeSelector(false);
+    setShowDocumentsModal(true);
+    resetEstadiasFilters();
   };
 
   const handleSelectTutorCategory = (category: TutorDocumentType) => {
     setSelectedTutorCategory(category);
     setSelectedDocumentCategory(null);
+    setSelectedEstadiasCategory(null);
     setShowDocumentTypeSelector(false);
     setShowDocumentsModal(true);
-    setFilterTutorDocente("all");
-    setFilterTutorPlan("all");
-    setFilterTutorCarrera("all");
-    setFilterTutorCuatrimestre("all");
-    setFilterTutorParcial("all");
+    resetTutorFilters();
   };
 
   const closeDocumentsModal = () => {
     setShowDocumentsModal(false);
     setSelectedDocumentType(null);
     setSelectedDocumentCategory(null);
+    setSelectedEstadiasCategory(null);
     setSelectedTutorCategory(null);
-    setFilterPlan("all");
-    setFilterCarrera("all");
-    setFilterCuatrimestre("all");
-    setFilterMateria("all");
-    setFilterDocente("all");
-    setFilterParcial("all");
-    setFilterTutorDocente("all");
-    setFilterTutorPlan("all");
-    setFilterTutorCarrera("all");
-    setFilterTutorCuatrimestre("all");
-    setFilterTutorParcial("all");
+    resetDocenteFilters();
+    resetEstadiasFilters();
+    resetTutorFilters();
   };
 
-  const openDocumentPreview = (document: DocumentRecord | TutorDocumentRecord) => {
+  useEffect(() => {
+    if (!showDocumentsModal) return;
+    if (selectedDocumentType === "docentes") {
+      resetDocenteFilters();
+      return;
+    }
+    if (selectedDocumentType === "estadias") {
+      resetEstadiasFilters();
+      return;
+    }
+    if (selectedDocumentType === "tutores") {
+      resetTutorFilters();
+    }
+  }, [showDocumentsModal, selectedDocumentType, selectedCycle?.id]);
+
+  const openDocumentPreview = (document: DocumentRecord | TutorDocumentRecord | EstadiasDocumentRecord) => {
     setPreviewDocument(document);
   };
 
@@ -1171,6 +1318,17 @@ export function CiclosEscolares() {
     [tutorDocuments, selectedTutorCategory, filterTutorPlan, filterTutorCarrera, filterTutorCuatrimestre, filterTutorDocente, filterTutorParcial]
   );
 
+  const filteredEstadiasDocuments = useMemo(
+    () => estadiasDocuments.filter((document) => (
+      (selectedEstadiasCategory === null || document.tipo === selectedEstadiasCategory)
+      && (filterEstadiasPlan === "all" || document.plan === filterEstadiasPlan)
+      && (filterEstadiasCarrera === "all" || document.carrera === filterEstadiasCarrera)
+      && (filterEstadiasGrupo === "all" || document.grupo === filterEstadiasGrupo)
+      && (filterEstadiasDocente === "all" || document.docente === filterEstadiasDocente)
+    )),
+    [estadiasDocuments, selectedEstadiasCategory, filterEstadiasPlan, filterEstadiasCarrera, filterEstadiasGrupo, filterEstadiasDocente]
+  );
+
   const docenteCountByType = useMemo(() => {
     return documents.reduce<Record<DocumentRecord["tipo"], number>>((acc, document) => {
       acc[document.tipo] = (acc[document.tipo] ?? 0) + 1;
@@ -1190,6 +1348,18 @@ export function CiclosEscolares() {
     });
   }, [documents]);
 
+  const estadiasCountByType = useMemo(() => {
+    return estadiasDocuments.reduce<Record<EstadiasDocumentType, number>>((acc, document) => {
+      acc[document.tipo] = (acc[document.tipo] ?? 0) + 1;
+      return acc;
+    }, {
+      "carta-presentacion": 0,
+      "carta-aceptacion": 0,
+      "carta-terminacion": 0,
+      estadias: 0,
+    });
+  }, [estadiasDocuments]);
+
   const tutorCountByType = useMemo(() => {
     return tutorDocuments.reduce<Record<TutorDocumentType, number>>((acc, document) => {
       acc[document.tipo] = (acc[document.tipo] ?? 0) + 1;
@@ -1204,9 +1374,19 @@ export function CiclosEscolares() {
   }, [tutorDocuments]);
 
   const totalDocenteDocuments = documents.length;
+  const totalEstadiasDocuments = estadiasDocuments.length;
   const totalTutorDocuments = tutorDocuments.length;
+  const totalSelectedDocenteCategory = selectedDocumentCategory
+    ? (docenteCountByType[selectedDocumentCategory] ?? 0)
+    : totalDocenteDocuments;
+  const totalSelectedEstadiasCategory = selectedEstadiasCategory
+    ? (estadiasCountByType[selectedEstadiasCategory] ?? 0)
+    : totalEstadiasDocuments;
+  const totalSelectedTutorCategory = selectedTutorCategory
+    ? (tutorCountByType[selectedTutorCategory] ?? 0)
+    : totalTutorDocuments;
 
-  const documentsModalTitle = getDocumentsModalTitle(selectedDocumentType, selectedDocumentCategory, selectedTutorCategory);
+  const documentsModalTitle = getDocumentsModalTitle(selectedDocumentType, selectedDocumentCategory, selectedEstadiasCategory, selectedTutorCategory);
 
   return (
     <div className="relative space-y-6 overflow-hidden">
@@ -1504,7 +1684,17 @@ export function CiclosEscolares() {
             >
               <FileText className="h-6 w-6 mb-3" />
               <span className="font-semibold text-lg">Documentos Docentes ({totalDocenteDocuments})</span>
-              <span className="text-sm text-muted-foreground">Planeación, instrumentos, listas, asesorías y más.</span>
+              <span className="text-sm text-muted-foreground">Planeación, instrumentos, listas, asesorías y portafolio.</span>
+            </Button>
+            <Button
+              onClick={() => handleSelectDocType("estadias")}
+              className="justify-start h-28 text-left flex flex-col items-start p-5 border-2 rounded-lg transition-all hover:shadow-lg"
+              variant="outline"
+              disabled={isLoadingDocuments || totalEstadiasDocuments === 0}
+            >
+              <FileText className="h-6 w-6 mb-3" />
+              <span className="font-semibold text-lg">Documentos de Estadías ({totalEstadiasDocuments})</span>
+              <span className="text-sm text-muted-foreground">Cartas, aceptación, terminación y acta final.</span>
             </Button>
             <Button
               onClick={() => handleSelectDocType("tutores")}
@@ -1535,20 +1725,32 @@ export function CiclosEscolares() {
               >
                 <ChevronLeft className="h-5 w-5 mr-2" />Atrás
               </Button>
-              <DialogTitle className="text-2xl">{selectedDocumentType === "tutores" ? "Seleccionar Tipo de Tutoría" : "Seleccionar Tipo de Documento"}</DialogTitle>
+              <DialogTitle className="text-2xl">{selectedDocumentType === "tutores" ? "Seleccionar Tipo de Tutoría" : selectedDocumentType === "estadias" ? "Seleccionar Tipo de Estadías" : "Seleccionar Tipo de Documento"}</DialogTitle>
             </div>
-            <DialogDescription className="text-base ml-11">{selectedDocumentType === "tutores" ? "Elige el apartado de tutorías que deseas revisar" : "Elige el documento que deseas revisar"}</DialogDescription>
+            <DialogDescription className="text-base ml-11">{selectedDocumentType === "tutores" ? "Elige el apartado de tutorías que deseas revisar" : selectedDocumentType === "estadias" ? "Elige el apartado de estadías que deseas revisar" : "Elige el documento que deseas revisar"}</DialogDescription>
           </DialogHeader>
           {selectedDocumentType === "tutores" ? (
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
+            <div className="mt-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <Button disabled={tutorCountByType["carga-academica"] === 0} onClick={() => handleSelectTutorCategory("carga-academica")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Carga académica ({tutorCountByType["carga-academica"]})</Button>
               <Button disabled={tutorCountByType["reporte-bajas"] === 0} onClick={() => handleSelectTutorCategory("reporte-bajas")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Reporte de bajas ({tutorCountByType["reporte-bajas"]})</Button>
               <Button disabled={tutorCountByType["concentrado-asesorias"] === 0} onClick={() => handleSelectTutorCategory("concentrado-asesorias")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Concentrado de asesorías y bajas ({tutorCountByType["concentrado-asesorias"]})</Button>
               <Button disabled={tutorCountByType["acta-asistencia"] === 0} onClick={() => handleSelectTutorCategory("acta-asistencia")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Acta de asistencia grupal ({tutorCountByType["acta-asistencia"]})</Button>
               <Button disabled={tutorCountByType["ficha-tecnica"] === 0} onClick={() => handleSelectTutorCategory("ficha-tecnica")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Ficha técnica ({tutorCountByType["ficha-tecnica"]})</Button>
+              </div>
+            </div>
+          ) : selectedDocumentType === "estadias" ? (
+            <div className="mt-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2">
+              <Button disabled={estadiasCountByType["carta-presentacion"] === 0} onClick={() => handleSelectEstadiasCategory("carta-presentacion")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Carta de presentación ({estadiasCountByType["carta-presentacion"]})</Button>
+              <Button disabled={estadiasCountByType["carta-aceptacion"] === 0} onClick={() => handleSelectEstadiasCategory("carta-aceptacion")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Carta de aceptación ({estadiasCountByType["carta-aceptacion"]})</Button>
+              <Button disabled={estadiasCountByType["carta-terminacion"] === 0} onClick={() => handleSelectEstadiasCategory("carta-terminacion")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Carta de terminación ({estadiasCountByType["carta-terminacion"]})</Button>
+              <Button disabled={estadiasCountByType["estadias"] === 0} onClick={() => handleSelectEstadiasCategory("estadias")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Acta final de estadías ({estadiasCountByType["estadias"]})</Button>
+              </div>
             </div>
           ) : (
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
+            <div className="mt-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <Button disabled={docenteCountByType["planeacion"] === 0} onClick={() => handleSelectDocumentCategory("planeacion")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Planeación ({docenteCountByType["planeacion"]})</Button>
               <Button disabled={docenteCountByType["instrumento-30"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-30")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 30% ({docenteCountByType["instrumento-30"]})</Button>
               <Button disabled={docenteCountByType["instrumento-40"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-40")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Instrumento 40% ({docenteCountByType["instrumento-40"]})</Button>
@@ -1560,6 +1762,7 @@ export function CiclosEscolares() {
               <Button disabled={docenteCountByType["asesoria"] === 0} onClick={() => handleSelectDocumentCategory("asesoria")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Asesoría ({docenteCountByType["asesoria"]})</Button>
               <Button disabled={docenteCountByType["portafolio"] === 0} onClick={() => handleSelectDocumentCategory("portafolio")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Portafolio Digital ({docenteCountByType["portafolio"]})</Button>
               <Button disabled={docenteCountByType["acta-final"] === 0} onClick={() => handleSelectDocumentCategory("acta-final")} className="justify-center h-24 font-semibold border-2 hover:bg-accent" variant="outline">Acta Final ({docenteCountByType["acta-final"]})</Button>
+              </div>
             </div>
           )}
         </DialogContent>
@@ -1639,7 +1842,10 @@ export function CiclosEscolares() {
                   </Select>
                 </div>
 
-                <div className="space-y-2 pt-4 pb-4">
+                <div className="space-y-2 pt-4 pb-4 max-h-[52vh] overflow-y-auto pr-1">
+                  <p className="text-xs text-muted-foreground">
+                    Mostrando {filteredDocuments.length} de {totalSelectedDocenteCategory} documentos.
+                  </p>
                   {filteredDocuments.length === 0 ? (
                     <div className="flex items-center justify-center h-32 text-muted-foreground">No hay documentos que coincidan con los filtros</div>
                   ) : (
@@ -1666,6 +1872,84 @@ export function CiclosEscolares() {
                               <Badge variant="outline" className="text-xs">Cuatrimestre {doc.cuatrimestre}</Badge>
                               <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
                               {doc.parcial !== "-" && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
+                            </div>
+                          </div>
+                          <ResponsiveActionButton
+                            variant="outline"
+                            size="sm"
+                            label="Ver PDF"
+                            title="Ver documento"
+                            className="shrink-0"
+                            onClick={(e) => { e.stopPropagation(); openDocumentPreview(doc); }}
+                            icon={<FileText className="h-4 w-4" />}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : selectedDocumentType === "estadias" ? (
+              <>
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-2 lg:grid-cols-4 py-4 border-b">
+                  <Select value={filterEstadiasPlan} onValueChange={(v) => { setFilterEstadiasPlan(v); setFilterEstadiasCarrera("all"); }}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Plan" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los planes</SelectItem>
+                      {tutorPlansAvailable.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterEstadiasCarrera} onValueChange={setFilterEstadiasCarrera}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Carrera" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las carreras</SelectItem>
+                      {tutorCarrerasAvailable.map((carrera) => <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterEstadiasGrupo} onValueChange={setFilterEstadiasGrupo}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Grupo" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los grupos</SelectItem>
+                      {Array.from(new Set(estadiasDocuments.map((document) => document.grupo).filter((value): value is string => Boolean(value) && value !== "-"))).map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterEstadiasDocente} onValueChange={setFilterEstadiasDocente}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Docente" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los docentes</SelectItem>
+                      {Array.from(new Set(estadiasDocuments.map((document) => document.docente))).map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 pt-4 pb-4 max-h-[52vh] overflow-y-auto pr-1">
+                  <p className="text-xs text-muted-foreground">
+                    Mostrando {filteredEstadiasDocuments.length} de {totalSelectedEstadiasCategory} documentos.
+                  </p>
+                  {filteredEstadiasDocuments.length === 0 ? (
+                    <div className="flex items-center justify-center h-32 text-muted-foreground">No hay documentos de estadías que coincidan con los filtros</div>
+                  ) : (
+                    filteredEstadiasDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        tabIndex={0}
+                        onClick={() => openDocumentPreview(doc)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openDocumentPreview(doc);
+                          }
+                        }}
+                        className="cursor-pointer p-3 border border-border/70 rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{doc.documento}</p>
+                            <p className="text-xs text-muted-foreground">{doc.docente} • {doc.carrera}</p>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                              {doc.grupo !== "-" && <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>}
+                              <Badge variant="outline" className="text-xs">{estadiasDocumentTitles[doc.tipo]}</Badge>
                             </div>
                           </div>
                           <ResponsiveActionButton
@@ -1723,7 +2007,10 @@ export function CiclosEscolares() {
                   </Select>
                 </div>
 
-                <div className="space-y-2 pt-4 pb-4">
+                <div className="space-y-2 pt-4 pb-4 max-h-[52vh] overflow-y-auto pr-1">
+                  <p className="text-xs text-muted-foreground">
+                    Mostrando {filteredTutorDocuments.length} de {totalSelectedTutorCategory} documentos.
+                  </p>
                   {filteredTutorDocuments.length === 0 ? (
                     <div className="flex items-center justify-center h-32 text-muted-foreground">No hay documentos de tutores</div>
                   ) : (

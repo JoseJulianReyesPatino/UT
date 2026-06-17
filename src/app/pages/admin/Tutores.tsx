@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { apiFetch } from "../../lib/api";
-import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { fetchDocumentBlob, getDocumentDisplayFileName } from "../../lib/documents";
 import { carrieras } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
 import ChargingImg from "../../../assets/Form_Not_Found.png";
@@ -25,11 +25,11 @@ type TutorDocument = {
   documento: string;
   apartado: string;
   carrera: string;
-  materia?: string;
   cuatrimestre?: string;
   grupo?: string;
   fecha?: string;
   status: string;
+  filePath?: string;
   returned?: boolean;
   returnedAt?: string;
   reviewedAt?: string;
@@ -57,19 +57,43 @@ const tutoriasApartadosPermitidos = new Set([
 
 const normalizeApartado = (value: string) => value.toLowerCase().replaceAll("_", "-").trim();
 
+const tutoriasApartadosEtiquetas: Record<string, string> = {
+  "carga-academica": "Carga académica",
+  "reporte-bajas": "Reporte de bajas",
+  "concentrado-asesorias": "Concentrado de asesorías",
+  "acta-asistencia": "Acta de asistencia grupal",
+  "acta-asistencia-grupal": "Acta de asistencia grupal",
+  "ficha-tecnica": "Ficha técnica",
+};
+
+const getTutoriasApartadoLabel = (apartado: string) => {
+  const key = normalizeApartado(apartado);
+  return tutoriasApartadosEtiquetas[key] ?? apartado;
+};
+
+const resolveTutorDocumentTitle = (doc: any): string => {
+  const title = (doc?.title ?? "").toString().trim();
+  if (title && !/^undefined\b/i.test(title)) {
+    return title;
+  }
+
+  const fileName = getDocumentDisplayFileName(doc?.title, doc?.file_path);
+  return fileName || "Documento";
+};
+
 const mapApiDocumentToTutorDocument = (doc: any): TutorDocument => ({
   id: Number(doc.id ?? 0),
-  ciclo: doc.cycle_name ?? "N/D",
-  plan: doc.plan ?? "N/D",
-  tutor: doc.uploaded_by_name ?? "N/D",
-  documento: doc.title ?? "Documento",
-  apartado: normalizeApartado(doc.apartado_label ?? "N/D"),
-  carrera: doc.carrera_label ?? "N/D",
-  materia: doc.materia || undefined,
-  cuatrimestre: doc.group_id ? String(doc.group_id) : undefined,
-  grupo: doc.group_id ? String(doc.group_id) : undefined,
+  ciclo: doc.cycle_name?.trim() || "Sin ciclo",
+  plan: doc.plan?.trim() || "Sin plan",
+  tutor: doc.uploaded_by_name?.trim() || "Sin tutor",
+  documento: resolveTutorDocumentTitle(doc),
+  apartado: normalizeApartado(doc.apartado_label ?? doc.form_code ?? doc.form_title ?? ""),
+  carrera: doc.carrera_label?.trim() || "",
+  cuatrimestre: doc.cuatrimestre ? String(doc.cuatrimestre) : undefined,
+  grupo: doc.group_code ? String(doc.group_code) : undefined,
   fecha: doc.submitted_at ?? undefined,
   status: doc.status ?? "pendiente",
+  filePath: doc.file_path ?? undefined,
   returned: (doc.status ?? "") === "devuelto",
   returnedAt: doc.returned_at ?? undefined,
   reviewedAt: doc.reviewed_at ?? undefined,
@@ -110,6 +134,9 @@ export default function Tutores() {
   const [filterReturned, setFilterReturned] = useState("all");
   const [activeSection, setActiveSection] = useState<ReviewSection>("all");
   const [previewDocument, setPreviewDocument] = useState<TutorDocumentItem | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [returnConfirmation, setReturnConfirmation] = useState<ReturnConfirmation | null>(null);
   const [reviewConfirmation, setReviewConfirmation] = useState<TutorPendingDocument | null>(null);
   const [page, setPage] = useState<number>(1);
@@ -169,20 +196,9 @@ export default function Tutores() {
 
   const downloadDocument = async (documentId: number) => {
     try {
-      const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-      const url = `${API_BASE_URL.replace(/\/+$/, '')}/documents/${documentId}/file`;
-      const headers: Record<string,string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch(url, { method: 'GET', headers });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || res.statusText);
-      }
-      const blob = await res.blob();
+      const blob = await fetchDocumentBlob(documentId);
       const blobUrl = URL.createObjectURL(blob);
       window.open(blobUrl, '_blank');
-      // optional: revoke after some time
       setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
     } catch (err: any) {
       toast.error(err?.message ?? 'No fue posible descargar el archivo');
@@ -284,7 +300,6 @@ export default function Tutores() {
 
   const ciclosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.ciclo)));
   const tutoresDisponibles = Array.from(new Set(allDocuments.map((doc) => ("tutor" in doc ? doc.tutor : (doc as any).tutor))));
-  const apartadosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.apartado)));
 
   const handleReviewDocument = async (documentId: number) => {
     try {
@@ -335,7 +350,49 @@ export default function Tutores() {
     globalThis.dispatchEvent(new CustomEvent('openMessagesConversation', { detail: { recipientName, recipientRole: 'Tutor', document: { id: doc.id, title: doc.documento } } }));
   };
 
-  const closePreview = () => setPreviewDocument(null);
+  const closePreview = () => {
+    if (previewBlobUrl) {
+      URL.revokeObjectURL(previewBlobUrl);
+    }
+    setPreviewBlobUrl(null);
+    setPreviewLoading(false);
+    setPreviewError(null);
+    setPreviewDocument(null);
+  };
+
+  useEffect(() => {
+    if (!previewDocument) return;
+
+    let cancelled = false;
+
+    const loadPreview = async () => {
+      setPreviewLoading(true);
+      setPreviewError(null);
+      setPreviewBlobUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+
+      try {
+        const blob = await fetchDocumentBlob(previewDocument.id);
+        if (cancelled) return;
+        const blobUrl = URL.createObjectURL(blob);
+        setPreviewBlobUrl(blobUrl);
+      } catch (error: any) {
+        if (cancelled) return;
+        setPreviewError(error?.message ?? "No fue posible abrir el PDF");
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    };
+
+    void loadPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewDocument]);
+  const apartadosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.apartado))).filter((apartado) => apartado && apartado.trim().length > 0);
 
   const previewChipClassName =
     "h-8 rounded-full border-border bg-background/90 px-3 text-xs font-medium text-foreground hover:bg-emerald-50 hover:text-emerald-900 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-200";
@@ -422,7 +479,7 @@ export default function Tutores() {
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
+                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{getTutoriasApartadoLabel(apartado)}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <div className="col-span-2 sm:col-span-1">
@@ -460,11 +517,6 @@ export default function Tutores() {
                           <p className="font-medium break-words text-sm sm:text-base">{doc.documento}</p>
                           <p className="text-sm text-muted-foreground">{"tutor" in doc ? doc.tutor : (doc as any).tutor} • {doc.carrera}</p>
                           <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                            {"materia" in doc && doc.materia && doc.materia.trim() !== "-" && (
-                              <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                {doc.materia}
-                              </Button>
-                            )}
                             {"cuatrimestre" in doc && doc.cuatrimestre && (
                               <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
                                 {doc.cuatrimestre}° Cuatri
@@ -479,7 +531,7 @@ export default function Tutores() {
                               {doc.ciclo}
                             </Button>
                             <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                              {doc.apartado}
+                              {getTutoriasApartadoLabel(doc.apartado)}
                             </Button>
                           </div>
                             {('fecha' in doc && doc.fecha) && (
@@ -602,7 +654,7 @@ export default function Tutores() {
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
+                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{getTutoriasApartadoLabel(apartado)}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <div className="col-span-2 sm:col-span-1">
@@ -639,11 +691,6 @@ export default function Tutores() {
                         <p className="break-words text-sm font-medium leading-snug sm:text-base">{doc.documento}</p>
                         <p className="mt-1 text-xs leading-snug text-muted-foreground sm:text-sm">{doc.tutor} • {doc.carrera}</p>
                         <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                          {doc.materia && doc.materia.trim() !== "-" && (
-                            <Button type="button" variant="outline" className={`${previewChipClassName} w-full justify-center pointer-events-auto sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
-                              {doc.materia}
-                            </Button>
-                          )}
                           <Button type="button" variant="outline" className={`${previewChipClassName} w-full justify-center pointer-events-auto sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
                             {doc.cuatrimestre}° Cuatri
                           </Button>
@@ -654,7 +701,7 @@ export default function Tutores() {
                             {doc.ciclo}
                           </Button>
                           <Button type="button" variant="outline" className={`${previewChipClassName} col-span-2 w-full justify-center pointer-events-auto sm:col-span-1 sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
-                            {doc.apartado}
+                            {getTutoriasApartadoLabel(doc.apartado)}
                           </Button>
                         </div>
                         {doc.fecha && (
@@ -773,7 +820,7 @@ export default function Tutores() {
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
+                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{getTutoriasApartadoLabel(apartado)}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <div className="col-span-2 sm:col-span-1">
@@ -825,7 +872,7 @@ export default function Tutores() {
                                 {doc.ciclo}
                               </Button>
                               <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                {doc.apartado}
+                                {getTutoriasApartadoLabel(doc.apartado)}
                               </Button>
                             </div>
                             {'reviewedAt' in doc && doc.reviewedAt && (
@@ -931,7 +978,7 @@ export default function Tutores() {
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}
+                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{getTutoriasApartadoLabel(apartado)}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterReturned} onValueChange={setFilterReturned}>
@@ -974,7 +1021,7 @@ export default function Tutores() {
                                 {doc.ciclo}
                               </Button>
                               <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                {doc.apartado}
+                                {getTutoriasApartadoLabel(doc.apartado)}
                               </Button>
                           </div>
                             {doc.fecha && (
@@ -1025,36 +1072,35 @@ export default function Tutores() {
         <DialogContent className="max-w-[95vw] w-[95vw] max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Vista previa del documento</DialogTitle>
-            <DialogDescription>Simulación de lectura del archivo PDF del documento seleccionado.</DialogDescription>
+            <DialogDescription>Visualiza el PDF real asociado al documento seleccionado.</DialogDescription>
           </DialogHeader>
           {previewDocument && (
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline">{previewDocument.ciclo}</Badge>
-                <Badge variant="outline">{previewDocument.apartado}</Badge>
+                <Badge variant="outline">{previewDocument.plan}</Badge>
+                <Badge variant="outline">{getTutoriasApartadoLabel(previewDocument.apartado)}</Badge>
                 {"resubmittedAt" in previewDocument && previewDocument.resubmittedAt ? (
                   <Badge variant="warning">Reenviado</Badge>
                 ) : Boolean(previewDocument.returned) && <Badge variant="destructive">Devuelto</Badge>}
               </div>
-              <div className="rounded-lg border border-border bg-muted/30 p-4 md:p-6">
-                <div className="mx-auto flex min-h-[70vh] w-full max-w-[1100px] flex-col justify-between rounded-lg border border-border bg-background p-6 md:p-10 shadow-sm">
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Documento PDF</p>
-                      <h3 className="mt-2 text-2xl font-semibold md:text-3xl">{previewDocument.documento}</h3>
-                      <p className="text-base text-muted-foreground">{"tutor" in previewDocument ? previewDocument.tutor : (previewDocument as any).tutor}</p>
-                    </div>
-                    <div className="grid gap-3 text-sm md:grid-cols-2 md:gap-4">
-                      <p><span className="font-medium">Carrera:</span> {previewDocument.carrera}</p>
-                      <p><span className="font-medium">Materia:</span> {"materia" in previewDocument ? previewDocument.materia : "N/D"}</p>
-                      <p><span className="font-medium">Cuatrímestre:</span> {"cuatrimestre" in previewDocument ? previewDocument.cuatrimestre : "N/D"}</p>
-                      <p><span className="font-medium">Grupo:</span> {"grupo" in previewDocument ? previewDocument.grupo : "N/D"}</p>
-                    </div>
-                  </div>
-                  <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                    Esta es una vista previa simulada del PDF asociado al documento.
-                  </div>
+              <div className="rounded-lg border border-border bg-muted/30 p-4 md:p-6 space-y-4">
+                <div className="rounded-md border border-border bg-background p-3 text-sm">
+                  <p className="font-medium text-foreground">{previewDocument.documento}</p>
+                  <p className="text-xs text-muted-foreground">{"tutor" in previewDocument ? previewDocument.tutor : (previewDocument as any).tutor} · {previewDocument.carrera}</p>
                 </div>
+                {previewLoading ? (
+                  <div className="flex h-[70vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                    <p>Cargando...</p>
+                  </div>
+                ) : previewError ? (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                    {previewError}
+                  </div>
+                ) : previewBlobUrl ? (
+                  <iframe src={previewBlobUrl} className="h-[70vh] w-full rounded-lg border border-border" title={previewDocument.documento} />
+                ) : null}
+                <div className="text-sm text-muted-foreground">Vista previa autenticada del documento cargado por el tutor.</div>
               </div>
             </div>
           )}

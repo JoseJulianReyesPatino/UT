@@ -68,12 +68,13 @@ const apartadoFilterOptions = [
 	{ value: "Instrumento 40%", label: "Instrumento 40%" },
 	{ value: "Instrumento 60%", label: "Instrumento 60%" },
 	{ value: "Instrumento 70%", label: "Instrumento 70%" },
-	{ value: "Remedial", label: "Remedial" },
 	{ value: "Lista Concentrada", label: "Lista Concentrada" },
 	{ value: "Asesoría", label: "Asesoría" },
 	{ value: "Portafolio Digital Final", label: "Portafolio Digital Final" },
-	{ value: "Acta de Asistencia Grupal", label: "Acta de Asistencia Grupal" },
+	{ value: "Acta Final", label: "Acta Final" },
 ];
+
+const GENERAL_DOCUMENT_APARTADOS = apartadoFilterOptions.map((option) => option.label);
 
 type ApiDocument = {
 	id: number;
@@ -115,6 +116,13 @@ const normalizeText = (value?: string | null) =>
 		.toLowerCase()
 		.trim();
 
+const normalizeApartadoKey = (value?: string | null) =>
+	normalizeText(value)
+		.replace(/[%]/g, "")
+		.replace(/[_\s]+/g, "-")
+		.replace(/-+/g, "-")
+		.trim();
+
 const isAllValue = (value?: string | null) => !value || normalizeText(value) === "all";
 
 const matchesNormalized = (value: string | undefined | null, filter: string) => {
@@ -123,29 +131,45 @@ const matchesNormalized = (value: string | undefined | null, filter: string) => 
 };
 
 const canonicalApartado = (value?: string | null) => {
-	const normalized = normalizeText(value);
+	const normalized = normalizeApartadoKey(value);
 	switch (normalized) {
 		case "planeacion":
 			return "PLANEACIÓN";
-		case "instrumento 30%":
+		case "instrumento-30":
+		case "instrumento-30-normal":
+		case "instrumento-30-40":
 			return "INSTRUMENTO 30%";
-		case "instrumento 40%":
+		case "instrumento-40":
 			return "INSTRUMENTO 40%";
-		case "instrumento 60%":
+		case "instrumento-60":
+		case "instrumento-60-70":
 			return "INSTRUMENTO 60%";
-		case "instrumento 70%":
+		case "instrumento-70":
 			return "INSTRUMENTO 70%";
 		case "remedial":
 			return "REMEDIAL";
-		case "lista concentrada":
+		case "lista-concentrada":
 			return "LISTA CONCENTRADA";
 		case "asesoria":
 			return "ASESORÍA";
-		case "portafolio digital final":
+		case "portafolio":
+		case "portafolio-digital":
+		case "portafolio-digital-final":
 			return "PORTAFOLIO DIGITAL FINAL";
-		case "acta de asistencia grupal":
-			return "ACTA DE ASISTENCIA GRUPAL";
+		case "acta-final":
+			return "ACTA FINAL";
+		case "acta-asistencia-grupal":
+			return "TUTORÍAS";
+		case "carga-academica":
+		case "reporte-bajas":
+		case "concentrado-asesorias":
+		case "ficha-tecnica":
+			return "TUTORÍAS";
 		case "estadias":
+		case "acta-final-estadias":
+		case "carta-presentacion":
+		case "carta-aceptacion":
+		case "carta-terminacion":
 			return "ESTADÍAS";
 		default:
 			return value ? value.toUpperCase() : "DOCUMENTO";
@@ -153,29 +177,44 @@ const canonicalApartado = (value?: string | null) => {
 };
 
 const friendlyApartado = (value?: string | null) => {
-	const normalized = normalizeText(value);
+	const normalized = normalizeApartadoKey(value);
 	switch (normalized) {
 		case "planeacion":
 			return "Planeación";
-		case "instrumento 30%":
+		case "instrumento-30":
+		case "instrumento-30-normal":
+		case "instrumento-30-40":
 			return "Instrumento 30%";
-		case "instrumento 40%":
+		case "instrumento-40":
 			return "Instrumento 40%";
-		case "instrumento 60%":
+		case "instrumento-60":
+		case "instrumento-60-70":
 			return "Instrumento 60%";
-		case "instrumento 70%":
+		case "instrumento-70":
 			return "Instrumento 70%";
 		case "remedial":
 			return "Remedial";
-		case "lista concentrada":
+		case "lista-concentrada":
 			return "Lista Concentrada";
 		case "asesoria":
 			return "Asesoría";
-		case "portafolio digital final":
+		case "portafolio":
+		case "portafolio-digital":
+		case "portafolio-digital-final":
 			return "Portafolio Digital Final";
-		case "acta de asistencia grupal":
-			return "Acta de Asistencia Grupal";
+		case "acta-final":
+			return "Acta Final";
+		case "acta-asistencia-grupal":
+		case "carga-academica":
+		case "reporte-bajas":
+		case "concentrado-asesorias":
+		case "ficha-tecnica":
+			return "Tutorías";
 		case "estadias":
+		case "acta-final-estadias":
+		case "carta-presentacion":
+		case "carta-aceptacion":
+		case "carta-terminacion":
 			return "Estadías";
 		default:
 			return value ?? "Documento";
@@ -386,8 +425,16 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					...extractApiDocuments(returnedPayload).map((doc) => mapApiDocument(doc, "reviewed")),
 				];
 
-				setPendingDocuments(pendingItems);
-				setReviewedDocuments(reviewedItems);
+				const isCoreGeneralDocument = (document: DocumentItem) => {
+					const normalizedApartado = normalizeText(friendlyApartado(document.apartado));
+					return GENERAL_DOCUMENT_APARTADOS.some((apartado) => normalizeText(apartado) === normalizedApartado);
+				};
+
+				const visiblePendingItems = forcedApartado ? pendingItems : pendingItems.filter(isCoreGeneralDocument);
+				const visibleReviewedItems = forcedApartado ? reviewedItems : reviewedItems.filter(isCoreGeneralDocument);
+
+				setPendingDocuments(visiblePendingItems);
+				setReviewedDocuments(visibleReviewedItems);
 
 				const failedStatuses = responses
 					.map((result, index) => (result.status === "rejected" ? statuses[index] : null))
@@ -396,7 +443,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 				if (failedStatuses.length > 0) {
 					setLoadError(`No fue posible cargar: ${failedStatuses.join(", ")}. Se muestran los documentos disponibles.`);
 					console.warn("DocumentReview: fallaron consultas de estado", { failedStatuses });
-				} else if (pendingItems.length === 0 && reviewedItems.length === 0) {
+				} else if (visiblePendingItems.length === 0 && visibleReviewedItems.length === 0) {
 					setLoadError("No se encontraron documentos para el ciclo visible actual.");
 				}
 			} catch {
@@ -495,7 +542,9 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const gruposDisponibles = Array.from(new Set(docsByMateria.map((doc) => doc.grupo).filter((value): value is string => Boolean(value) && normalizeText(value) !== "grupo -" && normalizeText(value) !== "-")));
 	const docentesDisponibles = Array.from(new Set(docsByGrupo.map((doc) => doc.docente).filter((value): value is string => Boolean(value))));
 	const parcialesDisponibles = PARCIAL_FILTER_OPTIONS;
-	const apartadosDisponibles = Array.from(new Set(docsByParcial.map((doc) => friendlyApartado(doc.apartado)).filter((value): value is string => Boolean(value))));
+	const apartadosDisponibles = forcedApartado
+		? Array.from(new Set(docsByParcial.map((doc) => friendlyApartado(doc.apartado)).filter((value): value is string => Boolean(value))))
+		: GENERAL_DOCUMENT_APARTADOS;
 
 	useEffect(() => {
 		if (filterCarrera !== "all" && !carrerasDisponibles.some((carrera) => carrera.value === filterCarrera)) {
