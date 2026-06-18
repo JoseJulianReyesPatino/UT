@@ -128,7 +128,6 @@ export default function Tutores() {
   const { isReady, isAuthenticated } = useAuth();
   const [pendingDocuments, setPendingDocuments] = useState<TutorDocument[]>([]);
   const [reviewedDocuments, setReviewedDocuments] = useState<TutorDocument[]>([]);
-  const [filterCiclo, setFilterCiclo] = useState("all");
   const [filterCarrera, setFilterCarrera] = useState("all");
   const [filterTutor, setFilterTutor] = useState("all");
   const [filterApartado, setFilterApartado] = useState("all");
@@ -154,7 +153,6 @@ export default function Tutores() {
     if (filterReturned === 'not-returned') q.status = 'pendiente';
     if (activeSection === 'pendientes') q.status = 'pendiente';
     if (activeSection === 'revisados') q.status = 'revisado';
-    // note: filterCiclo is a label; backend expects cycle_id — keep client-side for now
     return q;
   };
 
@@ -267,7 +265,6 @@ export default function Tutores() {
   };
 
   const matchesFilters = (doc: { ciclo: string; carrera: string; tutor: string; apartado: string; returned?: boolean }) => {
-    const matchesCiclo = filterCiclo === "all" || doc.ciclo === filterCiclo;
     const matchesCarrera = filterCarrera === "all" || doc.carrera === filterCarrera;
     const matchesTutor = filterTutor === "all" || doc.tutor === filterTutor;
     const matchesApartado = filterApartado === "all" || doc.apartado === filterApartado;
@@ -277,7 +274,7 @@ export default function Tutores() {
       || (filterReturned === "returned" && isReturned)
       || (filterReturned === "not-returned" && !isReturned);
 
-    return matchesCiclo && matchesCarrera && matchesTutor && matchesApartado && matchesReturned;
+    return matchesCarrera && matchesTutor && matchesApartado && matchesReturned;
   };
 
   const filteredPending = pendingDocuments.filter(matchesFilters);
@@ -300,7 +297,6 @@ export default function Tutores() {
     }, {});
   }, [filteredReviewed]);
 
-  const ciclosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.ciclo)));
   const tutoresDisponibles = Array.from(new Set(allDocuments.map((doc) => ("tutor" in doc ? doc.tutor : (doc as any).tutor))));
 
   const handleReviewDocument = async (documentId: number) => {
@@ -466,14 +462,6 @@ export default function Tutores() {
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
               <div className={filtersGridClassName}>
-                <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                
                 <Select value={filterTutor} onValueChange={setFilterTutor}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
                   <SelectContent>
@@ -641,14 +629,6 @@ export default function Tutores() {
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
               <div className={filtersGridClassName}>
-                <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                
                 <Select value={filterTutor} onValueChange={setFilterTutor}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
                   <SelectContent>
@@ -808,13 +788,6 @@ export default function Tutores() {
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
               <div className={filtersGridClassName}>
-                <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
-                  </SelectContent>
-                </Select>
                 <Select value={filterTutor} onValueChange={setFilterTutor}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
                   <SelectContent>
@@ -966,13 +939,6 @@ export default function Tutores() {
               <CardTitle>Revisados hoy</CardTitle>
               <CardDescription>Documentos abiertos por administración en el día</CardDescription>
               <div className={filtersGridClassName}>
-                <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}
-                  </SelectContent>
-                </Select>
                 <Select value={filterTutor} onValueChange={setFilterTutor}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
                   <SelectContent>

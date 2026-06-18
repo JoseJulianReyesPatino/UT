@@ -20,7 +20,7 @@ import Instrumento40Page from "./pages/docente/Instrumento40";
 import Instrumento60Page from "./pages/docente/Instrumento60";
 import Instrumento70Page from "./pages/docente/Instrumento70";
 import RemedialPage from "./pages/docente/Remedial";
-import Charging2 from "../assets/CHARGING_2.png";
+import LoadingGallo from "../assets/Form_Not_Found.png";
 import ListaConcentradaPage from "./pages/docente/ListaConcentrada";
 import AsesoriaPage from "./pages/docente/Asesoria";
 import PortafolioDigitalPage from "./pages/docente/PortafolioDigital";
@@ -35,6 +35,7 @@ import { apiFetch } from "./lib/api";
 
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import {
   Menu,
   Sun,
@@ -101,7 +102,7 @@ const pageDecorIcons = [
 ];
 
 function AppContent() {
-  const { isAuthenticated, isReady, user, notice } = useAuth();
+  const { isAuthenticated, isReady, user, notice, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const logoSrc = theme === "dark" ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
   const currentViewStorageKey = "utslrc-current-view";
@@ -109,6 +110,7 @@ function AppContent() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [deferredMessageOpen, setDeferredMessageOpen] = useState<null | { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string } }>(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
   const noticeBanner = notice ? (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4 sm:top-6">
@@ -205,6 +207,22 @@ function AppContent() {
       return;
     }
 
+    const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
+      const message = "¿Estás seguro de salir del sistema?";
+      event.preventDefault();
+      event.returnValue = message;
+      return message;
+    };
+
+    const popStateHandler = () => {
+      setLeaveDialogOpen(true);
+      window.history.pushState({ page: currentView }, "", window.location.href);
+    };
+
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+    window.history.replaceState({ page: currentView }, "", window.location.href);
+    window.addEventListener("popstate", popStateHandler);
+
     const syncFormConfig = async () => {
       try {
         const res = await apiFetch('/forms');
@@ -228,16 +246,33 @@ function AppContent() {
     };
 
     syncFormConfig();
-  }, [isReady, isAuthenticated]);
+
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnloadHandler);
+      window.removeEventListener("popstate", popStateHandler);
+    };
+  }, [isReady, isAuthenticated, currentView]);
+
+  const cancelLeave = () => setLeaveDialogOpen(false);
 
   // logout handled by AuthContext logout directly where needed
 
   if (!isReady) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        <div className="flex flex-col items-center gap-2 text-center">
-          <img src={Charging2} alt="Cargando sesión" className="h-48 w-auto" />
-          <div>Cargando sesión...</div>
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-sky-50 text-sm text-muted-foreground dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="flex h-56 items-center justify-center">
+            <img
+              src={LoadingGallo}
+              alt="Cargando sesión"
+              className="animate-gallo-bob h-48 w-auto select-none object-contain drop-shadow-[0_18px_35px_rgba(0,0,0,0.18)]"
+            />
+          </div>
+          <div className="flex items-center gap-1.5 text-base font-medium text-slate-700 dark:text-slate-200">
+            <span className="loading-dot dot-1" />
+            <span className="loading-dot dot-2" />
+            <span className="loading-dot dot-3" />
+          </div>
         </div>
       </div>
     );
@@ -253,6 +288,11 @@ function AppContent() {
       </>
     );
   }
+
+  const confirmLeaveAndLogout = () => {
+    setLeaveDialogOpen(false);
+    logout();
+  };
 
   const renderContent = () => {
     if (user?.role !== "administrador") {
@@ -414,6 +454,18 @@ function AppContent() {
         )}
 
         <Toaster />
+
+        <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+          <DialogContent className="rounded-3xl border border-emerald-200/80 bg-white/95 px-6 py-6 shadow-2xl shadow-emerald-300/20 dark:border-slate-700 dark:bg-slate-950/95">
+            <DialogHeader>
+              <DialogTitle>¿Estás seguro que quieres salir del sistema?</DialogTitle>
+            </DialogHeader>
+            <DialogFooter className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={cancelLeave}>Cancelar</Button>
+              <Button onClick={confirmLeaveAndLogout}>Salir</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </>
   );

@@ -433,6 +433,7 @@ export default function RemedialPage() {
     key={h.id}
     title={h.title ?? h.file_path}
     fileName={getUploadedFileName(h)}
+    carrera={h.carrera_label}
     subject={h.materia}
     submittedAt={new Date(h.submitted_at).toLocaleString()}
     status={h.status}

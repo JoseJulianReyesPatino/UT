@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { cn } from "../../lib/utils";
 import { Button } from "./ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import apiFetch from "../lib/api";
 import { getInitials, useResolvedAvatarUrl } from "../lib/avatar";
@@ -355,6 +355,22 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     onNavigate("instrumento-60-nuevo");
   }, [instrumento6070Open, onNavigate]);
 
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+
+  const handleLogoutClick = React.useCallback(() => {
+    setLogoutDialogOpen(true);
+  }, []);
+
+  const confirmLogout = React.useCallback(() => {
+    setLogoutDialogOpen(false);
+    logout();
+    if (onMobileOpenChange) onMobileOpenChange(false);
+  }, [logout, onMobileOpenChange]);
+
+  const cancelLogout = React.useCallback(() => {
+    setLogoutDialogOpen(false);
+  }, []);
+
   const docenteMenuItems = [
     { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
     { id: "planeacion", label: "Planeación", icon: FileText },
@@ -415,13 +431,13 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const renderContent = (isMobile: boolean = false) => {
     const isCollapsedLocal = isMobile ? false : collapsed;
     const containerClass = cn(
-      "relative mx-3 my-3 flex h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[28px] border border-emerald-200/70 bg-card text-sidebar-foreground shadow-[0_18px_45px_rgba(15,23,42,0.12)] transition-all duration-300 dark:border-slate-700 dark:bg-slate-950",
+      "relative mx-3 my-3 flex h-[calc(100dvh-1.5rem)] min-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-b from-slate-50 via-white to-slate-100 text-sidebar-foreground shadow-[0_18px_45px_rgba(15,23,42,0.12)] transition-all duration-300 dark:border-slate-700 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950",
       isCollapsedLocal ? "w-16" : "w-64"
     );
 
     return (
       <div className={containerClass}>
-        <div className="p-4 border-b border-sidebar-border/70 bg-card dark:bg-slate-950">
+        <div className="border-b border-sidebar-border/70 bg-transparent p-4">
           <div className="relative flex items-center justify-end">
             {!isCollapsedLocal && (
               <div className="absolute left-1/2 -translate-x-1/2">
@@ -447,7 +463,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-transparent py-4">
           <nav className="space-y-1 px-2">
             {menuItems.map((item) => {
               const Icon = item.icon;
@@ -496,7 +512,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
           </nav>
         </div>
 
-        <div className="p-4 border-t border-sidebar-border/70 space-y-3 bg-card dark:bg-slate-950">
+        <div className="space-y-3 border-t border-sidebar-border/70 bg-transparent p-4">
           {!isCollapsedLocal && (
             <button
               type="button"
@@ -534,16 +550,25 @@ export function Sidebar(props: Readonly<SidebarProps>) {
           <Button
             variant="ghost"
             size={isCollapsedLocal ? "icon" : "default"}
-            onClick={() => {
-              logout();
-              if (onMobileOpenChange) onMobileOpenChange(false);
-            }}
+            onClick={handleLogoutClick}
             aria-label="Cerrar sesión"
             className="w-full shrink-0 justify-start rounded-xl border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
           >
             <LogOut className="h-5 w-5" />
             {!isCollapsedLocal && <span className="ml-3">Cerrar Sesión</span>}
           </Button>
+
+          <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+            <DialogContent className="rounded-3xl border border-emerald-200/80 bg-white/95 p-6 shadow-2xl shadow-emerald-300/20 dark:border-slate-700 dark:bg-slate-950/95">
+              <DialogHeader>
+                <DialogTitle>¿Estás seguro que quieres salir del sistema?</DialogTitle>
+              </DialogHeader>
+              <DialogFooter className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <Button variant="outline" onClick={cancelLogout}>Cancelar</Button>
+                <Button onClick={confirmLogout}>Salir</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     );

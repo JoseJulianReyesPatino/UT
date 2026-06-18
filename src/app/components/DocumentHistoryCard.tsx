@@ -1,11 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { CheckCircle2, Clock2, Undo2 } from "lucide-react";
+import { CheckCircle2, Clock2, Undo2, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 interface DocumentHistoryCardProps {
   title: string;
   fileName: string;
+  carrera?: string;
   subject?: string;
   submittedAt: string;
   status?: string;
@@ -31,6 +39,7 @@ function getStatusInfo(status?: string) {
 export function DocumentHistoryCard({
   title,
   fileName,
+  carrera,
   subject,
   submittedAt,
   status,
@@ -38,61 +47,83 @@ export function DocumentHistoryCard({
   onView,
   onEdit,
 }: DocumentHistoryCardProps) {
+  const [openMotivo, setOpenMotivo] = useState(false);
   const { text, variant, Icon } = getStatusInfo(status);
-  const titleText = String(title ?? "").trim();
-  const subjectText = String(subject ?? "").trim();
-  const effectiveTitle = titleText || String(fileName ?? "");
+  const isDevuelto = String(status ?? "").trim().toLowerCase() === "devuelto";
 
   return (
-    <div className="group rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary sm:p-5">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="line-clamp-2 text-sm font-semibold text-foreground break-words whitespace-pre-wrap">
-              {effectiveTitle}
-            </p>
-          </div>
-
-          <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+    <>
+      <div className="group rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary sm:p-5">
+        <div className="flex flex-col gap-4">
+          {/* Fila 1: Fecha y Badge */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-muted-foreground">{submittedAt}</span>
             <Badge variant={variant} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs">
               <Icon className="h-3.5 w-3.5" />
               {text}
             </Badge>
-            <span className="text-xs text-muted-foreground">{submittedAt}</span>
           </div>
-        </div>
 
-        <div className="flex flex-col gap-2">
-          {subjectText ? (
-            <p className="text-sm font-medium text-foreground/80 break-words whitespace-pre-wrap">
-              Materia: {subjectText}
+          {/* Fila 2: Título principal (nombre del PDF) */}
+          <div>
+            <p className="text-base font-semibold text-foreground break-words">
+              {fileName}
             </p>
+          </div>
+
+          {/* Fila 3: Carrera */}
+          {carrera ? (
+            <div>
+              <p className="text-sm text-foreground break-words">
+                Carrera: {carrera}
+              </p>
+            </div>
           ) : null}
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span className="truncate">PDF: {fileName}</span>
+
+          {/* Fila 4: Materia */}
+          {subject ? (
+            <div>
+              <p className="text-sm text-muted-foreground break-words">
+                Materia: {subject}
+              </p>
+            </div>
+          ) : null}
+
+          {/* Botones */}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" className="min-w-[5.5rem]" onClick={onView}>
+              Ver
+            </Button>
+            <Button size="sm" variant="secondary" className="min-w-[5.5rem]" onClick={onEdit}>
+              Editar
+            </Button>
+            {isDevuelto && returnedComment ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-w-[5.5rem]"
+                onClick={() => setOpenMotivo(true)}
+              >
+                Motivo
+              </Button>
+            ) : null}
           </div>
         </div>
+      </div>
 
-        {returnedComment ? (
-          <div className="w-full rounded-xl border border-border bg-muted/60 p-3 text-sm text-foreground shadow-sm dark:border-border dark:bg-slate-800/60 dark:text-slate-100">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground dark:text-slate-300">
-              Motivo de devolución
-            </p>
-            <p className="mt-1 max-h-24 overflow-auto text-sm leading-6 whitespace-pre-wrap break-words text-foreground dark:text-slate-100">
+      {/* Diálogo de Motivo */}
+      <Dialog open={openMotivo} onOpenChange={setOpenMotivo}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Motivo de devolución</DialogTitle>
+          </DialogHeader>
+          <div className="bg-muted/50 rounded-lg p-4 border border-border">
+            <p className="text-sm text-foreground whitespace-pre-wrap break-words">
               {returnedComment}
             </p>
           </div>
-        ) : null}
-
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" className="min-w-[5.5rem]" onClick={onView}>
-            Ver
-          </Button>
-          <Button size="sm" variant="secondary" className="min-w-[5.5rem]" onClick={onEdit}>
-            Editar
-          </Button>
-        </div>
-      </div>
-    </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

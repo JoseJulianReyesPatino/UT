@@ -319,11 +319,55 @@
     }
   }
 
+  @keyframes gallo-bob {
+    0%,
+    100% {
+      transform: translateY(0) scale(1);
+    }
+    50% {
+      transform: translateY(-10px) scale(1.03);
+    }
+  }
+
+  @keyframes loading-dot {
+    0%,
+    80%,
+    100% {
+      opacity: 0.2;
+      transform: translateY(0);
+    }
+    40% {
+      opacity: 1;
+      transform: translateY(-4px);
+    }
+  }
+
   .animate-page-enter {
     animation: page-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .animate-page-exit {
     animation: page-exit 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-gallo-bob {
+    animation: gallo-bob 2.2s ease-in-out infinite;
+  }
+
+  .loading-dot {
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 9999px;
+    background: currentColor;
+    animation: loading-dot 1.4s infinite ease-in-out;
+  }
+
+  .loading-dot.dot-2 {
+    animation-delay: 0.2s;
+  }
+
+  .loading-dot.dot-3 {
+    animation-delay: 0.4s;
   }
 }

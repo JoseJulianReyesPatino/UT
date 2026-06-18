@@ -91,7 +91,6 @@ export default function Estadias() {
   const [reviewedDocuments, setReviewedDocuments] = useState<EstadiaReviewedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [filterCiclo, setFilterCiclo] = useState("all");
   const [filterPlan, setFilterPlan] = useState("all");
   const [filterCarrera, setFilterCarrera] = useState("all");
   const [filterCuatrimestre, setFilterCuatrimestre] = useState("all");
@@ -251,7 +250,6 @@ export default function Estadias() {
   const filterSelectValueClassName = "truncate";
 
   const matchesFilters = (doc: { ciclo: string; plan: string; carrera: string; cuatrimestre: string; docente: string; apartado: string; returned?: boolean }) => {
-    const matchesCiclo = filterCiclo === "all" || doc.ciclo === filterCiclo;
     const matchesPlan = filterPlan === "all" || doc.plan === filterPlan;
     const matchesCarrera = filterCarrera === "all" || doc.carrera === filterCarrera;
     const matchesCuatrimestre = filterCuatrimestre === "all" || doc.cuatrimestre === filterCuatrimestre;
@@ -262,7 +260,7 @@ export default function Estadias() {
       filterReturned === "all" ||
       (filterReturned === "returned" && isReturned) ||
       (filterReturned === "not-returned" && !isReturned);
-    return matchesCiclo && matchesPlan && matchesCarrera && matchesCuatrimestre && matchesDocente && matchesApartado && matchesReturned;
+    return matchesPlan && matchesCarrera && matchesCuatrimestre && matchesDocente && matchesApartado && matchesReturned;
   };
 
   const filteredPending = pendingDocuments.filter(matchesFilters);
@@ -288,9 +286,9 @@ export default function Estadias() {
 
       try {
         const [pendingResponse, reviewedResponse, returnedResponse] = await Promise.all([
-          apiFetch("/documents", { query: { status: "pendiente", include_all_cycles: "1", per_page: "500" } }),
-          apiFetch("/documents", { query: { status: "revisado", include_all_cycles: "1", per_page: "500" } }),
-          apiFetch("/documents", { query: { status: "devuelto", include_all_cycles: "1", per_page: "500" } }),
+          apiFetch("/documents", { query: { status: "pendiente", per_page: "500" } }),
+          apiFetch("/documents", { query: { status: "revisado", per_page: "500" } }),
+          apiFetch("/documents", { query: { status: "devuelto", per_page: "500" } }),
         ]);
 
         const pendingItems = extractApiDocuments(pendingResponse)
@@ -333,7 +331,6 @@ export default function Estadias() {
 
   const nonEmptyOptions = (values: string[]) => Array.from(new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)));
 
-  const ciclosDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.ciclo));
   const planesDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.plan));
   const carrerasDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.carrera));
   const cuatrimestresDisponibles = useMemo(() => {
@@ -534,13 +531,6 @@ export default function Estadias() {
           <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-emerald-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20">
             <CardHeader>
               <div className={filtersGridClassName}>
-                  <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                    <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {renderSelectItems(ciclosDisponibles)}
-                  </SelectContent>
-                </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
@@ -687,13 +677,6 @@ export default function Estadias() {
           <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20">
             <CardHeader>
               <div className={filtersGridClassName}>
-                <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {renderSelectItems(ciclosDisponibles)}
-                  </SelectContent>
-                </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
@@ -834,13 +817,6 @@ export default function Estadias() {
           <Card className={sectionCardClassName}>
             <CardHeader>
               <div className={filtersGridClassName}>
-                <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {renderSelectItems(ciclosDisponibles)}
-                  </SelectContent>
-                </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>
@@ -996,13 +972,6 @@ export default function Estadias() {
               <CardTitle>Revisados hoy</CardTitle>
               <CardDescription>Documentos abiertos por administración en el día</CardDescription>
               <div className={filtersGridClassName}>
-                <Select value={filterCiclo} onValueChange={setFilterCiclo}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por ciclo" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los ciclos</SelectItem>
-                    {renderSelectItems(ciclosDisponibles)}
-                  </SelectContent>
-                </Select>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
                   <SelectContent>

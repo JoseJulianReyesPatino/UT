@@ -356,7 +356,6 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const [reviewedDocuments, setReviewedDocuments] = useState<ReviewedDocument[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
-	const [filterCiclo, setFilterCiclo] = useState("all");
 	const [filterPlan, setFilterPlan] = useState("all");
 	const [filterCarrera, setFilterCarrera] = useState("all");
 	const [filterCuatrimestre, setFilterCuatrimestre] = useState("all");
@@ -527,8 +526,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const sectionCardClassName = "overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20";
 	const documentRowClassName = "cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border/70 bg-transparent shadow-sm transition-colors hover:bg-emerald-50/35 hover:border-emerald-300/60 dark:bg-transparent dark:hover:bg-slate-900/55 dark:hover:border-emerald-800/50";
 
-	const docsByCiclo = useMemo(() => allDocuments.filter((doc) => matchesNormalized(doc.ciclo, filterCiclo)), [allDocuments, filterCiclo]);
-	const docsByPlan = useMemo(() => docsByCiclo.filter((doc) => matchesNormalized(doc.plan, filterPlan)), [docsByCiclo, filterPlan]);
+	const docsByPlan = useMemo(() => allDocuments.filter((doc) => matchesNormalized(doc.plan, filterPlan)), [allDocuments, filterPlan]);
 	const docsByCarrera = useMemo(() => docsByPlan.filter((doc) => matchesNormalized(doc.carrera, filterCarrera)), [docsByPlan, filterCarrera]);
 	const docsByCuatrimestre = useMemo(() => docsByCarrera.filter((doc) => matchesNormalized(getDocumentCuatrimestre(doc), filterCuatrimestre)), [docsByCarrera, filterCuatrimestre]);
 	const docsByMateria = useMemo(() => docsByCuatrimestre.filter((doc) => matchesNormalized(doc.materia, filterMateria)), [docsByCuatrimestre, filterMateria]);
@@ -536,8 +534,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const docsByDocente = useMemo(() => docsByGrupo.filter((doc) => matchesNormalized(doc.docente, filterDocente)), [docsByGrupo, filterDocente]);
 	const docsByParcial = useMemo(() => docsByDocente.filter((doc) => filterParcial === "all" || getParcialFilterValue(doc.parcial) === filterParcial), [docsByDocente, filterParcial]);
 
-	const ciclosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.ciclo).filter((value): value is string => Boolean(value))));
-	const planesDisponibles = Array.from(new Set(docsByCiclo.map((doc) => formatPlanLabel(doc.plan, doc.carrera)).filter((value): value is string => Boolean(value))));
+	const planesDisponibles = Array.from(new Set(allDocuments.map((doc) => formatPlanLabel(doc.plan, doc.carrera)).filter((value): value is string => Boolean(value))));
 	const carrerasDisponibles = useMemo(() => getCareerFilterOptions(filterPlan), [filterPlan]);
 	const cuatrimestresDisponibles = Array.from(new Set(docsByCarrera.map((doc) => getDocumentCuatrimestre(doc)).filter((value): value is string => Boolean(value) && value !== "-")));
 	const materiasDisponibles = Array.from(new Set(docsByCuatrimestre.map((doc) => doc.materia).filter((value): value is string => Boolean(value) && normalizeText(value) !== "sin materia")));
@@ -553,17 +550,6 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			setFilterCarrera("all");
 		}
 	}, [carrerasDisponibles, filterCarrera]);
-
-	useEffect(() => {
-		setFilterPlan("all");
-		setFilterCarrera("all");
-		setFilterCuatrimestre("all");
-		setFilterMateria("all");
-		setFilterGrupo("all");
-		setFilterDocente("all");
-		setFilterParcial("all");
-		setFilterApartado(defaultApartadoFilter);
-	}, [filterCiclo]);
 
 	useEffect(() => {
 		setFilterCarrera("all");
@@ -618,7 +604,6 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		const base = doc;
 		return (
 			(!forcedApartadoNormalized || normalizeText(friendlyApartado(base.apartado)) === forcedApartadoNormalized) &&
-			matchesNormalized(base.ciclo, filterCiclo) &&
 			matchesNormalized(base.plan, filterPlan) &&
 			matchesNormalized(base.carrera, filterCarrera) &&
 			matchesNormalized(getDocumentCuatrimestre(base), filterCuatrimestre) &&
@@ -764,7 +749,6 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 
 	const renderFilters = () => (
 		<div className={filtersGridClassName}>
-			<Select value={filterCiclo} onValueChange={setFilterCiclo}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Ciclo escolar" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los ciclos escolares</SelectItem>{ciclosDisponibles.map((ciclo) => <SelectItem key={ciclo} value={ciclo}>{ciclo}</SelectItem>)}</SelectContent></Select>
 			<Select value={filterPlan} onValueChange={setFilterPlan}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Plan" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los planes</SelectItem>{planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}</SelectContent></Select>
 			<Select value={filterCarrera} onValueChange={setFilterCarrera}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Carrera" /></SelectTrigger><SelectContent><SelectItem value="all">Todas las carreras</SelectItem>{carrerasDisponibles.map((carrera) => <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>)}</SelectContent></Select>
 			<Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Cuatrimestre" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los cuatrimestres</SelectItem>{cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{`Cuatrimestre ${cuatrimestre}`}</SelectItem>)}</SelectContent></Select>
