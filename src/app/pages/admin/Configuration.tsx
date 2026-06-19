@@ -466,119 +466,116 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   };
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-  const file = event.target.files?.[0];
-  if (!file) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-    toast.error("Solo se permiten imágenes PNG, JPG o WEBP");
-    event.target.value = "";
-    return;
-  }
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      toast.error("Solo se permiten imágenes PNG, JPG o WEBP");
+      event.target.value = "";
+      return;
+    }
 
-  if (file.size > 4 * 1024 * 1024) {
-    toast.error("La imagen no debe superar 4 MB");
-    event.target.value = "";
-    return;
-  }
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error("La imagen no debe superar 4 MB");
+      event.target.value = "";
+      return;
+    }
 
-  setSelectedAvatarFile(file);
-  
-  const reader = new FileReader();
-  reader.onload = () => {
-    const result = typeof reader.result === "string" ? reader.result : undefined;
-    setProfileAvatar(result);
+    setSelectedAvatarFile(file);
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : undefined;
+      setProfileAvatar(result);
+    };
+    reader.readAsDataURL(file);
   };
-  reader.readAsDataURL(file);
-};
 
-// Modificar handleSaveProfile
-const handleSaveProfile = async () => {
-  if (!user) {
-    toast.error("No se pudo cargar el usuario actual");
-    return;
-  }
+  const handleSaveProfile = async () => {
+    if (!user) {
+      toast.error("No se pudo cargar el usuario actual");
+      return;
+    }
 
-  const firstNames = profileFirstNames.trim();
-  const lastNames = profileLastNames.trim();
-  const normalizedPhone = profilePhone.replace(/\D/g, "").slice(0, 10);
+    const firstNames = profileFirstNames.trim();
+    const lastNames = profileLastNames.trim();
+    const normalizedPhone = profilePhone.replace(/\D/g, "").slice(0, 10);
 
-  if (!firstNames || !lastNames) {
-    toast.error("Debes escribir nombres y apellidos");
-    return;
-  }
+    if (!firstNames || !lastNames) {
+      toast.error("Debes escribir nombres y apellidos");
+      return;
+    }
 
-  if (normalizedPhone.length !== 10) {
-    toast.error("El teléfono debe contener exactamente 10 números");
-    return;
-  }
+    if (normalizedPhone.length !== 10) {
+      toast.error("El teléfono debe contener exactamente 10 números");
+      return;
+    }
 
-  const fullName = `${firstNames} ${lastNames}`.trim();
+    const fullName = `${firstNames} ${lastNames}`.trim();
 
-  setIsSavingProfile(true);
+    setIsSavingProfile(true);
 
-  try {
-    if (selectedAvatarFile) {
-      const formData = new FormData();
-      formData.append("full_name", fullName);
-      formData.append("first_names", firstNames);
-      formData.append("last_names", lastNames);
-      formData.append("phone", normalizedPhone);
-      formData.append("avatar", selectedAvatarFile);
+    try {
+      if (selectedAvatarFile) {
+        const formData = new FormData();
+        formData.append("full_name", fullName);
+        formData.append("first_names", firstNames);
+        formData.append("last_names", lastNames);
+        formData.append("phone", normalizedPhone);
+        formData.append("avatar", selectedAvatarFile);
+        
+        await apiFetch("/auth/profile", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        await apiFetch("/auth/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            full_name: fullName,
+            first_names: firstNames,
+            last_names: lastNames,
+            phone: normalizedPhone,
+          }),
+        });
+      }
+
+      clearAvatarCache();
       
-      await apiFetch("/auth/profile", {
-        method: "POST",
-        body: formData,
-      });
-    } else {
-      await apiFetch("/auth/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: fullName,
-          first_names: firstNames,
-          last_names: lastNames,
+      const refreshedUser = await refreshUser();
+      
+      if (refreshedUser) {
+        updateProfile({
+          name: fullName,
+          firstNames,
+          lastNames,
           phone: normalizedPhone,
-        }),
-      });
-    }
-
-    // Limpiar caché de avatares
-    clearAvatarCache();
-    
-    // Refrescar usuario
-    const refreshedUser = await refreshUser();
-    
-    if (refreshedUser) {
-      updateProfile({
-        name: fullName,
-        firstNames,
-        lastNames,
-        phone: normalizedPhone,
-        avatar: refreshedUser.avatar,
-      });
+          avatar: refreshedUser.avatar,
+        });
+        
+        setProfileAvatar(refreshedUser.avatar);
+      }
       
-      setProfileAvatar(refreshedUser.avatar);
-    }
-    
-    setSelectedAvatarFile(null);
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-    
-    // Disparar evento para actualizar otros componentes
-    window.dispatchEvent(new CustomEvent('ut-avatar-updated', { 
-      detail: { userId: user.id, avatarUrl: refreshedUser?.avatar } 
-    }));
+      setSelectedAvatarFile(null);
+      
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      
+      window.dispatchEvent(new CustomEvent('ut-avatar-updated', { 
+        detail: { userId: user.id, avatarUrl: refreshedUser?.avatar } 
+      }));
 
-    toast.success("Configuración de cuenta actualizada");
-  } catch (error: any) {
-    console.error("Error saving profile:", error);
-    toast.error(error instanceof Error ? error.message : "No fue posible guardar la configuración");
-  } finally {
-    setIsSavingProfile(false);
-  }
-};
+      toast.success("Configuración de cuenta actualizada");
+    } catch (error: any) {
+      console.error("Error saving profile:", error);
+      toast.error(error instanceof Error ? error.message : "No fue posible guardar la configuración");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   const handleSavePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       toast.error("Completa todos los campos de contraseña");
@@ -674,23 +671,26 @@ const handleSaveProfile = async () => {
   );
 
   return (
-    <div className={`space-y-8 pb-6 ${shellClass}`}>
-      <div className="rounded-3xl border border-emerald-200/60 bg-white/45 p-6 shadow-sm backdrop-blur dark:border-emerald-900/35 dark:bg-slate-950/55">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <div className={`space-y-4 sm:space-y-8 pb-6 ${shellClass}`}>
+      {/* Header - Mejorado para móvil */}
+      <div className="rounded-2xl sm:rounded-3xl border border-emerald-200/60 bg-white/45 p-4 sm:p-6 shadow-sm backdrop-blur dark:border-emerald-900/35 dark:bg-slate-950/55">
+        <div className="flex flex-col gap-2">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Configuración del Sistema</h1>
-            <p className="text-sm text-slate-600 dark:text-slate-400">Ajustes globales y parámetros del sistema</p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100">Configuración del Sistema</h1>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">Ajustes globales y parámetros del sistema</p>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+      {/* Layout principal - Cambia a columna en móvil */}
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+        {/* Sidebar - Mejorado para móvil */}
         <Card className={`${sidebarClass} shadow-xl`}>
-          <CardHeader className={sidebarCardClass}>
-            <CardTitle className={theme === "dark" ? "text-white" : "text-slate-900"}>Secciones</CardTitle>
-            <CardDescription className={theme === "dark" ? "text-slate-400" : "text-slate-500"}>Navega por la configuración</CardDescription>
+          <CardHeader className={`${sidebarCardClass} p-3 sm:p-6`}>
+            <CardTitle className={theme === "dark" ? "text-white text-base sm:text-lg" : "text-slate-900 text-base sm:text-lg"}>Secciones</CardTitle>
+            <CardDescription className={`${theme === "dark" ? "text-slate-400" : "text-slate-500"} text-xs sm:text-sm`}>Navega por la configuración</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 p-3">
+          <CardContent className="space-y-1 sm:space-y-2 p-2 sm:p-3">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.value;
@@ -701,7 +701,7 @@ const handleSaveProfile = async () => {
                   type="button"
                   disabled={Boolean(editingGroupId && item.value !== activeTab)}
                   onClick={() => setActiveTab(item.value)}
-                  className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all ${
+                  className={`flex w-full items-center gap-2 sm:gap-3 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 text-left transition-all ${
                     isActive
                       ? (theme === "dark"
                           ? "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30"
@@ -711,12 +711,12 @@ const handleSaveProfile = async () => {
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")
                   }`}
                 >
-                  <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${isActive ? (theme === "dark" ? "bg-emerald-400/15" : "bg-emerald-100") : (theme === "dark" ? "bg-white/5" : "bg-slate-100")}`}>
-                    <Icon className={`h-5 w-5 ${isActive ? (theme === "dark" ? "text-emerald-300" : "text-emerald-700") : (theme === "dark" ? "text-slate-300" : "text-slate-500")}`} />
+                  <span className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl ${isActive ? (theme === "dark" ? "bg-emerald-400/15" : "bg-emerald-100") : (theme === "dark" ? "bg-white/5" : "bg-slate-100")}`}>
+                    <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${isActive ? (theme === "dark" ? "text-emerald-300" : "text-emerald-700") : (theme === "dark" ? "text-slate-300" : "text-slate-500")}`} />
                   </span>
-                  <span className="flex-1">
-                    <span className="block text-sm font-semibold">{item.label}</span>
-                    <span className={`block text-xs ${theme === "dark" ? "text-slate-400" : "text-slate-500"}`}>{item.description}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-xs sm:text-sm font-semibold truncate">{item.label}</span>
+                    <span className={`hidden sm:block text-xs ${theme === "dark" ? "text-slate-400" : "text-slate-500"}`}>{item.description}</span>
                   </span>
                 </button>
               );
@@ -724,16 +724,18 @@ const handleSaveProfile = async () => {
           </CardContent>
         </Card>
 
-        <div className="space-y-8">
+        {/* Contenido principal */}
+        <div className="space-y-4 sm:space-y-8">
           {activeTab === "cuenta" && (
             <Card className={sectionCardClass}>
-              <CardHeader className={sectionHeaderClass}>
-                <CardTitle>Configuración de tu Cuenta</CardTitle>
-                <CardDescription>Gestiona tu foto, datos básicos y preferencias visuales.</CardDescription>
+              <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
+                <CardTitle className="text-base sm:text-lg">Configuración de tu Cuenta</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Gestiona tu foto, datos básicos y preferencias visuales.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6 p-6">
-                <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-900/60">
-                  <Avatar className="h-20 w-20 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
+              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+                {/* Avatar - Mejorado para móvil */}
+                <div className="flex flex-col sm:flex-row gap-4 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 sm:p-4 sm:items-center dark:border-slate-800 dark:bg-slate-900/60">
+                  <Avatar className="h-16 w-16 sm:h-20 sm:w-20 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
                     {profileAvatar ? (
                       <AvatarImage
                         src={profileAvatar}
@@ -743,37 +745,38 @@ const handleSaveProfile = async () => {
                       />
                     ) : (
                       <AvatarFallback
-                        className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-xl cursor-pointer"
+                        className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-base sm:text-xl cursor-pointer"
                         onClick={() => setIsAvatarOpen(true)}
                       >
                         {(profileFirstNames || profileLastNames || user?.name || "U").split(" ").map((n) => n[0]).join("").slice(0, 2)}
                       </AvatarFallback>
                     )}
                   </Avatar>
-                  <div className="space-y-2">
-                    <Label htmlFor="avatar">Foto de perfil</Label>
+                  <div className="space-y-2 flex-1">
+                    <Label htmlFor="avatar" className="text-sm">Foto de perfil</Label>
                     <Input 
                       ref={fileInputRef}
                       id="avatar" 
                       type="file" 
                       accept="image/png,image/jpeg,image/webp" 
-                      onChange={handleAvatarChange} 
+                      onChange={handleAvatarChange}
+                      className="text-sm" 
                     />
                     <p className="text-xs text-muted-foreground">Formatos: PNG/JPG/WEBP. Tamaño máximo: 4MB.</p>
                   </div>
                 </div>
 
                 <Dialog open={isAvatarOpen} onOpenChange={setIsAvatarOpen}>
-                  <DialogContent>
+                  <DialogContent className="max-w-[95vw] sm:max-w-lg">
                     <DialogHeader>
                       <DialogTitle>Foto de perfil</DialogTitle>
                       <DialogDescription>Vista previa de tu imagen de perfil</DialogDescription>
                     </DialogHeader>
                     <div className="mt-4 flex justify-center">
                       {profileAvatar ? (
-                        <img src={profileAvatar} alt={profileFirstNames || "Usuario"} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
+                        <img src={profileAvatar} alt={profileFirstNames || "Usuario"} className="max-h-[50vh] sm:max-h-[70vh] max-w-full rounded-lg object-contain" />
                       ) : (
-                        <div className="h-40 w-40 rounded-lg bg-emerald-100 flex items-center justify-center text-2xl">
+                        <div className="h-32 w-32 sm:h-40 sm:w-40 rounded-lg bg-emerald-100 flex items-center justify-center text-2xl">
                           {(profileFirstNames || profileLastNames || user?.name || "U").split(" ").map((n) => n[0]).join("").slice(0, 2)}
                         </div>
                       )}
@@ -781,82 +784,89 @@ const handleSaveProfile = async () => {
                   </DialogContent>
                 </Dialog>
 
+                {/* Campos de perfil - Mejorado para móvil */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Nombres</Label>
-                    <Input value={profileFirstNames} onChange={(e) => setProfileFirstNames(e.target.value)} placeholder="Ej. María Fernanda" />
+                    <Label className="text-sm">Nombres</Label>
+                    <Input value={profileFirstNames} onChange={(e) => setProfileFirstNames(e.target.value)} placeholder="Ej. María Fernanda" className="text-sm" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Apellidos</Label>
-                    <Input value={profileLastNames} onChange={(e) => setProfileLastNames(e.target.value)} placeholder="Ej. González López" />
+                    <Label className="text-sm">Apellidos</Label>
+                    <Input value={profileLastNames} onChange={(e) => setProfileLastNames(e.target.value)} placeholder="Ej. González López" className="text-sm" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Correo electrónico</Label>
-                    <Input value={user?.email ?? ""} disabled />
+                    <Label className="text-sm">Correo electrónico</Label>
+                    <Input value={user?.email ?? ""} disabled className="text-sm" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Teléfono</Label>
+                    <Label className="text-sm">Teléfono</Label>
                     <Input
                       value={profilePhone}
                       onChange={(e) => setProfilePhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                       inputMode="numeric"
                       maxLength={10}
                       placeholder="Ej. 6531234567"
+                      className="text-sm"
                     />
                   </div>
                 </div>
 
+                {/* Cambiar contraseña - Mejorado para móvil */}
                 <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Cambiar contraseña</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">Actualiza tu contraseña sin salir de esta sección.</p>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="space-y-2 md:col-span-1">
-                        <Label>Contraseña actual</Label>
+                    <div className="grid gap-3 sm:gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label className="text-sm">Contraseña actual</Label>
                         <Input
                           type="password"
                           value={currentPassword}
                           onChange={(e) => setCurrentPassword(e.target.value)}
                           placeholder="Ingresa tu contraseña actual"
+                          className="text-sm"
                         />
                       </div>
-                      <div className="space-y-2 md:col-span-1">
-                        <Label>Nueva contraseña</Label>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Nueva contraseña</Label>
                         <Input
                           type="password"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           placeholder="Ingresa la nueva contraseña"
+                          className="text-sm"
                         />
                       </div>
-                      <div className="space-y-2 md:col-span-1">
-                        <Label>Confirmar contraseña</Label>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Confirmar contraseña</Label>
                         <Input
                           type="password"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           placeholder="Repite la contraseña"
+                          className="text-sm"
                         />
                       </div>
                     </div>
                     <div className="flex justify-end">
-                      <Button variant="outline" onClick={handleSavePassword} disabled={isSavingPassword}>
+                      <Button variant="outline" onClick={handleSavePassword} disabled={isSavingPassword} className="text-sm">
                         {isSavingPassword ? "Guardando..." : "Actualizar contraseña"}
                       </Button>
                     </div>
                   </div>
                 </div>
 
+                {/* Tema - Mejorado para móvil */}
                 <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
                   <div className="space-y-3">
-                    <Label className="block">Tema de la aplicación</Label>
+                    <Label className="block text-sm">Tema de la aplicación</Label>
                     <Button
                       type="button"
                       variant="outline"
                       onClick={toggleTheme}
-                      className="w-fit gap-2 border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      className="w-full sm:w-fit gap-2 border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 text-sm"
                     >
                       {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                       {theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
@@ -865,7 +875,7 @@ const handleSaveProfile = async () => {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button variant="success" onClick={handleSaveProfile} disabled={isSavingProfile}>
+                  <Button variant="success" onClick={handleSaveProfile} disabled={isSavingProfile} className="w-full sm:w-auto text-sm">
                     {isSavingProfile ? "Guardando..." : "Guardar cambios"}
                   </Button>
                 </div>
@@ -875,18 +885,19 @@ const handleSaveProfile = async () => {
 
           {activeTab === "formularios" && (
             <Card className={sectionCardClass}>
-              <CardHeader className={sectionHeaderClass}>
-                <CardTitle>Formularios</CardTitle>
-                <CardDescription>Administra el acceso, vencimiento y visibilidad de cada formulario</CardDescription>
+              <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
+                <CardTitle className="text-base sm:text-lg">Formularios</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Administra el acceso, vencimiento y visibilidad de cada formulario</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6 p-6">
+              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
                 <div className={softPanelClass}>
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Control por formulario</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Define vencimiento y roles permitidos para cada apartado del sistema.</p>
+                  <div className="mb-3">
+                    <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">Control por formulario</h3>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Define vencimiento y roles permitidos para cada apartado del sistema.</p>
                   </div>
 
-                  <div className="space-y-3">
+                  {/* SCROLL PARA FORMULARIOS - Ajustado para móvil */}
+                  <div className="space-y-2 sm:space-y-3 max-h-[400px] sm:max-h-[600px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
                     {formSections.map((section) => {
                       const isOpen = openFormSection === section.section;
                       return (
@@ -894,27 +905,27 @@ const handleSaveProfile = async () => {
                           <button
                             type="button"
                             onClick={() => setOpenFormSection(isOpen ? null : section.section)}
-                            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                            className="flex w-full items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 text-left"
                             aria-expanded={isOpen}
                           >
                             <div className="min-w-0">
-                              <h4 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{section.title}</h4>
-                              <p className="text-xs text-slate-500 dark:text-slate-400">{section.description}</p>
+                              <h4 className="truncate text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100">{section.title}</h4>
+                              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">{section.description}</p>
                             </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                                 {section.forms.length}
                               </span>
                               {isOpen ? (
-                                <ChevronUp className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                                <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                               ) : (
-                                <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                                <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                               )}
                             </div>
                           </button>
 
                           {isOpen && (
-                            <div className="border-t border-emerald-200/35 p-3 dark:border-emerald-900/20">
+                            <div className="border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20">
                               <div className="space-y-2">
                                 {section.forms.map((form) => {
                                   const config = formConfig.formAccess[form.id];
@@ -934,31 +945,31 @@ const handleSaveProfile = async () => {
                                       <button
                                         type="button"
                                         onClick={() => toggleFormItem(form.id)}
-                                        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+                                        className="w-full flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 text-left"
                                         aria-expanded={isOpenItem}
                                       >
                                         <div className="min-w-0">
-                                          <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{form.title}</p>
-                                          <p className="text-xs text-slate-500 dark:text-slate-400">{form.description}</p>
+                                          <p className="truncate text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">{form.title}</p>
+                                          <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">{form.description}</p>
                                         </div>
 
-                                        <div className="flex shrink-0 items-center gap-3">
-                                          <span className="rounded-full bg-white px-2 py-1 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">{allowedRoles}</span>
-                                          <span className="rounded-full bg-white px-2 py-1 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">{dueAtLabel}</span>
+                                        <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+                                          <span className="hidden sm:inline rounded-full bg-white px-2 py-1 text-[10px] sm:text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">{allowedRoles}</span>
+                                          <span className="hidden sm:inline rounded-full bg-white px-2 py-1 text-[10px] sm:text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">{dueAtLabel}</span>
                                           {isOpenItem ? (
-                                            <ChevronUp className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                                            <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                                           ) : (
-                                            <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                                            <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                                           )}
                                         </div>
                                       </button>
 
                                       {isOpenItem && (
-                                        <div className="border-t border-emerald-200/35 p-3 dark:border-emerald-900/20">
+                                        <div className="border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20">
                                           <div className="grid gap-3 sm:grid-cols-2">
                                             <div className="space-y-2 sm:col-span-2">
-                                              <div className="flex items-center justify-between">
-                                                <Label htmlFor={`deadline-${form.id}`}>Fecha y hora de vencimiento</Label>
+                                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                                <Label htmlFor={`deadline-${form.id}`} className="text-sm">Fecha y hora de vencimiento</Label>
                                                 <label className="flex items-center gap-2 text-sm">
                                                   <Checkbox
                                                     checked={config.dueAt === null}
@@ -975,18 +986,19 @@ const handleSaveProfile = async () => {
                                                 value={config.dueAt ?? ""}
                                                 onChange={(event) => handleDeadlineChange(form.id, event.target.value)}
                                                 disabled={config.dueAt === null}
+                                                className="text-sm"
                                               />
                                             </div>
 
                                             <div className="space-y-2 sm:col-span-2">
-                                              <Label>Roles permitidos</Label>
+                                              <Label className="text-sm">Roles permitidos</Label>
                                               {isTutoriasForm ? (
                                                 <div className="flex items-center gap-2">
                                                   <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Tutor</span>
                                                   <span className="text-xs text-muted-foreground">Este formulario queda asignado sólo a tutores.</span>
                                                 </div>
                                               ) : (
-                                                <div className="flex items-center gap-4">
+                                                <div className="flex flex-wrap items-center gap-4">
                                                   <label className="flex items-center gap-2">
                                                     <Checkbox
                                                       checked={config.roles.includes("docente")}
@@ -1025,82 +1037,90 @@ const handleSaveProfile = async () => {
 
           {activeTab === "grupos" && (
             <Card className={sectionCardClass}>
-              <CardHeader className={sectionHeaderClass}>
-                <CardTitle>Grupos</CardTitle>
-                <CardDescription>Crear y administrar grupos que aparecerán en los formularios</CardDescription>
+              <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
+                <CardTitle className="text-base sm:text-lg">Grupos</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Crear y administrar grupos que aparecerán en los formularios</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6 p-6">
-                <div className={softPanelClass.replace("p-4", "p-4 md:grid md:grid-cols-3 gap-3") }>
-                  <Select value={plan} onValueChange={(v: any) => setPlan(v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Plan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
-                      <SelectItem value="plan-normal">Plan Normal</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={careerCode} onValueChange={(value) => setCareerCode(value)} disabled={!plan}>
-                    <SelectTrigger className="min-w-0">
-                      <SelectValue placeholder="Carrera" className="min-w-0 flex-1 truncate" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {careerOptions.map((career) => (
-                        <SelectItem key={career.codigo} value={career.codigo} className="whitespace-normal py-2 pr-3">
-                          <span className="block max-w-[18rem] break-words leading-snug">{career.nombre}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={cuatrimestre} onValueChange={setCuatrimestre} disabled={!selectedCareer}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Cuatrimestre" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cuatrimestresDisponibles.map((number) => (
-                        <SelectItem key={number} value={String(number)}>
-                          {number}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={String(groupNumber)} onValueChange={(value) => setGroupNumber(Number(value))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Asignación de número" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 20 }, (_, index) => index + 1).map((number) => (
-                        <SelectItem key={number} value={String(number)}>
-                          {number}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex min-w-0 items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-950">
-                    <CalendarDays className="h-4 w-4 text-emerald-500" />
-                    <div className="min-w-0 truncate">Nombre generado: <strong className="ml-2 text-slate-900 dark:text-slate-100">{currentGroupName}</strong></div>
+              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+                {/* Formulario de creación - Mejorado para móvil */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <Select value={plan} onValueChange={(v: any) => setPlan(v)}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Plan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
+                        <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={careerCode} onValueChange={(value) => setCareerCode(value)} disabled={!plan}>
+                      <SelectTrigger className="min-w-0 text-sm">
+                        <SelectValue placeholder="Carrera" className="min-w-0 flex-1 truncate" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {careerOptions.map((career) => (
+                          <SelectItem key={career.codigo} value={career.codigo} className="whitespace-normal py-2 pr-3">
+                            <span className="block max-w-[18rem] break-words leading-snug text-sm">{career.nombre}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={cuatrimestre} onValueChange={setCuatrimestre} disabled={!selectedCareer}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Cuatrimestre" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cuatrimestresDisponibles.map((number) => (
+                          <SelectItem key={number} value={String(number)}>
+                            {number}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={String(groupNumber)} onValueChange={(value) => setGroupNumber(Number(value))}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Asignación de número" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 20 }, (_, index) => index + 1).map((number) => (
+                          <SelectItem key={number} value={String(number)}>
+                            {number}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="col-span-1 sm:col-span-2 lg:col-span-1">
+                      <div className="flex min-w-0 items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 h-full">
+                        <CalendarDays className="h-4 w-4 text-emerald-500 shrink-0" />
+                        <div className="min-w-0 truncate text-xs sm:text-sm">Nombre: <strong className="text-slate-900 dark:text-slate-100">{currentGroupName}</strong></div>
+                      </div>
+                    </div>
+                    <Button onClick={handleAddGroup} variant="success" disabled={!careerCode || !cuatrimestre} className="w-full text-sm">
+                      Crear grupo
+                    </Button>
                   </div>
-                  <Button onClick={handleAddGroup} variant="success" disabled={!careerCode || !cuatrimestre}>Crear grupo</Button>
                 </div>
 
+                {/* Lista de grupos - Mejorado para móvil */}
                 <div className={softPanelClass}>
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <h3 className="font-medium text-slate-900 dark:text-slate-100">Grupos creados</h3>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Selecciona un plan y verás sus carreras con los grupos creados.</p>
+                      <h3 className="font-medium text-slate-900 dark:text-slate-100 text-sm sm:text-base">Grupos creados</h3>
+                      <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Selecciona un plan y verás sus carreras con los grupos creados.</p>
                     </div>
-                    <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
-                      <div className="relative w-full md:w-64">
+                    <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto md:items-center">
+                      <div className="relative w-full sm:w-64">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <Input
                           value={groupSearch}
                           onChange={(event) => setGroupSearch(event.target.value)}
                           placeholder="Buscar grupo"
-                          className="pl-9"
+                          className="pl-9 text-sm"
                         />
                       </div>
                       <Select value={groupViewPlan} onValueChange={(value) => setGroupViewPlan(value as "nuevo-modelo" | "plan-normal")}>
-                        <SelectTrigger className="w-full md:w-64">
+                        <SelectTrigger className="w-full sm:w-64 text-sm">
                           <SelectValue placeholder="Ver plan" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1111,13 +1131,16 @@ const handleSaveProfile = async () => {
                     </div>
                   </div>
 
-                  <div className="mt-4 space-y-4">
+                  {/* CONTENEDOR CON SCROLL PARA GRUPOS - Ajustado para móvil */}
+                  <div className="mt-4 space-y-4 max-h-[400px] sm:max-h-[500px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
                     {filteredGroups.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-emerald-200/45 bg-white/40 px-4 py-6 text-sm text-slate-500 dark:border-emerald-900/25 dark:bg-slate-950/35">No hay grupos que coincidan con la búsqueda.</div>
+                      <div className="rounded-2xl border border-dashed border-emerald-200/45 bg-white/40 px-4 py-6 text-sm text-slate-500 dark:border-emerald-900/25 dark:bg-slate-950/35">
+                        No hay grupos que coincidan con la búsqueda.
+                      </div>
                     ) : (
                       <>
-                        <div className="rounded-2xl border border-emerald-200/40 bg-white/45 p-4 dark:border-emerald-900/25 dark:bg-slate-950/35">
-                          <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 pb-3 dark:border-slate-800">
+                        <div className="rounded-2xl border border-emerald-200/40 bg-white/45 p-3 sm:p-4 dark:border-emerald-900/25 dark:bg-slate-950/35">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-3 dark:border-slate-800">
                             <div>
                               <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
                                 {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
@@ -1127,7 +1150,8 @@ const handleSaveProfile = async () => {
                             <p className="text-xs text-slate-500 dark:text-slate-400">{selectedPlanCareerGroups.length} carreras con grupos</p>
                           </div>
 
-                          <div className="mt-4 space-y-3">
+                          {/* CONTENEDOR INTERNO CON SCROLL PARA LAS CARRERAS - Ajustado para móvil */}
+                          <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-3 max-h-[300px] sm:max-h-[400px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
                             {selectedPlanCareerGroups.length === 0 ? (
                               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40">
                                 No hay grupos creados para este plan.
@@ -1138,25 +1162,25 @@ const handleSaveProfile = async () => {
                                   <button
                                     type="button"
                                     onClick={() => setOpenCareer(openCareer === career.codigo ? null : career.codigo)}
-                                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+                                    className="w-full flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 text-left"
                                     aria-expanded={openCareer === career.codigo}
                                   >
                                     <div className="min-w-0">
-                                      <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{career.nombre}</p>
-                                      <p className="text-xs text-slate-500 dark:text-slate-400">{career.codigo} · {careerGroups.length} grupos creados</p>
+                                      <p className="truncate text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">{career.nombre}</p>
+                                      <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">{career.codigo} · {careerGroups.length} grupos creados</p>
                                     </div>
-                                    <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                    <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                                       {careerGroups.length}
                                     </span>
                                   </button>
 
                                   {openCareer === career.codigo && (
-                                    <div className="space-y-2 border-t border-emerald-200/35 p-3 dark:border-emerald-900/20">
+                                    <div className="space-y-2 border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20">
                                       {careerGroups.map((g) => (
-                                        <div key={g.id} className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200/35 bg-white/40 px-4 py-3 dark:border-emerald-900/20 dark:bg-slate-950/30">
+                                        <div key={g.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 rounded-2xl border border-emerald-200/35 bg-white/40 px-3 sm:px-4 py-2 sm:py-3 dark:border-emerald-900/20 dark:bg-slate-950/30">
                                           <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">
-                                            <p className="truncate font-medium">{g.name}</p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">Cuatrimestre {g.cuatrimestre} · Grupo {g.groupNumber}</p>
+                                            <p className="truncate font-medium text-xs sm:text-sm">{g.name}</p>
+                                            <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Cuatrimestre {g.cuatrimestre} · Grupo {g.groupNumber}</p>
                                           </div>
                                           <div className="flex items-center gap-2">
                                             <Button
@@ -1164,22 +1188,22 @@ const handleSaveProfile = async () => {
                                               size="icon"
                                               onClick={() => handleStartEditGroup(g)}
                                               disabled={Boolean(editingGroupId)}
-                                              className="h-9 w-9 rounded-full border-emerald-200/60 bg-white/60 text-slate-700 hover:bg-emerald-50 hover:text-slate-900 dark:border-emerald-900/30 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-900"
+                                              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border-emerald-200/60 bg-white/60 text-slate-700 hover:bg-emerald-50 hover:text-slate-900 dark:border-emerald-900/30 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-900"
                                               aria-label={`Editar grupo ${g.name}`}
                                               title="Editar grupo"
                                             >
-                                              <PencilLine className="h-4 w-4" aria-hidden="true" />
+                                              <PencilLine className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                                             </Button>
                                             <Button
                                               variant="ghost"
                                               size="icon"
                                               onClick={() => handleRemoveGroup(g.id)}
                                               disabled={Boolean(editingGroupId)}
-                                              className="h-9 w-9 rounded-full text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                                              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:bg-rose-500/10"
                                               aria-label={`Eliminar grupo ${g.name}`}
                                               title="Eliminar grupo"
                                             >
-                                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                                             </Button>
                                           </div>
                                         </div>
@@ -1201,6 +1225,7 @@ const handleSaveProfile = async () => {
         </div>
       </div>
 
+      {/* Diálogos - Mejorados para móvil */}
       <Dialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
@@ -1210,28 +1235,30 @@ const handleSaveProfile = async () => {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Confirmar eliminación</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base sm:text-lg">Confirmar eliminación</DialogTitle>
+            <DialogDescription className="text-sm">
               Escribe exactamente <strong>{deleteTarget?.label}</strong> para confirmar el borrado de {deleteTarget?.description?.toLowerCase()}.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label>Texto de confirmación</Label>
+            <Label className="text-sm">Texto de confirmación</Label>
             <Input
               value={deleteConfirmation}
               onChange={(event) => setDeleteConfirmation(event.target.value)}
               placeholder={deleteTarget?.label ?? "Escribe aquí"}
+              className="text-sm"
             />
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => {
                 setDeleteTarget(null);
                 setDeleteConfirmation("");
               }}
+              className="w-full sm:w-auto text-sm"
             >
               Cancelar
             </Button>
@@ -1253,6 +1280,7 @@ const handleSaveProfile = async () => {
                 }, 400);
               }}
               disabled={isLoading}
+              className="w-full sm:w-auto text-sm"
             >
               Eliminar
             </Button>
@@ -1268,16 +1296,16 @@ const handleSaveProfile = async () => {
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Editar grupo</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base sm:text-lg">Editar grupo</DialogTitle>
+            <DialogDescription className="text-sm">
               Modifica los datos del grupo seleccionado. Si haces cambios, debes guardarlos antes de salir.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-3 sm:p-4 dark:border-slate-800 dark:bg-slate-900/60">
               <div className="text-sm text-slate-500 dark:text-slate-400">
                 Nombre final: <strong className="ml-1 text-slate-900 dark:text-slate-100">{editingCurrentGroupName}</strong>
               </div>
@@ -1290,7 +1318,7 @@ const handleSaveProfile = async () => {
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <Select value={editingGroupPlan} onValueChange={(value) => setEditingGroupPlan(value as "nuevo-modelo" | "plan-normal")}>
-                <SelectTrigger className="min-w-0">
+                <SelectTrigger className="min-w-0 text-sm">
                   <SelectValue placeholder="Plan" className="min-w-0 flex-1 truncate" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1299,19 +1327,19 @@ const handleSaveProfile = async () => {
                 </SelectContent>
               </Select>
               <Select value={editingGroupCareerCode} onValueChange={setEditingGroupCareerCode} disabled={!editingGroupPlan}>
-                <SelectTrigger className="min-w-0">
+                <SelectTrigger className="min-w-0 text-sm">
                   <SelectValue placeholder="Carrera" className="min-w-0 flex-1 truncate" />
                 </SelectTrigger>
                 <SelectContent>
                   {editingCareerOptions.map((career) => (
                     <SelectItem key={career.codigo} value={career.codigo} className="whitespace-normal py-2 pr-3">
-                      <span className="block max-w-[18rem] break-words leading-snug">{career.nombre}</span>
+                      <span className="block max-w-[18rem] break-words leading-snug text-sm">{career.nombre}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Select value={editingGroupCuatrimestre} onValueChange={setEditingGroupCuatrimestre} disabled={!editingSelectedCareer}>
-                <SelectTrigger className="min-w-0">
+                <SelectTrigger className="min-w-0 text-sm">
                   <SelectValue placeholder="Cuatrimestre" className="min-w-0 flex-1 truncate" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1323,7 +1351,7 @@ const handleSaveProfile = async () => {
                 </SelectContent>
               </Select>
               <Select value={String(editingGroupNumber)} onValueChange={(value) => setEditingGroupNumber(Number(value))}>
-                <SelectTrigger className="min-w-0">
+                <SelectTrigger className="min-w-0 text-sm">
                   <SelectValue placeholder="Número" className="min-w-0 flex-1 truncate" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1337,11 +1365,12 @@ const handleSaveProfile = async () => {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={clearEditingGroupState}
               disabled={isEditingGroupDirty}
+              className="w-full sm:w-auto text-sm"
             >
               Cerrar
             </Button>
@@ -1349,17 +1378,20 @@ const handleSaveProfile = async () => {
               variant="success"
               onClick={handleSaveGroupEdit}
               disabled={!editingGroupId || !editingGroupCareerCode.trim() || !editingGroupCuatrimestre}
+              className="w-full sm:w-auto text-sm"
             >
               Guardar cambios
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Loader - Ajustado para móvil */}
       {isLoading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative z-10 flex flex-col items-center gap-3 rounded-lg bg-white/90 p-6 shadow-lg dark:bg-slate-900/90">
-            <svg className="h-12 w-12 animate-spin text-emerald-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <div className="relative z-10 flex flex-col items-center gap-3 rounded-lg bg-white/90 p-6 shadow-lg dark:bg-slate-900/90 max-w-[90vw]">
+            <svg className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-emerald-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
             </svg>

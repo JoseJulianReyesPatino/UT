@@ -9,7 +9,9 @@ import { Textarea } from "../../components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { CornerUpLeft, Paperclip, PencilLine, Search, Send, X, Trash, EyeOff, Eye } from "lucide-react";
 import { cn } from "../../../lib/utils";
+import downloadIcon from "../../../assets/icons/download-circle.svg";
 import apiFetch from "../../lib/api";
+import { resolveApiAssetUrl, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
 import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -19,10 +21,35 @@ import defaultAvatar from "../../../assets/perfil2.png";
 const DEFAULT_AVATAR_PATH = defaultAvatar;
 
 type AttachmentItem = {
+  file?: File;
   name: string;
   sizeLabel: string;
   typeLabel: string;
+  url?: string;
 };
+
+async function tryFetchAndDownload(url: string, filename: string) {
+  try {
+    const headers: Record<string, string> = {};
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(url, { method: 'GET', headers, credentials: 'include' });
+    if (!res.ok) throw new Error('Network response not ok');
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
 
 type ChatMessage = {
   id: number;
@@ -313,9 +340,42 @@ const MessageBubble = React.memo(({
             {message.attachments.map((attachment) => (
               <div key={`${message.id}-${attachment.name}`} className="flex items-center gap-3 rounded-lg border p-2 text-sm bg-muted/40 dark:bg-slate-700/40">
                 <Paperclip className="h-4 w-4 text-muted-foreground dark:text-slate-400" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium dark:text-slate-200">{attachment.name}</p>
-                  <p className="text-xs text-muted-foreground dark:text-slate-400">{attachment.typeLabel} • {attachment.sizeLabel}</p>
+                <div className="min-w-0 flex-1 flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium dark:text-slate-200">
+                      {attachment.url ? (
+                        <a
+                          href={resolveApiAssetUrl(attachment.url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline hover:text-emerald-700 dark:hover:text-emerald-300"
+                        >
+                          {attachment.name}
+                        </a>
+                      ) : (
+                        attachment.name
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground dark:text-slate-400">{attachment.typeLabel} • {attachment.sizeLabel}</p>
+                  </div>
+
+                  {attachment.url && (
+                    <a
+                      href={resolveApiAssetUrl(attachment.url)}
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        const resolved = resolveApiAssetUrl(attachment.url!);
+                        const ok = await tryFetchAndDownload(resolved, attachment.name);
+                        if (!ok) {
+                          window.open(resolved, '_blank', 'noopener');
+                        }
+                      }}
+                      className="ml-3 text-muted-foreground hover:text-emerald-700 dark:hover:text-emerald-300"
+                      title={`Descargar ${attachment.name}`}
+                      >
+                      <img src={downloadIcon} alt="Descargar" className="h-4 w-4" />
+                    </a>
+                  )}
                 </div>
               </div>
             ))}
@@ -1029,6 +1089,7 @@ export function MessagesAdmin(props: Readonly<{
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     const attachments = files.map((file) => ({
+      file,
       name: file.name,
       sizeLabel: formatSize(file.size),
       typeLabel: file.type || "Archivo",
@@ -1039,6 +1100,7 @@ export function MessagesAdmin(props: Readonly<{
 
   const addFiles = (files: File[]) => {
     const attachments = files.map((file) => ({
+      file,
       name: file.name,
       sizeLabel: formatSize(file.size),
       typeLabel: file.type || "Archivo",
@@ -1079,10 +1141,20 @@ export function MessagesAdmin(props: Readonly<{
           return;
         }
 
+        const formData = new FormData();
+        formData.append('body', trimmedMessage || (pendingAttachments.length > 0 ? 'Adjunto enviado' : ''));
+        if (replyingTo?.id) {
+          formData.append('reply_to_message_id', String(replyingTo.id));
+        }
+        pendingAttachments.forEach((attachment) => {
+          if (attachment.file) {
+            formData.append('attachments[]', attachment.file, attachment.file.name);
+          }
+        });
+
         await apiFetch(`/conversations/${targetConversationId}/messages`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ body: trimmedMessage || (pendingAttachments.length > 0 ? 'Adjunto enviado' : ''), reply_to_message_id: replyingTo?.id ?? null }),
+          body: formData,
         });
         setMessage('');
         setPendingAttachments([]);
