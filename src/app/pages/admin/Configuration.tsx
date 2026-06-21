@@ -9,10 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { getFormConfig, saveFormConfig, Group, type FormId, type FormRole } from "../../../lib/formConfig";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
+import { API_BASE_URL } from "../../lib/env";
 import { useTheme } from "../../context/ThemeContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { CalendarDays, ChevronDown, ChevronUp, FileText, Grid2x2, Moon, PencilLine, Search, Sun, Trash2, Users, Settings2 } from "lucide-react";
-import { toast } from "sonner";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronUp, FileText, Grid2x2, Moon, PencilLine, Search, Sun, Trash2, Users, Settings2 } from "lucide-react";import { toast } from "sonner";
 import { carrieras } from "../../data/curricula";
 import { clearAvatarCache, getAvatarUrlWithTimestamp, getInitials } from "../../lib/avatar";
 
@@ -21,7 +21,7 @@ const getAbsoluteUrl = (url?: string | null): string | undefined => {
   if (!url) return undefined;
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
   if (url.startsWith('/')) {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
+    const baseUrl = API_BASE_URL.replace(/\/api$/, '');
     return `${baseUrl}${url}`;
   }
   return url;
@@ -92,11 +92,14 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const { initialTab = "formularios" } = props;
   const { user, updateProfile, refreshUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
+const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
+const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
   const [formConfig, setFormConfig] = useState(getFormConfig());
   const [formCodeToId, setFormCodeToId] = useState<Record<FormId, number>>({} as Record<FormId, number>);
   const [isFormConfigLoading, setIsFormConfigLoading] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [formDrafts, setFormDrafts] = useState<Record<FormId, { roles: FormRole[]; dueAt: string | null }>>(() => getFormConfig().formAccess);
+  const [savingFormIds, setSavingFormIds] = useState<Record<FormId, boolean>>({} as Record<FormId, boolean>);
 
   const [plan, setPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
   const [careerCode, setCareerCode] = useState("");
@@ -179,6 +182,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
         const nextConfig = { ...savedConfig, formAccess };
         saveFormConfig(nextConfig);
         setFormConfig(nextConfig);
+        setFormDrafts(nextConfig.formAccess);
         setFormCodeToId(idMap);
       } catch (err: any) {
         console.error('Failed to load forms configuration', err);
@@ -299,24 +303,21 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     }
   }, [editingGroupId, editingSelectedCareer, editingCuatrimestresDisponibles, editingGroupCuatrimestre]);
 
-  const updateFormAccess = (formId: FormId, updater: (current: { roles: FormRole[]; dueAt: string | null }) => { roles: FormRole[]; dueAt: string | null }) => {
-    setFormConfig((current) => {
-      const next = {
-        ...current,
-        formAccess: {
-          ...current.formAccess,
-          [formId]: updater(current.formAccess[formId]),
-        },
-      };
-      saveFormConfig(next);
-      return next;
-    });
+  const setFormDraftValue = (
+    formId: FormId,
+    updater: (current: { roles: FormRole[]; dueAt: string | null }) => { roles: FormRole[]; dueAt: string | null },
+  ) => {
+    setFormDrafts((current) => ({
+      ...current,
+      [formId]: updater(current[formId] ?? formConfig.formAccess[formId]),
+    }));
   };
 
   const saveFormAccessRule = async (formId: FormId, nextRule: { roles: FormRole[]; dueAt: string | null }) => {
     const formIdNumber = formCodeToId[formId];
     if (!formIdNumber) {
-      return;
+      toast.error('No se encontró el identificador del formulario. Actualiza la página e intenta de nuevo.');
+      return false;
     }
 
     try {
@@ -325,32 +326,57 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           access_roles: nextRule.roles,
-          due_at: nextRule.dueAt,
+          due_at: nextRule.dueAt ?? null,
         }),
       });
+      return true;
     } catch (err: any) {
       toast.error(err?.message ?? 'No fue posible guardar la configuración del formulario');
+      return false;
     }
   };
 
-  const persistFormAccess = async (formId: FormId, updater: (current: { roles: FormRole[]; dueAt: string | null }) => { roles: FormRole[]; dueAt: string | null }) => {
-    setFormConfig((current) => {
-      const nextRule = updater(current.formAccess[formId]);
-      const next = {
-        ...current,
-        formAccess: {
-          ...current.formAccess,
-          [formId]: nextRule,
-        },
-      };
-      saveFormConfig(next);
-      void saveFormAccessRule(formId, nextRule);
-      return next;
-    });
+  const handleSaveForm = async (formId: FormId) => {
+    const currentDraft = formDrafts[formId];
+    if (!currentDraft) {
+      toast.error('No hay cambios para guardar.');
+      return;
+    }
+
+    const isDifferent = JSON.stringify(currentDraft) !== JSON.stringify(formConfig.formAccess[formId]);
+    if (!isDifferent) {
+      toast('No hay cambios pendientes.');
+      return;
+    }
+
+    setSavingFormIds((current) => ({ ...current, [formId]: true }));
+    const success = await saveFormAccessRule(formId, currentDraft);
+    if (success) {
+      setFormConfig((current) => {
+        const next = {
+          ...current,
+          formAccess: {
+            ...current.formAccess,
+            [formId]: currentDraft,
+          },
+        };
+        saveFormConfig(next);
+        return next;
+      });
+      toast.success('Configuración guardada');
+    }
+    setSavingFormIds((current) => ({ ...current, [formId]: false }));
+  };
+
+  const handleResetForm = (formId: FormId) => {
+    setFormDrafts((current) => ({
+      ...current,
+      [formId]: formConfig.formAccess[formId],
+    }));
   };
 
   const toggleFormRole = (formId: FormId, role: FormRole) => {
-    persistFormAccess(formId, (current) => {
+    setFormDraftValue(formId, (current) => {
       const nextRoles = current.roles.includes(role)
         ? current.roles.filter((item) => item !== role)
         : [...current.roles, role];
@@ -363,7 +389,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   };
 
   const handleDeadlineChange = (formId: FormId, value: string) => {
-    persistFormAccess(formId, (current) => ({
+    setFormDraftValue(formId, (current) => ({
       ...current,
       dueAt: value || null,
     }));
@@ -671,9 +697,9 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   );
 
   return (
-    <div className={`space-y-4 sm:space-y-8 pb-6 ${shellClass}`}>
+   <div className={`flex h-[calc(100vh-64px)] flex-col gap-4 sm:gap-6 overflow-hidden ${shellClass}`}>
       {/* Header - Mejorado para móvil */}
-      <div className="rounded-2xl sm:rounded-3xl border border-emerald-200/60 bg-white/45 p-4 sm:p-6 shadow-sm backdrop-blur dark:border-emerald-900/35 dark:bg-slate-950/55">
+     <div className="shrink-0 rounded-2xl sm:rounded-3xl border border-emerald-200/60 bg-white/45 p-4 sm:p-6 shadow-sm backdrop-blur dark:border-emerald-900/35 dark:bg-slate-950/55">
         <div className="flex flex-col gap-2">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100">Configuración del Sistema</h1>
@@ -683,10 +709,9 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       </div>
 
       {/* Layout principal - Cambia a columna en móvil */}
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 gap-4 sm:gap-6 lg:grid-cols-[280px_minmax(0,1fr)] items-start overflow-hidden">
         {/* Sidebar - Mejorado para móvil */}
-        <Card className={`${sidebarClass} shadow-xl`}>
-          <CardHeader className={`${sidebarCardClass} p-3 sm:p-6`}>
+<Card className={`${sidebarClass} shadow-xl self-start ${mobileSectionOpen ? "hidden lg:block" : "block"}`}>          <CardHeader className={`${sidebarCardClass} p-3 sm:p-6`}>
             <CardTitle className={theme === "dark" ? "text-white text-base sm:text-lg" : "text-slate-900 text-base sm:text-lg"}>Secciones</CardTitle>
             <CardDescription className={`${theme === "dark" ? "text-slate-400" : "text-slate-500"} text-xs sm:text-sm`}>Navega por la configuración</CardDescription>
           </CardHeader>
@@ -697,10 +722,13 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
               return (
                 <button
-                  key={item.value}
-                  type="button"
-                  disabled={Boolean(editingGroupId && item.value !== activeTab)}
-                  onClick={() => setActiveTab(item.value)}
+  key={item.value}
+  type="button"
+  disabled={Boolean(editingGroupId && item.value !== activeTab)}
+  onClick={() => {
+    setActiveTab(item.value);
+    setMobileSectionOpen(true);
+  }}
                   className={`flex w-full items-center gap-2 sm:gap-3 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 text-left transition-all ${
                     isActive
                       ? (theme === "dark"
@@ -725,8 +753,17 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
         </Card>
 
         {/* Contenido principal */}
-        <div className="space-y-4 sm:space-y-8">
-          {activeTab === "cuenta" && (
+      {/* Contenido principal */}
+<div className={`h-full min-h-0 space-y-4 sm:space-y-8 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent ${mobileSectionOpen ? "block" : "hidden lg:block"}`}>
+  <button
+    type="button"
+    onClick={() => setMobileSectionOpen(false)}
+    className="mb-2 flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 lg:hidden"
+  >
+    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+    Volver a secciones
+  </button>
+  {activeTab === "cuenta" && (
             <Card className={sectionCardClass}>
               <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
                 <CardTitle className="text-base sm:text-lg">Configuración de tu Cuenta</CardTitle>
@@ -885,10 +922,6 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
           {activeTab === "formularios" && (
             <Card className={sectionCardClass}>
-              <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
-                <CardTitle className="text-base sm:text-lg">Formularios</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Administra el acceso, vencimiento y visibilidad de cada formulario</CardDescription>
-              </CardHeader>
               <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
                 <div className={softPanelClass}>
                   <div className="mb-3">
@@ -928,17 +961,19 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                             <div className="border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20">
                               <div className="space-y-2">
                                 {section.forms.map((form) => {
-                                  const config = formConfig.formAccess[form.id];
-                                  const allowedRoles = config.roles.map((role) => FORM_ROLE_LABELS[role]).join(" y ");
+                                  const savedConfig = formConfig.formAccess[form.id];
+                                  const draftConfig = formDrafts[form.id] ?? savedConfig;
+                                  const allowedRoles = draftConfig.roles.map((role) => FORM_ROLE_LABELS[role]).join(" y ");
                                   const isTutoriasForm = form.section === "tutorias";
-                                  const dueAtLabel = config.dueAt
-                                    ? new Date(config.dueAt).toLocaleString("es-MX", {
+                                  const dueAtLabel = draftConfig.dueAt
+                                    ? new Date(draftConfig.dueAt).toLocaleString("es-MX", {
                                         dateStyle: "medium",
                                         timeStyle: "short",
                                       })
                                     : "Sin vencimiento";
 
                                   const isOpenItem = Boolean(openFormItems[form.id]);
+                                  const isDraftChanged = JSON.stringify(draftConfig) !== JSON.stringify(savedConfig);
 
                                   return (
                                     <div key={form.id} className="rounded-2xl border border-emerald-200/35 bg-white/45 dark:border-emerald-900/20 dark:bg-slate-950/30">
@@ -972,9 +1007,9 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                                 <Label htmlFor={`deadline-${form.id}`} className="text-sm">Fecha y hora de vencimiento</Label>
                                                 <label className="flex items-center gap-2 text-sm">
                                                   <Checkbox
-                                                    checked={config.dueAt === null}
+                                                    checked={draftConfig.dueAt === null}
                                                     onCheckedChange={(val) => {
-                                                      updateFormAccess(form.id, (current) => ({ ...current, dueAt: val ? null : "" }));
+                                                      setFormDraftValue(form.id, (current) => ({ ...current, dueAt: val ? null : "" }));
                                                     }}
                                                   />
                                                   <span>Sin límite</span>
@@ -983,9 +1018,9 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                               <Input
                                                 id={`deadline-${form.id}`}
                                                 type="datetime-local"
-                                                value={config.dueAt ?? ""}
+                                                value={draftConfig.dueAt ?? ""}
                                                 onChange={(event) => handleDeadlineChange(form.id, event.target.value)}
-                                                disabled={config.dueAt === null}
+                                                disabled={draftConfig.dueAt === null}
                                                 className="text-sm"
                                               />
                                             </div>
@@ -1001,14 +1036,14 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                                 <div className="flex flex-wrap items-center gap-4">
                                                   <label className="flex items-center gap-2">
                                                     <Checkbox
-                                                      checked={config.roles.includes("docente")}
+                                                      checked={draftConfig.roles.includes("docente")}
                                                       onCheckedChange={() => toggleFormRole(form.id, "docente")}
                                                     />
                                                     <span className="text-sm">Docente</span>
                                                   </label>
                                                   <label className="flex items-center gap-2">
                                                     <Checkbox
-                                                      checked={config.roles.includes("tutor")}
+                                                      checked={draftConfig.roles.includes("tutor")}
                                                       onCheckedChange={() => toggleFormRole(form.id, "tutor")}
                                                     />
                                                     <span className="text-sm">Tutor</span>
@@ -1017,6 +1052,25 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                               )}
                                               {!isTutoriasForm && <p className="text-xs text-muted-foreground">Selecciona si el formulario aplica para Docente, Tutor o ambos.</p>}
                                             </div>
+                                          </div>
+                                          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              onClick={() => handleResetForm(form.id)}
+                                              disabled={!isDraftChanged || Boolean(savingFormIds[form.id])}
+                                              className="w-full sm:w-auto text-sm"
+                                            >
+                                              Cancelar
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              onClick={() => handleSaveForm(form.id)}
+                                              disabled={!isDraftChanged || Boolean(savingFormIds[form.id])}
+                                              className="w-full sm:w-auto text-sm"
+                                            >
+                                              {savingFormIds[form.id] ? 'Guardando...' : 'Guardar cambios'}
+                                            </Button>
                                           </div>
                                         </div>
                                       )}
@@ -1104,11 +1158,13 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
                 {/* Lista de grupos - Mejorado para móvil */}
                 <div className={softPanelClass}>
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <h3 className="font-medium text-slate-900 dark:text-slate-100 text-sm sm:text-base">Grupos creados</h3>
-                      <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Selecciona un plan y verás sus carreras con los grupos creados.</p>
-                    </div>
+                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+              <h3 className="font-medium text-slate-900 dark:text-slate-100 text-sm sm:text-base">Grupos creados</h3>
+             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+               {selectedPlanGroups.length} {selectedPlanGroups.length === 1 ? "grupo" : "grupos"} en {selectedPlanCareerGroups.length} {selectedPlanCareerGroups.length === 1 ? "carrera" : "carreras"} · {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
+             </p>
+          </div>
                     <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto md:items-center">
                       <div className="relative w-full sm:w-64">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -1175,8 +1231,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                   </button>
 
                                   {openCareer === career.codigo && (
-                                    <div className="space-y-2 border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20">
-                                      {careerGroups.map((g) => (
+  <div className="space-y-2 border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20 max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
+    {careerGroups.map((g) => (
                                         <div key={g.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 rounded-2xl border border-emerald-200/35 bg-white/40 px-3 sm:px-4 py-2 sm:py-3 dark:border-emerald-900/20 dark:bg-slate-950/30">
                                           <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">
                                             <p className="truncate font-medium text-xs sm:text-sm">{g.name}</p>

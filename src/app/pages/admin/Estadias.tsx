@@ -28,6 +28,7 @@ type EstadiaPendingDocument = {
   carrera: string;
   grupo: string;
   fecha: string;
+  file_path?: string | null;
   returned?: boolean;
   returnedAt?: string;
   resubmittedAt?: string;
@@ -42,6 +43,7 @@ type EstadiaReviewedDocument = {
   documento: string;
   apartado: string;
   carrera: string;
+  file_path?: string | null;
   reviewedAt: string;
   fecha?: string;
   returned?: boolean;
@@ -201,6 +203,7 @@ export default function Estadias() {
       carrera: doc.carrera_label?.trim() || "Sin carrera",
       grupo: formatGroupCode(doc.group?.group_code ?? doc.group_code ?? "-"),
       fecha: doc.submitted_at ?? "",
+      file_path: doc.file_path ?? null,
       returned: doc.status === "devuelto",
       returnedAt: doc.returned_at ?? undefined,
       resubmittedAt: doc.resubmitted_at ?? undefined,
@@ -415,12 +418,13 @@ export default function Estadias() {
   };
 
   const handleShareToMessages = (doc: EstadiaDocumentItem) => {
+    const recipientName = 'docente' in doc ? doc.docente : (doc as any).docente;
     globalThis.dispatchEvent(
       new CustomEvent("openMessagesConversation", {
         detail: {
-          recipientName: doc.docente,
+          recipientName,
           recipientRole: "Docente",
-          document: { id: doc.id, title: doc.documento },
+          document: { id: doc.id, title: doc.documento, filePath: doc.file_path ?? "" },
         },
       })
     );

@@ -431,7 +431,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const renderContent = (isMobile: boolean = false) => {
     const isCollapsedLocal = isMobile ? false : collapsed;
     const containerClass = cn(
-      "relative mx-3 my-3 flex h-[calc(100dvh-1.5rem)] min-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-b from-slate-50 via-white to-slate-100 text-sidebar-foreground shadow-[0_18px_45px_rgba(15,23,42,0.12)] transition-all duration-300 dark:border-slate-700 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950",
+      "relative mx-3 my-3 flex h-[calc(100dvh-1.5rem)] min-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-background to-sky-50 text-sidebar-foreground shadow-[0_10px_30px_rgba(15,23,42,0.08),0_2px_10px_rgba(16,185,129,0.08)] transition-all duration-300 dark:border-slate-800 dark:bg-gradient-to-br dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950",
       isCollapsedLocal ? "w-16" : "w-64"
     );
 

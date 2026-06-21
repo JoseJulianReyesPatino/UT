@@ -432,7 +432,7 @@ export default function EstadiasPage() {
         {selectedConfig && (
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" className="rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent">
+              <Button variant="outline" className="w-full justify-center rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent sm:w-auto">
                 <History className="mr-2 h-4 w-4" />
                 Historial
               </Button>

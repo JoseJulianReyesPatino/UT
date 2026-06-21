@@ -33,6 +33,7 @@ type PendingDocument = {
 	grupo: string;
 	parcial?: string;
 	fecha: string;
+	file_path?: string | null;
 	returned?: boolean;
 	returnedAt?: string;
 	resubmittedAt?: string;
@@ -50,6 +51,7 @@ type ReviewedDocument = {
 	cuatrimestre?: string;
 	grupo?: string;
 	parcial?: string;
+	file_path?: string | null;
 	reviewedAt: string;
 	fecha?: string;
 	returned?: boolean;
@@ -672,7 +674,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	};
 
 	const handleShareToMessages = (doc: DocumentItem) => {
-		globalThis.dispatchEvent(new CustomEvent("openMessagesConversation", { detail: { recipientName: doc.docente, recipientRole: "Docente", document: { id: doc.id, title: doc.documento } } }));
+		globalThis.dispatchEvent(new CustomEvent("openMessagesConversation", { detail: { recipientName: doc.docente, recipientRole: "Docente", document: { id: doc.id, title: doc.documento, filePath: doc.file_path ?? "" } } }));
 	};
 
 	const confirmPendingAction = () => {
@@ -718,7 +720,12 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const pendingActionDescription = (() => {
 		if (!pendingAction) return "";
 		if (pendingAction.type === "review") return `Vas a marcar como revisado: ${pendingAction.document.documento}`;
-		if (pendingAction.type === "send") return `Vas a enviar a mensajes: ${pendingAction.document.documento}`;
+		if (pendingAction.type === "send") {
+			const doc = pendingAction.document as any;
+			const recipientRole = doc.tutor ? 'tutor' : 'docente';
+			const recipientName = doc.tutor ?? doc.docente ?? '';
+			return `Vas a compartirle el documento ${pendingAction.document.documento} al ${recipientRole} ${recipientName}`;
+		}
 		return `Vas a devolver: ${pendingAction.document.documento}`;
 	})();
 

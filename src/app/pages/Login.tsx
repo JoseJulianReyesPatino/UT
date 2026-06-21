@@ -1,38 +1,30 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../context/ThemeContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent } from "../components/ui/card";
-import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon } from "lucide-react";
+import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 export function Login() {
-  const THEME_TOGGLE_COOLDOWN_MS = 700;
   const topDots = Array.from({ length: 16 }, (_, index) => `login-dot-top-${index}`);
   const bottomDots = Array.from({ length: 15 }, (_, index) => `login-dot-bottom-${index}`);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const lastThemeToggleRef = useRef(0);
   const { login } = useAuth();
-  const { theme, toggleTheme } = useTheme();
-  const isDark = theme === "dark";
-  const logoSrc = isDark ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
+  const logoSrc = "/src/assets/LogotipoUTSLRC-BLANCO.webp";
   const superiorImage = new URL("../../assets/superior.webp", import.meta.url).href;
   const inferiorImage = new URL("../../assets/inferior.webp", import.meta.url).href;
+  const backgroundImage = new URL("../../assets/ut_imagen13.jpg", import.meta.url).href;
 
-  const pageBackground = isDark
-    ? "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950"
-    : "bg-gradient-to-br from-white via-slate-50 to-white";
-  const cardSurface = isDark
-    ? "bg-slate-950/85 border-slate-800/80 shadow-[0_24px_70px_rgba(0,0,0,0.45)]"
-    : "bg-white border-slate-100/50 shadow-2xl";
-  const labelText = isDark ? "text-slate-200" : "text-slate-700";
-  const helperText = isDark ? "text-slate-400" : "text-slate-500";
+  const pageBackground = "bg-slate-950";
+  const cardSurface = "bg-slate-950/85 border-slate-800/80 shadow-[0_24px_70px_rgba(0,0,0,0.45)]";
+  const labelText = "text-slate-200";
+  const helperText = "text-slate-400";
   const inputClasses =
-    "h-12 rounded-xl border bg-white/95 pl-12 pr-14 text-base text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 hover:border-slate-300 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:border-slate-700 dark:hover:border-slate-600";
+    "h-12 rounded-xl border bg-slate-900/80 pl-12 pr-14 text-base text-slate-100 placeholder:text-slate-500 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 hover:border-slate-600 border-slate-700";
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -46,18 +38,14 @@ export function Login() {
     }
   };
 
-  const handleThemeToggle = () => {
-    const now = Date.now();
-    if (now - lastThemeToggleRef.current < THEME_TOGGLE_COOLDOWN_MS) {
-      return;
-    }
-    lastThemeToggleRef.current = now;
-    toggleTheme();
-  };
-
   return (
-    <div className={`${pageBackground} min-h-screen overflow-hidden relative`}>
+    <div className={`dark ${pageBackground} min-h-screen overflow-hidden relative`}>
       {/* BACKGROUND - Gradientes y decoraciones mejoradas */}
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${backgroundImage})` }}
+      />
+      <div className="absolute inset-0 bg-slate-950/75" />
       <div className="absolute inset-0">
         <img
           src={superiorImage}
@@ -147,7 +135,7 @@ export function Login() {
 
             {/* TEXTO - Bloque independiente */}
             <div className="absolute left-0 top-[210px] max-w-[38rem]">
-              <p className={`${isDark ? "text-slate-300" : "text-slate-600"} text-lg lg:text-xl leading-relaxed font-medium text-justify`}>
+              <p className="text-lg lg:text-xl leading-relaxed font-medium text-justify text-slate-300">
                 Esta plataforma digital facilita la transición hacia el uso eficiente de documentos
                 digitales, optimizando los flujos de trabajo de suma y documentación pertinentes en la
                 institución.
@@ -332,17 +320,6 @@ export function Login() {
         </div>
       </div>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={handleThemeToggle}
-        aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-        title={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-        className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
-      >
-        {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-      </Button>
     </div>
   );
 }

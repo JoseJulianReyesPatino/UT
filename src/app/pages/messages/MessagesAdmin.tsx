@@ -12,6 +12,7 @@ import { cn } from "../../../lib/utils";
 import downloadIcon from "../../../assets/icons/download-circle.svg";
 import apiFetch from "../../lib/api";
 import { resolveApiAssetUrl, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { fetchDocumentBlob, getDocumentFileUrl } from "../../lib/documents";
 import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -26,6 +27,7 @@ type AttachmentItem = {
   sizeLabel: string;
   typeLabel: string;
   url?: string;
+  documentId?: number;
 };
 
 async function tryFetchAndDownload(url: string, filename: string) {
@@ -462,7 +464,7 @@ function EmptyConversationState({ title, description }: Readonly<{ title: string
 }
 
 export function MessagesAdmin(props: Readonly<{
-  initialOpen?: { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string } } | null;
+  initialOpen?: { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string; filePath?: string } } | null;
   onConsume?: () => void;
 }> = {}) {
   const { initialOpen, onConsume } = props;
@@ -476,6 +478,7 @@ export function MessagesAdmin(props: Readonly<{
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentItem[]>([]);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [hasProcessedInitialOpen, setHasProcessedInitialOpen] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [newConversationOpen, setNewConversationOpen] = useState(false);
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
@@ -881,13 +884,53 @@ export function MessagesAdmin(props: Readonly<{
     })();
   }, [isReady, isTeacher, loadConversations, resolveTeacherAdminDraft]);
 
-  const processInitialOpen = useCallback((detail: NonNullable<typeof initialOpen>) => {
+  const processInitialOpen = useCallback(async (detail: NonNullable<typeof initialOpen>) => {
     const { conversationId, recipientName, recipientRole, document } = detail;
-    const buildDocumentAttachment = (doc: { id: number; title: string }): AttachmentItem => ({
+    const buildDocumentAttachment = (doc: { id: number; title: string; filePath?: string }): AttachmentItem => ({
+      documentId: doc.id,
       name: `${doc.title}.pdf`,
       sizeLabel: "—",
       typeLabel: "Documento PDF",
+      url: doc.filePath || undefined,
     });
+
+    const addDocumentAsPending = async (doc: { id: number; title: string; filePath?: string }) => {
+      const attachmentUrl = doc.filePath || getDocumentFileUrl(doc.id);
+      if (!doc?.id) {
+        setPendingAttachments((current) => [...current, buildDocumentAttachment(doc)]);
+        return;
+      }
+
+      setPendingAttachments((current) => {
+        if (current.some((attachment) => attachment.documentId === doc.id)) {
+          return current;
+        }
+
+        return [...current, { ...buildDocumentAttachment(doc), url: attachmentUrl }];
+      });
+
+      try {
+        const blob = await fetchDocumentBlob(doc.id);
+        const name = `${doc.title}.pdf`;
+        const file = new File([blob], name, { type: blob.type || 'application/pdf' });
+        const attachment: AttachmentItem = {
+          documentId: doc.id,
+          file,
+          name,
+          sizeLabel: formatSize(blob.size),
+          typeLabel: blob.type || 'application/pdf',
+          url: attachmentUrl,
+        };
+        setPendingAttachments((current) =>
+          current.map((item) =>
+            item.documentId === doc.id ? attachment : item,
+          ),
+        );
+      } catch (err) {
+        console.error('addDocumentAsPending error', err);
+        toast.error('No fue posible adjuntar el documento automáticamente; se añadió como enlace.');
+      }
+    };
 
     const appendDocumentToConversation = (conv: Conversation, doc: { id: number; title: string }): Conversation => {
       const documentMessage: ChatMessage = {
@@ -909,11 +952,8 @@ export function MessagesAdmin(props: Readonly<{
     if (conversationId) {
       setSelectedChat(conversationId);
       if (document) {
-        setConversations((current) =>
-          current.map((conversation) =>
-            conversation.id === conversationId ? appendDocumentToConversation(conversation, document) : conversation
-          )
-        );
+        // Agregar documento como attachment pendiente en lugar de mensaje
+        await addDocumentAsPending(document);
       }
       void markConversationAsRead(conversationId);
       onConsume?.();
@@ -935,11 +975,10 @@ export function MessagesAdmin(props: Readonly<{
         if (found) {
           setSelectedChat(found.id);
           setDraftRecipient(null);
-          if (document) await apiFetch(`/conversations/${found.id}/messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ body: `Te comparto el documento: ${document.title}` }),
-          });
+          if (document) {
+            // Agregar documento como attachment pendiente en lugar de enviarlo inmediatamente
+            await addDocumentAsPending(document);
+          }
           await loadMessages(found.id);
           await markConversationAsRead(found.id);
           onConsume?.();
@@ -966,11 +1005,8 @@ export function MessagesAdmin(props: Readonly<{
             await loadConversations();
             setSelectedChat(conversationId);
             setDraftRecipient(null);
-            await apiFetch(`/conversations/${conversationId}/messages`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ body: `Te comparto el documento: ${document.title}` }),
-            });
+            // Agregar documento como attachment pendiente en lugar de enviarlo inmediatamente
+            if (document) await addDocumentAsPending(document);
             await loadMessages(conversationId);
             await markConversationAsRead(conversationId);
           }
@@ -987,9 +1023,10 @@ export function MessagesAdmin(props: Readonly<{
   }, [conversations, loadConversations, loadMessages, markConversationAsRead, onConsume, peerRoleLabel, toDraftRecipient]);
 
   React.useEffect(() => {
-    if (!initialOpen) return;
-    processInitialOpen(initialOpen);
-  }, [initialOpen, processInitialOpen]);
+    if (!initialOpen || !isReady || !user?.id || hasProcessedInitialOpen) return;
+    void processInitialOpen(initialOpen);
+    setHasProcessedInitialOpen(true);
+  }, [initialOpen, processInitialOpen, isReady, user?.id, hasProcessedInitialOpen]);
 
   const filteredConversations = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -1143,19 +1180,33 @@ export function MessagesAdmin(props: Readonly<{
 
         const formData = new FormData();
         formData.append('body', trimmedMessage || (pendingAttachments.length > 0 ? 'Adjunto enviado' : ''));
+        console.debug('handleSend: pendingAttachments before send', pendingAttachments);
         if (replyingTo?.id) {
           formData.append('reply_to_message_id', String(replyingTo.id));
         }
         pendingAttachments.forEach((attachment) => {
           if (attachment.file) {
             formData.append('attachments[]', attachment.file, attachment.file.name);
+          } else if (attachment.url) {
+            // include url as metadata field so backend can handle link-only attachments if supported
+            formData.append('attachment_urls[]', attachment.url);
           }
         });
 
-        await apiFetch(`/conversations/${targetConversationId}/messages`, {
+        // dump FormData entries for debugging
+        try {
+          for (const entry of (formData as any).entries()) {
+            console.debug('FormData entry:', entry[0], entry[1]);
+          }
+        } catch (e) {
+          console.debug('Unable to enumerate FormData entries', e);
+        }
+
+        const response = await apiFetch(`/conversations/${targetConversationId}/messages`, {
           method: 'POST',
           body: formData,
-        });
+        }) as any;
+        console.debug('handleSend: API response', response);
         setMessage('');
         setPendingAttachments([]);
         setReplyingTo(null);

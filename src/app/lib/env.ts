@@ -36,7 +36,21 @@ const configuredFallbacks = unique(
     .map((entry) => normalizeBaseUrl(entry)),
 );
 
-const mode = (runtimeEnv.VITE_API_MODE ?? "auto").toLowerCase() as
+const defaultMode = (() => {
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1"
+    ) {
+      return "local";
+    }
+  }
+  return "auto";
+})();
+
+const mode = (runtimeEnv.VITE_API_MODE ?? defaultMode).toLowerCase() as
   | "auto"
   | "public"
   | "local";

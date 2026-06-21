@@ -378,7 +378,7 @@ export default function ActaFinalPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6" ref={formRef}>
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold">Acta Final</h1>
           <p className="text-muted-foreground">Captura y envía el acta final de cierre de asignatura.</p>
@@ -387,7 +387,7 @@ export default function ActaFinalPage() {
         <div className="flex flex-wrap gap-3">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" className="rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent">
+              <Button variant="outline" className="w-full justify-center rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent sm:w-auto">
                 <History className="mr-2 h-4 w-4" />
                 Historial
               </Button>

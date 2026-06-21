@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { FileText, Search, Download, Eye, Filter, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import apiFetch from "../../lib/api";
-import { getDocumentDownloadUrl, getDocumentFileUrl } from "../../lib/documents";
-import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { fetchDocumentBlob, getDocumentDownloadUrl, getDocumentFileUrl } from "../../lib/documents";
+import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
 
 type ApiDocument = {
   id: number | string;
@@ -123,22 +123,7 @@ export function DocumentHistory() {
   const openDocumentWithAuth = async (documentId: number, title: string, action: "view" | "download") => {
     setLoadingPdfId(documentId);
     try {
-      const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-      const baseUrl = API_BASE_URL.replace(/\/api\/?$/, "");
-      const url = `${baseUrl}/api/documents/${documentId}/file`;
-      
-      const response = await fetch(url, {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "ngrok-skip-browser-warning": "true",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
-      const blob = await response.blob();
+      const blob = await fetchDocumentBlob(documentId, action === "download");
       const blobUrl = URL.createObjectURL(blob);
 
       if (action === "view") {
@@ -156,7 +141,7 @@ export function DocumentHistory() {
       }
     } catch (error: any) {
       console.error("Error loading document:", error);
-      alert(`No se pudo ${action === "view" ? "abrir" : "descargar"} el documento: ${error.message}`);
+      alert(`No se pudo ${action === "view" ? "abrir" : "descargar"} el documento: ${error?.message ?? "documento"}`);
     } finally {
       setLoadingPdfId(null);
     }

@@ -52,12 +52,20 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
 
       try {
         setIsLoadingHistory(true);
+
+        const query: Record<string, string | number> = {
+          uploaded_by: user.id,
+          per_page: 50,
+        };
+
+        if (/^\d+$/.test(String(formId))) {
+          query.form_id = Number(formId);
+        } else {
+          query.form_code = String(formId);
+        }
+
         const res = await apiFetch("/documents", {
-          query: {
-            uploaded_by: user.id,
-            form_id: formId,
-            per_page: 50,
-          },
+          query,
         });
 
         if (cancelled) return;
@@ -105,7 +113,7 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
           historyAction={
             user ? (
               <SheetTrigger asChild>
-                <Button className="rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-transform hover:-translate-y-0.5">
+                <Button className="w-full justify-center rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-transform hover:-translate-y-0.5 sm:w-auto">
                   <History className="mr-2 h-4 w-4" />
                   Ver historial
                 </Button>

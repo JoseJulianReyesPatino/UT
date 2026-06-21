@@ -20,7 +20,8 @@ import Instrumento40Page from "./pages/docente/Instrumento40";
 import Instrumento60Page from "./pages/docente/Instrumento60";
 import Instrumento70Page from "./pages/docente/Instrumento70";
 import RemedialPage from "./pages/docente/Remedial";
-import LoadingGallo from "../assets/Form_Not_Found.png";
+import LogoUTSLRC from "../assets/LogotipoUTSLRC.webp";
+import LogoUTSLRCWhite from "../assets/LogotipoUTSLRC-BLANCO.webp";
 import ListaConcentradaPage from "./pages/docente/ListaConcentrada";
 import AsesoriaPage from "./pages/docente/Asesoria";
 import PortafolioDigitalPage from "./pages/docente/PortafolioDigital";
@@ -32,6 +33,7 @@ import { FormAccessGuard } from "./components/FormAccessGuard";
 import { Alert, AlertDescription } from "./components/ui/alert";
 import { getFormConfig, saveFormConfig, type FormId } from "../lib/formConfig";
 import { apiFetch } from "./lib/api";
+import { getDeferredPrompt, onBeforeInstallPrompt, type BeforeInstallPromptEvent } from "./lib/pwaInstall";
 
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
@@ -40,6 +42,7 @@ import {
   Menu,
   Sun,
   Moon,
+  Download,
   GraduationCap,
   School,
   BookOpenText,
@@ -105,12 +108,17 @@ function AppContent() {
   const { isAuthenticated, isReady, user, notice, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const logoSrc = theme === "dark" ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
+  const splashLogoSrc = theme === "dark" ? LogoUTSLRCWhite : LogoUTSLRC;
   const currentViewStorageKey = "utslrc-current-view";
   const [currentView, setCurrentView] = useState(() => sessionStorage.getItem(currentViewStorageKey) ?? "dashboard");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [deferredMessageOpen, setDeferredMessageOpen] = useState<null | { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string } }>(null);
+  const [deferredMessageOpen, setDeferredMessageOpen] = useState<null | { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string; filePath?: string } }>(null);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(() => getDeferredPrompt());
+  const [isInstallAvailable, setIsInstallAvailable] = useState(() => Boolean(getDeferredPrompt()));
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [minimumLoadingElapsed, setMinimumLoadingElapsed] = useState(false);
+  const [isSplashExiting, setIsSplashExiting] = useState(false);
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
   const noticeBanner = notice ? (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4 sm:top-6">
@@ -253,26 +261,85 @@ function AppContent() {
     };
   }, [isReady, isAuthenticated, currentView]);
 
+  useEffect(() => {
+    if (!isReady) {
+      setMinimumLoadingElapsed(false);
+      setIsSplashExiting(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setMinimumLoadingElapsed(true);
+    }, 1_500);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isReady]);
+
+  useEffect(() => {
+    if (!isReady || !minimumLoadingElapsed) {
+      setIsSplashExiting(false);
+      return;
+    }
+
+    setIsSplashExiting(true);
+    const timer = window.setTimeout(() => {
+      setIsSplashExiting(false);
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isReady, minimumLoadingElapsed]);
+
   const cancelLeave = () => setLeaveDialogOpen(false);
+
+  const handleInstallApp = async () => {
+    if (!deferredInstallPrompt) return;
+
+    await deferredInstallPrompt.prompt();
+
+    const choiceResult = await deferredInstallPrompt.userChoice;
+    setDeferredInstallPrompt(null);
+    setIsInstallAvailable(false);
+
+    console.log('PWA install choice:', choiceResult.outcome);
+  };
+
+  useEffect(() => {
+    const unsubscribe = onBeforeInstallPrompt((prompt) => {
+      setDeferredInstallPrompt(prompt);
+      setIsInstallAvailable(Boolean(prompt));
+    });
+
+    const appInstalledHandler = () => {
+      setDeferredInstallPrompt(null);
+      setIsInstallAvailable(false);
+      console.log('PWA installed successfully');
+    };
+
+    window.addEventListener('appinstalled', appInstalledHandler);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('appinstalled', appInstalledHandler);
+    };
+  }, []);
 
   // logout handled by AuthContext logout directly where needed
 
-  if (!isReady) {
+  const shouldShowSplash = !isReady || !minimumLoadingElapsed || isSplashExiting;
+
+  if (shouldShowSplash) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-sky-50 text-sm text-muted-foreground dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="flex h-56 items-center justify-center">
-            <img
-              src={LoadingGallo}
-              alt="Cargando sesión"
-              className="animate-gallo-bob h-48 w-auto select-none object-contain drop-shadow-[0_18px_35px_rgba(0,0,0,0.18)]"
-            />
-          </div>
-          <div className="flex items-center gap-1.5 text-base font-medium text-slate-700 dark:text-slate-200">
-            <span className="loading-dot dot-1" />
-            <span className="loading-dot dot-2" />
-            <span className="loading-dot dot-3" />
-          </div>
+      <div className={isSplashExiting ? "tv-fullscreen tv-loader-exit relative flex min-h-screen items-center justify-center overflow-hidden bg-background text-sm text-muted-foreground" : "tv-fullscreen relative flex min-h-screen items-center justify-center overflow-hidden bg-background text-sm text-muted-foreground"}>
+        <div className={isSplashExiting ? "tv-loader-group tv-loader-group-exit relative z-10 flex flex-col items-center justify-center gap-6 px-6 text-center" : "tv-loader-group relative z-10 flex flex-col items-center justify-center gap-6 px-6 text-center"}>
+          <img
+            src={splashLogoSrc}
+            alt="Logo UTSLRC"
+            className="tv-loader-image tv-image-same-size select-none object-contain"
+          />
         </div>
       </div>
     );
@@ -361,7 +428,7 @@ function AppContent() {
         case "tutores":
           return <Tutores />;
         case "mensajes":
-          return <Messages />;
+          return <Messages initialOpen={deferredMessageOpen} onConsume={() => setDeferredMessageOpen(null)} />;
         case "documentos":
           return <DocumentReview initialSection="pendientes" />;
         case "remediales":
@@ -440,17 +507,32 @@ function AppContent() {
         </main>
 
         {currentView !== "configuracion" && currentView !== "configuracion-cuenta" && (
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={toggleTheme}
-            aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
+          <>
+            {isInstallAvailable && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleInstallApp}
+                aria-label="Instalar aplicación"
+                title="Instalar aplicación"
+                className="fixed bottom-16 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={toggleTheme}
+              aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+              title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+              className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+          </>
         )}
 
         <Toaster />

@@ -335,7 +335,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <h1 className="text-3xl font-bold">Tutorías</h1>
           <p className="text-muted-foreground">Seleccione el tipo de archivo que desea subir.</p>
@@ -344,7 +344,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
         {selectedConfig && (
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" className="rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent">
+              <Button variant="outline" className="w-full justify-center rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent sm:w-auto">
                 <History className="mr-2 h-4 w-4" />
                 Historial
               </Button>

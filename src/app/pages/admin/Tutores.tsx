@@ -37,6 +37,8 @@ type TutorDocument = {
   submittedAt?: string;
 };
 
+type TutorDocumentItem = TutorDocument;
+
 type ReturnConfirmation = {
   type: "return" | "cancel-return";
   document: TutorDocumentItem;
@@ -358,7 +360,7 @@ export default function Tutores() {
 
   const handleShareToMessages = (doc: TutorDocumentItem) => {
     const recipientName = 'tutor' in doc ? doc.tutor : (doc as any).tutor;
-    globalThis.dispatchEvent(new CustomEvent('openMessagesConversation', { detail: { recipientName, recipientRole: 'Tutor', document: { id: doc.id, title: doc.documento } } }));
+    globalThis.dispatchEvent(new CustomEvent('openMessagesConversation', { detail: { recipientName, recipientRole: 'Tutor', document: { id: doc.id, title: doc.documento, filePath: doc.filePath ?? "" } } }));
   };
 
   const closePreview = () => {
