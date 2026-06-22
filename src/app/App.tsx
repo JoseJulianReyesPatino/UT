@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { Login } from "./pages/Login";
@@ -34,7 +34,9 @@ import { Alert, AlertDescription } from "./components/ui/alert";
 import { getFormConfig, saveFormConfig, type FormId } from "../lib/formConfig";
 import { apiFetch } from "./lib/api";
 import { getDeferredPrompt, onBeforeInstallPrompt, type BeforeInstallPromptEvent } from "./lib/pwaInstall";
+import { syncPendingRequests } from "./lib/offline";
 
+import { toast } from "sonner";
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./components/ui/dialog";
@@ -117,6 +119,7 @@ function AppContent() {
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(() => getDeferredPrompt());
   const [isInstallAvailable, setIsInstallAvailable] = useState(() => Boolean(getDeferredPrompt()));
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [isOffline, setIsOffline] = useState(() => typeof navigator !== "undefined" ? !navigator.onLine : false);
   const [minimumLoadingElapsed, setMinimumLoadingElapsed] = useState(false);
   const [isSplashExiting, setIsSplashExiting] = useState(false);
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
@@ -260,6 +263,55 @@ function AppContent() {
       window.removeEventListener("popstate", popStateHandler);
     };
   }, [isReady, isAuthenticated, currentView]);
+
+  useEffect(() => {
+    const handleOnline = async () => {
+      if (!navigator.onLine || !isOffline) {
+        return;
+      }
+
+      setIsOffline(false);
+      toast.success("Conexión restaurada.");
+
+      if (isAuthenticated) {
+        const synced = await syncPendingRequests();
+        if (synced > 0) {
+          toast(`Sincronizadas ${synced} solicitud(es) pendientes.`);
+        }
+      }
+    };
+
+    const handleOffline = () => {
+      if (navigator.onLine || isOffline) {
+        return;
+      }
+
+      setIsOffline(true);
+      toast.error("Sin conexión a internet. Algunas funciones estarán limitadas.");
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      }
+    };
+  }, [isAuthenticated, isOffline]);
+
+  useEffect(() => {
+    if (!isOffline && isAuthenticated) {
+      void syncPendingRequests().then((synced) => {
+        if (synced > 0) {
+          toast(`Sincronizadas ${synced} solicitud(es) pendientes.`);
+        }
+      });
+    }
+  }, [isOffline, isAuthenticated]);
 
   useEffect(() => {
     if (!isReady) {
@@ -455,6 +507,15 @@ function AppContent() {
 
   return (
     <>
+      {isOffline && (
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-[110] flex justify-center px-4 py-4">
+          <Alert variant="destructive" className="pointer-events-auto w-[min(100%,36rem)] rounded-2xl border px-5 py-4 shadow-[0_24px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+            <AlertDescription className="text-center text-sm font-semibold tracking-wide">
+              Sin conexión a internet. Algunas funciones estarán limitadas.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
       {noticeBanner}
       <div className={`flex h-screen overflow-hidden bg-background ${isLoggingOut ? "animate-page-exit" : "animate-page-enter"} motion-reduce:animate-none`}>
         <Sidebar

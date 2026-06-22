@@ -40,6 +40,7 @@ export default defineConfig({
         "favicon_io/android-chrome-192x192.png",
         "favicon_io/android-chrome-512x512.png",
         "favicon_io/apple-touch-icon.png",
+        "offline.html",
       ],
       manifest: {
         name: "Gestión Académica Digital",
@@ -73,6 +74,52 @@ export default defineConfig({
             src: "favicon_io/favicon-16x16.png",
             sizes: "16x16",
             type: "image/png",
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: [
+          "**/*.{js,css,html,png,svg,ico,json,woff2,woff}",
+          "offline.html",
+        ],
+        navigateFallback: "/offline.html",
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) =>
+              request.destination === "document" || request.destination === "",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "pages-cache",
+              networkTimeoutSeconds: 5,
+            },
+          },
+          {
+            urlPattern: ({ request }) =>
+              request.destination === "script" ||
+              request.destination === "style",
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "assets-cache",
+            },
+          },
+          {
+            urlPattern: ({ request }) => request.destination === "image",
+            handler: "CacheFirst",
+            options: {
+              cacheName: "images-cache",
+              expiration: {
+                maxEntries: 80,
+                maxAgeSeconds: 30 * 24 * 60 * 60,
+              },
+            },
+          },
+          {
+            urlPattern: /^https?:.*\/api\/.*$/,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "api-cache",
+              networkTimeoutSeconds: 5,
+            },
           },
         ],
       },
