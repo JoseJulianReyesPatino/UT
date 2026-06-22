@@ -15,6 +15,7 @@ import { getCalendarFileUrl } from "../../lib/calendar";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { getDocumentDisplayFileName } from "../../lib/documents";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { DocumentHistoryCard } from "../../components/DocumentHistoryCard";
 import { formatGroupCode } from "../../../lib/utils";
@@ -233,10 +234,7 @@ export default function Instrumento70Page() {
   const documentFileUrl = (id: number) => `${API_BASE_URL.replace(/\/+$/, "")}/documents/${id}/file`;
 
   const getUploadedFileName = (doc: any) => {
-    const path = String(doc?.file_path ?? "");
-    if (!path) return "Documento sin nombre";
-    const base = path.split("/").pop() ?? path;
-    return base.replace(/^doc_[^_]+_/, "");
+    return getDocumentDisplayFileName(undefined, doc?.file_path);
   };
 
   const openDocument = async (id: number, action: "view" | "download") => {

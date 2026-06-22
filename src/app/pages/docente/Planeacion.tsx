@@ -262,7 +262,10 @@ export default function PlaneacionPage() {
   };
 
   const getUploadedFileName = (doc: any) => {
-    return getDocumentDisplayFileName(doc?.title, doc?.file_path);
+    return getDocumentDisplayFileName(
+      doc?.title,
+      doc?.fileUrl ?? doc?.file_path,
+    );
   };
 
   const openDocument = async (id: number, action: "view" | "download") => {
@@ -417,7 +420,7 @@ export default function PlaneacionPage() {
                       {history.map((h) => (
                         <DocumentHistoryCard
                           key={h.id}
-                          title={h.title ?? h.file_path}
+                          title=""
                           fileName={getUploadedFileName(h)}
                           carrera={h.carrera_label}
                           subject={h.materia}

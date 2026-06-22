@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent } from "../components/ui/card";
-import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Loader2, Mail, Lock, Eye, EyeOff, Moon, Sun } from "lucide-react";
 
 export function Login() {
   const topDots = Array.from({ length: 16 }, (_, index) => `login-dot-top-${index}`);
@@ -14,17 +15,24 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
-  const logoSrc = "/src/assets/LogotipoUTSLRC-BLANCO.webp";
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === "dark";
+  const logoSrc = isDarkMode 
+    ? "/src/assets/LogotipoUTSLRC-BLANCO.webp"
+    : "/src/assets/LogotipoUTSLRC.webp";
   const superiorImage = new URL("../../assets/superior.webp", import.meta.url).href;
   const inferiorImage = new URL("../../assets/inferior.webp", import.meta.url).href;
   const backgroundImage = new URL("../../assets/ut_imagen13.jpg", import.meta.url).href;
 
-  const pageBackground = "bg-slate-950";
-  const cardSurface = "bg-slate-950/85 border-slate-800/80 shadow-[0_24px_70px_rgba(0,0,0,0.45)]";
-  const labelText = "text-slate-200";
-  const helperText = "text-slate-400";
-  const inputClasses =
-    "h-12 rounded-xl border bg-slate-900/80 pl-12 pr-14 text-base text-slate-100 placeholder:text-slate-500 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 hover:border-slate-600 border-slate-700";
+  const pageBackground = isDarkMode ? "bg-slate-950" : "bg-gradient-to-br from-slate-50 to-slate-100";
+  const cardSurface = isDarkMode
+    ? "bg-slate-950/85 border-slate-800/80 shadow-[0_24px_70px_rgba(0,0,0,0.45)]"
+    : "bg-white/90 border-slate-200/60 shadow-[0_24px_70px_rgba(0,0,0,0.1)]";
+  const labelText = isDarkMode ? "text-slate-200" : "text-slate-700";
+  const helperText = isDarkMode ? "text-slate-400" : "text-slate-600";
+  const inputClasses = isDarkMode
+    ? "h-12 rounded-xl border bg-slate-900/80 pl-12 pr-14 text-base text-slate-100 placeholder:text-slate-500 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 hover:border-slate-600 border-slate-700"
+    : "h-12 rounded-xl border bg-slate-50 pl-12 pr-14 text-base text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 hover:border-slate-300 border-slate-200";
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -39,13 +47,9 @@ export function Login() {
   };
 
   return (
-    <div className={`dark ${pageBackground} min-h-screen overflow-hidden relative`}>
+    <div className={`${isDarkMode ? "dark" : "light"} ${pageBackground} min-h-screen overflow-hidden relative transition-colors duration-300`}>
       {/* BACKGROUND - Gradientes y decoraciones mejoradas */}
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${backgroundImage})` }}
-      />
-      <div className="absolute inset-0 bg-slate-950/75" />
+      <div className={`absolute inset-0 ${isDarkMode ? "bg-slate-950/75" : "bg-transparent"}`} />
       <div className="absolute inset-0">
         <img
           src={superiorImage}
@@ -83,6 +87,24 @@ export function Login() {
         <div className="absolute bottom-[26%] left-[7%] w-28 h-px bg-gradient-to-r from-transparent via-[#3BBF82]/18 to-transparent -rotate-12 dark:via-[#3BBF82]/28" />
         <div className="absolute bottom-[8%] right-[46%] w-20 h-20 rounded-full border border-[#3BBF82]/10 opacity-40 dark:border-[#3BBF82]/25" />
       </div>
+
+      {/* Botón de cambio de tema - Esquina inferior derecha */}
+      <button
+        onClick={toggleTheme}
+        className="fixed bottom-8 right-8 p-3 rounded-full z-50 transition-all duration-300 hover:scale-110 shadow-lg"
+        style={{
+          backgroundColor: isDarkMode ? "rgba(59, 191, 130, 0.2)" : "rgba(59, 191, 130, 0.15)",
+          border: `2px solid ${isDarkMode ? "rgba(59, 191, 130, 0.4)" : "rgba(59, 191, 130, 0.3)"}`
+        }}
+        aria-label={isDarkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+        title={isDarkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+      >
+        {isDarkMode ? (
+          <Sun className="h-6 w-6 text-yellow-400" />
+        ) : (
+          <Moon className="h-6 w-6 text-slate-700" />
+        )}
+      </button>
 
       <div className="relative z-10 min-h-screen grid lg:grid-cols-2">
         {/* ===================================================== */}
@@ -127,15 +149,35 @@ export function Login() {
 
             {/* TÍTULO - Bloque independiente */}
             <div className="absolute left-0 top-16 max-w-[38rem]">
-              <h1 className="text-[58px] lg:text-[64px] leading-[0.98] font-black tracking-tight text-slate-900 dark:text-slate-50 drop-shadow-sm">
+              <h1 
+                className={`text-[58px] lg:text-[64px] leading-[0.98] font-black tracking-tight ${
+                  isDarkMode ? "text-slate-50" : "text-slate-900"
+                }`}
+                style={{
+                  textShadow: isDarkMode 
+                    ? "0 2px 8px rgba(0,0,0,0.6)" 
+                    : "0 2px 4px rgba(0,0,0,0.1)"
+                }}
+              >
                 <span className="whitespace-nowrap">Sistema de Gestión</span>
-                <span className="hidden lg:block text-[#3BBF82] dark:text-emerald-300">Académica Digital</span>
+                <span className={`hidden lg:block ${
+                  isDarkMode ? "text-emerald-300" : "text-[#3BBF82]"
+                }`}>Académica Digital</span>
               </h1>
             </div>
 
             {/* TEXTO - Bloque independiente */}
             <div className="absolute left-0 top-[210px] max-w-[38rem]">
-              <p className="text-lg lg:text-xl leading-relaxed font-medium text-justify text-slate-300">
+              <p 
+                className={`text-lg lg:text-xl leading-relaxed font-medium text-justify ${
+                  isDarkMode ? "text-slate-300" : "text-slate-600"
+                }`}
+                style={{
+                  textShadow: isDarkMode 
+                    ? "0 1px 4px rgba(0,0,0,0.4)" 
+                    : "0 1px 2px rgba(0,0,0,0.08)"
+                }}
+              >
                 Esta plataforma digital facilita la transición hacia el uso eficiente de documentos
                 digitales, optimizando los flujos de trabajo de suma y documentación pertinentes en la
                 institución.
@@ -229,7 +271,7 @@ export function Login() {
               <div className="text-center mb-8">
                 <div className="mb-6">
                   <div className="w-16 h-1 bg-gradient-to-r from-[#3BBF82] to-[#2da06a] rounded-full mx-auto mb-4" />
-                  <p className="text-sm font-semibold text-[#3BBF82] uppercase tracking-wider">
+                  <p className={`text-sm font-semibold ${isDarkMode ? "text-[#3BBF82]" : "text-[#2da06a]"} uppercase tracking-wider`}>
                     Bienvenido
                   </p>
                 </div>
@@ -239,7 +281,9 @@ export function Login() {
                 </p>
               </div>
 
-              <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-8 dark:via-slate-700" />
+              <div className={`h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-8 ${
+                isDarkMode ? "dark:via-slate-700" : ""
+              }`} />
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2 group/email">
@@ -247,7 +291,11 @@ export function Login() {
                     Correo Electrónico
                   </Label>
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 group-focus-within/email:text-[#3BBF82] transition-colors" />
+                    <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 group-focus-within/email:text-[#3BBF82] transition-colors ${
+                      isDarkMode
+                        ? "text-slate-400 dark:text-slate-500"
+                        : "text-slate-500"
+                    }`} />
                     <Input
                       id="email"
                       type="email"
@@ -266,7 +314,11 @@ export function Login() {
                     Contraseña
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 group-focus-within/password:text-[#3BBF82] transition-colors" />
+                    <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 group-focus-within/password:text-[#3BBF82] transition-colors ${
+                      isDarkMode
+                        ? "text-slate-400 dark:text-slate-500"
+                        : "text-slate-500"
+                    }`} />
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
@@ -283,7 +335,11 @@ export function Login() {
                       onClick={() => setShowPassword((s) => !s)}
                       aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                       title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-[#3BBF82] transition-colors duration-200 dark:text-slate-400"
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors duration-200 ${
+                        isDarkMode
+                          ? "text-slate-500 hover:text-[#3BBF82] dark:text-slate-400"
+                          : "text-slate-400 hover:text-[#3BBF82]"
+                      }`}
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -293,7 +349,11 @@ export function Login() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full h-12 rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white font-semibold text-base shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+                  className={`w-full h-12 rounded-xl font-semibold text-base shadow-lg transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 ${
+                    isDarkMode
+                      ? "bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white hover:shadow-2xl"
+                      : "bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white hover:shadow-2xl"
+                  }`}
                 >
                   {isLoading ? (
                     <>
@@ -308,7 +368,11 @@ export function Login() {
                 <div className="text-center mt-3">
                   <button
                     type="button"
-                    className="text-sm text-[#3BBF82] hover:underline font-medium"
+                    className={`text-sm font-medium ${
+                      isDarkMode
+                        ? "text-[#3BBF82] hover:underline"
+                        : "text-[#2da06a] hover:underline"
+                    }`}
                     aria-label="Olvidaste la contraseña"
                   >
                     ¿Olvidaste la contraseña?

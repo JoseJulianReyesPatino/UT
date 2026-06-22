@@ -1278,7 +1278,7 @@ export function MessagesTeacher(props: Readonly<{
     const adminConversation = targetConversation;
 
     return (
-      <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-5 overflow-hidden">
+      <div className="flex h-[calc(100dvh-64px)] min-h-0 flex-col gap-5 overflow-hidden">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
             <h1>Mensajes</h1>

@@ -50,26 +50,7 @@ export function FormClosedState({ title, message, historyAction }: Readonly<Form
             </div>
           </div>
 
-          <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300 sm:grid-cols-2">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 rounded-2xl bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                <CalendarClock className="h-4 w-4" />
-              </div>
-              <p>Revisa la fecha límite y confirma si el periodo sigue habilitado.</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 rounded-2xl bg-slate-100 p-2 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                <ArrowLeft className="h-4 w-4" />
-              </div>
-              <p>Mientras tanto, puedes regresar a otros módulos disponibles.</p>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button onClick={() => window.history.back()} className="rounded-full px-6 shadow-sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver
-            </Button>
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
             <div className="rounded-full border border-dashed border-slate-300 px-4 py-2 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
               Si necesitas acceso, contacta al administrador.
             </div>

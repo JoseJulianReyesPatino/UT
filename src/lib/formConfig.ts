@@ -31,6 +31,28 @@ export type FormId =
   | "estadias"
   | "tutorias";
 
+const BACKEND_FORM_ALIAS_MAP: Record<string, FormId[]> = {
+  "instrumento-3040": ["instrumento-30-normal", "instrumento-40-nuevo"],
+  "instrumento-6070": ["instrumento-60-nuevo", "instrumento-70-normal"],
+};
+
+export function getBackendFormCode(formId: FormId): string {
+  if (formId === "instrumento-30-normal" || formId === "instrumento-40-nuevo") {
+    return "instrumento-3040";
+  }
+
+  if (formId === "instrumento-60-nuevo" || formId === "instrumento-70-normal") {
+    return "instrumento-6070";
+  }
+
+  return formId;
+}
+
+export function getFormIdsForBackendCode(formCode: string): FormId[] {
+  const normalized = formCode.replace(/_/g, "-");
+  return BACKEND_FORM_ALIAS_MAP[normalized] ?? [normalized as FormId];
+}
+
 export type FormAccessRule = {
   roles: FormRole[];
   dueAt: string | null;

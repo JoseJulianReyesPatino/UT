@@ -31,7 +31,7 @@ import TutoriasPage from "./pages/docente/Tutorias";
 import { Sidebar } from "./components/Sidebar";
 import { FormAccessGuard } from "./components/FormAccessGuard";
 import { Alert, AlertDescription } from "./components/ui/alert";
-import { getFormConfig, saveFormConfig, type FormId } from "../lib/formConfig";
+import { getFormConfig, saveFormConfig, getFormIdsForBackendCode, type FormId } from "../lib/formConfig";
 import { apiFetch } from "./lib/api";
 import { getDeferredPrompt, onBeforeInstallPrompt, type BeforeInstallPromptEvent } from "./lib/pwaInstall";
 import { syncPendingRequests } from "./lib/offline";
@@ -241,12 +241,16 @@ function AppContent() {
         const nextAccess = { ...currentConfig.formAccess };
 
         for (const form of res?.data ?? []) {
-          const formCode = String(form.form_code).replace(/_/g, '-') as FormId;
-          if (formCode in nextAccess) {
-            nextAccess[formCode] = {
-              roles: form.access_roles ?? nextAccess[formCode].roles,
-              dueAt: form.due_at ?? nextAccess[formCode].dueAt,
-            };
+          const backendFormCode = String(form.form_code).replace(/_/g, '-');
+          const formIds = getFormIdsForBackendCode(backendFormCode);
+
+          for (const formId of formIds) {
+            if (formId in nextAccess) {
+              nextAccess[formId] = {
+                roles: form.access_roles ?? nextAccess[formId].roles,
+                dueAt: form.due_at ?? nextAccess[formId].dueAt,
+              };
+            }
           }
         }
 

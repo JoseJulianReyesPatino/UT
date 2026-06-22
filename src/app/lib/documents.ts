@@ -102,28 +102,48 @@ export const fetchDocumentBlob = async (
   throw lastError ?? new Error("No fue posible abrir el documento");
 };
 
+const safeDecodeURIComponent = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
 export const getDocumentDisplayFileName = (
   title?: string | null,
   filePath?: string | null,
 ) => {
   const cleanTitle = (title ?? "").trim();
   if (cleanTitle) {
-    const normalizedTitle = cleanTitle.replace(/\.pdf$/i, "");
+    const decodedTitle = safeDecodeURIComponent(cleanTitle);
+    const normalizedTitle = decodedTitle.replace(/\.pdf$/i, "");
     const lastSegment =
       normalizedTitle.split(" - ").pop()?.trim() ?? normalizedTitle;
-    if (lastSegment) {
-      return lastSegment;
+    const cleanedTitle = String(lastSegment)
+      .replace(/\.pdf$/i, "")
+      .replaceAll("_", " ")
+      .trim();
+
+    const genericTitlePattern =
+      /^(planeaci[oó]n|portafolio( digital)?|acta final|instrumento( \d+)?|lista concentrada|tutorias?|asesor[ií]a|remedial|estad[ií]as?|documento)$/i;
+    if (cleanedTitle && !genericTitlePattern.test(cleanedTitle)) {
+      return `${cleanedTitle}.pdf`;
     }
   }
 
   const path = (filePath ?? "").toString().trim();
   if (!path) {
-    return "Documento sin nombre";
+    return "Documento sin nombre.pdf";
   }
 
-  const base = path.split("/").pop() ?? path;
-  return base
+  const base = path.split("?")[0].split("/").pop() ?? path;
+  const decodedBase = safeDecodeURIComponent(base);
+  const cleaned = decodedBase
     .replace(/^doc_[^_]+_/, "")
     .replace(/\.pdf$/i, "")
-    .replaceAll("_", " ");
+    .replaceAll("_", " ")
+    .trim();
+
+  return cleaned ? `${cleaned}.pdf` : "Documento sin nombre.pdf";
 };

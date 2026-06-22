@@ -6,13 +6,14 @@ import { Label } from "../../components/ui/label";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { getFormConfig, saveFormConfig, Group, type FormId, type FormRole } from "../../../lib/formConfig";
+import { getBackendFormCode, getFormConfig, saveFormConfig, getFormIdsForBackendCode, type FormId, type FormRole, type Group } from "../../../lib/formConfig";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { API_BASE_URL } from "../../lib/env";
 import { useTheme } from "../../context/ThemeContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronUp, FileText, Grid2x2, Moon, PencilLine, Search, Sun, Trash2, Users, Settings2 } from "lucide-react";import { toast } from "sonner";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronUp, FileText, Grid2x2, Moon, PencilLine, Plus, Search, Sun, Trash2, Users, Settings2 } from "lucide-react";
+import { toast } from "sonner";
 import { carrieras } from "../../data/curricula";
 import { clearAvatarCache, getAvatarUrlWithTimestamp, getInitials } from "../../lib/avatar";
 
@@ -92,10 +93,11 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const { initialTab = "formularios" } = props;
   const { user, updateProfile, refreshUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
-const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
-const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
+  const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
   const [formConfig, setFormConfig] = useState(getFormConfig());
   const [formCodeToId, setFormCodeToId] = useState<Record<FormId, number>>({} as Record<FormId, number>);
+  const [formBackendCode, setFormBackendCode] = useState<Record<FormId, string>>({} as Record<FormId, string>);
   const [isFormConfigLoading, setIsFormConfigLoading] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   const [formDrafts, setFormDrafts] = useState<Record<FormId, { roles: FormRole[]; dueAt: string | null }>>(() => getFormConfig().formAccess);
@@ -129,6 +131,7 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [groupSearch, setGroupSearch] = useState("");
   const [groupViewPlan, setGroupViewPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
   const [openFormSection, setOpenFormSection] = useState<FormSectionId | null>(null);
@@ -166,17 +169,36 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
         const savedConfig = getFormConfig();
         const formAccess = { ...savedConfig.formAccess };
         const idMap = {} as Record<FormId, number>;
+        const assignedFormIds = new Set<FormId>();
+        const combinedBackendCodes = new Set(["instrumento-3040", "instrumento-6070"]);
 
-        for (const item of res?.data ?? []) {
-          const formCode = String(item.form_code).replace(/_/g, '-') as FormId;
-          idMap[formCode] = item.id;
+        const forms = res?.data ?? [];
+        const formByCode = forms.reduce((acc: Record<string, any>, item: any) => {
+          const backendCode = String(item.form_code).replace(/_/g, '-');
+          acc[backendCode] = item;
+          return acc;
+        }, {} as Record<string, any>);
 
-          if (formCode in formAccess) {
-            formAccess[formCode] = {
-              roles: item.access_roles ?? formAccess[formCode].roles,
-              dueAt: item.due_at ?? formAccess[formCode].dueAt,
-            };
+        const backendCodeForFormId = {} as Record<FormId, string>;
+
+        for (const formId of Object.keys(formAccess) as FormId[]) {
+          const directCode = formId;
+          const combinedCode = getBackendFormCode(formId);
+          const combinedItem = combinedCode !== directCode ? formByCode[combinedCode] : undefined;
+          const directItem = formByCode[directCode];
+          const item = combinedItem ?? directItem;
+
+          if (!item) {
+            continue;
           }
+
+          backendCodeForFormId[formId] = combinedItem ? combinedCode : directCode;
+          formAccess[formId] = {
+            roles: item.access_roles ?? formAccess[formId].roles,
+            dueAt: item.due_at ?? formAccess[formId].dueAt,
+          };
+
+          idMap[formId] = item.id;
         }
 
         const nextConfig = { ...savedConfig, formAccess };
@@ -184,6 +206,7 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
         setFormConfig(nextConfig);
         setFormDrafts(nextConfig.formAccess);
         setFormCodeToId(idMap);
+        setFormBackendCode(backendCodeForFormId);
       } catch (err: any) {
         console.error('Failed to load forms configuration', err);
       } finally {
@@ -307,10 +330,21 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
     formId: FormId,
     updater: (current: { roles: FormRole[]; dueAt: string | null }) => { roles: FormRole[]; dueAt: string | null },
   ) => {
-    setFormDrafts((current) => ({
-      ...current,
-      [formId]: updater(current[formId] ?? formConfig.formAccess[formId]),
-    }));
+    const actualBackendCode = formBackendCode[formId] ?? getBackendFormCode(formId);
+    const isCombined = actualBackendCode === "instrumento-3040" || actualBackendCode === "instrumento-6070";
+    const relatedFormIds = isCombined ? getFormIdsForBackendCode(actualBackendCode) : [formId];
+
+    setFormDrafts((current) => {
+      const next = { ...current };
+      const base = current[formId] ?? formConfig.formAccess[formId];
+      const updated = updater(base);
+
+      for (const id of relatedFormIds) {
+        next[id] = updated;
+      }
+
+      return next;
+    });
   };
 
   const saveFormAccessRule = async (formId: FormId, nextRule: { roles: FormRole[]; dueAt: string | null }) => {
@@ -352,15 +386,31 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
     setSavingFormIds((current) => ({ ...current, [formId]: true }));
     const success = await saveFormAccessRule(formId, currentDraft);
     if (success) {
+      const actualBackendCode = formBackendCode[formId] ?? getBackendFormCode(formId);
+      const isCombined = actualBackendCode === "instrumento-3040" || actualBackendCode === "instrumento-6070";
+      const relatedFormIds = isCombined ? getFormIdsForBackendCode(actualBackendCode) : [formId];
+
       setFormConfig((current) => {
+        const nextFormAccess = { ...current.formAccess };
+
+        for (const id of relatedFormIds) {
+          nextFormAccess[id] = currentDraft;
+        }
+
         const next = {
           ...current,
-          formAccess: {
-            ...current.formAccess,
-            [formId]: currentDraft,
-          },
+          formAccess: nextFormAccess,
         };
         saveFormConfig(next);
+        return next;
+      });
+      setFormDrafts((current) => {
+        const next = { ...current };
+
+        for (const id of relatedFormIds) {
+          next[id] = currentDraft;
+        }
+
         return next;
       });
       toast.success('Configuración guardada');
@@ -414,6 +464,7 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
       setCareerCode("");
       setCuatrimestre("");
       setGroupNumber(1);
+      setIsCreateGroupOpen(false);
       toast.success('Grupo creado');
     } catch (err: any) {
       toast.error(err?.message ?? 'No fue posible crear el grupo');
@@ -697,9 +748,9 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
   );
 
   return (
-   <div className={`flex h-[calc(100vh-64px)] flex-col gap-4 sm:gap-6 overflow-hidden ${shellClass}`}>
+    <div className={`flex h-[calc(100vh-64px)] flex-col gap-4 sm:gap-6 overflow-hidden ${shellClass}`}>
       {/* Header - Mejorado para móvil */}
-     <div className="shrink-0 rounded-2xl sm:rounded-3xl border border-emerald-200/60 bg-white/45 p-4 sm:p-6 shadow-sm backdrop-blur dark:border-emerald-900/35 dark:bg-slate-950/55">
+      <div className="shrink-0 rounded-2xl sm:rounded-3xl border border-emerald-200/60 bg-white/45 p-4 sm:p-6 shadow-sm backdrop-blur dark:border-emerald-900/35 dark:bg-slate-950/55">
         <div className="flex flex-col gap-2">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100">Configuración del Sistema</h1>
@@ -711,7 +762,8 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
       {/* Layout principal - Cambia a columna en móvil */}
       <div className="grid min-h-0 flex-1 gap-4 sm:gap-6 lg:grid-cols-[280px_minmax(0,1fr)] items-start overflow-hidden">
         {/* Sidebar - Mejorado para móvil */}
-<Card className={`${sidebarClass} shadow-xl self-start ${mobileSectionOpen ? "hidden lg:block" : "block"}`}>          <CardHeader className={`${sidebarCardClass} p-3 sm:p-6`}>
+        <Card className={`${sidebarClass} shadow-xl self-start ${mobileSectionOpen ? "hidden lg:block" : "block"}`}>
+          <CardHeader className={`${sidebarCardClass} p-3 sm:p-6`}>
             <CardTitle className={theme === "dark" ? "text-white text-base sm:text-lg" : "text-slate-900 text-base sm:text-lg"}>Secciones</CardTitle>
             <CardDescription className={`${theme === "dark" ? "text-slate-400" : "text-slate-500"} text-xs sm:text-sm`}>Navega por la configuración</CardDescription>
           </CardHeader>
@@ -722,13 +774,13 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
 
               return (
                 <button
-  key={item.value}
-  type="button"
-  disabled={Boolean(editingGroupId && item.value !== activeTab)}
-  onClick={() => {
-    setActiveTab(item.value);
-    setMobileSectionOpen(true);
-  }}
+                  key={item.value}
+                  type="button"
+                  disabled={Boolean(editingGroupId && item.value !== activeTab)}
+                  onClick={() => {
+                    setActiveTab(item.value);
+                    setMobileSectionOpen(true);
+                  }}
                   className={`flex w-full items-center gap-2 sm:gap-3 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 text-left transition-all ${
                     isActive
                       ? (theme === "dark"
@@ -753,17 +805,16 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
         </Card>
 
         {/* Contenido principal */}
-      {/* Contenido principal */}
-<div className={`h-full min-h-0 space-y-4 sm:space-y-8 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent ${mobileSectionOpen ? "block" : "hidden lg:block"}`}>
-  <button
-    type="button"
-    onClick={() => setMobileSectionOpen(false)}
-    className="mb-2 flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 lg:hidden"
-  >
-    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-    Volver a secciones
-  </button>
-  {activeTab === "cuenta" && (
+        <div className={`h-full min-h-0 space-y-4 sm:space-y-8 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent ${mobileSectionOpen ? "block" : "hidden lg:block"}`}>
+          <button
+            type="button"
+            onClick={() => setMobileSectionOpen(false)}
+            className="mb-2 flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 lg:hidden"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            Volver a secciones
+          </button>
+          {activeTab === "cuenta" && (
             <Card className={sectionCardClass}>
               <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
                 <CardTitle className="text-base sm:text-lg">Configuración de tu Cuenta</CardTitle>
@@ -929,8 +980,8 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
                     <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Define vencimiento y roles permitidos para cada apartado del sistema.</p>
                   </div>
 
-                  {/* SCROLL PARA FORMULARIOS - Ajustado para móvil */}
-                  <div className="space-y-2 sm:space-y-3 max-h-[400px] sm:max-h-[600px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
+                  {/* SCROLL SOLO EN LA LISTA DE FORMULARIOS DE CADA SECCIÓN - Títulos fijos */}
+                  <div className="space-y-2 sm:space-y-3">
                     {formSections.map((section) => {
                       const isOpen = openFormSection === section.section;
                       return (
@@ -959,7 +1010,8 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
 
                           {isOpen && (
                             <div className="border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20">
-                              <div className="space-y-2">
+                              {/* SCROLL SOLO EN LA LISTA DE FORMULARIOS - Título de sección queda fijo */}
+                              <div className="space-y-2 max-h-[320px] sm:max-h-[420px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
                                 {section.forms.map((form) => {
                                   const savedConfig = formConfig.formAccess[form.id];
                                   const draftConfig = formDrafts[form.id] ?? savedConfig;
@@ -1089,195 +1141,143 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
             </Card>
           )}
 
-          {activeTab === "grupos" && (
-            <Card className={sectionCardClass}>
-              <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
-                <CardTitle className="text-base sm:text-lg">Grupos</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Crear y administrar grupos que aparecerán en los formularios</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
-                {/* Formulario de creación - Mejorado para móvil */}
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <Select value={plan} onValueChange={(v: any) => setPlan(v)}>
-                      <SelectTrigger className="text-sm">
-                        <SelectValue placeholder="Plan" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
-                        <SelectItem value="plan-normal">Plan Normal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={careerCode} onValueChange={(value) => setCareerCode(value)} disabled={!plan}>
-                      <SelectTrigger className="min-w-0 text-sm">
-                        <SelectValue placeholder="Carrera" className="min-w-0 flex-1 truncate" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {careerOptions.map((career) => (
-                          <SelectItem key={career.codigo} value={career.codigo} className="whitespace-normal py-2 pr-3">
-                            <span className="block max-w-[18rem] break-words leading-snug text-sm">{career.nombre}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={cuatrimestre} onValueChange={setCuatrimestre} disabled={!selectedCareer}>
-                      <SelectTrigger className="text-sm">
-                        <SelectValue placeholder="Cuatrimestre" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {cuatrimestresDisponibles.map((number) => (
-                          <SelectItem key={number} value={String(number)}>
-                            {number}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={String(groupNumber)} onValueChange={(value) => setGroupNumber(Number(value))}>
-                      <SelectTrigger className="text-sm">
-                        <SelectValue placeholder="Asignación de número" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 20 }, (_, index) => index + 1).map((number) => (
-                          <SelectItem key={number} value={String(number)}>
-                            {number}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="col-span-1 sm:col-span-2 lg:col-span-1">
-                      <div className="flex min-w-0 items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 h-full">
-                        <CalendarDays className="h-4 w-4 text-emerald-500 shrink-0" />
-                        <div className="min-w-0 truncate text-xs sm:text-sm">Nombre: <strong className="text-slate-900 dark:text-slate-100">{currentGroupName}</strong></div>
-                      </div>
-                    </div>
-                    <Button onClick={handleAddGroup} variant="success" disabled={!careerCode || !cuatrimestre} className="w-full text-sm">
-                      Crear grupo
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Lista de grupos - Mejorado para móvil */}
-                <div className={softPanelClass}>
-                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-              <h3 className="font-medium text-slate-900 dark:text-slate-100 text-sm sm:text-base">Grupos creados</h3>
-             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-               {selectedPlanGroups.length} {selectedPlanGroups.length === 1 ? "grupo" : "grupos"} en {selectedPlanCareerGroups.length} {selectedPlanCareerGroups.length === 1 ? "carrera" : "carreras"} · {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
-             </p>
+         {activeTab === "grupos" && (
+  <Card className={sectionCardClass}>
+    <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <CardTitle className="text-base sm:text-lg">Grupos</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Crear y administrar grupos que aparecerán en los formularios</CardDescription>
+        </div>
+        <Button onClick={() => setIsCreateGroupOpen(true)} variant="success" className="gap-2 text-sm shrink-0">
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Crear grupo
+        </Button>
+      </div>
+    </CardHeader>
+    <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0 sm:pt-0">
+      {/* Lista de grupos - Mejorado para móvil */}
+      <div className={softPanelClass}>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="font-medium text-slate-900 dark:text-slate-100 text-sm sm:text-base">Grupos creados</h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              {selectedPlanGroups.length} {selectedPlanGroups.length === 1 ? "grupo" : "grupos"} en {selectedPlanCareerGroups.length} {selectedPlanCareerGroups.length === 1 ? "carrera" : "carreras"} · {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
+            </p>
           </div>
-                    <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto md:items-center">
-                      <div className="relative w-full sm:w-64">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        <Input
-                          value={groupSearch}
-                          onChange={(event) => setGroupSearch(event.target.value)}
-                          placeholder="Buscar grupo"
-                          className="pl-9 text-sm"
-                        />
-                      </div>
-                      <Select value={groupViewPlan} onValueChange={(value) => setGroupViewPlan(value as "nuevo-modelo" | "plan-normal")}>
-                        <SelectTrigger className="w-full sm:w-64 text-sm">
-                          <SelectValue placeholder="Ver plan" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
-                          <SelectItem value="plan-normal">Plan Normal</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+          <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto md:items-center">
+            <div className="relative w-full sm:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={groupSearch}
+                onChange={(event) => setGroupSearch(event.target.value)}
+                placeholder="Buscar grupo"
+                className="pl-9 text-sm"
+              />
+            </div>
+            <Select value={groupViewPlan} onValueChange={(value) => setGroupViewPlan(value as "nuevo-modelo" | "plan-normal")}>
+              <SelectTrigger className="w-full sm:w-64 text-sm">
+                <SelectValue placeholder="Ver plan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
+                <SelectItem value="plan-normal">Plan Normal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* CONTENEDOR CON SCROLL PARA GRUPOS - Ajustado para móvil */}
+        <div className="mt-4 space-y-4 max-h-[400px] sm:max-h-[500px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
+          {filteredGroups.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-emerald-200/45 bg-white/40 px-4 py-6 text-sm text-slate-500 dark:border-emerald-900/25 dark:bg-slate-950/35">
+              No hay grupos que coincidan con la búsqueda.
+            </div>
+          ) : (
+            <>
+              <div className="rounded-2xl border border-emerald-200/40 bg-white/45 p-3 sm:p-4 dark:border-emerald-900/25 dark:bg-slate-950/35">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-3 dark:border-slate-800">
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
+                      {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{selectedPlanGroups.length} grupos en este plan</p>
                   </div>
-
-                  {/* CONTENEDOR CON SCROLL PARA GRUPOS - Ajustado para móvil */}
-                  <div className="mt-4 space-y-4 max-h-[400px] sm:max-h-[500px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
-                    {filteredGroups.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-emerald-200/45 bg-white/40 px-4 py-6 text-sm text-slate-500 dark:border-emerald-900/25 dark:bg-slate-950/35">
-                        No hay grupos que coincidan con la búsqueda.
-                      </div>
-                    ) : (
-                      <>
-                        <div className="rounded-2xl border border-emerald-200/40 bg-white/45 p-3 sm:p-4 dark:border-emerald-900/25 dark:bg-slate-950/35">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-3 dark:border-slate-800">
-                            <div>
-                              <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
-                                {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
-                              </h4>
-                              <p className="text-xs text-slate-500 dark:text-slate-400">{selectedPlanGroups.length} grupos en este plan</p>
-                            </div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{selectedPlanCareerGroups.length} carreras con grupos</p>
-                          </div>
-
-                          {/* CONTENEDOR INTERNO CON SCROLL PARA LAS CARRERAS - Ajustado para móvil */}
-                          <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-3 max-h-[300px] sm:max-h-[400px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
-                            {selectedPlanCareerGroups.length === 0 ? (
-                              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40">
-                                No hay grupos creados para este plan.
-                              </div>
-                            ) : (
-                              selectedPlanCareerGroups.map(({ career, groups: careerGroups }) => (
-                                <div key={career.codigo} className="rounded-2xl border border-emerald-200/35 bg-white/35 dark:border-emerald-900/20 dark:bg-slate-950/25">
-                                  <button
-                                    type="button"
-                                    onClick={() => setOpenCareer(openCareer === career.codigo ? null : career.codigo)}
-                                    className="w-full flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 text-left"
-                                    aria-expanded={openCareer === career.codigo}
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="truncate text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">{career.nombre}</p>
-                                      <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">{career.codigo} · {careerGroups.length} grupos creados</p>
-                                    </div>
-                                    <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                                      {careerGroups.length}
-                                    </span>
-                                  </button>
-
-                                  {openCareer === career.codigo && (
-  <div className="space-y-2 border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20 max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
-    {careerGroups.map((g) => (
-                                        <div key={g.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 rounded-2xl border border-emerald-200/35 bg-white/40 px-3 sm:px-4 py-2 sm:py-3 dark:border-emerald-900/20 dark:bg-slate-950/30">
-                                          <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">
-                                            <p className="truncate font-medium text-xs sm:text-sm">{g.name}</p>
-                                            <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Cuatrimestre {g.cuatrimestre} · Grupo {g.groupNumber}</p>
-                                          </div>
-                                          <div className="flex items-center gap-2">
-                                            <Button
-                                              variant="outline"
-                                              size="icon"
-                                              onClick={() => handleStartEditGroup(g)}
-                                              disabled={Boolean(editingGroupId)}
-                                              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border-emerald-200/60 bg-white/60 text-slate-700 hover:bg-emerald-50 hover:text-slate-900 dark:border-emerald-900/30 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-900"
-                                              aria-label={`Editar grupo ${g.name}`}
-                                              title="Editar grupo"
-                                            >
-                                              <PencilLine className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              onClick={() => handleRemoveGroup(g.id)}
-                                              disabled={Boolean(editingGroupId)}
-                                              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:bg-rose-500/10"
-                                              aria-label={`Eliminar grupo ${g.name}`}
-                                              title="Eliminar grupo"
-                                            >
-                                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{selectedPlanCareerGroups.length} carreras con grupos</p>
                 </div>
-              </CardContent>
-            </Card>
+
+                {/* CONTENEDOR INTERNO CON SCROLL PARA LAS CARRERAS - Ajustado para móvil */}
+                <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-3 max-h-[300px] sm:max-h-[400px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
+                  {selectedPlanCareerGroups.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40">
+                      No hay grupos creados para este plan.
+                    </div>
+                  ) : (
+                    selectedPlanCareerGroups.map(({ career, groups: careerGroups }) => (
+                      <div key={career.codigo} className="rounded-2xl border border-emerald-200/35 bg-white/35 dark:border-emerald-900/20 dark:bg-slate-950/25">
+                        <button
+                          type="button"
+                          onClick={() => setOpenCareer(openCareer === career.codigo ? null : career.codigo)}
+                          className="w-full flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 text-left"
+                          aria-expanded={openCareer === career.codigo}
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">{career.nombre}</p>
+                            <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">{career.codigo} · {careerGroups.length} grupos creados</p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                            {careerGroups.length}
+                          </span>
+                        </button>
+
+                        {openCareer === career.codigo && (
+                          <div className="space-y-2 border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20 max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
+                            {careerGroups.map((g) => (
+                              <div key={g.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 rounded-2xl border border-emerald-200/35 bg-white/40 px-3 sm:px-4 py-2 sm:py-3 dark:border-emerald-900/20 dark:bg-slate-950/30">
+                                <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">
+                                  <p className="truncate font-medium text-xs sm:text-sm">{g.name}</p>
+                                  <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Cuatrimestre {g.cuatrimestre} · Grupo {g.groupNumber}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => handleStartEditGroup(g)}
+                                    disabled={Boolean(editingGroupId)}
+                                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border-emerald-200/60 bg-white/60 text-slate-700 hover:bg-emerald-50 hover:text-slate-900 dark:border-emerald-900/30 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-900"
+                                    aria-label={`Editar grupo ${g.name}`}
+                                    title="Editar grupo"
+                                  >
+                                    <PencilLine className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleRemoveGroup(g.id)}
+                                    disabled={Boolean(editingGroupId)}
+                                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                                    aria-label={`Eliminar grupo ${g.name}`}
+                                    title="Eliminar grupo"
+                                  >
+                                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
           )}
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+)}
         </div>
       </div>
 
@@ -1437,6 +1437,91 @@ const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
               className="w-full sm:w-auto text-sm"
             >
               Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para crear grupo */}
+      <Dialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Crear nuevo grupo</DialogTitle>
+            <DialogDescription className="text-sm">
+              Selecciona el plan, carrera, cuatrimestre y número para generar el grupo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Select value={plan} onValueChange={(v: any) => setPlan(v)}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
+                  <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={careerCode} onValueChange={(value) => setCareerCode(value)} disabled={!plan}>
+                <SelectTrigger className="min-w-0 text-sm">
+                  <SelectValue placeholder="Carrera" className="min-w-0 flex-1 truncate" />
+                </SelectTrigger>
+                <SelectContent>
+                  {careerOptions.map((career) => (
+                    <SelectItem key={career.codigo} value={career.codigo} className="whitespace-normal py-2 pr-3">
+                      <span className="block max-w-[18rem] break-words leading-snug text-sm">{career.nombre}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={cuatrimestre} onValueChange={setCuatrimestre} disabled={!selectedCareer}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Cuatrimestre" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cuatrimestresDisponibles.map((number) => (
+                    <SelectItem key={number} value={String(number)}>
+                      {number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={String(groupNumber)} onValueChange={(value) => setGroupNumber(Number(value))}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Asignación de número" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 20 }, (_, index) => index + 1).map((number) => (
+                    <SelectItem key={number} value={String(number)}>
+                      {number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex min-w-0 items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
+              <CalendarDays className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
+              <div className="min-w-0 truncate text-xs sm:text-sm">Nombre: <strong className="text-slate-900 dark:text-slate-100">{currentGroupName}</strong></div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateGroupOpen(false)}
+              className="w-full sm:w-auto text-sm"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleAddGroup}
+              variant="success"
+              disabled={!careerCode || !cuatrimestre}
+              className="w-full sm:w-auto text-sm"
+            >
+              Crear grupo
             </Button>
           </DialogFooter>
         </DialogContent>

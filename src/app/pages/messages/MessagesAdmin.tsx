@@ -1419,8 +1419,8 @@ export function MessagesAdmin(props: Readonly<{
   // ─────────────────────────────────────────────────────────────────────────────
   // VISTA ADMINISTRADOR
   // ─────────────────────────────────────────────────────────────────────────────
-  return (
-    <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-5 overflow-hidden">
+ return (
+    <div className="flex h-[calc(100dvh-64px)] min-h-0 flex-col gap-5 overflow-hidden">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1>Mensajes</h1>

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { FileText, Search, Download, Eye, Filter, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import apiFetch from "../../lib/api";
-import { fetchDocumentBlob, getDocumentDownloadUrl, getDocumentFileUrl } from "../../lib/documents";
+import { fetchDocumentBlob, getDocumentDownloadUrl, getDocumentFileUrl, getDocumentDisplayFileName } from "../../lib/documents";
 import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
 
 type ApiDocument = {
@@ -24,6 +24,33 @@ type ApiDocument = {
   observaciones?: string | null;
   fileUrl?: string | null;
   downloadUrl?: string | null;
+  form_id?: number;
+  apartado_label?: string;
+  isTutoria?: boolean;
+};
+
+// IDs de formularios de tutorías (según tu configuración)
+const TUTORIA_FORM_IDS = [8, 9, 10, 11, 12];
+
+// Normalizar el título del documento (evitar "undefined")
+const resolveDocumentTitle = (doc: any): string => {
+  const title = (doc?.title ?? "").toString().trim();
+  if (title && !/^undefined\b/i.test(title)) {
+    return title;
+  }
+
+  const fileName = getDocumentDisplayFileName(doc?.title, doc?.file_path);
+  return fileName || "Documento";
+};
+
+// Obtener solo el nombre del archivo sin el título completo
+const getFileNameOnly = (fullName: string): string => {
+  // Si tiene un guión, tomar la última parte
+  const parts = fullName.split(' - ');
+  if (parts.length > 1) {
+    return parts[parts.length - 1].trim();
+  }
+  return fullName;
 };
 
 const normalizeStatusFilter = (value: string) => {
@@ -74,10 +101,8 @@ export function DocumentHistory() {
   const [openPreview, setOpenPreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string | undefined>(undefined);
-  // Cambiar a un Map para manejar carga individual por documento
   const [loadingPdfId, setLoadingPdfId] = useState<number | null>(null);
 
-  // Tus typeOptions originales
   const typeOptions = useMemo(
     () => [
       { value: "all", label: "Todos los apartados" },
@@ -103,23 +128,47 @@ export function DocumentHistory() {
     []
   );
 
-  // Función para obtener el tipo real del documento para filtrar
-  const getDocumentTipoForFilter = (doc: ApiDocument): string => {
-    // Primero intentar con el tipo que ya tenemos
-    if (doc.tipo && doc.tipo !== "documento") return doc.tipo;
-    // Si no, intentar derivar del nombre u otros campos
-    if (doc.nombre.toLowerCase().includes("planeación")) return "planeacion";
-    if (doc.nombre.toLowerCase().includes("instrumento")) return "instrumento-3040";
-    if (doc.nombre.toLowerCase().includes("lista")) return "lista-concentrada";
-    if (doc.nombre.toLowerCase().includes("asesoría")) return "asesoria";
-    if (doc.nombre.toLowerCase().includes("portafolio")) return "portafolio-digital";
-    if (doc.nombre.toLowerCase().includes("acta")) return "acta-final";
-    if (doc.nombre.toLowerCase().includes("remedial")) return "remedial";
-    if (doc.nombre.toLowerCase().includes("estadías")) return "estadias";
-    return "planeacion"; // default
+  const isTutoriaDocument = (doc: ApiDocument): boolean => {
+    if (doc.form_id && TUTORIA_FORM_IDS.includes(doc.form_id)) {
+      return true;
+    }
+    const apartado = (doc.apartado_label || "").toLowerCase();
+    const tutoriasApartados = [
+      "carga-academica",
+      "reporte-bajas",
+      "concentrado-asesorias",
+      "acta-asistencia",
+      "acta-asistencia-grupal",
+      "ficha-tecnica"
+    ];
+    return tutoriasApartados.some(a => apartado.includes(a));
   };
 
-  // Función para abrir el PDF con autenticación
+  const getDocumentTipoForFilter = (doc: ApiDocument): string => {
+    if (isTutoriaDocument(doc)) {
+      const apartado = (doc.apartado_label || "").toLowerCase();
+      if (apartado.includes("carga")) return "carga-academica";
+      if (apartado.includes("baja")) return "reporte-bajas";
+      if (apartado.includes("concentrado") && apartado.includes("asesorias")) return "concentrado-asesorias";
+      if (apartado.includes("acta") && apartado.includes("asistencia")) return "acta-asistencia-grupal";
+      if (apartado.includes("ficha")) return "ficha-tecnica";
+      return "tutorias";
+    }
+
+    if (doc.tipo && doc.tipo !== "documento") return doc.tipo;
+    
+    const nombre = doc.nombre.toLowerCase();
+    if (nombre.includes("planeación")) return "planeacion";
+    if (nombre.includes("instrumento")) return "instrumento-3040";
+    if (nombre.includes("lista")) return "lista-concentrada";
+    if (nombre.includes("asesoría")) return "asesoria";
+    if (nombre.includes("portafolio")) return "portafolio-digital";
+    if (nombre.includes("acta")) return "acta-final";
+    if (nombre.includes("remedial")) return "remedial";
+    if (nombre.includes("estadías")) return "estadias";
+    return "planeacion";
+  };
+
   const openDocumentWithAuth = async (documentId: number, title: string, action: "view" | "download") => {
     setLoadingPdfId(documentId);
     try {
@@ -147,7 +196,6 @@ export function DocumentHistory() {
     }
   };
 
-  // Cargar documentos
   useEffect(() => {
     let isMounted = true;
 
@@ -167,7 +215,6 @@ export function DocumentHistory() {
         const docsBackend = response?.data || [];
 
         const transformedDocs: ApiDocument[] = docsBackend.map((doc: any) => {
-          // Determinar el tipo basado en form_code o apartado_label
           let tipo = "planeacion";
           if (doc.form_code) {
             tipo = doc.form_code;
@@ -175,9 +222,11 @@ export function DocumentHistory() {
             tipo = doc.apartado_label.toLowerCase().replace(/\s+/g, '-');
           }
           
+          const title = resolveDocumentTitle(doc);
+          
           return {
             id: doc.id,
-            nombre: doc.title,
+            nombre: title,
             tipo: tipo,
             tipoLabel: doc.form_title || doc.apartado_label || "Planeación",
             materia: doc.materia || "Sin materia",
@@ -189,6 +238,9 @@ export function DocumentHistory() {
             observaciones: null,
             fileUrl: doc.file_path ? getDocumentFileUrl(doc.id) : null,
             downloadUrl: doc.file_path ? getDocumentDownloadUrl(doc.id) : null,
+            form_id: doc.form_id,
+            apartado_label: doc.apartado_label,
+            isTutoria: TUTORIA_FORM_IDS.includes(doc.form_id),
           };
         });
 
@@ -217,7 +269,6 @@ export function DocumentHistory() {
       doc.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.materia.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === "all" || doc.status === filterStatus;
-    // Usar la función para obtener el tipo correcto para filtrar
     const docTipo = getDocumentTipoForFilter(doc);
     const matchesTipo = filterTipo === "all" || docTipo === filterTipo;
     return matchesSearch && matchesStatus && matchesTipo;
@@ -317,67 +368,99 @@ export function DocumentHistory() {
               </div>
             )}
 
-            {!isLoading && !loadError && filteredDocuments.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors"
-              >
-                <div className="flex items-start gap-3 flex-1">
-                  <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                    <FileText className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">{doc.nombre}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {doc.materia} • Parcial {doc.parcial} • Grupo {doc.grupo}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {doc.fecha
-                        ? `${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long", year: "numeric" }).format(new Date(doc.fecha))}${doc.hora ? ` • ${doc.hora}` : ""}`
-                        : "Sin fecha"}
-                    </p>
-                    {doc.observaciones && (
-                      <p className="text-xs text-muted-foreground mt-2 bg-muted px-2 py-1 rounded inline-block">
+            {!isLoading && !loadError && filteredDocuments.map((doc) => {
+              const isTutoria = isTutoriaDocument(doc);
+              
+              // --- CORRECCIÓN: Construir información sin duplicar el título ---
+              let infoLine = "";
+              if (isTutoria) {
+                infoLine = doc.materia && doc.materia !== "Sin materia" ? doc.materia : "Documento de tutoría";
+              } else {
+                const parts = [];
+                // Materia
+                if (doc.materia && doc.materia !== "Sin materia") {
+                  parts.push(doc.materia);
+                }
+                // Parcial - CORREGIDO: ya no dice "Parcial Parcial"
+                if (doc.parcial && doc.parcial !== "N/A" && doc.parcial !== "") {
+                  // Si el parcial ya viene con la palabra "Parcial", no la agregamos de nuevo
+                  const parcialStr = String(doc.parcial);
+                  if (parcialStr.toLowerCase().startsWith("parcial ")) {
+                    parts.push(parcialStr);
+                  } else {
+                    parts.push(`Parcial ${parcialStr}`);
+                  }
+                }
+                // Grupo
+                if (doc.grupo && doc.grupo !== "Grupo ?" && doc.grupo !== "?") {
+                  parts.push(`Grupo ${doc.grupo}`);
+                }
+                infoLine = parts.length > 0 ? parts.join(" • ") : "Sin información";
+              }
+
+              return (
+                <div
+                  key={doc.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-start gap-3 flex-1">
+                    <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                      <FileText className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {/* Solo el nombre del archivo, sin el título repetido */}
+                      <p className="font-medium">{getFileNameOnly(doc.nombre)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {infoLine}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {doc.fecha
+                          ? `${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long", year: "numeric" }).format(new Date(doc.fecha))}${doc.hora ? ` • ${doc.hora}` : ""}`
+                          : "Sin fecha"}
+                      </p>
+                      {doc.observaciones && (
+                        <p className="text-xs text-muted-foreground mt-2 bg-muted px-2 py-1 rounded inline-block">
                           {doc.observaciones}
                         </p>
-                    )}
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={
+                        doc.status === "revisado"
+                          ? "success"
+                          : doc.status === "pendiente"
+                          ? "outline"
+                          : "destructive"
+                      }
+                    >
+                      {doc.status === "revisado"
+                        ? "Revisado"
+                        : doc.status === "pendiente"
+                        ? "Pendiente"
+                        : "Devuelto"}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "view")}
+                      disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
+                    >
+                      {loadingPdfId === Number(doc.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "download")}
+                      disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant={
-                      doc.status === "revisado"
-                        ? "success"
-                        : doc.status === "pendiente"
-                        ? "outline"
-                        : "destructive"
-                    }
-                  >
-                    {doc.status === "revisado"
-                      ? "Revisado"
-                      : doc.status === "pendiente"
-                      ? "Pendiente"
-                      : "Devuelto"}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "view")}
-                    disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
-                  >
-                    {loadingPdfId === Number(doc.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "download")}
-                    disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
