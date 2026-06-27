@@ -242,7 +242,20 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const [instrumento3040Open, setInstrumento3040Open] = useState(false);
   const [instrumento6070Open, setInstrumento6070Open] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
-  const sidebarResolvedAvatar = useResolvedAvatarUrl(user?.avatar && user.avatar !== "/api/default-avatar" ? user.avatar : undefined);
+  // Extraer path relativo (incluyendo ?bust=) para que useResolvedAvatarUrl
+  // use fetch autenticado con ngrok-skip-browser-warning y detecte cambios de URL.
+  const sidebarAvatarPath = useMemo(() => {
+    const src = user?.avatar;
+    if (!src || src === "/api/default-avatar") return undefined;
+    if (src.startsWith("data:") || src.startsWith("blob:") || src.startsWith("/")) return src;
+    try {
+      const parsed = new URL(src);
+      return parsed.pathname + parsed.search; // "/api/users/1/avatar" o "...?bust=123"
+    } catch {
+      return src;
+    }
+  }, [user?.avatar]);
+  const sidebarResolvedAvatar = useResolvedAvatarUrl(sidebarAvatarPath);
   const sidebarAvatarUrl = sidebarResolvedAvatar || defaultProfileAvatar;
 
   // IDs de los hijos de instrumentos para saber si estamos en ellos

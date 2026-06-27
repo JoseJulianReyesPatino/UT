@@ -667,7 +667,7 @@ export function MessagesTeacher(props: Readonly<{
     
     const resolvedAvatarFallback = avatarFallback || getInitials(displayName);
     const avatarValue = avatarUrl && isImageUrl(avatarUrl) ? avatarUrl : DEFAULT_AVATAR_PATH;
-    
+
     return {
       id: raw.id,
       name: displayName ?? 'Conversación',
@@ -865,7 +865,7 @@ export function MessagesTeacher(props: Readonly<{
     const interval = setInterval(() => {
       void loadMessagesRef.current(selectedChat);
       void loadConversationsRef.current();
-    }, 3000);
+    }, 8000);
     return () => clearInterval(interval);
   }, [isReady, selectedChat, user?.id]);
 

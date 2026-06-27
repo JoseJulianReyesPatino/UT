@@ -52,10 +52,9 @@ export const getAvatarUrlWithTimestamp = (
     return urlWithTimestamp;
   }
 
-  // Si es una URL relativa
+  // Si es una URL relativa — usar resolveApiAssetUrl para obtener el origen correcto (ngrok/local)
   if (url.startsWith("/")) {
-    const baseUrl = getBackendBaseUrl();
-    const fullUrl = `${baseUrl}${url}`;
+    const fullUrl = resolveApiAssetUrl(url) ?? `${getBackendBaseUrl()}${url}`;
 
     if (avatarUrlCache.has(fullUrl)) {
       return avatarUrlCache.get(fullUrl);
@@ -182,6 +181,7 @@ export const useResolvedAvatarUrl = (
         const response = await fetch(absoluteUrl, {
           method: "GET",
           credentials: "include",
+          cache: "no-store",
           headers: {
             ...toFetchHeaders(),
             "ngrok-skip-browser-warning": "true",

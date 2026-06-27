@@ -334,8 +334,9 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   return (
     <div className="relative z-0 space-y-8 overflow-hidden bg-slate-50 pb-6 dark:bg-transparent">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -right-12 top-8 h-40 w-40 rounded-full bg-emerald-100/20 blur-3xl dark:bg-emerald-500/5" />
-        <div className="absolute -left-10 bottom-0 h-52 w-52 rounded-full bg-sky-100/12 blur-3xl dark:bg-sky-500/5" />
+        <div className="absolute -right-10 top-8 h-44 w-44 rounded-[2rem] bg-emerald-100/25 blur-[120px] dark:bg-emerald-500/8" />
+        <div className="absolute left-[8%] top-[34%] h-40 w-40 rounded-[2rem] bg-sky-100/18 blur-[120px] dark:bg-sky-500/8" />
+        <div className="absolute -left-12 bottom-0 h-56 w-56 rounded-[2rem] bg-emerald-200/18 blur-[140px] dark:bg-emerald-600/8" />
         {backgroundIcons.map(({ icon: Icon, className }, index) => (
           <span
             key={`${Icon.displayName ?? "icon"}-${index}`}

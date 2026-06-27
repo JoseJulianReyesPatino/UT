@@ -121,6 +121,20 @@ type TutorDocumentRecord = {
 
 type TutorDocumentType = TutorDocumentRecord["tipo"];
 
+type RemedialDocumentRecord = {
+  id: number;
+  ciclo: string;
+  documento: string;
+  docente: string;
+  carrera: string;
+  plan: string;
+  cuatrimestre: string;
+  grupo: string;
+  parcial: string;
+  tipo: string;
+  pdfUrl?: string;
+};
+
 type ApiDocument = {
   id: number;
   form_id?: number;
@@ -162,7 +176,10 @@ const estadiasDocumentTitles: Record<EstadiasDocumentType, string> = {
   estadias: "Acta final",
 };
 
-const getDocumentsModalTitle = (selectedDocumentType: "docentes" | "estadias" | "tutores" | null, selectedDocumentCategory: DocumentRecord["tipo"] | null, selectedEstadiasCategory: EstadiasDocumentType | null, selectedTutorCategory: TutorDocumentType | null) => {
+const getDocumentsModalTitle = (selectedDocumentType: "docentes" | "estadias" | "tutores" | "remediales" | null, selectedDocumentCategory: DocumentRecord["tipo"] | null, selectedEstadiasCategory: EstadiasDocumentType | null, selectedTutorCategory: TutorDocumentType | null) => {
+  if (selectedDocumentType === "remediales") {
+    return "Documentos Remediales";
+  }
   if (selectedDocumentType === "docentes") {
     let title = "Documentos de Docentes";
     if (selectedDocumentCategory) {
@@ -201,7 +218,7 @@ const getDocumentsModalTitle = (selectedDocumentType: "docentes" | "estadias" | 
 
 type DocumentPreviewDialogProps = {
   open: boolean;
-  document: DocumentRecord | TutorDocumentRecord | null;
+  document: DocumentRecord | TutorDocumentRecord | EstadiasDocumentRecord | RemedialDocumentRecord | null;
   onOpenChange: (open: boolean) => void;
   onOpenPdf: () => void;
   previewLoading: boolean;
@@ -270,11 +287,11 @@ export function CiclosEscolares() {
   const [showDocumentTypeSelector, setShowDocumentTypeSelector] = useState(false);
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [selectedCycle, setSelectedCycle] = useState<AcademicCycle | null>(null);
-  const [selectedDocumentType, setSelectedDocumentType] = useState<"docentes" | "estadias" | "tutores" | null>(null);
+  const [selectedDocumentType, setSelectedDocumentType] = useState<"docentes" | "estadias" | "tutores" | "remediales" | null>(null);
   const [selectedDocumentCategory, setSelectedDocumentCategory] = useState<DocumentRecord["tipo"] | null>(null);
   const [selectedEstadiasCategory, setSelectedEstadiasCategory] = useState<EstadiasDocumentType | null>(null);
   const [selectedTutorCategory, setSelectedTutorCategory] = useState<TutorDocumentType | null>(null);
-  const [previewDocument, setPreviewDocument] = useState<DocumentRecord | TutorDocumentRecord | EstadiasDocumentRecord | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<DocumentRecord | TutorDocumentRecord | EstadiasDocumentRecord | RemedialDocumentRecord | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -303,6 +320,7 @@ export function CiclosEscolares() {
   const [documents, setDocuments] = useState<DocumentRecord[]>(initialDocuments);
   const [estadiasDocuments, setEstadiasDocuments] = useState<EstadiasDocumentRecord[]>([]);
   const [tutorDocuments, setTutorDocuments] = useState<TutorDocumentRecord[]>(initialTutorDocuments);
+  const [remedialDocuments, setRemedialDocuments] = useState<RemedialDocumentRecord[]>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [documentCountByCycleId, setDocumentCountByCycleId] = useState<Record<number, number>>({});
 
@@ -348,6 +366,9 @@ export function CiclosEscolares() {
       .replace(/-+/g, "-")
       .trim();
   };
+
+  const isRemedialTipo = (tipo: string): boolean =>
+    tipo.includes("remedial") || tipo.includes("recuperacion");
 
   const normalizeText = (value?: string | null) =>
     (value ?? "")
@@ -677,13 +698,48 @@ export function CiclosEscolares() {
           pdfUrl: row.downloadUrl ?? row.fileUrl ?? `/documents/${row.id}/file`,
         }));
 
+      const remediales: RemedialDocumentRecord[] = rows
+        .filter((row) => isRemedialTipo(resolveRowTipo(row)))
+        .map((row) => ({
+          id: row.id,
+          ciclo: cycle.nombre,
+          documento: getDocumentTitle(row, resolveRowTipo(row)),
+          docente: row.docente ?? row.uploaded_by_name ?? "Sin docente",
+          carrera: row.carrera ?? row.carrera_label ?? "Sin carrera",
+          plan: formatPlanLabel(row.plan, row.carrera ?? row.carrera_label),
+          cuatrimestre: getCuatrimestreFromRow(row),
+          grupo: row.grupo ?? row.group_code ?? "-",
+          parcial: getParcialFromRow(row),
+          tipo: resolveRowTipo(row),
+          pdfUrl: row.downloadUrl ?? row.fileUrl ?? `/documents/${row.id}/file`,
+        }));
+
+      const classifiedIds = new Set([
+        ...docentes.map((d) => d.id),
+        ...estadiasDocs.map((d) => d.id),
+        ...tutores.map((d) => d.id),
+        ...remediales.map((d) => d.id),
+      ]);
+      const unclassified = rows.filter((row) => !classifiedIds.has(row.id));
+      if (unclassified.length > 0) {
+        console.warn(
+          `[CiclosEscolares] ${unclassified.length} documento(s) sin clasificar en ciclo "${cycle.nombre}":`,
+          unclassified.map((r) => ({ id: r.id, form_code: r.form_code, tipo: r.tipo, apartado_label: r.apartado_label }))
+        );
+      }
+
+      const classifiedTotal = docentes.length + estadiasDocs.length + tutores.length + remediales.length;
+      setDocumentCountByCycleId((current) => ({ ...current, [cycle.id]: classifiedTotal }));
+
       setDocuments(docentes);
       setEstadiasDocuments(estadiasDocs);
       setTutorDocuments(tutores);
+      setRemedialDocuments(remediales);
     } catch (error) {
       setDocuments([]);
       setEstadiasDocuments([]);
       setTutorDocuments([]);
+      setRemedialDocuments([]);
       toast.error("No fue posible cargar los documentos del ciclo");
     } finally {
       setIsLoadingDocuments(false);
@@ -727,6 +783,10 @@ export function CiclosEscolares() {
   const [filterTutorCarrera, setFilterTutorCarrera] = useState("all");
   const [filterTutorCuatrimestre, setFilterTutorCuatrimestre] = useState("all");
   const [filterTutorParcial, setFilterTutorParcial] = useState("all");
+  const [filterRemedialPlan, setFilterRemedialPlan] = useState("all");
+  const [filterRemedialCarrera, setFilterRemedialCarrera] = useState("all");
+  const [filterRemedialDocente, setFilterRemedialDocente] = useState("all");
+  const [filterRemedialGrupo, setFilterRemedialGrupo] = useState("all");
 
   const resetDocenteFilters = () => {
     setFilterPlan("all");
@@ -752,6 +812,13 @@ export function CiclosEscolares() {
     setFilterEstadiasDocente("all");
   };
 
+  const resetRemedialFilters = () => {
+    setFilterRemedialPlan("all");
+    setFilterRemedialCarrera("all");
+    setFilterRemedialDocente("all");
+    setFilterRemedialGrupo("all");
+  };
+
   const cycleDocumentCount = useMemo(
     () => (cycle: AcademicCycle) => {
       const countFromApi = documentCountByCycleId[cycle.id];
@@ -761,9 +828,10 @@ export function CiclosEscolares() {
 
       return documents.filter((document) => document.ciclo === cycle.nombre).length
         + estadiasDocuments.filter((document) => document.ciclo === cycle.nombre).length
-        + tutorDocuments.filter((document) => document.ciclo === cycle.nombre).length;
+        + tutorDocuments.filter((document) => document.ciclo === cycle.nombre).length
+        + remedialDocuments.filter((document) => document.ciclo === cycle.nombre).length;
     },
-    [documentCountByCycleId, documents, estadiasDocuments, tutorDocuments]
+    [documentCountByCycleId, documents, estadiasDocuments, tutorDocuments, remedialDocuments]
   );
 
   const getActiveCycle = () => ciclos.find((cycle) => cycle.status === "activo");
@@ -996,9 +1064,14 @@ export function CiclosEscolares() {
     setSelectedCycle(null);
   };
 
-  const handleSelectDocType = (type: "docentes" | "estadias" | "tutores") => {
+  const handleSelectDocType = (type: "docentes" | "estadias" | "tutores" | "remediales") => {
     setSelectedDocumentType(type);
     setShowDocTypeDialog(false);
+    if (type === "remediales") {
+      resetRemedialFilters();
+      setShowDocumentsModal(true);
+      return;
+    }
     if (type === "docentes" || type === "estadias") {
       setShowDocumentTypeSelector(true);
       return;
@@ -1044,6 +1117,7 @@ export function CiclosEscolares() {
     resetDocenteFilters();
     resetEstadiasFilters();
     resetTutorFilters();
+    resetRemedialFilters();
   };
 
   useEffect(() => {
@@ -1058,10 +1132,14 @@ export function CiclosEscolares() {
     }
     if (selectedDocumentType === "tutores") {
       resetTutorFilters();
+      return;
+    }
+    if (selectedDocumentType === "remediales") {
+      resetRemedialFilters();
     }
   }, [showDocumentsModal, selectedDocumentType, selectedCycle?.id]);
 
-  const openDocumentPreview = (document: DocumentRecord | TutorDocumentRecord | EstadiasDocumentRecord) => {
+  const openDocumentPreview = (document: DocumentRecord | TutorDocumentRecord | EstadiasDocumentRecord | RemedialDocumentRecord) => {
     setPreviewDocument(document);
   };
 
@@ -1329,6 +1407,16 @@ export function CiclosEscolares() {
     [estadiasDocuments, selectedEstadiasCategory, filterEstadiasPlan, filterEstadiasCarrera, filterEstadiasGrupo, filterEstadiasDocente]
   );
 
+  const filteredRemedialDocuments = useMemo(
+    () => remedialDocuments.filter((document) => (
+      (filterRemedialPlan === "all" || document.plan === filterRemedialPlan)
+      && (filterRemedialCarrera === "all" || document.carrera === filterRemedialCarrera)
+      && (filterRemedialDocente === "all" || document.docente === filterRemedialDocente)
+      && (filterRemedialGrupo === "all" || document.grupo === filterRemedialGrupo)
+    )),
+    [remedialDocuments, filterRemedialPlan, filterRemedialCarrera, filterRemedialDocente, filterRemedialGrupo]
+  );
+
   const docenteCountByType = useMemo(() => {
     return documents.reduce<Record<DocumentRecord["tipo"], number>>((acc, document) => {
       acc[document.tipo] = (acc[document.tipo] ?? 0) + 1;
@@ -1376,6 +1464,7 @@ export function CiclosEscolares() {
   const totalDocenteDocuments = documents.length;
   const totalEstadiasDocuments = estadiasDocuments.length;
   const totalTutorDocuments = tutorDocuments.length;
+  const totalRemedialDocuments = remedialDocuments.length;
   const totalSelectedDocenteCategory = selectedDocumentCategory
     ? (docenteCountByType[selectedDocumentCategory] ?? 0)
     : totalDocenteDocuments;
@@ -1706,6 +1795,16 @@ export function CiclosEscolares() {
               <span className="font-semibold text-lg">Documentos Tutores ({totalTutorDocuments})</span>
               <span className="text-sm text-muted-foreground">Carga académica, reportes, concentrados y fichas.</span>
             </Button>
+            <Button
+              onClick={() => handleSelectDocType("remediales")}
+              className="justify-start h-28 text-left flex flex-col items-start p-5 border-2 rounded-lg transition-all hover:shadow-lg"
+              variant="outline"
+              disabled={isLoadingDocuments || totalRemedialDocuments === 0}
+            >
+              <FileText className="h-6 w-6 mb-3" />
+              <span className="font-semibold text-lg">Documentos Remediales ({totalRemedialDocuments})</span>
+              <span className="text-sm text-muted-foreground">Actividades y actas de recuperación académica.</span>
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1775,7 +1874,11 @@ export function CiclosEscolares() {
               <Button
                 onClick={() => {
                   setShowDocumentsModal(false);
-                  setShowDocumentTypeSelector(true);
+                  if (selectedDocumentType === "remediales") {
+                    setShowDocTypeDialog(true);
+                  } else {
+                    setShowDocumentTypeSelector(true);
+                  }
                 }}
                 variant="ghost"
                 size="sm"
@@ -1872,6 +1975,85 @@ export function CiclosEscolares() {
                               <Badge variant="outline" className="text-xs">Cuatrimestre {doc.cuatrimestre}</Badge>
                               <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
                               {doc.parcial !== "-" && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
+                            </div>
+                          </div>
+                          <ResponsiveActionButton
+                            variant="outline"
+                            size="sm"
+                            label="Ver PDF"
+                            title="Ver documento"
+                            className="shrink-0"
+                            onClick={(e) => { e.stopPropagation(); openDocumentPreview(doc); }}
+                            icon={<FileText className="h-4 w-4" />}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : selectedDocumentType === "remediales" ? (
+              <>
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-2 lg:grid-cols-4 py-4 border-b">
+                  <Select value={filterRemedialPlan} onValueChange={(v) => { setFilterRemedialPlan(v); setFilterRemedialCarrera("all"); }}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Plan" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los planes</SelectItem>
+                      {Array.from(new Set(remedialDocuments.map((d) => d.plan).filter(Boolean))).map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterRemedialCarrera} onValueChange={setFilterRemedialCarrera}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Carrera" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las carreras</SelectItem>
+                      {Array.from(new Set(remedialDocuments.filter((d) => filterRemedialPlan === "all" || d.plan === filterRemedialPlan).map((d) => d.carrera).filter(Boolean))).map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterRemedialDocente} onValueChange={setFilterRemedialDocente}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Docente" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los docentes</SelectItem>
+                      {Array.from(new Set(remedialDocuments.map((d) => d.docente).filter(Boolean))).map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterRemedialGrupo} onValueChange={setFilterRemedialGrupo}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Grupo" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los grupos</SelectItem>
+                      {Array.from(new Set(remedialDocuments.map((d) => d.grupo).filter((v): v is string => Boolean(v) && v !== "-"))).map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 pt-4 pb-4 max-h-[52vh] overflow-y-auto pr-1">
+                  <p className="text-xs text-muted-foreground">
+                    Mostrando {filteredRemedialDocuments.length} de {totalRemedialDocuments} documentos.
+                  </p>
+                  {filteredRemedialDocuments.length === 0 ? (
+                    <div className="flex items-center justify-center h-32 text-muted-foreground">No hay documentos remediales que coincidan con los filtros</div>
+                  ) : (
+                    filteredRemedialDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        tabIndex={0}
+                        onClick={() => openDocumentPreview(doc)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openDocumentPreview(doc);
+                          }
+                        }}
+                        className="cursor-pointer p-3 border border-border/70 rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{doc.documento}</p>
+                            <p className="text-xs text-muted-foreground">{doc.docente} • {doc.carrera}</p>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                              {doc.grupo !== "-" && <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>}
+                              {doc.cuatrimestre !== "-" && <Badge variant="outline" className="text-xs">Cuatrimestre {doc.cuatrimestre}</Badge>}
+                              <Badge variant="outline" className="text-xs">{doc.tipo.replaceAll("-", " ")}</Badge>
                             </div>
                           </div>
                           <ResponsiveActionButton
