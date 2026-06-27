@@ -78,7 +78,6 @@ const candidatesByMode = () => {
     ]);
   }
 
-  // auto: prefer public endpoint if defined, then explicit primary, then local.
   return unique([
     configuredPublic,
     configuredPrimary,
@@ -106,7 +105,6 @@ export const AUTH_TOKEN_STORAGE_KEY = "utslrc-auth-token";
 export const resolveApiAssetUrl = (value?: string | null) => {
   if (!value) return undefined;
 
-  // Si ya es una URL completa, devolverla directamente
   if (
     /^https?:\/\//i.test(value) ||
     /^data:/i.test(value) ||
@@ -115,7 +113,6 @@ export const resolveApiAssetUrl = (value?: string | null) => {
     return value;
   }
 
-  // Rutas servidas por Vite en el frontend
   if (
     value.startsWith("/assets/") ||
     value.startsWith("/src/assets/") ||
@@ -132,15 +129,9 @@ export const resolveApiAssetUrl = (value?: string | null) => {
     );
   }
 
-  // Si es una ruta relativa, construirla con el origen correcto
   if (correctedValue.startsWith("/")) {
     return `${apiOrigin}${correctedValue}`;
   }
 
   return `${apiOrigin}/${correctedValue}`;
 };
-
-console.log("[env] API mode:", mode);
-console.log("[env] API candidates:", API_BASE_URL_CANDIDATES);
-console.log("[env] API_BASE_URL:", API_BASE_URL);
-console.log("[env] apiOrigin:", apiOrigin);

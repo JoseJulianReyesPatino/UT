@@ -360,7 +360,11 @@ export default function Tutores() {
 
   const handleShareToMessages = (doc: TutorDocumentItem) => {
     const recipientName = 'tutor' in doc ? doc.tutor : (doc as any).tutor;
-    globalThis.dispatchEvent(new CustomEvent('openMessagesConversation', { detail: { recipientName, recipientRole: 'Tutor', document: { id: doc.id, title: doc.documento, filePath: doc.filePath ?? "" } } }));
+    const lastSep = doc.documento.lastIndexOf(" - ");
+    const cleanTitle = lastSep !== -1 && doc.documento.substring(lastSep + 3).trim()
+      ? doc.documento.substring(lastSep + 3).trim()
+      : doc.documento;
+    globalThis.dispatchEvent(new CustomEvent('openMessagesConversation', { detail: { recipientName, recipientRole: 'Tutor', document: { id: doc.id, title: cleanTitle, filePath: doc.filePath ?? "" } } }));
   };
 
   const closePreview = () => {

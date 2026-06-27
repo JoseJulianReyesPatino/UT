@@ -379,23 +379,15 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   // -----------------------------------------------------------
 
   return (
-    <div className="relative z-0 space-y-8 overflow-hidden bg-slate-50 pb-6 dark:bg-transparent">
+    <div className="relative z-0 space-y-8 overflow-hidden rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl pb-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/60 dark:bg-slate-950/30">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -right-10 top-8 h-44 w-44 rounded-[2rem] bg-emerald-100/25 blur-[120px] dark:bg-emerald-500/8" />
         <div className="absolute left-[8%] top-[34%] h-40 w-40 rounded-[2rem] bg-sky-100/18 blur-[120px] dark:bg-sky-500/8" />
         <div className="absolute -left-12 bottom-0 h-56 w-56 rounded-[2rem] bg-emerald-200/18 blur-[140px] dark:bg-emerald-600/8" />
-        {backgroundIcons.map(({ icon: Icon, className }, index) => (
-          <span
-            key={`${Icon.displayName ?? "icon"}-${index}`}
-            className={`absolute text-emerald-300/15 dark:text-emerald-200/10 ${className}`}
-          >
-            <Icon className="h-full w-full" />
-          </span>
-        ))}
       </div>
 
       <div className="relative z-10">
-        <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-emerald-50/25 to-slate-100 shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900">
+        <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60">
           <CardContent className="space-y-5 p-5 sm:p-7">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-2">
@@ -480,7 +472,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                   trend={stat.trend}
                   color={stat.color}
                   bgColor={stat.bgColor}
-                  cardClass={stat.cardClass}
+                  cardClass={`${stat.cardClass} bg-white/70 border-slate-200/70 backdrop-blur-xl dark:bg-slate-950/60 dark:border-slate-800/70`}
                   accentClass={stat.accentClass}
                 />
               </button>
@@ -490,7 +482,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
         <div className="relative z-10 mt-3 grid gap-6 xl:grid-cols-2">
           {/* Card de Documentos Recientes */}
-          <Card className="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-slate-100 to-emerald-50/10 shadow-[0_18px_45px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-emerald-950/10">
+          <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.05)] dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -528,7 +520,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                     return (
                       <div
                         key={doc.id}
-                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/70 dark:hover:bg-slate-900"
+                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/70 p-3 transition-colors hover:bg-slate-100/90 dark:border-slate-800 dark:bg-slate-900/70 dark:hover:bg-slate-900"
                       >
                         <div className="flex items-center gap-3">
                           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
@@ -559,7 +551,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           </Card>
 
           {/* Card de Próximas Entregas */}
-          <Card className="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-slate-100 to-emerald-50/10 shadow-[0_18px_45px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-emerald-950/10">
+          <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.05)] dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -596,7 +588,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                       return (
                         <div
                           key={index}
-                          className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70"
+                          className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-900/70"
                         >
                           <div>
                             <p className="text-sm font-semibold text-slate-800 dark:text-white">{entrega.titulo}</p>
@@ -613,7 +605,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                     return (
                       <div
                         key={`${entrega.titulo}-${index}`}
-                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70"
+                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-900/70"
                       >
                         <div>
                           <div className="flex items-center gap-2">

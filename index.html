@@ -32,10 +32,15 @@
           }
         })();
       </script>
-      <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
+      <style>
+        html, body { height: 100%; margin: 0; }
+        #root { height: 100%; }
+        body.splashing { background-image: none !important; background-color: #f8fafc !important; }
+        html.dark body.splashing { background-color: #0f172a !important; }
+      </style>
     </head>
 
-    <body>
+    <body class="splashing">
       <div id="root"></div>
       <script type="module" src="/src/main.tsx"></script>
     </body>

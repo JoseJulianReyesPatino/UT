@@ -22,7 +22,7 @@ export function StatsCard({
   trend,
   color = "text-foreground",
   bgColor = "bg-muted",
-  cardClass = "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 border-slate-200 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900/40 dark:border-slate-800/70",
+  cardClass = "glass-card bg-white/70 border border-slate-200/70 dark:bg-slate-950/60 dark:border-slate-800/70",
   accentClass = "from-slate-400/35 via-slate-300/20 to-transparent",
 }: StatsCardProps) {
   return (

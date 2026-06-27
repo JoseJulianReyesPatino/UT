@@ -269,49 +269,27 @@ export default function Instrumento70Page() {
 
   const uploadMultipleFiles = async (files: File[], basePayload: any) => {
     const uploadedIds = [];
-    
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const toBase64 = (f: File) => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          const parts = result.split(",");
-          resolve(parts[1] ?? "");
-        };
-        reader.onerror = (e) => reject(e);
-        reader.readAsDataURL(f);
-      });
 
-      const fileBase64 = await toBase64(file);
-      
+    for (const file of files) {
       const cleanFileName = file.name.replace(/\.pdf$/i, "").substring(0, 50);
-      const payload = {
-        form_id: basePayload.form_id,
-        apartado_label: basePayload.apartado_label,
-        carrera_label: basePayload.carrera_label,
-        plan: "plan-normal",
-        materia: basePayload.materia,
-        parcial: basePayload.parcial,
-        docente: basePayload.docente,
-        nota: basePayload.nota,
-        group_id: basePayload.group_id,
-        group_code: basePayload.group_code,
-        file_base64: fileBase64,
-        file_name: file.name,
-        file_type: file.type,
-        file_size: file.size,
-        title: `${basePayload.materia || "Instrumento 70%"} - ${basePayload.parcial || ""} - ${cleanFileName}`.trim(),
-      };
-      
-      if (basePayload.original_document_id) {
-        payload.original_document_id = basePayload.original_document_id;
-      }
-      
-      const result = await apiFetch("/documents", { method: "POST", body: JSON.stringify(payload) });
+      const title = `${basePayload.materia || "Instrumento 70%"} - ${basePayload.parcial || ""} - ${cleanFileName}`.trim();
+
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('form_id', String(basePayload.form_id));
+      fd.append('title', title);
+      fd.append('plan', 'plan_normal');
+      if (basePayload.apartado_label) fd.append('apartado_label', basePayload.apartado_label);
+      if (basePayload.carrera_label) fd.append('carrera_label', basePayload.carrera_label);
+      if (basePayload.materia) fd.append('materia', basePayload.materia);
+      if (basePayload.parcial) fd.append('parcial', basePayload.parcial);
+      if (basePayload.group_id) fd.append('group_id', String(basePayload.group_id));
+      if (basePayload.original_document_id) fd.append('original_document_id', String(basePayload.original_document_id));
+
+      const result = await apiFetch("/documents", { method: "POST", body: fd });
       uploadedIds.push(result?.data?.id);
     }
-    
+
     return uploadedIds;
   };
 
@@ -400,7 +378,7 @@ export default function Instrumento70Page() {
     fileName={getUploadedFileName(h)}
     carrera={h.carrera_label}
     subject={h.materia}
-    submittedAt={new Date(h.submitted_at).toLocaleString()}
+    submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
     status={h.status}
     returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
     onView={() => openDocument(h.id, "view")}

@@ -53,11 +53,30 @@ async function tryFetchAndDownload(url: string, filename: string) {
   }
 }
 
+async function tryFetchAndOpen(url: string) {
+  try {
+    const headers: Record<string, string> = {};
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(url, { method: 'GET', headers, credentials: 'include' });
+    if (!res.ok) throw new Error('Network response not ok');
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 type ChatMessage = {
   id: number;
   sender: string;
   content: string;
   timestamp: string;
+  rawTimestamp?: string;
   isOwn: boolean;
   avatar?: string;
   attachments?: AttachmentItem[];
@@ -79,6 +98,7 @@ type Conversation = {
   avatarFallback: string;
   status: "online" | "offline" | "away";
   messages: ChatMessage[];
+  peerUserId?: number;
 };
 
 type DraftRecipient = {
@@ -92,6 +112,20 @@ type DraftRecipient = {
 
 const initialConversations: Conversation[] = [];
 
+const formatMessageTimestamp = (raw: string): string => {
+  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return raw;
+  return date.toLocaleString('es-MX', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
 const formatSize = (size: number) => {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
@@ -99,9 +133,13 @@ const formatSize = (size: number) => {
 };
 
 const getTimeLabel = () =>
-  new Date().toLocaleTimeString("es-MX", {
+  new Date().toLocaleString("es-MX", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: true,
   });
 
 const parseMessageDate = (timestamp: string) => {
@@ -113,7 +151,7 @@ const parseMessageDate = (timestamp: string) => {
 const canEditMessage = (timestamp: string) => {
   const parsed = parseMessageDate(timestamp);
   if (!parsed) return false;
-  return Date.now() - parsed.getTime() <= 5 * 60 * 1000;
+  return Date.now() - parsed.getTime() <= 15 * 60 * 1000;
 };
 
 const isConversationAccessDenied = (error: unknown) => {
@@ -295,7 +333,7 @@ const MessageBubble = React.memo(({
   const [removeOpen, setRemoveOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editBody, setEditBody] = useState(message.content);
-  const editable = message.isOwn && canEditMessage(message.timestamp);
+  const editable = message.isOwn && canEditMessage(message.rawTimestamp ?? message.timestamp);
   const { theme } = useTheme();
   const isDark = theme === "dark";
   
@@ -308,7 +346,7 @@ const MessageBubble = React.memo(({
   }, [editOpen, message.content]);
 
   return (
-    <div className={cn("flex items-end", message.isOwn ? "justify-end" : "justify-start")}> 
+    <div className={cn("flex w-full min-w-0 items-end", message.isOwn ? "justify-end" : "justify-start")}>
       {!message.isOwn && (
         <div className="mr-2 mt-0.5 shrink-0">
           <Avatar className="h-8 w-8 ring-1 ring-white/80 dark:ring-slate-900/50">
@@ -325,7 +363,7 @@ const MessageBubble = React.memo(({
 
       <div
         className={cn(
-          "max-w-[78%] rounded-2xl px-4 py-3 shadow-sm relative",
+          "max-w-[78%] min-w-0 overflow-hidden rounded-2xl px-4 py-3 shadow-sm relative",
           message.isOwn
             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white"
             : cn("bg-white/95 border border-border/70 text-foreground", isDark && "bg-slate-800/95 border-slate-700 text-slate-200")
@@ -335,25 +373,45 @@ const MessageBubble = React.memo(({
         <div className={cn("text-xs font-medium mb-1", message.isOwn ? "text-white/80" : "text-muted-foreground")}>
           {!message.isOwn && message.sender}
         </div>
+
+        {message.replyTo && (
+          <div className={cn(
+            "mb-2 rounded-lg border-l-4 px-3 py-1.5 text-xs cursor-default select-none",
+            message.isOwn
+              ? "border-white/50 bg-white/10"
+              : "border-emerald-400 bg-emerald-50/80 dark:border-emerald-600 dark:bg-emerald-950/40"
+          )}>
+            <p className={cn("font-semibold mb-0.5 truncate", message.isOwn ? "text-white/90" : "text-emerald-700 dark:text-emerald-400")}>
+              {message.replyTo.sender}
+            </p>
+            <p className={cn("line-clamp-2 leading-snug", message.isOwn ? "text-white/70" : "text-muted-foreground dark:text-slate-400")}>
+              {message.replyTo.content}
+            </p>
+          </div>
+        )}
+
         <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
 
         {message.attachments && message.attachments.length > 0 && (
           <div className="mt-3 space-y-2">
             {message.attachments.map((attachment) => (
-              <div key={`${message.id}-${attachment.name}`} className="flex items-center gap-3 rounded-lg border p-2 text-sm bg-muted/40 dark:bg-slate-700/40">
-                <Paperclip className="h-4 w-4 text-muted-foreground dark:text-slate-400" />
+              <div key={`${message.id}-${attachment.name}`} className="flex items-center gap-2 rounded-lg border p-2 text-sm bg-muted/40 dark:bg-slate-700/40 min-w-0 overflow-hidden">
+                <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground dark:text-slate-400" />
                 <div className="min-w-0 flex-1 flex items-center justify-between">
                   <div className="min-w-0">
                     <p className="truncate font-medium dark:text-slate-200">
                       {attachment.url ? (
-                        <a
-                          href={resolveApiAssetUrl(attachment.url)}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const resolved = resolveApiAssetUrl(attachment.url!);
+                            const ok = await tryFetchAndOpen(resolved!);
+                            if (!ok) window.open(resolved, '_blank', 'noopener');
+                          }}
                           className="underline hover:text-emerald-700 dark:hover:text-emerald-300"
                         >
                           {attachment.name}
-                        </a>
+                        </button>
                       ) : (
                         attachment.name
                       )}
@@ -362,21 +420,18 @@ const MessageBubble = React.memo(({
                   </div>
 
                   {attachment.url && (
-                    <a
-                      href={resolveApiAssetUrl(attachment.url)}
-                      onClick={async (e) => {
-                        e.preventDefault();
+                    <button
+                      type="button"
+                      onClick={async () => {
                         const resolved = resolveApiAssetUrl(attachment.url!);
-                        const ok = await tryFetchAndDownload(resolved, attachment.name);
-                        if (!ok) {
-                          window.open(resolved, '_blank', 'noopener');
-                        }
+                        const ok = await tryFetchAndDownload(resolved!, attachment.name);
+                        if (!ok) window.open(resolved, '_blank', 'noopener');
                       }}
                       className="ml-3 text-muted-foreground hover:text-emerald-700 dark:hover:text-emerald-300"
                       title={`Descargar ${attachment.name}`}
-                      >
+                    >
                       <img src={downloadIcon} alt="Descargar" className="h-4 w-4" />
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>
@@ -496,6 +551,9 @@ export function MessagesAdmin(props: Readonly<{
   const peerRoleLabels = ["Docente", "Tutor"];
   const isTeacher = false;
   const suppressionStorageKey = `ut-suppressed-chats:${user?.id ?? "anon"}`;
+  const suppressionStorageKeyRef = useRef(suppressionStorageKey);
+  suppressionStorageKeyRef.current = suppressionStorageKey;
+  const suppressionMountedRef = useRef(true);
   const conversationsCacheKey = `chat_conversations:admin:${user?.id ?? "anon"}`;
   const selectedChatCacheKey = `chat_selected_chat:admin:${user?.id ?? "anon"}`;
 
@@ -544,8 +602,12 @@ export function MessagesAdmin(props: Readonly<{
   }, [suppressionStorageKey]);
 
   useEffect(() => {
-    localStorage.setItem(suppressionStorageKey, JSON.stringify(suppressedChatIds));
-  }, [suppressedChatIds, suppressionStorageKey]);
+    if (suppressionMountedRef.current) {
+      suppressionMountedRef.current = false;
+      return;
+    }
+    localStorage.setItem(suppressionStorageKeyRef.current, JSON.stringify(suppressedChatIds));
+  }, [suppressedChatIds]);
 
   useEffect(() => {
     const handleAvatarUpdate = () => {
@@ -606,8 +668,10 @@ export function MessagesAdmin(props: Readonly<{
 
   const handleCreateConversation = async (recipient: any) => {
     try {
-      const normalizedRecipientName = ((recipient.full_name ?? recipient.name ?? '') as string).trim().toLowerCase();
-      const existingConversation = conversations.find((conversation) => conversation.name.trim().toLowerCase() === normalizedRecipientName);
+      const recipientId = Number(recipient.id ?? 0);
+      const existingConversation = recipientId > 0
+        ? conversations.find((c) => c.peerUserId === recipientId)
+        : conversations.find((c) => c.name.trim().toLowerCase() === ((recipient.full_name ?? recipient.name ?? '') as string).trim().toLowerCase());
       if (existingConversation) {
         setSelectedChat(existingConversation.id);
         setDraftRecipient(null);
@@ -650,12 +714,14 @@ export function MessagesAdmin(props: Readonly<{
     let participantRole = raw.role;
     let avatarUrl = raw.avatar_url || raw.avatar;
     let avatarFallback = raw.avatar_fallback || '';
-    
+    let peerUserId: number | undefined;
+
     if (raw.participants && Array.isArray(raw.participants) && user) {
       const otherParticipant = raw.participants.find((p: any) => p.id !== Number(user.id));
       if (otherParticipant) {
+        peerUserId = Number(otherParticipant.id);
         displayName = otherParticipant.name;
-        const otherRole = otherParticipant.role === 'administrador' ? 'Administrador' : 
+        const otherRole = otherParticipant.role === 'administrador' ? 'Administrador' :
                          otherParticipant.role === 'tutor' ? 'Tutor' : 'Docente';
         participantRole = otherRole;
         if (otherParticipant.avatar_url || otherParticipant.avatar) {
@@ -664,7 +730,7 @@ export function MessagesAdmin(props: Readonly<{
         if (otherParticipant.avatar_fallback) avatarFallback = otherParticipant.avatar_fallback;
       }
     }
-    
+
     const resolvedAvatarFallback = avatarFallback || getInitials(displayName);
     const avatarValue = avatarUrl && isImageUrl(avatarUrl) ? avatarUrl : DEFAULT_AVATAR_PATH;
 
@@ -679,6 +745,7 @@ export function MessagesAdmin(props: Readonly<{
       avatarFallback: resolvedAvatarFallback,
       status: raw.status ?? 'offline',
       messages: [],
+      peerUserId,
     };
   }, [user]);
 
@@ -686,12 +753,14 @@ export function MessagesAdmin(props: Readonly<{
     const avatarUrl = raw.avatar_url ?? raw.avatar;
     const avatarFallback = raw.avatar_fallback || getInitials(raw.sender);
     const avatarValue = avatarUrl && isImageUrl(avatarUrl) ? avatarUrl : DEFAULT_AVATAR_PATH;
-    
+    const rawTs = raw.timestamp ?? raw.created_at ?? new Date().toISOString();
+
     return {
       id: raw.id,
       sender: raw.sender ?? raw.user_name ?? 'Usuario',
       content: raw.content ?? raw.body ?? '',
-      timestamp: raw.timestamp ?? raw.created_at ?? new Date().toISOString(),
+      timestamp: formatMessageTimestamp(rawTs),
+      rawTimestamp: rawTs,
       isOwn: Boolean(raw.isOwn || raw.is_own || raw.sender_id === Number(user?.id)),
       avatar: avatarValue,
       attachments: raw.attachments ?? [],
@@ -886,15 +955,18 @@ export function MessagesAdmin(props: Readonly<{
 
   const processInitialOpen = useCallback(async (detail: NonNullable<typeof initialOpen>) => {
     const { conversationId, recipientName, recipientRole, document } = detail;
+    const toAttachmentName = (title: string) =>
+      title.toLowerCase().endsWith('.pdf') ? title : `${title}.pdf`;
+
     const buildDocumentAttachment = (doc: { id: number; title: string; filePath?: string }): AttachmentItem => ({
       documentId: doc.id,
-      name: `${doc.title}.pdf`,
+      name: toAttachmentName(doc.title),
       sizeLabel: "—",
       typeLabel: "Documento PDF",
       url: doc.filePath || undefined,
     });
 
-    const addDocumentAsPending = async (doc: { id: number; title: string; filePath?: string }) => {
+    const addDocumentAsPending = (doc: { id: number; title: string; filePath?: string }) => {
       const attachmentUrl = doc.filePath || getDocumentFileUrl(doc.id);
       if (!doc?.id) {
         setPendingAttachments((current) => [...current, buildDocumentAttachment(doc)]);
@@ -905,31 +977,23 @@ export function MessagesAdmin(props: Readonly<{
         if (current.some((attachment) => attachment.documentId === doc.id)) {
           return current;
         }
-
         return [...current, { ...buildDocumentAttachment(doc), url: attachmentUrl }];
       });
 
-      try {
-        const blob = await fetchDocumentBlob(doc.id);
-        const name = `${doc.title}.pdf`;
+      void fetchDocumentBlob(doc.id).then((blob) => {
+        const name = toAttachmentName(doc.title);
         const file = new File([blob], name, { type: blob.type || 'application/pdf' });
-        const attachment: AttachmentItem = {
-          documentId: doc.id,
-          file,
-          name,
-          sizeLabel: formatSize(blob.size),
-          typeLabel: blob.type || 'application/pdf',
-          url: attachmentUrl,
-        };
         setPendingAttachments((current) =>
           current.map((item) =>
-            item.documentId === doc.id ? attachment : item,
+            item.documentId === doc.id
+              ? { ...item, file, name, sizeLabel: formatSize(blob.size), typeLabel: blob.type || 'application/pdf' }
+              : item,
           ),
         );
-      } catch (err) {
+      }).catch((err) => {
         console.error('addDocumentAsPending error', err);
         toast.error('No fue posible adjuntar el documento automáticamente; se añadió como enlace.');
-      }
+      });
     };
 
     const appendDocumentToConversation = (conv: Conversation, doc: { id: number; title: string }): Conversation => {
@@ -953,7 +1017,7 @@ export function MessagesAdmin(props: Readonly<{
       setSelectedChat(conversationId);
       if (document) {
         // Agregar documento como attachment pendiente en lugar de mensaje
-        await addDocumentAsPending(document);
+        addDocumentAsPending(document);
       }
       void markConversationAsRead(conversationId);
       onConsume?.();
@@ -977,7 +1041,7 @@ export function MessagesAdmin(props: Readonly<{
           setDraftRecipient(null);
           if (document) {
             // Agregar documento como attachment pendiente en lugar de enviarlo inmediatamente
-            await addDocumentAsPending(document);
+            addDocumentAsPending(document);
           }
           await loadMessages(found.id);
           await markConversationAsRead(found.id);
@@ -1006,7 +1070,7 @@ export function MessagesAdmin(props: Readonly<{
             setSelectedChat(conversationId);
             setDraftRecipient(null);
             // Agregar documento como attachment pendiente en lugar de enviarlo inmediatamente
-            if (document) await addDocumentAsPending(document);
+            if (document) addDocumentAsPending(document);
             await loadMessages(conversationId);
             await markConversationAsRead(conversationId);
           }
@@ -1048,6 +1112,8 @@ export function MessagesAdmin(props: Readonly<{
   }, [conversations, suppressedChatIds]);
 
   useEffect(() => {
+    if (isInitialLoad) return;
+
     const validSuppressedIds = new Set(
       conversations
         .filter((conversation) => peerRoleLabels.includes(conversation.role))
@@ -1058,7 +1124,7 @@ export function MessagesAdmin(props: Readonly<{
       const next = current.filter((id) => validSuppressedIds.has(id));
       return next.length === current.length ? current : next;
     });
-  }, [conversations]);
+  }, [conversations, isInitialLoad]);
 
   const selectedConversation = selectedChat !== null
     ? filteredConversations.find((conversation) => conversation.id === selectedChat)
@@ -1150,14 +1216,13 @@ export function MessagesAdmin(props: Readonly<{
     if (!trimmedMessage && pendingAttachments.length === 0) return;
 
     (async () => {
+      let targetConversationId: number | null = selectedChat;
+      let tempId = 0;
       try {
-        let targetConversationId = selectedChat;
 
         if (!targetConversationId) {
           const createPayload = draftRecipient && draftRecipient.id > 0
             ? { recipient_user_id: draftRecipient.id }
-            : isTeacher
-            ? {}
             : null;
 
           if (!createPayload) {
@@ -1178,52 +1243,91 @@ export function MessagesAdmin(props: Readonly<{
           return;
         }
 
-        const formData = new FormData();
-        formData.append('body', trimmedMessage || (pendingAttachments.length > 0 ? 'Adjunto enviado' : ''));
-        console.debug('handleSend: pendingAttachments before send', pendingAttachments);
-        if (replyingTo?.id) {
-          formData.append('reply_to_message_id', String(replyingTo.id));
-        }
-        pendingAttachments.forEach((attachment) => {
-          if (attachment.file) {
-            formData.append('attachments[]', attachment.file, attachment.file.name);
-          } else if (attachment.url) {
-            // include url as metadata field so backend can handle link-only attachments if supported
-            formData.append('attachment_urls[]', attachment.url);
-          }
-        });
+        const convId = targetConversationId;
+        tempId = -(Date.now());
+        const capturedAttachments = [...pendingAttachments];
+        const capturedReplyingTo = replyingTo;
 
-        // dump FormData entries for debugging
-        try {
-          for (const entry of (formData as any).entries()) {
-            console.debug('FormData entry:', entry[0], entry[1]);
-          }
-        } catch (e) {
-          console.debug('Unable to enumerate FormData entries', e);
-        }
+        // Optimistic: mostrar mensaje de inmediato
+        const tempMessage: ChatMessage = {
+          id: tempId,
+          sender: user?.name ?? 'Tú',
+          content: trimmedMessage || (capturedAttachments.length > 0 ? 'Adjunto enviado' : ''),
+          timestamp: getTimeLabel(),
+          rawTimestamp: new Date().toISOString(),
+          isOwn: true,
+          attachments: capturedAttachments.map((a) => ({
+            name: a.name,
+            sizeLabel: a.sizeLabel,
+            typeLabel: a.typeLabel,
+            url: a.file ? URL.createObjectURL(a.file) : a.url,
+          })),
+          replyTo: capturedReplyingTo
+            ? { id: capturedReplyingTo.id, sender: capturedReplyingTo.sender, content: capturedReplyingTo.content }
+            : undefined,
+        };
+        setConversations((prev) => prev.map((c) =>
+          c.id === convId
+            ? { ...c, messages: [...c.messages, tempMessage], lastMessage: tempMessage.content }
+            : c
+        ));
 
-        const response = await apiFetch(`/conversations/${targetConversationId}/messages`, {
-          method: 'POST',
-          body: formData,
-        }) as any;
-        console.debug('handleSend: API response', response);
+        // Limpiar entradas de inmediato (sin esperar al servidor)
         setMessage('');
         setPendingAttachments([]);
         setReplyingTo(null);
         setIsTyping(false);
         setDraftRecipient(null);
-        setSelectedChat(targetConversationId);
-        await Promise.all([loadMessages(targetConversationId), loadConversations()]);
-        await markConversationAsRead(targetConversationId);
+        setSelectedChat(convId);
+
+        const formData = new FormData();
+        formData.append('body', trimmedMessage || (capturedAttachments.length > 0 ? 'Adjunto enviado' : ''));
+        if (capturedReplyingTo?.id) {
+          formData.append('reply_to_message_id', String(capturedReplyingTo.id));
+        }
+        capturedAttachments.forEach((attachment) => {
+          if (attachment.file) {
+            formData.append('attachments[]', attachment.file, attachment.file.name);
+          } else if (attachment.url) {
+            formData.append('attachment_urls[]', attachment.url);
+          }
+        });
+
+        const response = await apiFetch(`/conversations/${convId}/messages`, {
+          method: 'POST',
+          body: formData,
+        }) as any;
+
+        // Reemplazar mensaje temporal con el confirmado por el servidor
+        if (response?.data) {
+          const realMessage = normalizeMessage(response.data);
+          setConversations((prev) => prev.map((c) =>
+            c.id === convId
+              ? { ...c, messages: c.messages.map((m) => (m.id === tempId ? realMessage : m)) }
+              : c
+          ));
+        }
+
+        // Sincronización en segundo plano (sin bloquear)
+        void Promise.all([loadMessages(convId), loadConversations(), markConversationAsRead(convId)]);
       } catch (err) {
+        // Revertir mensaje optimista si falla el envío
+        if (tempId !== 0) {
+          setConversations((prev) => prev.map((c) =>
+            c.id === targetConversationId
+              ? { ...c, messages: c.messages.filter((m) => m.id !== tempId) }
+              : c
+          ));
+        }
         if (targetConversationId && isConversationAccessDenied(err)) {
           setConversations((current) => current.filter((conversation) => conversation.id !== targetConversationId));
           setSuppressedChatIds((current) => current.filter((id) => id !== targetConversationId));
           setSelectedChat((current) => (current === targetConversationId ? null : current));
           toast.error('No tienes acceso a esta conversación. Se actualizará la lista de chats.');
-          await loadConversations();
+          void loadConversations();
           return;
         }
+        toast.error('No fue posible enviar el mensaje');
         console.error('send message error', err);
       }
     })();
@@ -1231,13 +1335,25 @@ export function MessagesAdmin(props: Readonly<{
 
   const handleDeleteMessage = async (messageId: number) => {
     if (!selectedChat) return;
+    const convId = selectedChat;
+    const prevMessages = conversations.find((c) => c.id === convId)?.messages ?? [];
+
+    // Optimistic: eliminar de inmediato
+    setConversations((prev) => prev.map((c) =>
+      c.id === convId ? { ...c, messages: c.messages.filter((m) => m.id !== messageId) } : c
+    ));
+
     try {
-      await apiFetch(`/conversations/${selectedChat}/messages/${messageId}`, { method: 'DELETE' });
-      await Promise.all([loadMessages(selectedChat), loadConversations()]);
-      await updateUnreadCount();
-      window.dispatchEvent(new Event('ut-messages-updated'));
+      await apiFetch(`/conversations/${convId}/messages/${messageId}`, { method: 'DELETE' });
       toast.success("Mensaje eliminado");
+      window.dispatchEvent(new Event('ut-messages-updated'));
+      void Promise.all([loadMessages(convId), loadConversations()]);
+      void updateUnreadCount();
     } catch (err: any) {
+      // Revertir si falla
+      setConversations((prev) => prev.map((c) =>
+        c.id === convId ? { ...c, messages: prevMessages } : c
+      ));
       console.error('delete message error', err);
       toast.error(err?.message ?? 'No fue posible eliminar el mensaje');
     }
@@ -1245,16 +1361,30 @@ export function MessagesAdmin(props: Readonly<{
 
   const handleEditMessage = async (messageId: number, body: string) => {
     if (!selectedChat) return;
+    const convId = selectedChat;
+    const prevMessages = conversations.find((c) => c.id === convId)?.messages ?? [];
+
+    // Optimistic: actualizar contenido de inmediato
+    setConversations((prev) => prev.map((c) =>
+      c.id === convId
+        ? { ...c, messages: c.messages.map((m) => (m.id === messageId ? { ...m, content: body } : m)) }
+        : c
+    ));
+
     try {
-      await apiFetch(`/conversations/${selectedChat}/messages/${messageId}`, {
+      await apiFetch(`/conversations/${convId}/messages/${messageId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body }),
       });
-      await Promise.all([loadMessages(selectedChat), loadConversations()]);
-      window.dispatchEvent(new Event('ut-messages-updated'));
       toast.success('Mensaje actualizado');
+      window.dispatchEvent(new Event('ut-messages-updated'));
+      void loadMessages(convId);
     } catch (err: any) {
+      // Revertir si falla
+      setConversations((prev) => prev.map((c) =>
+        c.id === convId ? { ...c, messages: prevMessages } : c
+      ));
       console.error('edit message error', err);
       toast.error(err?.message ?? 'No fue posible editar el mensaje');
     }
@@ -1315,9 +1445,8 @@ export function MessagesAdmin(props: Readonly<{
                         </Badge>
                       )}
                     </div>
-                    <CardDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <CardDescription>
                       <span>{adminConversation.role}</span>
-                      <span>{adminConversation.timestamp}</span>
                     </CardDescription>
                   </div>
                 </div>
@@ -1331,8 +1460,8 @@ export function MessagesAdmin(props: Readonly<{
 
             <CardContent className="min-h-0 flex-1 p-0">
               {adminConversation ? (
-                <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 px-3 py-4 pr-2 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
-                  <div className="space-y-4 pb-2 pt-1">
+                <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
+                  <div className="w-full min-w-0 space-y-4 px-3 pb-2 pt-1 pr-4">
                     {adminConversation.messages.length > 0 ? (
                       adminConversation.messages.map((messageItem) => (
                         <MessageBubble 
@@ -1379,7 +1508,7 @@ export function MessagesAdmin(props: Readonly<{
                   placeholder="Escribe un mensaje..."
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  className="min-h-[88px] resize-none rounded-[1.35rem] border-border/70 bg-background/90 px-4 py-3 shadow-inner dark:bg-slate-900 dark:border-slate-700"
+                  className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background/90 px-4 py-3 shadow-inner dark:bg-slate-900 dark:border-slate-700"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -1597,9 +1726,8 @@ export function MessagesAdmin(props: Readonly<{
                       </Badge>
                     )}
                   </div>
-                  <CardDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <CardDescription>
                     <span>{targetConversation.role}</span>
-                    {targetConversation.timestamp && <span>{targetConversation.timestamp}</span>}
                   </CardDescription>
                 </div>
               </div>
@@ -1613,8 +1741,8 @@ export function MessagesAdmin(props: Readonly<{
 
           <CardContent className="min-h-0 flex-1 p-0">
             {targetConversation ? (
-              <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 px-3 py-4 pr-2 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
-                <div className="space-y-4 pb-2 pt-1">
+              <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
+                <div className="w-full min-w-0 space-y-4 px-3 pb-2 pt-1 pr-4">
                   {targetConversation.messages.length > 0 ? (
                     targetConversation.messages.map((messageItem) => (
                       <MessageBubble 
@@ -1661,7 +1789,7 @@ export function MessagesAdmin(props: Readonly<{
                 placeholder="Escribe un mensaje..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                className="min-h-[88px] resize-none rounded-[1.35rem] border-border/70 bg-background/90 px-4 py-3 shadow-inner dark:bg-slate-900 dark:border-slate-700"
+                className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background/90 px-4 py-3 shadow-inner dark:bg-slate-900 dark:border-slate-700"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();

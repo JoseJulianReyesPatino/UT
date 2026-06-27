@@ -255,35 +255,21 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
 
   const uploadMultipleFiles = async (files: File[], basePayload: any) => {
     const uploadedIds = [];
-    
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const toBase64 = (f: File) => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          const parts = result.split(",");
-          resolve(parts[1] ?? "");
-        };
-        reader.onerror = (e) => reject(e);
-        reader.readAsDataURL(f);
-      });
 
-      const fileBase64 = await toBase64(file);
-      
-      const payload = {
-        ...basePayload,
-        file_base64: fileBase64,
-        file_name: file.name,
-        file_type: file.type,
-        file_size: file.size,
-        title: `${basePayload.title} - ${file.name}`,
-      };
-      
-      const result = await apiFetch("/documents", { method: "POST", body: JSON.stringify(payload) });
+    for (const file of files) {
+      const title = `${basePayload.title} - ${file.name}`;
+
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('form_id', String(basePayload.form_id));
+      fd.append('title', title);
+      if (basePayload.apartado_label) fd.append('apartado_label', basePayload.apartado_label);
+      if (basePayload.original_document_id) fd.append('original_document_id', String(basePayload.original_document_id));
+
+      const result = await apiFetch("/documents", { method: "POST", body: fd });
       uploadedIds.push(result?.data?.id);
     }
-    
+
     return uploadedIds;
   };
 
@@ -365,7 +351,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
     fileName={getUploadedFileName(h)}
     carrera={h.carrera_label}
     subject={h.materia}
-    submittedAt={new Date(h.submitted_at).toLocaleString()}
+    submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
     status={h.status}
     returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
     onView={() => openDocument(h.id, "view")}

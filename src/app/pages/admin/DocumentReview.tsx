@@ -674,7 +674,11 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	};
 
 	const handleShareToMessages = (doc: DocumentItem) => {
-		globalThis.dispatchEvent(new CustomEvent("openMessagesConversation", { detail: { recipientName: doc.docente, recipientRole: "Docente", document: { id: doc.id, title: doc.documento, filePath: doc.file_path ?? "" } } }));
+		const lastSep = doc.documento.lastIndexOf(" - ");
+		const cleanTitle = lastSep !== -1 && doc.documento.substring(lastSep + 3).trim()
+			? doc.documento.substring(lastSep + 3).trim()
+			: doc.documento;
+		globalThis.dispatchEvent(new CustomEvent("openMessagesConversation", { detail: { recipientName: doc.docente, recipientRole: "Docente", document: { id: doc.id, title: cleanTitle, filePath: doc.file_path ?? "" } } }));
 	};
 
 	const confirmPendingAction = () => {
@@ -802,7 +806,11 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		const statusVariant = getStatusVariant(doc);
 		const statusLabel = getStatusLabel(doc);
 		const fecha = typeof doc.fecha === "string" ? doc.fecha : "";
-		const fileName = getDocumentFileName(doc as ApiDocument);
+		const lastSep = doc.documento.lastIndexOf(" - ");
+		const rawName = lastSep !== -1 && doc.documento.substring(lastSep + 3).trim()
+			? doc.documento.substring(lastSep + 3).trim()
+			: getDocumentFileName(doc as ApiDocument);
+		const fileName = rawName.toUpperCase().endsWith(".PDF") ? rawName : `${rawName}.PDF`;
 		const apartadoTitle = canonicalApartado(doc.apartado);
 		const cuatrimestreLabel = `Cuatrimestre ${getDocumentCuatrimestre(doc as ApiDocument)}`;
 		const parcialLabel = getDocumentParcial(doc as ApiDocument);

@@ -419,12 +419,16 @@ export default function Estadias() {
 
   const handleShareToMessages = (doc: EstadiaDocumentItem) => {
     const recipientName = 'docente' in doc ? doc.docente : (doc as any).docente;
+    const lastSep = doc.documento.lastIndexOf(" - ");
+    const cleanTitle = lastSep !== -1 && doc.documento.substring(lastSep + 3).trim()
+      ? doc.documento.substring(lastSep + 3).trim()
+      : doc.documento;
     globalThis.dispatchEvent(
       new CustomEvent("openMessagesConversation", {
         detail: {
           recipientName,
           recipientRole: "Docente",
-          document: { id: doc.id, title: doc.documento, filePath: doc.file_path ?? "" },
+          document: { id: doc.id, title: cleanTitle, filePath: doc.file_path ?? "" },
         },
       })
     );

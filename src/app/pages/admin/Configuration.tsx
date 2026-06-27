@@ -298,9 +298,19 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   );
 
   const [openCareer, setOpenCareer] = useState<string | null>(null);
+  const [openCuatrimestres, setOpenCuatrimestres] = useState<Set<string>>(new Set());
+
+  const toggleCuatrimestre = (key: string) => {
+    setOpenCuatrimestres((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) { next.delete(key); } else { next.add(key); }
+      return next;
+    });
+  };
 
   useEffect(() => {
     setOpenCareer(null);
+    setOpenCuatrimestres(new Set());
   }, [groupViewPlan]);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -1230,42 +1240,73 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                     </span>
                                   </button>
 
-                                  {openCareer === career.codigo && (
-                                    <div className="space-y-2 border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20 max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
-                                      {careerGroups.map((g) => (
-                                        <div key={g.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 rounded-2xl border border-emerald-200/35 bg-white/40 px-3 sm:px-4 py-2 sm:py-3 dark:border-emerald-900/20 dark:bg-slate-950/30">
-                                          <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">
-                                            <p className="truncate font-medium text-xs sm:text-sm">{g.name}</p>
-                                            <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Cuatrimestre {g.cuatrimestre} · Grupo {g.groupNumber}</p>
-                                          </div>
-                                          <div className="flex items-center gap-2">
-                                            <Button
-                                              variant="outline"
-                                              size="icon"
-                                              onClick={() => handleStartEditGroup(g)}
-                                              disabled={Boolean(editingGroupId)}
-                                              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border-emerald-200/60 bg-white/60 text-slate-700 hover:bg-emerald-50 hover:text-slate-900 dark:border-emerald-900/30 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-900"
-                                              aria-label={`Editar grupo ${g.name}`}
-                                              title="Editar grupo"
-                                            >
-                                              <PencilLine className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              onClick={() => handleRemoveGroup(g.id)}
-                                              disabled={Boolean(editingGroupId)}
-                                              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:bg-rose-500/10"
-                                              aria-label={`Eliminar grupo ${g.name}`}
-                                              title="Eliminar grupo"
-                                            >
-                                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
+                                  {openCareer === career.codigo && (() => {
+                                    const byCuat = careerGroups.reduce<Record<number, typeof careerGroups>>(
+                                      (acc, g) => { (acc[g.cuatrimestre] ??= []).push(g); return acc; },
+                                      {}
+                                    );
+                                    const cuatNums = Object.keys(byCuat).map(Number).sort((a, b) => a - b);
+                                    return (
+                                      <div className="space-y-2 border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20 max-h-[340px] overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
+                                        {cuatNums.map((cuat) => {
+                                          const key = `${career.codigo}-${cuat}`;
+                                          const isOpen = openCuatrimestres.has(key);
+                                          return (
+                                            <div key={key} className="rounded-xl border border-emerald-200/40 dark:border-emerald-900/25 overflow-hidden">
+                                              <button
+                                                onClick={() => toggleCuatrimestre(key)}
+                                                className="flex w-full items-center justify-between gap-2 bg-emerald-50/60 px-3 py-2 text-left text-xs font-semibold text-emerald-800 hover:bg-emerald-100/60 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30 transition-colors"
+                                              >
+                                                <span>Cuatrimestre {cuat}</span>
+                                                <span className="flex items-center gap-1.5">
+                                                  <span className="rounded-full bg-emerald-200/70 px-2 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-800/50 dark:text-emerald-400">
+                                                    {byCuat[cuat].length} grupo{byCuat[cuat].length !== 1 ? "s" : ""}
+                                                  </span>
+                                                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                                                </span>
+                                              </button>
+                                              {isOpen && (
+                                                <div className="space-y-1.5 p-2">
+                                                  {byCuat[cuat].map((g) => (
+                                                    <div key={g.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 rounded-xl border border-emerald-200/35 bg-white/40 px-3 sm:px-4 py-2 sm:py-3 dark:border-emerald-900/20 dark:bg-slate-950/30">
+                                                      <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">
+                                                        <p className="truncate font-medium text-xs sm:text-sm">{g.name}</p>
+                                                        <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Grupo {g.groupNumber}</p>
+                                                      </div>
+                                                      <div className="flex items-center gap-2">
+                                                        <Button
+                                                          variant="outline"
+                                                          size="icon"
+                                                          onClick={() => handleStartEditGroup(g)}
+                                                          disabled={Boolean(editingGroupId)}
+                                                          className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border-emerald-200/60 bg-white/60 text-slate-700 hover:bg-emerald-50 hover:text-slate-900 dark:border-emerald-900/30 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-900"
+                                                          aria-label={`Editar grupo ${g.name}`}
+                                                          title="Editar grupo"
+                                                        >
+                                                          <PencilLine className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                                                        </Button>
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="icon"
+                                                          onClick={() => handleRemoveGroup(g.id)}
+                                                          disabled={Boolean(editingGroupId)}
+                                                          className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                                                          aria-label={`Eliminar grupo ${g.name}`}
+                                                          title="Eliminar grupo"
+                                                        >
+                                                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                                                        </Button>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               ))
                             )}
