@@ -4,11 +4,6 @@ import {
   AUTH_TOKEN_STORAGE_KEY,
 } from "./env";
 import { toast } from "sonner";
-import {
-  getCachedApiResponse,
-  saveApiResponseCache,
-  savePendingRequest,
-} from "./offline";
 
 type FetchOptions = RequestInit & {
   query?: Record<string, string | number | boolean>;
@@ -41,8 +36,6 @@ const parseResponseBody = async (res: Response) => {
 
 export async function apiFetch(path: string, options: FetchOptions = {}) {
   const method = (options.method ?? "GET").toUpperCase();
-  const isOnline =
-    typeof window !== "undefined" ? window.navigator.onLine : true;
   const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
 
   // FIXED: No establecer Content-Type automáticamente si es FormData
@@ -61,43 +54,6 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  if (!isOnline) {
-    const requestUrl = buildUrl(API_BASE_URL, path, options.query);
-    if (method === "GET") {
-      const cachedResponse = await getCachedApiResponse(requestUrl);
-      if (cachedResponse) {
-        return cachedResponse.body as any;
-      }
-      const error: any = new Error("Sin conexión a internet");
-      error.isOffline = true;
-      throw error;
-    }
-
-    if (method !== "GET") {
-      if (isFormData) {
-        const error: any = new Error(
-          "No se puede guardar esta solicitud sin conexión (FormData)",
-        );
-        error.isOffline = true;
-        throw error;
-      }
-
-      const bodyData = options.body
-        ? typeof options.body === "string"
-          ? options.body
-          : JSON.stringify(options.body)
-        : null;
-      await savePendingRequest({
-        url: requestUrl,
-        method,
-        headers,
-        body: bodyData,
-      });
-      toast(`Sin conexión: solicitud guardada para sincronizar más tarde.`);
-      return { data: null, offline: true } as any;
-    }
   }
 
   // Solo agregar Content-Type si NO es FormData (el navegador lo setea automáticamente para FormData)
@@ -132,10 +88,6 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
       });
       const { json } = await parseResponseBody(res);
 
-      if (method === "GET" && res.ok) {
-        await saveApiResponseCache(url, res.status, json);
-      }
-
       if (!res.ok) {
         const message = json?.message ?? res.statusText ?? "Error";
         const errors = json?.errors ?? undefined;
@@ -160,13 +112,7 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
       error.isOffline = error.isOffline || isOfflineNetwork;
 
       const isNetworkError = !error?.status;
-      if (method === "GET" && isNetworkError) {
-        const cachedResponse = await getCachedApiResponse(url);
-        if (cachedResponse) {
-          return cachedResponse.body as any;
-        }
-      }
-
+      
       if (!isLastCandidate && isNetworkError) {
         lastError = error;
         continue;

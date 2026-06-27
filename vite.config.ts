@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+
 function toFsPath(url: URL) {
   return decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, "$1");
 }

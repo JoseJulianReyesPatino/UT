@@ -33,8 +33,6 @@ import { FormAccessGuard } from "./components/FormAccessGuard";
 import { Alert, AlertDescription } from "./components/ui/alert";
 import { getFormConfig, saveFormConfig, getFormIdsForBackendCode, type FormId } from "../lib/formConfig";
 import { apiFetch } from "./lib/api";
-import { getDeferredPrompt, onBeforeInstallPrompt, type BeforeInstallPromptEvent } from "./lib/pwaInstall";
-import { syncPendingRequests } from "./lib/offline";
 
 import { toast } from "sonner";
 import { Toaster } from "./components/ui/toast";
@@ -44,7 +42,6 @@ import {
   Menu,
   Sun,
   Moon,
-  Download,
 } from "lucide-react";
 
 function AppContent() {
@@ -57,12 +54,11 @@ function AppContent() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [deferredMessageOpen, setDeferredMessageOpen] = useState<null | { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string; filePath?: string } }>(null);
-  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(() => getDeferredPrompt());
-  const [isInstallAvailable, setIsInstallAvailable] = useState(() => Boolean(getDeferredPrompt()));
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== "undefined" ? !navigator.onLine : false);
   const [minimumLoadingElapsed, setMinimumLoadingElapsed] = useState(false);
   const [isSplashExiting, setIsSplashExiting] = useState(false);
+  const [contentAnimationActive, setContentAnimationActive] = useState(false);
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
   const noticeBanner = notice ? (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4 sm:top-6">
@@ -209,28 +205,20 @@ function AppContent() {
     };
   }, [isReady, isAuthenticated, currentView]);
 
+  // Efecto para manejar estado offline/online sin PWA
   useEffect(() => {
-    const handleOnline = async () => {
+    const handleOnline = () => {
       if (!navigator.onLine || !isOffline) {
         return;
       }
-
       setIsOffline(false);
       toast.success("Conexión restaurada.");
-
-      if (isAuthenticated) {
-        const synced = await syncPendingRequests();
-        if (synced > 0) {
-          toast(`Sincronizadas ${synced} solicitud(es) pendientes.`);
-        }
-      }
     };
 
     const handleOffline = () => {
       if (navigator.onLine || isOffline) {
         return;
       }
-
       setIsOffline(true);
       toast.error("Sin conexión a internet. Algunas funciones estarán limitadas.");
     };
@@ -247,16 +235,6 @@ function AppContent() {
       }
     };
   }, [isAuthenticated, isOffline]);
-
-  useEffect(() => {
-    if (!isOffline && isAuthenticated) {
-      void syncPendingRequests().then((synced) => {
-        if (synced > 0) {
-          toast(`Sincronizadas ${synced} solicitud(es) pendientes.`);
-        }
-      });
-    }
-  }, [isOffline, isAuthenticated]);
 
   useEffect(() => {
     if (!isReady) {
@@ -290,43 +268,26 @@ function AppContent() {
     };
   }, [isReady, minimumLoadingElapsed]);
 
-  const cancelLeave = () => setLeaveDialogOpen(false);
-
-  const handleInstallApp = async () => {
-    if (!deferredInstallPrompt) return;
-
-    await deferredInstallPrompt.prompt();
-
-    const choiceResult = await deferredInstallPrompt.userChoice;
-    setDeferredInstallPrompt(null);
-    setIsInstallAvailable(false);
-
-    console.log('PWA install choice:', choiceResult.outcome);
-  };
+  const shouldShowSplash = !isReady || !minimumLoadingElapsed || isSplashExiting;
 
   useEffect(() => {
-    const unsubscribe = onBeforeInstallPrompt((prompt) => {
-      setDeferredInstallPrompt(prompt);
-      setIsInstallAvailable(Boolean(prompt));
-    });
+    if (!shouldShowSplash && typeof document !== "undefined") {
+      document.body.classList.remove("splashing");
+      setContentAnimationActive(true);
+    }
+  }, [shouldShowSplash]);
 
-    const appInstalledHandler = () => {
-      setDeferredInstallPrompt(null);
-      setIsInstallAvailable(false);
-      console.log('PWA installed successfully');
-    };
+  useEffect(() => {
+    if (!contentAnimationActive) return;
 
-    window.addEventListener('appinstalled', appInstalledHandler);
+    const timer = window.setTimeout(() => {
+      setContentAnimationActive(false);
+    }, 600);
 
-    return () => {
-      unsubscribe();
-      window.removeEventListener('appinstalled', appInstalledHandler);
-    };
-  }, []);
+    return () => window.clearTimeout(timer);
+  }, [contentAnimationActive]);
 
-  // logout handled by AuthContext logout directly where needed
-
-  const shouldShowSplash = !isReady || !minimumLoadingElapsed || isSplashExiting;
+  const cancelLeave = () => setLeaveDialogOpen(false);
 
   if (shouldShowSplash) {
     return (
@@ -496,39 +457,23 @@ function AppContent() {
               <div className="h-10 w-10" />
             </div>
           </div>
-          <div className="container relative z-10 mx-auto max-w-7xl p-6 lg:p-8">
+          <div className={`container relative z-10 mx-auto max-w-7xl p-6 lg:p-8 ${contentAnimationActive ? "animate-in fade-in slide-in-from-bottom-5 duration-500" : ""}`}>
             {renderContent()}
           </div>
         </main>
 
-        {currentView !== "configuracion" && currentView !== "configuracion-cuenta" && (
-          <>
-            {isInstallAvailable && (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={handleInstallApp}
-                aria-label="Instalar aplicación"
-                title="Instalar aplicación"
-                className="fixed bottom-16 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={toggleTheme}
-              aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-              title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-              className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-          </>
-        )}
+        {/* Solo el botón de tema - ELIMINADO el botón de instalación PWA */}
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={toggleTheme}
+          aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+          title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+          className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
 
         <Toaster />
 

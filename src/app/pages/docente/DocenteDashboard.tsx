@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { getDocumentDisplayFileName, fetchDocumentBlob } from "../../lib/documents";
 import {
   FileText,
   Clock,
@@ -68,9 +69,10 @@ type DocumentItem = {
   nombre: string;
   materia?: string;
   tipo?: string;
-  fecha?: string;
+  fecha?: string | null;
   status: string;
   filePath?: string | null;
+  submittedAt?: string | null;  // ← NUEVO: fecha de envío
 };
 
 type FormItem = {
@@ -117,10 +119,47 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const [proximasEntregas, setProximasEntregas] = useState<any[]>([]);
   const [isLoadingProximas, setIsLoadingProximas] = useState(false);
 
+  // --- Función para formatear fecha ---
+  const formatDate = useCallback((dateStr?: string | null) => {
+    if (!dateStr) return "N/A";
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "N/A";
+      return date.toLocaleDateString("es-MX", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "N/A";
+    }
+  }, []);
+
   // --- Función para obtener la URL de previsualización ---
   const getPreviewUrl = useCallback((documentId: number) => {
     const baseUrl = API_BASE_URL.replace(/\/api\/?$/, "");
     return `${baseUrl}/api/documents/${documentId}/file`;
+  }, []);
+
+  // --- Función para cargar la vista previa del documento ---
+  const loadDocumentPreview = useCallback(async (doc: DocumentItem) => {
+    if (!doc) return;
+    
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewBlobUrl(null);
+    
+    try {
+      const blob = await fetchDocumentBlob(Number(doc.id));
+      const blobUrl = URL.createObjectURL(blob);
+      setPreviewBlobUrl(blobUrl);
+    } catch (error: any) {
+      setPreviewError(error?.message ?? "No fue posible abrir el documento");
+    } finally {
+      setPreviewLoading(false);
+    }
   }, []);
 
   // --- Función para recargar los datos manualmente ---
@@ -139,7 +178,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         {
           title: 'Documentos Pendientes',
           value: String(dashboard.documents_pending ?? 0),
-          description: 'Pendientes de revisión', // ← CAMBIADO
+          description: 'Pendientes de revisión',
           icon: Clock,
           action: 'historial',
           cardClass: 'border-slate-200/80 bg-gradient-to-br from-slate-50 via-emerald-50/40 to-slate-100 dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-950',
@@ -166,20 +205,36 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
       ];
       setStats(statsArr);
 
-      // 2. Recargar documentos recientes
+      // 2. Recargar documentos recientes con corrección de "undefined"
       const docsPayload = (await apiFetch('/documents?per_page=6', { method: 'GET' })) as any;
-      const docs = (docsPayload?.data?.data ?? docsPayload?.data ?? []) as DocumentItem[];
-      setRecentDocuments(docs.map((d) => ({
-        id: d.id,
-        nombre: d.nombre ?? d.title ?? 'Documento',
-        materia: d.materia ?? '-',
-        tipo: d.tipoLabel ?? d.tipo ?? 'Documento',
-        fecha: d.fecha ?? null,
-        status: d.status ?? 'pendiente',
-        filePath: d.filePath ?? null,
-      })));
+      const docs = (docsPayload?.data?.data ?? docsPayload?.data ?? []) as any[];
+      
+      setRecentDocuments(docs.map((d) => {
+        // Resolver el título correctamente (evita "undefined")
+        const title = (d?.nombre ?? d?.title ?? "").toString().trim();
+        let nombre = title;
+        
+        // Si el título es "undefined" o está vacío, usar el nombre del archivo
+        if (!nombre || /^undefined\b/i.test(nombre)) {
+          nombre = getDocumentDisplayFileName(d?.title, d?.filePath) || 'Documento';
+        }
+        
+        // Obtener la fecha correcta (submitted_at o fecha)
+        const fechaEnvio = d?.submitted_at ?? d?.fecha ?? d?.created_at ?? null;
+        
+        return {
+          id: d.id,
+          nombre: nombre,
+          materia: d.materia ?? d?.carrera_label ?? '-',
+          tipo: d.tipoLabel ?? d.apartado_label ?? d.form_title ?? 'Documento',
+          fecha: fechaEnvio,
+          submittedAt: fechaEnvio,
+          status: d.status ?? 'pendiente',
+          filePath: d.filePath ?? null,
+        };
+      }));
 
-      // 3. Recargar próximas entregas (usando endpoint /forms que SÍ existe)
+      // 3. Recargar próximas entregas
       await loadProximasEntregas(docs);
       
     } catch (err) {
@@ -196,7 +251,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     try {
       setIsLoadingProximas(true);
       
-      // Si no se pasaron documentos, cargarlos
       let documents = docs;
       if (!documents) {
         const docsPayload = (await apiFetch('/documents?per_page=100', { method: 'GET' })) as any;
@@ -205,12 +259,10 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
       const userRoles = user?.roles ?? [];
       
-      // --- USAR ENDPOINT EXISTENTE /forms ---
       let allForms: FormItem[] = [];
       let formsLoaded = false;
       
       try {
-        // Este endpoint SÍ existe en tu API
         const formsPayload = await apiFetch('/forms', { method: 'GET' });
         allForms = (formsPayload?.data ?? []) as FormItem[];
         formsLoaded = true;
@@ -220,28 +272,18 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         console.error("❌ Error al cargar formularios:", formError);
       }
 
-      // --- FILTRAR formularios activos con fecha de vencimiento ---
       let upcomingFromForms: any[] = [];
       
       if (formsLoaded && allForms.length > 0) {
         console.log("🔍 Roles del usuario:", userRoles);
         
-        // Filtrar: activos, con fecha de vencimiento, futuros, y con acceso
         upcomingFromForms = allForms
           .filter((form) => {
-            // 1. Debe estar activo
             const isActive = form.is_active === true;
-            
-            // 2. Debe tener fecha de vencimiento
             const hasDueDate = form.due_at && form.due_at !== null && form.due_at !== '';
-            
-            // 3. La fecha debe ser futura
             const isFuture = hasDueDate && new Date(form.due_at!) > new Date();
-            
-            // 4. El usuario debe tener acceso (según roles)
             const hasAccess = form.access_roles?.some((role) => userRoles.includes(role)) ?? false;
             
-            // Log para depuración
             if (isActive && hasDueDate) {
               console.log(`  📄 ${form.title}: activo=${isActive}, dueDate=${form.due_at}, futuro=${isFuture}, acceso=${hasAccess}`);
             }
@@ -260,7 +302,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         console.log("📅 Entregas desde formularios:", upcomingFromForms.length);
       }
 
-      // --- ESTRATEGIA 2: Documentos pendientes como fallback ---
       const pendingDocuments = (documents || [])
         .filter((d) => d.status === 'pendiente' && d.fecha)
         .map((d) => ({
@@ -274,10 +315,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
       console.log("📄 Entregas desde documentos:", pendingDocuments.length);
 
-      // --- COMBINAR: Priorizar formularios, complementar con documentos ---
       let combined = [...upcomingFromForms];
       
-      // Si hay pocos formularios, agregar documentos pendientes
       if (combined.length < 5 && pendingDocuments.length > 0) {
         const remaining = 5 - combined.length;
         const docsToAdd = pendingDocuments
@@ -286,7 +325,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         combined = [...combined, ...docsToAdd];
       }
 
-      // Si no hay nada, mostrar mensaje
       if (combined.length === 0) {
         setProximasEntregas([
           {
@@ -297,7 +335,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           }
         ]);
       } else {
-        // Ordenar por días restantes
         combined.sort((a, b) => a.dias - b.dias);
         setProximasEntregas(combined.slice(0, 5));
       }
@@ -320,7 +357,17 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   // --- Función para abrir el documento en el diálogo ---
   const openDocument = useCallback((doc: DocumentItem) => {
     setSelectedDocument(doc);
-  }, []);
+    loadDocumentPreview(doc);
+  }, [loadDocumentPreview]);
+
+  // --- Limpiar URL del blob al cerrar el diálogo ---
+  const closePreview = useCallback(() => {
+    if (previewBlobUrl) {
+      URL.revokeObjectURL(previewBlobUrl);
+    }
+    setPreviewBlobUrl(null);
+    setSelectedDocument(null);
+  }, [previewBlobUrl]);
   // -----------------------------------------------------------
 
   // --- Efecto para cargar los datos del dashboard ---
@@ -360,31 +407,17 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={refreshData}
-                  disabled={isLoadingStats || isLoadingDocuments || isLoadingProximas}
-                  className="h-11 w-11 rounded-2xl border border-slate-200 bg-slate-50 text-emerald-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-900/60 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-slate-800"
-                  title="Recargar datos"
-                >
-                  <RefreshCw className={`h-4 w-4 ${(isLoadingStats || isLoadingDocuments || isLoadingProximas) ? 'animate-spin' : ''}`} />
-                </Button>
-                
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsIntroOpen((current) => !current)}
-                  aria-label={isIntroOpen ? "Contraer información" : "Expandir información"}
-                  title={isIntroOpen ? "Contraer información" : "Expandir información"}
-                  className="h-11 w-11 rounded-2xl border border-slate-200 bg-slate-50 text-emerald-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-900/60 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-slate-800"
-                >
-                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isIntroOpen ? "rotate-180" : "rotate-0"}`} />
-                </Button>
-              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsIntroOpen((current) => !current)}
+                aria-label={isIntroOpen ? "Contraer información" : "Expandir información"}
+                title={isIntroOpen ? "Contraer información" : "Expandir información"}
+                className="h-11 w-11 rounded-2xl border border-slate-200 bg-slate-50 text-emerald-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-900/60 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-slate-800"
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isIntroOpen ? "rotate-180" : "rotate-0"}`} />
+              </Button>
             </div>
 
             {isIntroOpen && (
@@ -533,20 +566,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                   <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Próximas Entregas</CardTitle>
                   <CardDescription className="mt-1 text-slate-500 dark:text-slate-400">Fechas límite importantes</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={refreshData}
-                    disabled={isLoadingProximas}
-                    className="h-9 w-9 rounded-xl text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                    title="Recargar próximas entregas"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${isLoadingProximas ? 'animate-spin' : ''}`} />
-                  </Button>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <Calendar className="h-5 w-5" />
-                  </div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <Calendar className="h-5 w-5" />
                 </div>
               </div>
             </CardHeader>
@@ -571,7 +592,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                   </div>
                 ) : (
                   proximasEntregas.map((entrega, index) => {
-                    // Si es un placeholder
                     if (entrega.isPlaceholder) {
                       return (
                         <div
@@ -586,7 +606,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                       );
                     }
 
-                    // Si es una entrega real con días restantes
                     const isUrgent = entrega.dias <= 3;
                     const isWarning = entrega.dias <= 7 && entrega.dias > 3;
                     const isFromForm = entrega.source === 'formulario';
@@ -636,7 +655,11 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
       </div>
 
       {/* Diálogo de vista previa del documento */}
-      <Dialog open={Boolean(selectedDocument)} onOpenChange={(open) => !open && setSelectedDocument(null)}>
+      <Dialog open={Boolean(selectedDocument)} onOpenChange={(open) => {
+        if (!open) {
+          closePreview();
+        }
+      }}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>Vista previa del documento</DialogTitle>
@@ -685,29 +708,31 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
               </TabsContent>
 
               <TabsContent value="details" className="space-y-3">
-                <div className="rounded-lg border border-border p-4 space-y-2">
+                <div className="rounded-lg border border-border p-4 space-y-3">
                   <div>
-                    <p className="text-xs text-muted-foreground">Nombre</p>
-                    <p className="text-sm font-medium">{selectedDocument.nombre}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Nombre</p>
+                    <p className="text-sm text-foreground">{selectedDocument.nombre || "N/A"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Materia</p>
-                    <p className="text-sm">{selectedDocument.materia || "N/A"}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Materia</p>
+                    <p className="text-sm text-foreground">{selectedDocument.materia || "N/A"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Tipo</p>
-                    <p className="text-sm">{selectedDocument.tipo || "N/A"}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Tipo</p>
+                    <p className="text-sm text-foreground">{selectedDocument.tipo || "N/A"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Fecha de envío</p>
-                    <p className="text-sm">{selectedDocument.fecha || "N/A"}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Fecha de envío</p>
+                    <p className="text-sm text-foreground">
+                      {selectedDocument.submittedAt ? formatDate(selectedDocument.submittedAt) : "N/A"}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Estado</p>
+                    <p className="text-xs text-muted-foreground font-medium">Estado</p>
                     <Badge variant={
                       selectedDocument.status === "aprobado" || selectedDocument.status === "revisado" ? "success" :
                       selectedDocument.status === "devuelto" ? "warning" : "outline"
-                    }>
+                    } className="mt-1">
                       {selectedDocument.status === "aprobado" || selectedDocument.status === "revisado" ? "Aprobado" :
                        selectedDocument.status === "devuelto" ? "Devuelto" :
                        selectedDocument.status === "revision" ? "En revisión" : "Pendiente"}
@@ -718,7 +743,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             </Tabs>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedDocument(null)}>
+            <Button variant="outline" onClick={closePreview}>
               Cerrar
             </Button>
           </DialogFooter>
