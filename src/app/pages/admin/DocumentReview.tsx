@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
@@ -258,12 +258,20 @@ const getDocumentFileName = (doc: ApiDocument) => {
 	return rawName.replace(/^doc_[^_]+_/, "");
 };
 
+const extractPreviewFileName = (documento: string) => {
+	const lastSep = documento.lastIndexOf(" - ");
+	const raw = lastSep !== -1 && documento.substring(lastSep + 3).trim()
+		? documento.substring(lastSep + 3).trim()
+		: documento;
+	return raw.toLowerCase().endsWith(".pdf") ? raw : `${raw}.pdf`;
+};
+
 const getDocumentCuatrimestre = (doc: ApiDocument) => {
 	const value = doc.cuatrimestre !== null && doc.cuatrimestre !== undefined
 		? String(doc.cuatrimestre).trim()
 		: "";
-	if (value && value !== "-") return value;
-	return doc.parcial?.trim() || "-";
+	if (value && value !== "-" && /^\d+$/.test(value)) return value;
+	return "-";
 };
 
 const PARCIAL_FILTER_OPTIONS = [
@@ -526,7 +534,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const filterSelectTriggerClassName = "w-full text-[13px] leading-tight sm:text-sm";
 	const filterSelectValueClassName = "truncate";
 	const sectionCardClassName = "overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20";
-	const documentRowClassName = "cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border/70 bg-transparent shadow-sm transition-colors hover:bg-emerald-50/35 hover:border-emerald-300/60 dark:bg-transparent dark:hover:bg-slate-900/55 dark:hover:border-emerald-800/50";
+	const documentRowClassName = "relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border transition-colors hover:bg-accent/50";
 
 	const docsByPlan = useMemo(() => allDocuments.filter((doc) => matchesNormalized(doc.plan, filterPlan)), [allDocuments, filterPlan]);
 	const docsByCarrera = useMemo(() => docsByPlan.filter((doc) => matchesNormalized(doc.carrera, filterCarrera)), [docsByPlan, filterCarrera]);
@@ -767,7 +775,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			<Select value={filterGrupo} onValueChange={setFilterGrupo}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Grupo" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los grupos</SelectItem>{gruposDisponibles.map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}</SelectContent></Select>
 			<Select value={filterDocente} onValueChange={setFilterDocente}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Docente" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los docentes</SelectItem>{docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}</SelectContent></Select>
 			<Select value={filterParcial} onValueChange={setFilterParcial}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Parcial" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los parciales</SelectItem>{parcialesDisponibles.map((parcial) => <SelectItem key={parcial.value} value={parcial.value}>{parcial.label}</SelectItem>)}</SelectContent></Select>
-			<Select value={filterApartado} onValueChange={setFilterApartado}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Apartado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los apartados</SelectItem>{apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}</SelectContent></Select>
+			{!forcedApartado && <Select value={filterApartado} onValueChange={setFilterApartado}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Apartado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los apartados</SelectItem>{apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}</SelectContent></Select>}
 		</div>
 	);
 
@@ -823,10 +831,10 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 						<p className="font-semibold uppercase tracking-wide text-foreground">{apartadoTitle} - {fileName}</p>
 						<p className="text-xs text-muted-foreground">{doc.docente} • {doc.carrera}</p>
 						<div className="mt-2 flex flex-wrap gap-2">
-							<Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
+							{!forcedApartado && <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>}
 							<Badge variant="outline" className="text-xs">{doc.plan}</Badge>
-							<Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
-							<Badge variant="outline" className="text-xs">{cuatrimestreLabel}</Badge>
+							{!forcedApartado && <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>}
+							{doc.cuatrimestre !== "-" && <Badge variant="outline" className="text-xs">{cuatrimestreLabel}</Badge>}
 							{doc.grupo && <Badge variant="outline" className="text-xs">{`Grupo ${doc.grupo}`}</Badge>}
 							<Badge variant="outline" className="text-xs">{parcialLabel}</Badge>
 						</div>
@@ -859,25 +867,35 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	};
 
 	return (
-		<div className="relative space-y-6 overflow-hidden bg-gradient-to-br from-emerald-50 via-background to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950">
-			<div className="absolute inset-0 pointer-events-none opacity-60 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.12),transparent_30%)] dark:opacity-40" />
-				<div className="relative z-10 space-y-6">
+		<div className="relative space-y-6 overflow-hidden">
+				<div className="relative space-y-6">
 					<div>
 						<h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">{headingText}</h1>
 						<p className="text-muted-foreground">Revisa y aprueba los documentos enviados por los docentes</p>
 					</div>
 
 					<Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
-					<TabsList className="bg-gradient-to-r from-emerald-100 via-emerald-50 to-emerald-50 p-1 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 flex-wrap">
-						<TabsTrigger value="all">Todos <Badge variant="outline" className="ml-2">{allDocuments.length}</Badge></TabsTrigger>
-						<TabsTrigger value="pendientes">Pendientes <Badge variant="warning" className="ml-2">{filteredPendingDocuments.length}</Badge></TabsTrigger>
-						<TabsTrigger value="revisados">Revisados <Badge variant="outline" className="ml-2">{filteredReviewedDocuments.length}</Badge></TabsTrigger>
-						<TabsTrigger value="hoy">Revisados hoy <Badge variant="outline" className="ml-2">{reviewedTodayDocuments.length}</Badge></TabsTrigger>
+					<div className="sm:hidden mb-3">
+						<Select value={activeSection} onValueChange={(v) => setActiveSection(v as ReviewSection)}>
+							<SelectTrigger className="w-full"><SelectValue placeholder="Sección" /></SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Todos</SelectItem>
+								<SelectItem value="pendientes">Pendientes</SelectItem>
+								<SelectItem value="revisados">Revisados</SelectItem>
+								<SelectItem value="hoy">Revisados hoy</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+					<TabsList className="hidden sm:flex w-full gap-2 p-1 px-2 bg-gradient-to-r from-emerald-100 via-emerald-50 to-emerald-50 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 flex-wrap">
+						<TabsTrigger value="all" className="px-3 py-2 text-sm">Todos <Badge variant="outline" className="ml-2">{filteredAllDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="pendientes" className="px-3 py-2 text-sm">Pendientes <Badge variant="warning" className="ml-2">{filteredPendingDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="revisados" className="px-3 py-2 text-sm">Revisados <Badge variant="outline" className="ml-2">{filteredReviewedDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="hoy" className="px-3 py-2 text-sm">Revisados hoy <Badge variant="outline" className="ml-2">{reviewedTodayDocuments.length}</Badge></TabsTrigger>
 					</TabsList>
 
 					<TabsContent value="all" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
-							<CardHeader>{renderFilters()}</CardHeader>
+							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
 							<CardContent>
 								{renderListState(<div className="space-y-3">{filteredAllDocuments.length === 0 ? <EmptyState text="No hay documentos en esta sección." /> : filteredAllDocuments.map(renderDocumentRow)}</div>)}
 							</CardContent>
@@ -886,32 +904,37 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 
 					<TabsContent value="pendientes" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
-							<CardHeader>{renderFilters()}</CardHeader>
+							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
 							<CardContent>{renderListState(<div className="space-y-3">{filteredPendingDocuments.length === 0 ? <EmptyState text="No hay documentos pendientes." /> : filteredPendingDocuments.map(renderDocumentRow)}</div>)}</CardContent>
 						</Card>
 					</TabsContent>
 
 					<TabsContent value="revisados" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
-							<CardHeader>{renderFilters()}</CardHeader>
+							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
+							<CardContent>
+								{renderListState(
+									Object.entries(reviewedByDate).length === 0
+										? <EmptyState text="No hay documentos revisados." />
+										: <div className="space-y-6">
+											{Object.entries(reviewedByDate).map(([date, docs]) => (
+												<div key={date}>
+													<div className="mb-3">
+														<p className="font-semibold text-sm text-foreground">{formatDateOnlyFromKey(date)}</p>
+														<p className="text-xs text-muted-foreground">{docs.length} documentos revisados</p>
+													</div>
+													<div className="space-y-3">{docs.map(renderDocumentRow)}</div>
+												</div>
+											))}
+										</div>
+								)}
+							</CardContent>
 						</Card>
-						<div className="space-y-4">
-							{Object.entries(reviewedByDate).map(([date, docs]) => (
-								<Card key={date} className={sectionCardClassName}>
-									<CardHeader><CardTitle>{formatDateOnlyFromKey(date)}</CardTitle><CardDescription>{docs.length} documentos revisados</CardDescription></CardHeader>
-									<CardContent>{renderListState(<div className="space-y-3">{docs.map(renderDocumentRow)}</div>)}</CardContent>
-								</Card>
-							))}
-						</div>
 					</TabsContent>
 
 					<TabsContent value="hoy" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
-							<CardHeader>
-								<CardTitle>Revisados hoy</CardTitle>
-								<CardDescription>Documentos abiertos por administración en el día</CardDescription>
-								{renderFilters()}
-							</CardHeader>
+							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
 							<CardContent>{renderListState(<div className="space-y-3">{reviewedTodayDocuments.length === 0 ? <EmptyState text="No hay documentos revisados hoy." /> : reviewedTodayDocuments.map(renderDocumentRow)}</div>)}</CardContent>
 						</Card>
 					</TabsContent>
@@ -919,29 +942,24 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			</div>
 
 			<Dialog open={previewDocument !== null} onOpenChange={(open) => { if (!open) setPreviewDocument(null); }}>
-				<DialogContent className="max-w-[95vw] w-[95vw] max-h-[92vh] overflow-y-auto">
-					<DialogHeader><DialogTitle>Vista previa del documento</DialogTitle><DialogDescription>Visualiza el PDF real asociado al documento seleccionado.</DialogDescription></DialogHeader>
+				<DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
+					<DialogHeader>
+						<DialogTitle>{previewDocument ? extractPreviewFileName(previewDocument.documento) : ""}</DialogTitle>
+						{previewDocument && <DialogDescription>{previewDocument.docente} · {previewDocument.carrera}</DialogDescription>}
+					</DialogHeader>
 					{previewDocument && (
-						<div className="space-y-4">
-							<div className="flex flex-wrap gap-2"><Badge variant="outline">{previewDocument.ciclo}</Badge><Badge variant="outline">{previewDocument.plan}</Badge><Badge variant="outline">{previewDocument.apartado}</Badge></div>
-							<div className="rounded-lg border border-border bg-muted/30 p-4 md:p-6 space-y-4">
-								<div className="rounded-md border border-border bg-background p-3 text-sm">
-									<p className="font-medium text-foreground">{previewDocument.documento}</p>
-									<p className="text-xs text-muted-foreground">{previewDocument.docente} · {previewDocument.carrera}</p>
+						<div className="flex-1 min-h-0">
+							{previewLoading ? (
+								<div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+									<p>Cargando...</p>
 								</div>
-								{previewLoading ? (
-									<div className="flex h-[70vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
-										<p>Cargando...</p>
-									</div>
-								) : previewError ? (
-									<div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-										{previewError}
-									</div>
-								) : previewBlobUrl ? (
-									<iframe src={previewBlobUrl} className="h-[70vh] w-full rounded-lg border border-border" title={previewDocument.documento} />
-								) : null}
-								<div className="text-sm text-muted-foreground">Vista previa autenticada del documento cargado por el docente.</div>
-							</div>
+							) : previewError ? (
+								<div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+									{previewError}
+								</div>
+							) : previewBlobUrl ? (
+								<iframe src={previewBlobUrl} className="h-[82vh] w-full rounded-lg border border-border" title={previewDocument.documento} />
+							) : null}
 						</div>
 					)}
 				</DialogContent>

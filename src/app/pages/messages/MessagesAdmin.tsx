@@ -7,7 +7,7 @@ import { Input } from "../../components/ui/input";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { Textarea } from "../../components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { CornerUpLeft, Paperclip, PencilLine, Search, Send, X, Trash, EyeOff, Eye } from "lucide-react";
+import { ChevronLeft, CornerUpLeft, Paperclip, PencilLine, Search, Send, X, Trash, EyeOff, Eye } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import downloadIcon from "../../../assets/icons/download-circle.svg";
 import apiFetch from "../../lib/api";
@@ -277,6 +277,45 @@ const ConversationRow = React.memo(({
   );
 });
 
+const RecipientRow = React.memo(({
+  recipient,
+  peerRoleLabel,
+  onClick,
+}: {
+  recipient: any;
+  peerRoleLabel: string;
+  onClick: () => void;
+}) => {
+  const recipientName = recipient.full_name ?? recipient.name ?? "Usuario";
+  const recipientAvatarUrl = recipient.avatar_url ?? recipient.avatar ?? null;
+  const rawAvatar = recipientAvatarUrl && isImageUrl(recipientAvatarUrl) ? recipientAvatarUrl : null;
+  const imageUrl = useResolvedAvatarUrl(rawAvatar);
+
+  return (
+    <button
+      key={recipient.id}
+      type="button"
+      onClick={onClick}
+      className="w-full rounded-xl border border-border/60 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/80"
+    >
+      <div className="flex items-center gap-3">
+        <Avatar className="h-10 w-10 ring-1 ring-white/80 dark:ring-slate-900/60">
+          {imageUrl && (
+            <AvatarImage src={imageUrl} alt={recipientName} className="h-full w-full object-cover" />
+          )}
+          <AvatarFallback className="bg-transparent p-0 overflow-hidden">
+            <img src={DEFAULT_AVATAR_PATH} alt={recipientName} className="h-full w-full object-cover" />
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0">
+          <p className="truncate font-semibold">{recipientName}</p>
+          <p className="text-sm text-muted-foreground">{peerRoleLabel}</p>
+        </div>
+      </div>
+    </button>
+  );
+});
+
 const SuppressedConversationRow = React.memo(({
   conversation,
   onRestore,
@@ -397,9 +436,9 @@ const MessageBubble = React.memo(({
             {message.attachments.map((attachment) => (
               <div key={`${message.id}-${attachment.name}`} className="flex items-center gap-2 rounded-lg border p-2 text-sm bg-muted/40 dark:bg-slate-700/40 min-w-0 overflow-hidden">
                 <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground dark:text-slate-400" />
-                <div className="min-w-0 flex-1 flex items-center justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium dark:text-slate-200">
+                <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <div className="truncate font-medium dark:text-slate-200">
                       {attachment.url ? (
                         <button
                           type="button"
@@ -408,14 +447,14 @@ const MessageBubble = React.memo(({
                             const ok = await tryFetchAndOpen(resolved!);
                             if (!ok) window.open(resolved, '_blank', 'noopener');
                           }}
-                          className="underline hover:text-emerald-700 dark:hover:text-emerald-300"
+                          className="block w-full truncate text-left underline hover:text-emerald-700 dark:hover:text-emerald-300"
                         >
                           {attachment.name}
                         </button>
                       ) : (
-                        attachment.name
+                        <span className="block truncate">{attachment.name}</span>
                       )}
-                    </p>
+                    </div>
                     <p className="text-xs text-muted-foreground dark:text-slate-400">{attachment.typeLabel} • {attachment.sizeLabel}</p>
                   </div>
 
@@ -427,7 +466,7 @@ const MessageBubble = React.memo(({
                         const ok = await tryFetchAndDownload(resolved!, attachment.name);
                         if (!ok) window.open(resolved, '_blank', 'noopener');
                       }}
-                      className="ml-3 text-muted-foreground hover:text-emerald-700 dark:hover:text-emerald-300"
+                      className="shrink-0 text-muted-foreground hover:text-emerald-700 dark:hover:text-emerald-300"
                       title={`Descargar ${attachment.name}`}
                     >
                       <img src={downloadIcon} alt="Descargar" className="h-4 w-4" />
@@ -545,6 +584,7 @@ export function MessagesAdmin(props: Readonly<{
   const [draftRecipient, setDraftRecipient] = useState<DraftRecipient | null>(null);
   const [suppressedChatIds, setSuppressedChatIds] = useState<number[]>([]);
   const deniedConversationIdsRef = useRef<Set<number>>(new Set());
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   
   const peerRoleLabel = "Docente";
   const recipientRoleCodes = ["docente", "tutor"];
@@ -562,11 +602,12 @@ export function MessagesAdmin(props: Readonly<{
     const roleCode = (raw?.role ?? raw?.roles?.[0]?.code ?? raw?.roles?.[0] ?? "").toString().toLowerCase();
     const role = roleCode === "administrador" ? "Administrador" : roleCode === "tutor" ? "Tutor" : fallbackRole;
     const avatarUrl = raw?.avatar_url ?? raw?.avatar ?? null;
+    const toPath = (u: string) => { try { return u.startsWith("http") ? new URL(u).pathname : u; } catch { return u; } };
     return {
       id: Number(raw?.id ?? 0),
       name: rawName,
       role,
-      avatar: avatarUrl && isImageUrl(avatarUrl) ? avatarUrl : DEFAULT_AVATAR_PATH,
+      avatar: avatarUrl && isImageUrl(avatarUrl) ? toPath(avatarUrl) : DEFAULT_AVATAR_PATH,
       avatarFallback: raw?.avatar_fallback ?? getInitials(rawName),
       status: "offline",
     };
@@ -658,13 +699,21 @@ export function MessagesAdmin(props: Readonly<{
     void loadRecipientUsers();
   }, [newConversationOpen, loadRecipientUsers]);
 
+  const existingConversationPeerIds = useMemo(() => {
+    return new Set(conversations.map((c) => c.peerUserId).filter(Boolean));
+  }, [conversations]);
+
+  const recipientUsersWithoutConversation = useMemo(() => {
+    return recipientUsers.filter((recipient) => !existingConversationPeerIds.has(Number(recipient.id)));
+  }, [recipientUsers, existingConversationPeerIds]);
+
   const filteredRecipientUsers = useMemo(() => {
     const normalizedSearch = recipientQuery.trim().toLowerCase();
-    return recipientUsers.filter((recipient) => {
+    return recipientUsersWithoutConversation.filter((recipient) => {
       const fullName = ((recipient.full_name ?? recipient.name ?? '') as string).toLowerCase();
       return !normalizedSearch || fullName.includes(normalizedSearch);
     });
-  }, [recipientQuery, recipientUsers]);
+  }, [recipientQuery, recipientUsersWithoutConversation]);
 
   const handleCreateConversation = async (recipient: any) => {
     try {
@@ -732,7 +781,8 @@ export function MessagesAdmin(props: Readonly<{
     }
 
     const resolvedAvatarFallback = avatarFallback || getInitials(displayName);
-    const avatarValue = avatarUrl && isImageUrl(avatarUrl) ? avatarUrl : DEFAULT_AVATAR_PATH;
+    const toPath = (u: string) => { try { return u.startsWith("http") ? new URL(u).pathname : u; } catch { return u; } };
+    const avatarValue = avatarUrl && isImageUrl(avatarUrl) ? toPath(avatarUrl) : DEFAULT_AVATAR_PATH;
 
     return {
       id: raw.id,
@@ -752,7 +802,8 @@ export function MessagesAdmin(props: Readonly<{
   const normalizeMessage = useCallback((raw: any): ChatMessage => {
     const avatarUrl = raw.avatar_url ?? raw.avatar;
     const avatarFallback = raw.avatar_fallback || getInitials(raw.sender);
-    const avatarValue = avatarUrl && isImageUrl(avatarUrl) ? avatarUrl : DEFAULT_AVATAR_PATH;
+    const toPath = (u: string) => { try { return u.startsWith("http") ? new URL(u).pathname : u; } catch { return u; } };
+    const avatarValue = avatarUrl && isImageUrl(avatarUrl) ? toPath(avatarUrl) : DEFAULT_AVATAR_PATH;
     const rawTs = raw.timestamp ?? raw.created_at ?? new Date().toISOString();
 
     return {
@@ -1181,6 +1232,7 @@ export function MessagesAdmin(props: Readonly<{
     setSelectedChat(conversationId);
     setDraftRecipient(null);
     setReplyingTo(null);
+    setMobileView('chat');
     updateConversation(conversationId, (conversation) => ({ ...conversation, unread: 0 }));
     void Promise.all([loadMessages(conversationId), markConversationAsRead(conversationId)]);
   };
@@ -1458,10 +1510,10 @@ export function MessagesAdmin(props: Readonly<{
               )}
             </CardHeader>
 
-            <CardContent className="min-h-0 flex-1 p-0">
+            <CardContent className="min-h-0 flex-1 p-0 overflow-x-hidden">
               {adminConversation ? (
                 <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
-                  <div className="w-full min-w-0 space-y-4 px-3 pb-2 pt-1 pr-4">
+                  <div className="w-full min-w-0 overflow-x-hidden space-y-4 px-3 pb-2 pt-1 pr-4">
                     {adminConversation.messages.length > 0 ? (
                       adminConversation.messages.map((messageItem) => (
                         <MessageBubble 
@@ -1557,12 +1609,19 @@ export function MessagesAdmin(props: Readonly<{
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="hidden sm:flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
+      <div className="grid min-h-0 flex-1 gap-6 sm:grid-cols-[300px_minmax(0,1fr)]">
+        <Card className={cn("min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20", mobileView === 'list' ? "flex" : "hidden sm:flex")}>
           <CardHeader className="space-y-4 border-b border-border/60 pb-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <CardTitle>Chats</CardTitle>
+                <div className="flex items-center gap-2">
+                  <CardTitle>Chats</CardTitle>
+                  {filteredConversations.filter((c) => c.unread > 0).length > 0 && (
+                    <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1.5 text-[11px]">
+                      {filteredConversations.filter((c) => c.unread > 0).length}
+                    </Badge>
+                  )}
+                </div>
                 <CardDescription className="hidden sm:block">Conversaciones recientes</CardDescription>
               </div>
               {suppressedConversations.length > 0 && (
@@ -1612,7 +1671,14 @@ export function MessagesAdmin(props: Readonly<{
         <Dialog open={newConversationOpen} onOpenChange={setNewConversationOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Iniciar nuevo chat</DialogTitle>
+              <div className="flex items-center justify-between gap-3">
+                <DialogTitle>Iniciar nuevo chat</DialogTitle>
+                {!isLoadingRecipients && recipientUsersWithoutConversation.length > 0 && (
+                  <span className="text-sm text-muted-foreground font-normal">
+                    {filteredRecipientUsers.length} sin chat
+                  </span>
+                )}
+              </div>
               <DialogDescription>Selecciona un {peerRoleLabel.toLowerCase()}. El chat se creará cuando se envíe el primer mensaje.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -1634,34 +1700,14 @@ export function MessagesAdmin(props: Readonly<{
               ) : (
                 <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-background/80 p-3">
                   {filteredRecipientUsers.length > 0 ? (
-                    filteredRecipientUsers.map((recipient) => {
-                      const recipientName = recipient.full_name ?? recipient.name ?? "Usuario";
-                      const recipientAvatarUrl = recipient.avatar_url ?? recipient.avatar ?? null;
-                      const recipientAvatar = recipientAvatarUrl && isImageUrl(recipientAvatarUrl) ? recipientAvatarUrl : DEFAULT_AVATAR_PATH;
-                      const recipientAvatarFallback = recipient.avatar_fallback ?? getInitials(recipientName);
-
-                      return (
-                        <button
-                          key={recipient.id}
-                          type="button"
-                          onClick={() => handleCreateConversation(recipient)}
-                          className="w-full rounded-xl border border-border/60 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/80"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10 ring-1 ring-white/80 dark:ring-slate-900/60">
-                              <AvatarImage src={recipientAvatar} alt={recipientName} className="h-full w-full object-cover" />
-                              <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-medium">
-                                {recipientAvatarFallback}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0">
-                              <p className="truncate font-semibold">{recipientName}</p>
-                              <p className="text-sm text-muted-foreground">{peerRoleLabel}</p>
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })
+                    filteredRecipientUsers.map((recipient) => (
+                      <RecipientRow
+                        key={recipient.id}
+                        recipient={recipient}
+                        peerRoleLabel={peerRoleLabel}
+                        onClick={() => handleCreateConversation(recipient)}
+                      />
+                    ))
                   ) : (
                     <p className="text-sm text-muted-foreground">No se encontraron usuarios.</p>
                   )}
@@ -1700,8 +1746,16 @@ export function MessagesAdmin(props: Readonly<{
           </DialogContent>
         </Dialog>
 
-        <Card className="flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
+        <Card className={cn("min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20", mobileView === 'chat' ? "flex" : "hidden sm:flex")}>
           <CardHeader className="border-b border-border/60 bg-background/80 pb-4">
+            <button
+              type="button"
+              onClick={() => setMobileView('list')}
+              className="sm:hidden flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2 -ml-1"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Chats
+            </button>
             {targetConversation ? (
               <div className="flex items-start gap-3">
                 <Avatar className="h-11 w-11 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
@@ -1739,10 +1793,10 @@ export function MessagesAdmin(props: Readonly<{
             )}
           </CardHeader>
 
-          <CardContent className="min-h-0 flex-1 p-0">
+          <CardContent className="min-h-0 flex-1 p-0 overflow-x-hidden">
             {targetConversation ? (
               <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
-                <div className="w-full min-w-0 space-y-4 px-3 pb-2 pt-1 pr-4">
+                <div className="w-full min-w-0 overflow-x-hidden space-y-4 px-3 pb-2 pt-1 pr-4">
                   {targetConversation.messages.length > 0 ? (
                     targetConversation.messages.map((messageItem) => (
                       <MessageBubble 

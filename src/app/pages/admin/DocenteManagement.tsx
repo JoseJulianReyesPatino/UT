@@ -100,21 +100,29 @@ function DocenteAvatar({ name, avatar, className }: Readonly<{ name: string; ava
 
   return (
     <Avatar className={className}>
-      {resolvedAvatar ? <AvatarImage src={resolvedAvatar} alt={name} className="h-full w-full object-cover" /> : null}
-      <AvatarFallback className="bg-success/10 text-success">
-        {getInitials(name)}
+      {resolvedAvatar && (
+        <AvatarImage src={resolvedAvatar} alt={name} className="h-full w-full object-cover" />
+      )}
+      <AvatarFallback className="bg-transparent p-0 overflow-hidden">
+        <img src={defaultAvatar} alt={name} className="h-full w-full object-cover" />
       </AvatarFallback>
     </Avatar>
   );
 }
 
+const toAvatarPath = (url: string): string => {
+  if (!url || !url.startsWith("http")) return url;
+  try { return new URL(url).pathname; } catch { return url; }
+};
+
 const mapApiUser = (user: ApiUser): Docente => {
   const roles = (user.roles ?? [])
     .map(normalizeRole)
     .filter((role): role is UserRole => role !== null);
-  const avatarUrl = user.avatar_url && user.avatar_url !== "/api/default-avatar"
+  const rawAvatar = user.avatar_url && user.avatar_url !== "/api/default-avatar"
     ? user.avatar_url
-    : defaultAvatar;
+    : null;
+  const avatarUrl = rawAvatar ? toAvatarPath(rawAvatar) : defaultAvatar;
 
   return {
     id: Number(user.id),

@@ -74,6 +74,17 @@ const getTutoriasApartadoLabel = (apartado: string) => {
   return tutoriasApartadosEtiquetas[key] ?? apartado;
 };
 
+const ensurePdfExtension = (name: string) =>
+  name.toLowerCase().endsWith(".pdf") ? name : `${name}.pdf`;
+
+const extractPreviewFileName = (documento: string) => {
+  const lastSep = documento.lastIndexOf(" - ");
+  const raw = lastSep !== -1 && documento.substring(lastSep + 3).trim()
+    ? documento.substring(lastSep + 3).trim()
+    : documento;
+  return raw.toLowerCase().endsWith(".pdf") ? raw : `${raw}.pdf`;
+};
+
 const resolveTutorDocumentTitle = (doc: any): string => {
   const title = (doc?.title ?? "").toString().trim();
   if (title && !/^undefined\b/i.test(title)) {
@@ -130,7 +141,6 @@ export default function Tutores() {
   const { isReady, isAuthenticated } = useAuth();
   const [pendingDocuments, setPendingDocuments] = useState<TutorDocument[]>([]);
   const [reviewedDocuments, setReviewedDocuments] = useState<TutorDocument[]>([]);
-  const [filterCarrera, setFilterCarrera] = useState("all");
   const [filterTutor, setFilterTutor] = useState("all");
   const [filterApartado, setFilterApartado] = useState("all");
   const [filterReturned, setFilterReturned] = useState("all");
@@ -148,7 +158,6 @@ export default function Tutores() {
 
   const buildQueryFromFilters = () => {
     const q: Record<string, any> = { uploader_role: 'tutor', tutorias_only: 1, page, per_page: perPage };
-    if (filterCarrera !== 'all') q.carrera_label = filterCarrera;
     if (filterTutor !== 'all') q.uploaded_by_name = filterTutor;
     if (filterApartado !== 'all') q.apartado_label = filterApartado;
     if (filterReturned === 'returned') q.status = 'devuelto';
@@ -194,7 +203,7 @@ export default function Tutores() {
   useEffect(() => {
     const to = setTimeout(() => { void loadDocuments(); }, 150);
     return () => clearTimeout(to);
-  }, [filterCarrera, filterTutor, filterApartado, filterReturned, activeSection, page, perPage]);
+  }, [filterTutor, filterApartado, filterReturned, activeSection, page, perPage]);
 
   const downloadDocument = async (documentId: number) => {
     try {
@@ -266,8 +275,7 @@ export default function Tutores() {
     }
   };
 
-  const matchesFilters = (doc: { ciclo: string; carrera: string; tutor: string; apartado: string; returned?: boolean }) => {
-    const matchesCarrera = filterCarrera === "all" || doc.carrera === filterCarrera;
+  const matchesFilters = (doc: { tutor: string; apartado: string; returned?: boolean }) => {
     const matchesTutor = filterTutor === "all" || doc.tutor === filterTutor;
     const matchesApartado = filterApartado === "all" || doc.apartado === filterApartado;
     const isReturned = Boolean(doc.returned);
@@ -276,7 +284,7 @@ export default function Tutores() {
       || (filterReturned === "returned" && isReturned)
       || (filterReturned === "not-returned" && !isReturned);
 
-    return matchesCarrera && matchesTutor && matchesApartado && matchesReturned;
+    return matchesTutor && matchesApartado && matchesReturned;
   };
 
   const filteredPending = pendingDocuments.filter(matchesFilters);
@@ -420,7 +428,7 @@ export default function Tutores() {
   const sectionCardClassName =
     "overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20";
 
-  const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-2 xl:grid-cols-5";
+  const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3";
   const filterSelectTriggerClassName = "w-full text-[13px] leading-tight sm:text-sm";
   const filterSelectValueClassName = "truncate";
 
@@ -435,7 +443,7 @@ export default function Tutores() {
     <div className="relative space-y-6 overflow-hidden">
       <div>
         <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">Gestión de Tutores</h1>
-        <p className="text-muted-foreground">Revisa y administra los documentos enviados por tutores (separado de documentos docentes)</p>
+        <p className="text-muted-foreground">Revisa y administra los documentos enviados por tutores</p>
       </div>
 
       <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
@@ -473,15 +481,6 @@ export default function Tutores() {
                   <SelectContent>
                     <SelectItem value="all">Todos los tutores</SelectItem>
                     {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las carreras</SelectItem>
-                    {careerOptions.map((career) => (
-                      <SelectItem key={career.value} value={career.value}>{career.label}</SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
@@ -523,26 +522,8 @@ export default function Tutores() {
                           <FileText className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                          <p className="font-medium break-words text-sm sm:text-base">{doc.documento}</p>
-                          <p className="text-sm text-muted-foreground">{"tutor" in doc ? doc.tutor : (doc as any).tutor} • {doc.carrera}</p>
-                          <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                            {"cuatrimestre" in doc && doc.cuatrimestre && (
-                              <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                {doc.cuatrimestre}° Cuatri
-                              </Button>
-                            )}
-                            {"grupo" in doc && doc.grupo && (
-                              <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                Grupo {doc.grupo}
-                              </Button>
-                            )}
-                            <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                              {doc.ciclo}
-                            </Button>
-                            <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                              {getTutoriasApartadoLabel(doc.apartado)}
-                            </Button>
-                          </div>
+                          <p className="font-medium break-words text-sm sm:text-base">{ensurePdfExtension(doc.documento)}</p>
+                          <p className="text-sm text-muted-foreground">{"tutor" in doc ? doc.tutor : (doc as any).tutor}</p>
                             {('fecha' in doc && doc.fecha) && (
                               <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(('fecha' in doc ? doc.fecha : ''))} {('fecha' in doc && doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' '))) ? <span className="ml-2 text-xs text-muted-foreground">{formatTime12(doc.fecha)}</span> : null}</p>
                             )}
@@ -563,7 +544,7 @@ export default function Tutores() {
                           size="sm"
                           label="Ver"
                           title="Ver PDF"
-                          onClick={(e) => { e.stopPropagation(); void downloadDocument(doc.id); }}
+                          onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}
                           icon={<Eye className="h-4 w-4" />}
                         />
 
@@ -642,15 +623,6 @@ export default function Tutores() {
                     {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las carreras</SelectItem>
-                    {careerOptions.map((career) => (
-                      <SelectItem key={career.value} value={career.value}>{career.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
@@ -689,22 +661,8 @@ export default function Tutores() {
                         <FileText className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                        <p className="break-words text-sm font-medium leading-snug sm:text-base">{doc.documento}</p>
-                        <p className="mt-1 text-xs leading-snug text-muted-foreground sm:text-sm">{doc.tutor} • {doc.carrera}</p>
-                        <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                          <Button type="button" variant="outline" className={`${previewChipClassName} w-full justify-center pointer-events-auto sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
-                            {doc.cuatrimestre}° Cuatri
-                          </Button>
-                          <Button type="button" variant="outline" className={`${previewChipClassName} w-full justify-center pointer-events-auto sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
-                            Grupo {doc.grupo}
-                          </Button>
-                          <Button type="button" variant="outline" className={`${previewChipClassName} w-full justify-center pointer-events-auto sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
-                            {doc.ciclo}
-                          </Button>
-                          <Button type="button" variant="outline" className={`${previewChipClassName} col-span-2 w-full justify-center pointer-events-auto sm:col-span-1 sm:w-auto`} onClick={() => setPreviewDocument(doc)}>
-                            {getTutoriasApartadoLabel(doc.apartado)}
-                          </Button>
-                        </div>
+                        <p className="break-words text-sm font-medium leading-snug sm:text-base">{ensurePdfExtension(doc.documento)}</p>
+                        <p className="mt-1 text-xs leading-snug text-muted-foreground sm:text-sm">{doc.tutor}</p>
                         {doc.fecha && (
                           <p className="mt-2 text-[11px] leading-snug text-muted-foreground sm:text-xs">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-[11px] text-muted-foreground sm:text-xs">{formatTime12(doc.fecha)}</span> : null}</p>
                         )}
@@ -720,7 +678,7 @@ export default function Tutores() {
                       {isReturned && <Badge variant="destructive" className="col-span-2 justify-self-end sm:col-span-1">Devuelto</Badge>}
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); void downloadDocument(doc.id); }} aria-label="Ver PDF">
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
                             <Eye className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
@@ -801,15 +759,6 @@ export default function Tutores() {
                     {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las carreras</SelectItem>
-                    {careerOptions.map((career) => (
-                      <SelectItem key={career.value} value={career.value}>{career.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
                   <SelectContent>
@@ -829,136 +778,94 @@ export default function Tutores() {
                 </div>
               </div>
             </CardHeader>
-          </Card>
-          <div className="space-y-4">
-            {Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
-              <EmptyState text={emptyStateLegend} />
-            ) : Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => (
-              <Card key={date} className={sectionCardClassName}>
-                <CardHeader>
-                  <CardTitle>{formatDateOnlyFromKey(date)}</CardTitle>
-                  <CardDescription>{docs.length} documentos revisados</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {docs.map((doc) => {
-                      const isReturned = Boolean(doc.returned);
-                      return (
-                      <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
-                        <button
-                          type="button"
-                          aria-label={`Abrir vista previa de ${doc.documento}`}
-                          onClick={() => setPreviewDocument(doc)}
-                          className={previewCardOverlayClassName}
-                        />
-                        <div className="relative z-20 flex items-start gap-3 flex-1 pointer-events-none">
-                          <div className="relative z-20 h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 pointer-events-none">
-                            <FileText className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                          <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                            <p className="font-medium break-words text-sm sm:text-base">{doc.documento}</p>
-                            <p className="text-sm text-muted-foreground">{doc.tutor}</p>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                {doc.carrera}
-                              </Button>
-                              <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                {doc.ciclo}
-                              </Button>
-                              <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                {getTutoriasApartadoLabel(doc.apartado)}
-                              </Button>
-                            </div>
-                            {'reviewedAt' in doc && doc.reviewedAt && (
-                              <p className="mt-1 text-xs text-muted-foreground">Revisado: {formatDateTimeFromIso(doc.reviewedAt)}</p>
-                            )}
-                            {'returnedAt' in doc && doc.returnedAt && (
-                              <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); void downloadDocument(doc.id); }} aria-label="Ver PDF">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Ver PDF</TooltipContent>
-                          </Tooltip>
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.tutor}`}>
-                                <MessageSquare className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Enviar</TooltipContent>
-                          </Tooltip>
-
-                          {doc.returned ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setReturnConfirmation({ type: "cancel-return", document: doc });
-                                  }}
-                                  aria-label="Cancelar devolución"
-                                >
-                                  <Undo2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Cancelar devolución</TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            <ResponsiveActionButton
-                              variant="destructive"
-                              size="sm"
-                              label="Devolver"
-                              title="Devolver documento"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setReturnConfirmation({ type: "return", document: doc });
-                              }}
-                              icon={<Undo2 className="h-4 w-4" />}
-                            />
-                          )}
-
-                          <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "warning"}>{getDocumentStatusLabel(doc)}</Badge>
-                        </div>
+            <CardContent>
+              {Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
+                <EmptyState text={emptyStateLegend} />
+              ) : (
+                <div className="space-y-6">
+                  {Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => (
+                    <div key={date}>
+                      <div className="mb-3">
+                        <p className="font-semibold text-sm text-foreground">{formatDateOnlyFromKey(date)}</p>
+                        <p className="text-xs text-muted-foreground">{docs.length} documentos revisados</p>
                       </div>
-                    )})}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                      <div className="space-y-3">
+                        {docs.map((doc) => {
+                          const isReturned = Boolean(doc.returned);
+                          return (
+                          <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
+                            <button
+                              type="button"
+                              aria-label={`Abrir vista previa de ${doc.documento}`}
+                              onClick={() => setPreviewDocument(doc)}
+                              className={previewCardOverlayClassName}
+                            />
+                            <div className="relative z-20 flex items-start gap-3 flex-1 pointer-events-none">
+                              <div className="relative z-20 h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 pointer-events-none">
+                                <FileText className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                              <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
+                                <p className="font-medium break-words text-sm sm:text-base">{ensurePdfExtension(doc.documento)}</p>
+                                <p className="text-sm text-muted-foreground">{doc.tutor}</p>
+                                {'reviewedAt' in doc && doc.reviewedAt && (
+                                  <p className="mt-1 text-xs text-muted-foreground">Revisado: {formatDateTimeFromIso(doc.reviewedAt)}</p>
+                                )}
+                                {'returnedAt' in doc && doc.returnedAt && (
+                                  <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Ver PDF</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.tutor}`}>
+                                    <MessageSquare className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Enviar</TooltipContent>
+                              </Tooltip>
+                              {doc.returned ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="outline" size="icon" className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }} aria-label="Cancelar devolución">
+                                      <Undo2 className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Cancelar devolución</TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <ResponsiveActionButton variant="destructive" size="sm" label="Devolver" title="Devolver documento" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} />
+                              )}
+                              <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "warning"}>{getDocumentStatusLabel(doc)}</Badge>
+                            </div>
+                          </div>
+                        )})}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="hoy" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              <CardTitle>Revisados hoy</CardTitle>
-              <CardDescription>Documentos abiertos por administración en el día</CardDescription>
               <div className={filtersGridClassName}>
                 <Select value={filterTutor} onValueChange={setFilterTutor}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los tutores</SelectItem>
                     {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las carreras</SelectItem>
-                    {careerOptions.map((career) => (
-                      <SelectItem key={career.value} value={career.value}>{career.label}</SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
                 <Select value={filterApartado} onValueChange={setFilterApartado}>
@@ -968,14 +875,16 @@ export default function Tutores() {
                     {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{getTutoriasApartadoLabel(apartado)}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los documentos</SelectItem>
-                    <SelectItem value="returned">Solo devueltos</SelectItem>
-                    <SelectItem value="not-returned">No devueltos</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="col-span-2 sm:col-span-1">
+                  <Select value={filterReturned} onValueChange={setFilterReturned}>
+                    <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los documentos</SelectItem>
+                      <SelectItem value="returned">Solo devueltos</SelectItem>
+                      <SelectItem value="not-returned">No devueltos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -998,37 +907,23 @@ export default function Tutores() {
                           <FileText className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                          <p className="font-medium">{doc.documento}</p>
+                          <p className="font-medium break-words text-sm sm:text-base">{ensurePdfExtension(doc.documento)}</p>
                           <p className="text-sm text-muted-foreground">{doc.tutor}</p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                              <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                {doc.carrera}
-                              </Button>
-                              <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                {doc.ciclo}
-                              </Button>
-                              <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                {getTutoriasApartadoLabel(doc.apartado)}
-                              </Button>
-                          </div>
                             {doc.fecha && (
                               <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-xs text-muted-foreground">{formatTime12(doc.fecha)}</span> : null}</p>
+                            )}
+                            {'reviewedAt' in doc && doc.reviewedAt && (
+                              <p className="mt-1 text-xs text-muted-foreground">Revisado: {formatDateTimeFromIso(doc.reviewedAt)}</p>
                             )}
                             {'returnedAt' in doc && doc.returnedAt && (
                               <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>
                             )}
-                            {'resubmittedAt' in doc && doc.resubmittedAt && (
-                              <p className="mt-1 text-xs text-muted-foreground">Reenviado: {formatDateTimeFromIso(doc.resubmittedAt)}</p>
-                            )}
-                          {'reviewedAt' in doc && doc.reviewedAt && (
-                            <p className="mt-1 text-xs text-muted-foreground">Revisado: {formatDateTimeFromIso(doc.reviewedAt)}</p>
-                          )}
                         </div>
                       </div>
-                      <div className="relative z-20 flex flex-wrap items-center justify-end gap-2 pointer-events-auto">
+                      <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); void downloadDocument(doc.id); }} aria-label="Ver PDF">
+                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
                               <Eye className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
@@ -1044,6 +939,32 @@ export default function Tutores() {
                           <TooltipContent>Enviar</TooltipContent>
                         </Tooltip>
 
+                        {doc.returned ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                                onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
+                                aria-label="Cancelar devolución"
+                              >
+                                <Undo2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Cancelar devolución</TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <ResponsiveActionButton
+                            variant="destructive"
+                            size="sm"
+                            label="Devolver"
+                            title="Devolver documento"
+                            onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
+                            icon={<Undo2 className="h-4 w-4" />}
+                          />
+                        )}
+
                         <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "warning"}>{getDocumentStatusLabel(doc)}</Badge>
                       </div>
                     </div>
@@ -1056,39 +977,24 @@ export default function Tutores() {
       </Tabs>
 
       <Dialog open={previewDocument !== null} onOpenChange={(open) => { if (!open) closePreview(); }}>
-        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[92vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Vista previa del documento</DialogTitle>
-            <DialogDescription>Visualiza el PDF real asociado al documento seleccionado.</DialogDescription>
+            <DialogTitle>{previewDocument ? extractPreviewFileName(previewDocument.documento) : ""}</DialogTitle>
+            {previewDocument && <DialogDescription>{"tutor" in previewDocument ? previewDocument.tutor : (previewDocument as any).tutor}</DialogDescription>}
           </DialogHeader>
           {previewDocument && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">{previewDocument.ciclo}</Badge>
-                <Badge variant="outline">{previewDocument.plan}</Badge>
-                <Badge variant="outline">{getTutoriasApartadoLabel(previewDocument.apartado)}</Badge>
-                {"resubmittedAt" in previewDocument && previewDocument.resubmittedAt ? (
-                  <Badge variant="warning">Reenviado</Badge>
-                ) : Boolean(previewDocument.returned) && <Badge variant="destructive">Devuelto</Badge>}
-              </div>
-              <div className="rounded-lg border border-border bg-muted/30 p-4 md:p-6 space-y-4">
-                <div className="rounded-md border border-border bg-background p-3 text-sm">
-                  <p className="font-medium text-foreground">{previewDocument.documento}</p>
-                  <p className="text-xs text-muted-foreground">{"tutor" in previewDocument ? previewDocument.tutor : (previewDocument as any).tutor} · {previewDocument.carrera}</p>
+            <div className="flex-1 min-h-0">
+              {previewLoading ? (
+                <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                  <p>Cargando...</p>
                 </div>
-                {previewLoading ? (
-                  <div className="flex h-[70vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
-                    <p>Cargando...</p>
-                  </div>
-                ) : previewError ? (
-                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-                    {previewError}
-                  </div>
-                ) : previewBlobUrl ? (
-                  <iframe src={previewBlobUrl} className="h-[70vh] w-full rounded-lg border border-border" title={previewDocument.documento} />
-                ) : null}
-                <div className="text-sm text-muted-foreground">Vista previa autenticada del documento cargado por el tutor.</div>
-              </div>
+              ) : previewError ? (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                  {previewError}
+                </div>
+              ) : previewBlobUrl ? (
+                <iframe src={previewBlobUrl} className="h-[82vh] w-full rounded-lg border border-border" title={previewDocument.documento} />
+              ) : null}
             </div>
           )}
         </DialogContent>
@@ -1117,7 +1023,7 @@ export default function Tutores() {
 
           {returnConfirmation && (
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
-              <p className="font-medium">{returnConfirmation.document.documento}</p>
+              <p className="font-medium">{ensurePdfExtension(returnConfirmation.document.documento)}</p>
               <p className="text-muted-foreground">{returnConfirmation.document.tutor}</p>
             </div>
           )}
@@ -1161,7 +1067,7 @@ export default function Tutores() {
 
           {reviewConfirmation && (
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
-              <p className="font-medium">{reviewConfirmation.documento}</p>
+              <p className="font-medium">{ensurePdfExtension(reviewConfirmation.documento)}</p>
               <p className="text-muted-foreground">{reviewConfirmation.tutor}</p>
             </div>
           )}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { resolveApiAssetUrl, AUTH_TOKEN_STORAGE_KEY } from "./env";
 
 const avatarUrlCache = new Map<string, string>();
+const CACHE_CLEAR_EVENT = "ut-avatar-cache-cleared";
 
 // Obtener la URL base del backend
 const getBackendBaseUrl = (): string => {
@@ -72,6 +73,7 @@ export const getAvatarUrlWithTimestamp = (
 // Función para limpiar la caché (llamar después de actualizar el avatar)
 export const clearAvatarCache = () => {
   avatarUrlCache.clear();
+  window.dispatchEvent(new CustomEvent(CACHE_CLEAR_EVENT));
 };
 
 // Función para obtener iniciales de un nombre
@@ -131,6 +133,7 @@ const toFetchHeaders = () => {
 export const useResolvedAvatarUrl = (
   url?: string | null,
 ): string | undefined => {
+  const [cacheEpoch, setCacheEpoch] = useState(0);
   const [resolvedUrl, setResolvedUrl] = useState<string | undefined>(() => {
     if (!url || !isRenderableAvatarSource(url)) {
       return undefined;
@@ -146,35 +149,56 @@ export const useResolvedAvatarUrl = (
   });
 
   useEffect(() => {
+    const onCacheCleared = () => {
+      setResolvedUrl(undefined);
+      setCacheEpoch((v) => v + 1);
+    };
+    window.addEventListener(CACHE_CLEAR_EVENT, onCacheCleared);
+    return () => window.removeEventListener(CACHE_CLEAR_EVENT, onCacheCleared);
+  }, []);
+
+  useEffect(() => {
     if (!url || !isRenderableAvatarSource(url)) {
       setResolvedUrl(undefined);
       return;
     }
 
-    if (
-      url.startsWith("data:") ||
-      url.startsWith("http://") ||
-      url.startsWith("https://") ||
-      url.startsWith("blob:")
-    ) {
+    if (url.startsWith("data:") || url.startsWith("blob:")) {
       setResolvedUrl(getAvatarUrlWithTimestamp(url));
       return;
     }
 
-    const cachedUrl = avatarUrlCache.get(url);
+    // Para URLs absolutas http/https, extraer el path y verificar si es ruta protegida
+    let effectiveUrl = url;
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      try {
+        const parsed = new URL(url);
+        const path = parsed.pathname;
+        if (!isProtectedAvatarRoute(path)) {
+          setResolvedUrl(getAvatarUrlWithTimestamp(url));
+          return;
+        }
+        effectiveUrl = path; // usar solo el path para el fetch autenticado
+      } catch {
+        setResolvedUrl(getAvatarUrlWithTimestamp(url));
+        return;
+      }
+    }
+
+    const cachedUrl = avatarUrlCache.get(effectiveUrl);
     if (cachedUrl) {
       setResolvedUrl(cachedUrl);
       return;
     }
 
-    if (!isProtectedAvatarRoute(url)) {
-      setResolvedUrl(getAvatarUrlWithTimestamp(url));
+    if (!isProtectedAvatarRoute(effectiveUrl)) {
+      setResolvedUrl(getAvatarUrlWithTimestamp(effectiveUrl));
       return;
     }
 
     let isActive = true;
     const abortController = new AbortController();
-    const absoluteUrl = resolveApiAssetUrl(url) ?? url;
+    const absoluteUrl = resolveApiAssetUrl(effectiveUrl) ?? effectiveUrl;
 
     (async () => {
       try {
@@ -199,14 +223,14 @@ export const useResolvedAvatarUrl = (
         }
 
         const objectUrl = URL.createObjectURL(blob);
-        avatarUrlCache.set(url, objectUrl);
+        avatarUrlCache.set(effectiveUrl, objectUrl);
         setResolvedUrl(objectUrl);
       } catch {
         if (!isActive) {
           return;
         }
 
-        setResolvedUrl(getAvatarUrlWithTimestamp(url));
+        setResolvedUrl(getAvatarUrlWithTimestamp(effectiveUrl));
       }
     })();
 
@@ -214,7 +238,7 @@ export const useResolvedAvatarUrl = (
       isActive = false;
       abortController.abort();
     };
-  }, [url]);
+  }, [url, cacheEpoch]);
 
   return resolvedUrl;
 };

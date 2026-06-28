@@ -1461,10 +1461,10 @@ export function MessagesTeacher(props: Readonly<{
               )}
             </CardHeader>
 
-            <CardContent className="min-h-0 flex-1 p-0">
+            <CardContent className="min-h-0 flex-1 p-0 overflow-x-hidden">
               {adminConversation ? (
                 <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
-                  <div className="w-full min-w-0 space-y-4 px-3 pb-2 pt-1 pr-4">
+                  <div className="w-full min-w-0 overflow-x-hidden space-y-4 px-3 pb-2 pt-1 pr-4">
                     {adminConversation.messages.length > 0 ? (
                       adminConversation.messages.map((messageItem) => (
                         <MessageBubble 
@@ -1742,7 +1742,7 @@ export function MessagesTeacher(props: Readonly<{
             )}
           </CardHeader>
 
-          <CardContent className="min-h-0 flex-1 p-0">
+          <CardContent className="min-h-0 flex-1 p-0 overflow-x-hidden">
             {targetConversation ? (
               <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
                 <div className="w-full min-w-0 space-y-4 px-3 pb-2 pt-1 pr-4">

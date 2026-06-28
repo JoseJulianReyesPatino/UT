@@ -7,7 +7,10 @@ export function Messages(props: Readonly<{
   initialOpen?: { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string; filePath?: string } } | null;
   onConsume?: () => void;
 }> = {}) {
-  const { user } = useAuth();
+  const { user, isReady } = useAuth();
+
+  if (!isReady) return null;
+
   const isAdmin = user?.role === "administrador" || user?.roles?.includes("administrador");
 
   if (isAdmin) {

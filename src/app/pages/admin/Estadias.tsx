@@ -43,6 +43,7 @@ type EstadiaReviewedDocument = {
   documento: string;
   apartado: string;
   carrera: string;
+  grupo: string;
   file_path?: string | null;
   reviewedAt: string;
   fecha?: string;
@@ -85,6 +86,14 @@ const extractApiDocuments = (payload: unknown): ApiDocument[] => {
     return (payload as { data: ApiDocument[] }).data;
   }
   return [];
+};
+
+const extractPreviewFileName = (documento: string) => {
+  const lastSep = documento.lastIndexOf(" - ");
+  const raw = lastSep !== -1 && documento.substring(lastSep + 3).trim()
+    ? documento.substring(lastSep + 3).trim()
+    : documento;
+  return raw.toLowerCase().endsWith(".pdf") ? raw : `${raw}.pdf`;
 };
 
 export default function Estadias() {
@@ -150,6 +159,9 @@ export default function Estadias() {
       return fecha;
     }
   };
+
+  const ensurePdfExtension = (name: string) =>
+    name.toLowerCase().endsWith(".pdf") ? name : `${name}.pdf`;
 
   const formatDateTimeFromIso = (value?: string) => {
     if (!value) return "";
@@ -605,12 +617,13 @@ export default function Estadias() {
                           <FileText className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium">{doc.documento}</p>
+                          <p className="font-medium">{ensurePdfExtension(doc.documento)}</p>
                           <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                           <div className="flex flex-wrap gap-2 mt-2">
-                            <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
                             <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
-                            <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
+                            {doc.grupo && doc.grupo !== "-" && (
+                              <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
+                            )}
                           </div>
                           {('fecha' in doc && doc.fecha) && (
                             <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-xs text-muted-foreground">{formatTime12(doc.fecha)}</span> : null}</p>
@@ -747,13 +760,13 @@ export default function Estadias() {
                         <FileText className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium">{doc.documento}</p>
+                        <p className="font-medium">{ensurePdfExtension(doc.documento)}</p>
                         <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>
                           <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
-                          <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
-                          <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
+                          {doc.grupo && doc.grupo !== "-" && (
+                            <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
+                          )}
                         </div>
                         {doc.fecha && (
                           <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-xs text-muted-foreground">{formatTime12(doc.fecha)}</span> : null}</p>
@@ -870,17 +883,18 @@ export default function Estadias() {
                 </Select>
               </div>
             </CardHeader>
-          </Card>
-          <div className="space-y-4">
-            {Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => {
-              return (
-              <Card key={date} className={sectionCardClassName}>
-                <CardHeader>
-                  <CardTitle>{formatDateOnlyFromKey(date)}</CardTitle>
-                  <CardDescription>{docs.length} documentos revisados</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
+            <CardContent>
+              {Object.entries(reviewedByDate).filter(([date]) => date).length === 0 ? (
+                <EmptyState text={emptyStateLegend} />
+              ) : (
+                <div className="space-y-6">
+                  {Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => (
+                    <div key={date}>
+                      <div className="mb-3">
+                        <p className="font-semibold text-sm text-foreground">{formatDateOnlyFromKey(date)}</p>
+                        <p className="text-xs text-muted-foreground">{docs.length} documentos revisados</p>
+                      </div>
+                      <div className="space-y-3">
                     {docs.map((doc) => {
                       const isReturned = Boolean(doc.returned);
                       return (
@@ -891,21 +905,17 @@ export default function Estadias() {
                               <FileText className="h-6 w-6 text-muted-foreground" />
                             </div>
                             <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                              <p className="font-medium">{doc.documento}</p>
-                              <p className="text-sm text-muted-foreground">{doc.docente}</p>
+                              <p className="font-medium">{ensurePdfExtension(doc.documento)}</p>
+                              <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                               <div className="mt-2 flex flex-wrap gap-2">
-                                <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                  {doc.carrera}
-                                </Button>
-                                <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                  {doc.ciclo}
-                                </Button>
                                 <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
                                   {doc.plan}
                                 </Button>
-                                <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                                  {doc.apartado}
-                                </Button>
+                                {doc.grupo && doc.grupo !== "-" && (
+                                  <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
+                                    Grupo {doc.grupo}
+                                  </Button>
+                                )}
                               </div>
                               {'fecha' in doc && doc.fecha && (
                                 <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatDateTimeFromIso(doc.fecha)}</p>
@@ -966,19 +976,18 @@ export default function Estadias() {
                         </div>
                       );
                     })}
-                  </div>
-                </CardContent>
-              </Card>
-              );
-            })}
-          </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="hoy" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader>
-              <CardTitle>Revisados hoy</CardTitle>
-              <CardDescription>Documentos abiertos por administración en el día</CardDescription>
               <div className={filtersGridClassName}>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
@@ -1040,21 +1049,17 @@ export default function Estadias() {
                           <FileText className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                          <p className="font-medium">{doc.documento}</p>
-                          <p className="text-sm text-muted-foreground">{doc.docente}</p>
+                          <p className="font-medium">{ensurePdfExtension(doc.documento)}</p>
+                          <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                           <div className="mt-2 flex flex-wrap gap-2">
-                            <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                              {doc.carrera}
-                            </Button>
-                            <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                              {doc.ciclo}
-                            </Button>
                             <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
                               {doc.plan}
                             </Button>
-                            <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
-                              {doc.apartado}
-                            </Button>
+                            {doc.grupo && doc.grupo !== "-" && (
+                              <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
+                                Grupo {doc.grupo}
+                              </Button>
+                            )}
                           </div>
                           {'reviewedAt' in doc && doc.reviewedAt && (
                             <p className="mt-1 text-xs text-muted-foreground">{formatTime12(doc.reviewedAt)}</p>
@@ -1094,44 +1099,34 @@ export default function Estadias() {
       </Tabs>
 
       <Dialog open={previewDocument !== null} onOpenChange={(open) => { if (!open) closePreview(); }}>
-        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[92vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Vista previa del documento</DialogTitle>
-            <DialogDescription>Vista real del archivo PDF almacenado para el documento seleccionado.</DialogDescription>
+            <DialogTitle>{previewDocument ? extractPreviewFileName(previewDocument.documento) : ""}</DialogTitle>
+            {previewDocument && <DialogDescription>{previewDocument.docente} · {previewDocument.carrera}</DialogDescription>}
           </DialogHeader>
           {previewDocument && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">{previewDocument.ciclo}</Badge>
-                <Badge variant="outline">{previewDocument.plan}</Badge>
-                <Badge variant="outline">{previewDocument.apartado}</Badge>
-              </div>
-              <div className="rounded-lg border border-border bg-muted/30 p-4 md:p-6">
-                {previewLoading ? (
-                  <div className="flex h-[70vh] items-center justify-center text-sm text-muted-foreground">
-                    Cargando PDF...
-                  </div>
-                ) : previewError ? (
-                  <div className="flex h-[70vh] items-center justify-center text-sm text-destructive">
-                    {previewError}
-                  </div>
-                ) : previewBlobUrl ? (
-                  <iframe
-                    src={previewBlobUrl}
-                    className="h-[70vh] w-full rounded-lg border border-border bg-background"
-                    title={previewDocument.documento}
-                  />
-                ) : (
-                  <div className="flex h-[70vh] items-center justify-center text-sm text-muted-foreground">
-                    No hay vista previa disponible para este PDF.
-                  </div>
-                )}
-              </div>
+            <div className="flex-1 min-h-0">
+              {previewLoading ? (
+                <div className="flex h-[82vh] items-center justify-center text-sm text-muted-foreground">
+                  Cargando PDF...
+                </div>
+              ) : previewError ? (
+                <div className="flex h-[82vh] items-center justify-center text-sm text-destructive">
+                  {previewError}
+                </div>
+              ) : previewBlobUrl ? (
+                <iframe
+                  src={previewBlobUrl}
+                  className="h-[82vh] w-full rounded-lg border border-border bg-background"
+                  title={previewDocument.documento}
+                />
+              ) : (
+                <div className="flex h-[82vh] items-center justify-center text-sm text-muted-foreground">
+                  No hay vista previa disponible para este PDF.
+                </div>
+              )}
             </div>
           )}
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={() => setPreviewDocument(null)}>Cerrar</Button>
-          </div>
         </DialogContent>
       </Dialog>
       <Dialog
@@ -1148,7 +1143,7 @@ export default function Estadias() {
 
           {reviewConfirmation && (
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
-              <p className="font-medium">{reviewConfirmation.documento}</p>
+              <p className="font-medium">{ensurePdfExtension(reviewConfirmation.documento)}</p>
               <p className="text-muted-foreground">{reviewConfirmation.docente}</p>
             </div>
           )}
@@ -1184,7 +1179,7 @@ export default function Estadias() {
 
           {returnConfirmation && (
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
-              <p className="font-medium">{returnConfirmation.document.documento}</p>
+              <p className="font-medium">{ensurePdfExtension(returnConfirmation.document.documento)}</p>
               <p className="text-muted-foreground">{'docente' in returnConfirmation.document ? returnConfirmation.document.docente : (returnConfirmation.document as any).docente}</p>
             </div>
           )}
