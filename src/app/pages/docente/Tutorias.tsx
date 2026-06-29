@@ -1,5 +1,5 @@
 ﻿import React, { useMemo, useState, useEffect } from "react";
-import { ArrowLeft, ChevronRight, FileText, Upload, X, History } from "lucide-react";
+import { ArrowLeft, Ban, ChevronRight, FileText, Upload, X, History } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "../../components/ui/button";
@@ -217,8 +217,21 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
     return `${espacios} espacio${plural} disponible${plural}`;
   };
 
-  const getUploadedFileName = (doc: any) => {
-    return getDocumentDisplayFileName(doc?.title, doc?.file_path);
+  const getUploadedFileName = (doc: any): string => {
+    const t = (doc?.title ?? '').toString().trim();
+    if (t && !/^undefined\b/i.test(t)) {
+      const parts = t.split(' - ');
+      const last = (parts.length > 1 ? parts[parts.length - 1] : t).trim();
+      return /\.pdf$/i.test(last) ? last : last + '.pdf';
+    }
+    const p = (doc?.file_path ?? doc?.fileUrl ?? '').toString();
+    if (p) {
+      const raw = decodeURIComponent(p.split('?')[0].split('/').pop() ?? '');
+      const cleaned = raw.replace(/^doc_[^_]+_/, '');
+      if (!cleaned) return 'Documento.pdf';
+      return /\.pdf$/i.test(cleaned) ? cleaned : cleaned + '.pdf';
+    }
+    return 'Documento.pdf';
   };
 
   const openDocument = async (id: number, action: "view" | "download") => {
@@ -265,6 +278,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
       fd.append('title', title);
       if (basePayload.apartado_label) fd.append('apartado_label', basePayload.apartado_label);
       if (basePayload.original_document_id) fd.append('original_document_id', String(basePayload.original_document_id));
+      if (basePayload.nota) fd.append('nota', basePayload.nota);
 
       const result = await apiFetch("/documents", { method: "POST", body: fd });
       uploadedIds.push(result?.data?.id);
@@ -335,7 +349,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
                 Historial
               </Button>
             </SheetTrigger>
-            <SheetContent side="right">
+            <SheetContent side="right" className="sm:max-w-xl overflow-y-auto">
               <SheetHeader>
                 <SheetTitle>Historial de archivos</SheetTitle>
                 <SheetDescription>Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
@@ -489,12 +503,15 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
 
             <div className="space-y-2">
               <Label>Nombre del docente *</Label>
-              <Input
-                value={formData.docente}
-                onChange={(e) => setFormData(prev => ({ ...prev, docente: e.target.value }))}
-                placeholder="Nombre del docente"
-                className="rounded-2xl"
-              />
+              <div className="relative">
+                <Input
+                  value={formData.docente}
+                  readOnly
+                  placeholder="Nombre del docente"
+                  className="rounded-2xl bg-muted/50 cursor-default select-none pr-10"
+                />
+                <Ban className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              </div>
             </div>
 
             <div className="space-y-2 text-sm">

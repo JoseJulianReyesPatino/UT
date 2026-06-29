@@ -9,7 +9,7 @@ import { Badge } from "../../components/ui/badge";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { resolveApiAssetUrl } from "../../lib/env";
-import { clearAvatarCache, getInitials } from "../../lib/avatar";
+import { clearAvatarCache, getInitials, useResolvedAvatarUrl } from "../../lib/avatar";
 import { Calendar, Eye, EyeOff, Key, Upload } from "lucide-react";
 import { toast } from "sonner";
 
@@ -251,7 +251,12 @@ export function Profile() {
   };
 
   const avatarInitials = getInitials(`${firstName} ${lastName}`);
-  const visibleAvatar = avatarPreview && avatarPreview !== "/api/default-avatar" ? avatarPreview : defaultProfileAvatar;
+  const resolvedServerAvatar = useResolvedAvatarUrl(
+    user?.avatar && user.avatar !== "/api/default-avatar" ? user.avatar : null
+  );
+  const visibleAvatar = (selectedAvatarFile && avatarPreview?.startsWith("data:"))
+    ? avatarPreview
+    : (resolvedServerAvatar ?? defaultProfileAvatar);
     
   const memberSinceLabel = useMemo(() => {
     if (!user?.createdAt) return "Sin datos";
@@ -303,10 +308,10 @@ export function Profile() {
                     className="cursor-pointer"
                   />
                   <AvatarFallback
-                    className="bg-success/10 text-success text-xl cursor-pointer"
+                    className="bg-transparent p-0 overflow-hidden cursor-pointer"
                     onClick={() => setIsAvatarOpen(true)}
                   >
-                    {avatarInitials || "--"}
+                    <img src={defaultProfileAvatar} alt="Foto de perfil" className="h-full w-full object-cover" />
                   </AvatarFallback>
                 </Avatar>
                 <div>

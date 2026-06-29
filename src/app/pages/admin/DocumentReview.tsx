@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Check, Eye, FileText, MessageSquare, Undo2 } from "lucide-react";
+import { Check, Eye, FileText, MessageCircleMore, MessageSquare, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "../../components/ui/badge";
@@ -37,6 +37,7 @@ type PendingDocument = {
 	returned?: boolean;
 	returnedAt?: string;
 	resubmittedAt?: string;
+	nota?: string | null;
 };
 
 type ReviewedDocument = {
@@ -57,6 +58,7 @@ type ReviewedDocument = {
 	returned?: boolean;
 	returnedAt?: string;
 	resubmittedAt?: string;
+	nota?: string | null;
 };
 
 type DocumentItem = PendingDocument | ReviewedDocument;
@@ -100,6 +102,7 @@ type ApiDocument = {
 	returned_at?: string | null;
 	resubmitted_at?: string | null;
 	fileUrl?: string | null;
+	nota?: string | null;
 };
 
 const getCareerFilterOptions = (plan: string): CareerFilterOption[] => {
@@ -381,6 +384,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const [previewError, setPreviewError] = useState<string | null>(null);
 	const [pendingAction, setPendingAction] = useState<{ type: "review" | "send" | "return"; document: DocumentItem } | null>(null);
 	const [returnComment, setReturnComment] = useState("");
+	const [noteDialog, setNoteDialog] = useState<{ nota: string; docente: string } | null>(null);
 
 	const allDocuments = [...pendingDocuments, ...reviewedDocuments];
 	const todayKey = new Date().toISOString().slice(0, 10);
@@ -797,6 +801,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			returned: doc.status === "devuelto",
 			returnedAt: doc.returned_at ?? undefined,
 			resubmittedAt: doc.resubmitted_at ?? undefined,
+			nota: doc.nota ?? null,
 		};
 
 		if (kind === "reviewed") {
@@ -855,7 +860,8 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 
 					  <Badge variant={statusVariant}>{statusLabel}</Badge>
 
-					<Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}><MessageSquare className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Enviar</TooltipContent></Tooltip>
+					{doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+				<Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} aria-label={`Enviar a mensajes ${doc.docente}`}><MessageSquare className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Enviar</TooltipContent></Tooltip>
 					{doc.returned ? (
 						<Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} aria-label="Cancelar devolución"><Undo2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Cancelar devolución</TooltipContent></Tooltip>
 					) : (
@@ -981,6 +987,17 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					<DialogFooter><Button variant="outline" onClick={() => { setPendingAction(null); setReturnComment(""); }}>Cancelar</Button><Button variant={pendingAction?.type === "return" ? "destructive" : "default"} onClick={confirmPendingAction} disabled={!pendingAction}>Confirmar</Button></DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+		<Dialog open={noteDialog !== null} onOpenChange={(open) => { if (!open) setNoteDialog(null); }}>
+			<DialogContent className="max-w-md">
+				<DialogHeader>
+					<DialogTitle className="flex items-center gap-2"><MessageCircleMore className="h-5 w-5 text-blue-500" />Nota del docente</DialogTitle>
+					<DialogDescription>{noteDialog?.docente}</DialogDescription>
+				</DialogHeader>
+				<div className="rounded-lg border border-border bg-muted/40 p-4 text-sm whitespace-pre-wrap">{noteDialog?.nota}</div>
+				<DialogFooter><Button variant="outline" onClick={() => setNoteDialog(null)}>Cerrar</Button></DialogFooter>
+			</DialogContent>
+		</Dialog>
 		</div>
 	);
 }

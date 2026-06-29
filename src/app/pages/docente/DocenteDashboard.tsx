@@ -37,7 +37,24 @@ import {
   Presentation,
   Eye,
   RefreshCw,
+  Clock2,
+  Undo2,
 } from "lucide-react";
+
+function formatTiempoRestante(fecha: string): { valor: string; unidad: string } {
+  const diff = new Date(fecha).getTime() - Date.now();
+  if (diff <= 0) return { valor: '0', unidad: 'minutos' };
+  const mins  = Math.floor(diff / 60_000);
+  const horas = Math.floor(diff / 3_600_000);
+  const dias  = Math.floor(diff / 86_400_000);
+  const sems  = Math.floor(dias / 7);
+  const meses = Math.floor(dias / 30);
+  if (mins  < 60)  return { valor: String(mins),  unidad: mins  === 1 ? 'minuto'  : 'minutos' };
+  if (horas < 24)  return { valor: String(horas), unidad: horas === 1 ? 'hora'    : 'horas'   };
+  if (dias  < 7)   return { valor: String(dias),  unidad: dias  === 1 ? 'día'     : 'días'    };
+  if (dias  < 30)  return { valor: String(sems),  unidad: sems  === 1 ? 'semana'  : 'semanas' };
+  return             { valor: String(meses), unidad: meses === 1 ? 'mes'     : 'meses'   };
+}
 
 interface DocenteDashboardProps {
   onNavigate?: (view: string) => void;
@@ -68,11 +85,13 @@ type DocumentItem = {
   id: number;
   nombre: string;
   materia?: string;
+  grupo?: string;
   tipo?: string;
   fecha?: string | null;
   status: string;
+  resubmittedAt?: string | null;
   filePath?: string | null;
-  submittedAt?: string | null;  // ← NUEVO: fecha de envío
+  submittedAt?: string | null;
 };
 
 type FormItem = {
@@ -210,27 +229,33 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
       const docs = (docsPayload?.data?.data ?? docsPayload?.data ?? []) as any[];
       
       setRecentDocuments(docs.map((d) => {
-        // Resolver el título correctamente (evita "undefined")
-        const title = (d?.nombre ?? d?.title ?? "").toString().trim();
-        let nombre = title;
-        
-        // Si el título es "undefined" o está vacío, usar el nombre del archivo
-        if (!nombre || /^undefined\b/i.test(nombre)) {
-          nombre = getDocumentDisplayFileName(d?.title, d?.filePath) || 'Documento';
-        }
-        
-        // Obtener la fecha correcta (submitted_at o fecha)
+        const formTitle = (d?.form_title ?? d?.tipoLabel ?? d?.apartado_label ?? '').toString().trim();
+
+        // Nombre de archivo tal cual lo subió el docente (último segmento del title, sin modificar)
+        const titleStr = decodeURIComponent((d?.title ?? '').toString().trim());
+        const lastSegment = titleStr.split(' - ').pop()?.trim() ?? titleStr;
+        const fileName = lastSegment || 'Documento';
+        const nombre = formTitle ? `${formTitle} - ${fileName}` : fileName;
+
+        const rawMateria = (d?.materia ?? '').toString().trim();
+        const materia = rawMateria && rawMateria !== 'Sin materia' ? rawMateria : '';
+
+        const rawGrupo = (d?.grupo ?? d?.group_code ?? '').toString().trim();
+        const grupo = rawGrupo && rawGrupo !== '-' ? rawGrupo : '';
+
         const fechaEnvio = d?.submitted_at ?? d?.fecha ?? d?.created_at ?? null;
-        
+
         return {
           id: d.id,
-          nombre: nombre,
-          materia: d.materia ?? d?.carrera_label ?? '-',
-          tipo: d.tipoLabel ?? d.apartado_label ?? d.form_title ?? 'Documento',
+          nombre,
+          materia,
+          grupo,
+          tipo: formTitle || 'Documento',
           fecha: fechaEnvio,
           submittedAt: fechaEnvio,
           status: d.status ?? 'pendiente',
-          filePath: d.filePath ?? null,
+          resubmittedAt: d.resubmitted_at ?? null,
+          filePath: d.file_path ?? d.filePath ?? null,
         };
       }));
 
@@ -495,7 +520,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="max-h-[24rem] space-y-3 overflow-y-auto pr-2">
+              <div className="max-h-[24rem] space-y-3 overflow-x-hidden overflow-y-auto pr-2">
                 {recentDocuments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600" />
@@ -503,44 +528,59 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                   </div>
                 ) : (
                   recentDocuments.map((doc) => {
-                    let docStatusVariant: "success" | "warning" | "outline" = "outline";
+                    const s = (doc.status ?? '').toLowerCase();
+                    let docStatusVariant: "success" | "warning" | "outline" | "destructive" = "warning";
                     let docStatusLabel = "Pendiente";
+                    let DocStatusIcon: React.ComponentType<{ className?: string }> = Clock2;
 
-                    if (doc.status === "aprobado" || doc.status === "revisado") {
+                    if (doc.resubmittedAt) {
+                      docStatusVariant = "outline";
+                      docStatusLabel = "Reenviado";
+                      DocStatusIcon = RefreshCw;
+                    } else if (s === "aprobado" || s === "revisado") {
                       docStatusVariant = "success";
-                      docStatusLabel = "Aprobado";
-                    } else if (doc.status === "revision") {
+                      docStatusLabel = "Revisado";
+                      DocStatusIcon = CheckCircle2;
+                    } else if (s === "devuelto") {
+                      docStatusVariant = "destructive";
+                      docStatusLabel = "Devuelto";
+                      DocStatusIcon = Undo2;
+                    } else if (s === "revision") {
                       docStatusVariant = "outline";
                       docStatusLabel = "En revisión";
-                    } else if (doc.status === "devuelto") {
-                      docStatusVariant = "warning";
-                      docStatusLabel = "Devuelto";
+                      DocStatusIcon = Clock2;
                     }
 
                     return (
                       <div
                         key={doc.id}
-                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/70 p-3 transition-colors hover:bg-slate-100/90 dark:border-slate-800 dark:bg-slate-900/70 dark:hover:bg-slate-900"
+                        className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white/70 p-3 transition-colors hover:bg-slate-100/90 dark:border-slate-800 dark:bg-slate-900/70 dark:hover:bg-slate-900"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                            <FileText className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-slate-800 dark:text-white">{doc.nombre}</p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400">{doc.materia}</p>
-                          </div>
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          <FileText className="h-5 w-5" />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={docStatusVariant}>{docStatusLabel}</Badge>
-                          <ResponsiveActionButton
-                            icon={<Eye className="h-4 w-4" aria-hidden />}
-                            label="Abrir"
-                            size="sm"
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-800 dark:text-white">{doc.nombre}</p>
+                          {(doc.materia || doc.grupo) && (
+                            <p className="truncate text-xs text-slate-600 dark:text-slate-400">
+                              {[doc.materia, doc.grupo].filter(Boolean).join(' · ')}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Badge variant={docStatusVariant} className="inline-flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-xs">
+                            <DocStatusIcon className="h-3.5 w-3.5" />
+                            {docStatusLabel}
+                          </Badge>
+                          <Button
+                            size="icon"
                             variant="ghost"
+                            className="h-8 w-8 shrink-0"
                             onClick={() => openDocument(doc)}
-                            className="pointer-events-auto w-full justify-center sm:w-auto sm:min-w-[6rem]"
-                          />
+                            aria-label="Ver documento"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     );
@@ -564,7 +604,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="max-h-[24rem] space-y-3 overflow-y-auto pr-2">
+              <div className="max-h-[24rem] space-y-3 overflow-x-hidden overflow-y-auto pr-2">
                 {isLoadingProximas ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="text-center">
@@ -598,8 +638,11 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                       );
                     }
 
-                    const isUrgent = entrega.dias <= 3;
-                    const isWarning = entrega.dias <= 7 && entrega.dias > 3;
+                    const diffMs   = new Date(entrega.fecha).getTime() - Date.now();
+                    const diffHrs  = diffMs / 3_600_000;
+                    const isUrgent  = diffHrs < 24;
+                    const isWarning = diffHrs >= 24 && diffHrs < 7 * 24;
+                    const tiempoRestante = formatTiempoRestante(entrega.fecha);
                     const isFromForm = entrega.source === 'formulario';
                     
                     return (
@@ -632,7 +675,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                             isWarning ? "text-yellow-600 dark:text-yellow-400" :
                             "text-emerald-700 dark:text-emerald-300"
                           }`}>
-                            {entrega.dias} días
+                            {tiempoRestante.valor} {tiempoRestante.unidad}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400">restantes</p>
                         </div>
@@ -647,98 +690,26 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
       </div>
 
       {/* Diálogo de vista previa del documento */}
-      <Dialog open={Boolean(selectedDocument)} onOpenChange={(open) => {
-        if (!open) {
-          closePreview();
-        }
-      }}>
-        <DialogContent className="max-w-5xl">
+      <Dialog open={Boolean(selectedDocument)} onOpenChange={(open) => { if (!open) closePreview(); }}>
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Vista previa del documento</DialogTitle>
-            <DialogDescription>
-              {selectedDocument?.nombre || "Documento"}
-            </DialogDescription>
+            <DialogTitle>{selectedDocument?.nombre || "Documento"}</DialogTitle>
           </DialogHeader>
           {selectedDocument && (
-            <Tabs defaultValue="preview" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="preview">Vista previa</TabsTrigger>
-                <TabsTrigger value="details">Detalles</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="preview" className="space-y-3">
-                <div className="rounded-lg border border-border p-2 sm:p-3">
-                  {previewLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="text-center">
-                        <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent mx-auto"></div>
-                        <p className="text-sm text-muted-foreground">Cargando vista previa...</p>
-                      </div>
-                    </div>
-                  ) : previewError ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="text-center">
-                        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
-                        <p className="text-sm text-destructive">{previewError}</p>
-                      </div>
-                    </div>
-                  ) : previewBlobUrl ? (
-                    <iframe
-                      src={previewBlobUrl}
-                      title={selectedDocument.nombre}
-                      className="h-[60vh] w-full rounded-md border border-border"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="text-center">
-                        <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                        <p className="text-sm text-muted-foreground">No hay vista previa disponible.</p>
-                      </div>
-                    </div>
-                  )}
+            <div className="flex-1 min-h-0">
+              {previewLoading ? (
+                <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                  <p>Cargando...</p>
                 </div>
-              </TabsContent>
-
-              <TabsContent value="details" className="space-y-3">
-                <div className="rounded-lg border border-border p-4 space-y-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium">Nombre</p>
-                    <p className="text-sm text-foreground">{selectedDocument.nombre || "N/A"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium">Materia</p>
-                    <p className="text-sm text-foreground">{selectedDocument.materia || "N/A"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium">Tipo</p>
-                    <p className="text-sm text-foreground">{selectedDocument.tipo || "N/A"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium">Fecha de envío</p>
-                    <p className="text-sm text-foreground">
-                      {selectedDocument.submittedAt ? formatDate(selectedDocument.submittedAt) : "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium">Estado</p>
-                    <Badge variant={
-                      selectedDocument.status === "aprobado" || selectedDocument.status === "revisado" ? "success" :
-                      selectedDocument.status === "devuelto" ? "warning" : "outline"
-                    } className="mt-1">
-                      {selectedDocument.status === "aprobado" || selectedDocument.status === "revisado" ? "Aprobado" :
-                       selectedDocument.status === "devuelto" ? "Devuelto" :
-                       selectedDocument.status === "revision" ? "En revisión" : "Pendiente"}
-                    </Badge>
-                  </div>
+              ) : previewError ? (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                  {previewError}
                 </div>
-              </TabsContent>
-            </Tabs>
+              ) : previewBlobUrl ? (
+                <iframe src={previewBlobUrl} className="h-[82vh] w-full rounded-lg border border-border" title={selectedDocument.nombre} />
+              ) : null}
+            </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={closePreview}>
-              Cerrar
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

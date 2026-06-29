@@ -548,8 +548,8 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                   tabIndex={0}
                   className="cursor-pointer"
                 />
-                <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                  {user?.name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "U"}
+                <AvatarFallback className="bg-transparent p-0 overflow-hidden">
+                  <img src="/src/assets/perfil2.png" alt="Foto de perfil" className="h-full w-full object-cover" />
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">

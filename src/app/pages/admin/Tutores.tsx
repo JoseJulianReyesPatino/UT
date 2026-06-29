@@ -4,7 +4,7 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { FileText, Eye, MessageSquare, Check, Undo2 } from "lucide-react";
+import { FileText, Eye, MessageCircleMore, MessageSquare, Check, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
@@ -35,6 +35,7 @@ type TutorDocument = {
   returnedAt?: string;
   reviewedAt?: string;
   submittedAt?: string;
+  nota?: string | null;
 };
 
 type TutorDocumentItem = TutorDocument;
@@ -112,6 +113,7 @@ const mapApiDocumentToTutorDocument = (doc: any): TutorDocument => ({
   returnedAt: doc.returned_at ?? undefined,
   reviewedAt: doc.reviewed_at ?? undefined,
   submittedAt: doc.submitted_at ?? undefined,
+  nota: doc.nota ?? null,
 });
 
 const emptyStateLegend = "Aún no hay documentos de tutores para mostrar en esta sección. Cuando un tutor suba uno, aparecerá aquí automáticamente.";
@@ -151,6 +153,7 @@ export default function Tutores() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [returnConfirmation, setReturnConfirmation] = useState<ReturnConfirmation | null>(null);
   const [returnComment, setReturnComment] = useState("");
+  const [noteDialog, setNoteDialog] = useState<{ nota: string; tutor: string } | null>(null);
   const [reviewConfirmation, setReviewConfirmation] = useState<TutorPendingDocument | null>(null);
   const [page, setPage] = useState<number>(1);
   const [perPage, setPerPage] = useState<number>(20);
@@ -559,6 +562,8 @@ export default function Tutores() {
                         />
                         )}
 
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: 'tutor' in doc ? (doc as TutorDocument).tutor : '' }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+
                         <ResponsiveActionButton
                           variant="ghost"
                           size="sm"
@@ -694,6 +699,8 @@ export default function Tutores() {
                         <TooltipContent>Revisar</TooltipContent>
                       </Tooltip>
 
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: 'tutor' in doc ? (doc as TutorDocument).tutor : '' }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+
                         <ResponsiveActionButton
                           variant="ghost"
                           size="sm"
@@ -824,6 +831,7 @@ export default function Tutores() {
                                 </TooltipTrigger>
                                 <TooltipContent>Ver PDF</TooltipContent>
                               </Tooltip>
+                              {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.tutor}`}>
@@ -930,6 +938,7 @@ export default function Tutores() {
                           <TooltipContent>Ver PDF</TooltipContent>
                         </Tooltip>
 
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.tutor}`}>
@@ -1086,6 +1095,17 @@ export default function Tutores() {
               Sí, marcar como revisado
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={noteDialog !== null} onOpenChange={(open) => { if (!open) setNoteDialog(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><MessageCircleMore className="h-5 w-5 text-blue-500" />Nota del docente</DialogTitle>
+            <DialogDescription>{noteDialog?.tutor}</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm whitespace-pre-wrap">{noteDialog?.nota}</div>
+          <DialogFooter><Button variant="outline" onClick={() => setNoteDialog(null)}>Cerrar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

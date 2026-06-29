@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
-import { Eye, FileText, Check, MessageSquare, Undo2 } from "lucide-react";
+import { Eye, FileText, Check, MessageCircleMore, MessageSquare, Undo2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
@@ -32,6 +32,7 @@ type EstadiaPendingDocument = {
   returned?: boolean;
   returnedAt?: string;
   resubmittedAt?: string;
+  nota?: string | null;
 };
 
 type EstadiaReviewedDocument = {
@@ -50,6 +51,7 @@ type EstadiaReviewedDocument = {
   returned?: boolean;
   returnedAt?: string;
   resubmittedAt?: string;
+  nota?: string | null;
 };
 
 type EstadiaDocumentItem = EstadiaPendingDocument | EstadiaReviewedDocument;
@@ -78,6 +80,7 @@ type ApiDocument = {
   returned_at?: string | null;
   resubmitted_at?: string | null;
   fileUrl?: string | null;
+  nota?: string | null;
 };
 
 const extractApiDocuments = (payload: unknown): ApiDocument[] => {
@@ -116,6 +119,7 @@ export default function Estadias() {
   const [reviewConfirmation, setReviewConfirmation] = useState<EstadiaPendingDocument | null>(null);
   const [returnConfirmation, setReturnConfirmation] = useState<{ type: "return" | "cancel-return"; document: EstadiaDocumentItem } | null>(null);
   const [returnComment, setReturnComment] = useState("");
+  const [noteDialog, setNoteDialog] = useState<{ nota: string; docente: string } | null>(null);
 
   const allDocuments = [...pendingDocuments, ...reviewedDocuments];
   const todayKey = new Date().toISOString().slice(0, 10);
@@ -219,6 +223,7 @@ export default function Estadias() {
       returned: doc.status === "devuelto",
       returnedAt: doc.returned_at ?? undefined,
       resubmittedAt: doc.resubmitted_at ?? undefined,
+      nota: doc.nota ?? null,
     };
 
     if (kind === "reviewed") {
@@ -649,6 +654,8 @@ export default function Estadias() {
                           <TooltipContent>Ver PDF</TooltipContent>
                         </Tooltip>
 
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
@@ -791,6 +798,8 @@ export default function Estadias() {
                         </TooltipTrigger>
                         <TooltipContent>Revisar</TooltipContent>
                       </Tooltip>
+
+                      {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
 
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1076,6 +1085,8 @@ export default function Estadias() {
                           <TooltipContent>Ver PDF</TooltipContent>
                         </Tooltip>
 
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
@@ -1201,6 +1212,17 @@ export default function Estadias() {
               {returnConfirmation?.type === "return" ? "Sí, devolver" : "Sí, cancelar devolución"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={noteDialog !== null} onOpenChange={(open) => { if (!open) setNoteDialog(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><MessageCircleMore className="h-5 w-5 text-blue-500" />Nota del docente</DialogTitle>
+            <DialogDescription>{noteDialog?.docente}</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm whitespace-pre-wrap">{noteDialog?.nota}</div>
+          <DialogFooter><Button variant="outline" onClick={() => setNoteDialog(null)}>Cerrar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

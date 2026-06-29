@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { CalendarClock, FileText, History, ShieldAlert, Calendar } from "lucide-react";
+import { CalendarClock, Eye, FileText, History, Calendar } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
-import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Button } from "./ui/button";
 import { FormClosedState } from "./FormClosedState";
 import { ScrollArea } from "./ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { apiFetch } from "../lib/api";
+import { fetchDocumentBlob } from "../lib/documents";
 import { getFormAccessRule, isFormExpired, isFormRoleAllowed, type FormId } from "../../lib/formConfig";
 import { getCalendarFileUrl } from "../lib/calendar";
 
@@ -24,6 +25,10 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<Array<{ id: number; title?: string; file_path?: string; submitted_at?: string; status?: string; materia?: string }>>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [previewItem, setPreviewItem] = useState<{ id: number; nombre: string } | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const hasRole = (role: "docente" | "tutor" | "administrador") => user?.role === role || user?.roles?.includes(role);
 
@@ -81,6 +86,45 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
       cancelled = true;
     };
   }, [formId, user]);
+
+  const getFileName = (item: { title?: string; file_path?: string; id: number }): string => {
+    const t = (item.title ?? '').toString().trim();
+    if (t && !/^undefined\b/i.test(t)) {
+      const parts = t.split(' - ');
+      const last = (parts.length > 1 ? parts[parts.length - 1] : t).trim();
+      return /\.pdf$/i.test(last) ? last : last + '.pdf';
+    }
+    const p = (item.file_path ?? '').toString();
+    if (p) {
+      const raw = decodeURIComponent(p.split('?')[0].split('/').pop() ?? '');
+      const cleaned = raw.replace(/^doc_[^_]+_/, '');
+      return cleaned ? (/\.pdf$/i.test(cleaned) ? cleaned : cleaned + '.pdf') : 'Documento.pdf';
+    }
+    return `Documento #${item.id}.pdf`;
+  };
+
+  const openPreview = async (item: { id: number; title?: string; file_path?: string }) => {
+    const nombre = getFileName(item);
+    setPreviewItem({ id: item.id, nombre });
+    setPreviewBlobUrl(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
+    try {
+      const blob = await fetchDocumentBlob(item.id);
+      setPreviewBlobUrl(URL.createObjectURL(blob));
+    } catch {
+      setPreviewError('No fue posible cargar el documento.');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const closePreview = () => {
+    if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+    setPreviewBlobUrl(null);
+    setPreviewItem(null);
+    setPreviewError(null);
+  };
 
   if (roleAllowed && !expired) {
     if (!dueAt) {
@@ -144,23 +188,26 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
                     {history.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openPreview(item)}
+                        onKeyDown={(e) => e.key === 'Enter' && openPreview(item)}
+                        className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/20"
                       >
                         <div className="flex items-start gap-3">
-                          <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                          <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 shrink-0">
                             <FileText className="h-4 w-4" />
                           </div>
                           <div className="min-w-0 flex-1 space-y-1">
-                            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
-                              {item.title ?? item.file_path ?? `Documento #${item.id}`}
+                            <p className="break-words text-sm font-semibold text-slate-900 dark:text-slate-50">
+                              {getFileName(item)}
                             </p>
-                            <p className="text-xs text-muted-foreground">
-                              {item.materia ?? title}
-                            </p>
+                            {item.materia && <p className="text-xs text-muted-foreground">{item.materia}</p>}
                             <p className="text-xs text-muted-foreground">
                               {item.submitted_at ? new Date(item.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Fecha no disponible"}
                             </p>
                           </div>
+                          <Eye className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-emerald-600" />
                         </div>
                       </div>
                     ))}
@@ -193,6 +240,28 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
         title={title}
         message={`Si necesitas acceso, solicita al administrador que actualice la fecha de vencimiento o los roles permitidos para ${title.toLowerCase()}.`}
       />
+
+      {/* Diálogo de vista previa */}
+      <Dialog open={previewItem !== null} onOpenChange={(open) => { if (!open) closePreview(); }}>
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{previewItem?.nombre ?? 'Documento'}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {previewLoading ? (
+              <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                <p>Cargando...</p>
+              </div>
+            ) : previewError ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                {previewError}
+              </div>
+            ) : previewBlobUrl ? (
+              <iframe src={previewBlobUrl} className="h-[82vh] w-full rounded-lg border border-border" title={previewItem?.nombre} />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -199,7 +199,7 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       const apiUser = mapApiUser(payload.user);
       localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, payload.token);
       saveCachedProfile(apiUser);
-      flashNotice('success', 'Accediendo al sistema');
+      flashNotice('success', `¡Bienvenido(a) ${apiUser.name.split(' ')[0]}!`);
       setUser(apiUser);
     } catch (err: any) {
       if (err && err.status === 422) {
