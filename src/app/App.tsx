@@ -270,9 +270,19 @@ function AppContent() {
 
   const shouldShowSplash = !isReady || !minimumLoadingElapsed || isSplashExiting;
 
+  // CAMBIO: quitamos "splashing" del body en cuanto isReady es true (no esperamos
+  // a que termine la animación). El contenido real ya queda montado debajo del
+  // overlay opaco del splash, así que el cambio de fondo nunca se ve.
   useEffect(() => {
-    if (!shouldShowSplash && typeof document !== "undefined") {
+    if (isReady && typeof document !== "undefined") {
       document.body.classList.remove("splashing");
+    }
+  }, [isReady]);
+
+  // CAMBIO: esto solo controla la animación de entrada del contenido, ya separado
+  // de la manipulación del body.
+  useEffect(() => {
+    if (!shouldShowSplash) {
       setContentAnimationActive(true);
     }
   }, [shouldShowSplash]);
@@ -289,27 +299,53 @@ function AppContent() {
 
   const cancelLeave = () => setLeaveDialogOpen(false);
 
-  if (shouldShowSplash) {
-    return (
-      <div className={isSplashExiting ? "tv-fullscreen tv-loader-exit relative flex min-h-screen items-center justify-center overflow-hidden bg-background text-sm text-muted-foreground" : "tv-fullscreen relative flex min-h-screen items-center justify-center overflow-hidden bg-background text-sm text-muted-foreground"}>
-        <div className={isSplashExiting ? "tv-loader-group tv-loader-group-exit relative z-10 flex flex-col items-center justify-center gap-6 px-6 text-center" : "tv-loader-group relative z-10 flex flex-col items-center justify-center gap-6 px-6 text-center"}>
-          <img
-            src={splashLogoSrc}
-            alt="Logo UTSLRC"
-            className="tv-loader-image tv-image-same-size select-none object-contain"
-          />
-        </div>
+  // CAMBIO: el splash ahora es un overlay fixed con z-index alto, que se renderiza
+  // ENCIMA del contenido real (Login o Dashboard), en vez de sustituirlo. Así, cuando
+  // se desvanece (fade), revela el contenido que ya está montado debajo — nunca el
+  // fondo "pelón" de la página.
+  const splashOverlay = shouldShowSplash ? (
+    <div
+      className={
+        isSplashExiting
+          ? "tv-fullscreen tv-loader-exit fixed inset-0 z-[200] flex min-h-screen items-center justify-center overflow-hidden bg-background text-sm text-muted-foreground"
+          : "tv-fullscreen fixed inset-0 z-[200] flex min-h-screen items-center justify-center overflow-hidden bg-background text-sm text-muted-foreground"
+      }
+    >
+      <div
+        className={
+          isSplashExiting
+            ? "tv-loader-group tv-loader-group-exit relative z-10 flex flex-col items-center justify-center gap-6 px-6 text-center"
+            : "tv-loader-group relative z-10 flex flex-col items-center justify-center gap-6 px-6 text-center"
+        }
+      >
+        <img
+          src={splashLogoSrc}
+          alt="Logo UTSLRC"
+          className="tv-loader-image tv-image-same-size select-none object-contain"
+        />
       </div>
-    );
+    </div>
+  ) : null;
+
+  // CAMBIO: mientras no sabemos si hay sesión (!isReady), no hay nada que montar
+  // detrás, así que solo mostramos el splash.
+  if (!isReady) {
+    return splashOverlay;
   }
 
-  if (!isAuthenticated) {
+ if (!isAuthenticated) {
     return (
       <>
         {noticeBanner}
-        <div className="animate-page-enter motion-reduce:animate-none">
-          <Login />
+        {/* Contenedor exterior sólido y SIN animar: bloquea la imagen de fondo
+           desde el primer frame. La animación de entrada ocurre dentro,
+           encima de este fondo opaco, así nunca se filtra la imagen. */}
+        <div className="fixed inset-0 z-0 bg-background">
+          <div className="h-full animate-page-enter motion-reduce:animate-none">
+            <Login />
+          </div>
         </div>
+        {splashOverlay}
       </>
     );
   }
@@ -489,6 +525,7 @@ function AppContent() {
           </DialogContent>
         </Dialog>
       </div>
+      {splashOverlay}
     </>
   );
 }

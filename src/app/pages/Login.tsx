@@ -47,7 +47,7 @@ export function Login() {
   };
 
   return (
-    <div className={`${isDarkMode ? "dark" : "light"} ${pageBackground} min-h-screen overflow-hidden relative transition-colors duration-300`}>
+    <div className={`${isDarkMode ? "dark" : "light"} ${pageBackground} min-h-screen overflow-hidden relative transition-colors duration-200`}>
       {/* BACKGROUND - Gradientes y decoraciones mejoradas */}
       <div className={`absolute inset-0 ${isDarkMode ? "bg-slate-950/75" : "bg-transparent"}`} />
       <div className="absolute inset-0">
