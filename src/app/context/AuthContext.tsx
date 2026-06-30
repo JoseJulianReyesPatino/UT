@@ -3,7 +3,7 @@ import { AUTH_TOKEN_STORAGE_KEY, resolveApiAssetUrl } from "../lib/env";
 import { apiFetch } from "../lib/api";
 import { clearAvatarCache } from "../lib/avatar";
 
-type UserRole = "docente" | "tutor" | "administrador";
+type UserRole = "docente" | "tutor" | "administrador" | "supervisor";
 
 interface User {
   id: string;
@@ -74,6 +74,11 @@ const normalizeRoles = (roles: ApiRolePayload[] | undefined): UserRole[] => {
       return;
     }
 
+    if (s.includes('supervisor')) {
+      if (!result.includes('supervisor')) result.push('supervisor');
+      return;
+    }
+
     if (s.includes('tutor')) {
       if (!result.includes('tutor')) result.push('tutor');
       return;
@@ -137,9 +142,11 @@ const mapApiUser = (apiUser: ApiLoginResponse["user"]): User => {
   const roles = normalizeRoles(apiUser.roles);
   const primaryRole = roles.includes("administrador")
     ? "administrador"
-    : roles.includes("tutor")
-      ? "tutor"
-      : "docente";
+    : roles.includes("supervisor")
+      ? "supervisor"
+      : roles.includes("tutor")
+        ? "tutor"
+        : "docente";
   const apiNames = {
     firstNames: apiUser.first_names?.trim() ?? "",
     lastNames: apiUser.last_names?.trim() ?? "",

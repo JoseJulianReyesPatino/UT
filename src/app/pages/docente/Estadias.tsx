@@ -176,10 +176,9 @@ export default function EstadiasPage() {
       grupoValido = false;
     }
 
-    return Boolean(
+  return Boolean(
       formData.plan &&
       formData.carrera &&
-      formData.materia.trim() &&
       grupoValido &&
       formData.archivos.length > 0 &&
       user &&
@@ -362,13 +361,12 @@ export default function EstadiasPage() {
       if (formData.grupo && groupsOptions.length > 0) {
         selectedGroup = groupsOptions.find(g => formatGroupCode(g.group_code) === formData.grupo);
       }
-      
-      const basePayload: any = {
+
+       const basePayload: any = {
         form_id: selectedConfig.formId,
         apartado_label: selectedConfig.apartadoLabel,
         carrera_label: carreraLabel,
         plan: formData.plan,
-        materia: formData.materia,
         docente: formData.docente,
         nota: formData.nota,
         titulo: selectedConfig.titulo,
@@ -581,16 +579,6 @@ export default function EstadiasPage() {
                     No hay grupos disponibles.
                   </div>
                 )}
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label>Materia *</Label>
-                <Input
-                  value={formData.materia}
-                  onChange={(e) => setFormData((c) => ({ ...c, materia: e.target.value }))}
-                  placeholder="Nombre de la materia"
-                  className="rounded-2xl"
-                />
               </div>
 
               <div className="space-y-2 md:col-span-2">

@@ -18,6 +18,8 @@ type ApiDocument = {
   materia: string;
   parcial: string;
   grupo: string;
+  carrera: string;
+  plan: string;
   fecha: string | null;
   hora: string | null;
   status: "pendiente" | "revisado" | "devuelto";
@@ -31,6 +33,9 @@ type ApiDocument = {
 
 // IDs de formularios de tutorías (según tu configuración)
 const TUTORIA_FORM_IDS = [8, 9, 10, 11, 12];
+
+// IDs de formularios de estadías (ajusta estos IDs según tu configuración)
+const ESTADIAS_FORM_IDS = [13, 14, 15]; // Ejemplo: carta-presentacion, carta-aceptacion, carta-terminacion
 
 // Normalizar el título del documento (evitar "undefined")
 const resolveDocumentTitle = (doc: any): string => {
@@ -60,6 +65,22 @@ const normalizeStatusFilter = (value: string) => {
   return value;
 };
 
+const formatPlanLabel = (value?: string | null): string => {
+  const normalized = (value ?? "").toString().toLowerCase();
+  if (normalized.includes("nuevo")) return "Nuevo Modelo";
+  if (normalized.includes("normal")) return "Plan Normal";
+  return "";
+};
+
+const formatParcialLabel = (value?: string | null): string => {
+  const raw = (value ?? "").toString().trim();
+  if (!raw || raw === "N/A" || raw === "-") return "";
+  const match = raw.match(/\b([123])\b/);
+  if (match) return `Parcial ${match[1]}`;
+  if (raw.toLowerCase().startsWith("parcial")) return raw;
+  return `Parcial ${raw}`;
+};
+
 const normalizeTipoFilter = (value: string) => {
   const legacyMap: Record<string, string> = {
     instrumento3040: "instrumento-3040",
@@ -69,6 +90,31 @@ const normalizeTipoFilter = (value: string) => {
     acta: "acta-final",
   };
   return legacyMap[value] ?? value;
+};
+
+// Mapeo de tipos para mostrar etiquetas legibles
+const getTipoLabel = (tipo: string): string => {
+  const tipoMap: Record<string, string> = {
+    "planeacion": "Planeación",
+    "instrumento-3040": "Instrumento 30/40",
+    "instrumento-6070": "Instrumento 60/70",
+    "lista-concentrada": "Lista Concentrada",
+    "asesoria": "Asesoría",
+    "portafolio-digital": "Portafolio Digital",
+    "acta-final": "Acta Final",
+    "remedial": "Remedial",
+    "estadias": "Estadías",
+    "tutorias": "Tutorías",
+    "carga-academica": "Carga Académica",
+    "reporte-bajas": "Reporte de Bajas",
+    "concentrado-asesorias": "Concentrado de Asesorías y Bajas",
+    "acta-asistencia-grupal": "Acta de Asistencia Grupal",
+    "ficha-tecnica": "Ficha Técnica",
+    "carta-presentacion": "Carta de Presentación",
+    "carta-aceptacion": "Carta de Aceptación",
+    "carta-terminacion": "Carta de Terminación",
+  };
+  return tipoMap[tipo] || tipo;
 };
 
 export function DocumentHistory() {
@@ -121,9 +167,6 @@ export function DocumentHistory() {
       { value: "concentrado-asesorias", label: "Concentrado de Asesorías y Bajas" },
       { value: "acta-asistencia-grupal", label: "Acta de Asistencia Grupal" },
       { value: "ficha-tecnica", label: "Ficha Técnica" },
-      { value: "carta-presentacion", label: "Carta de Presentación" },
-      { value: "carta-aceptacion", label: "Carta de Aceptación" },
-      { value: "carta-terminacion", label: "Carta de Terminación" },
     ],
     []
   );
@@ -144,7 +187,31 @@ export function DocumentHistory() {
     return tutoriasApartados.some(a => apartado.includes(a));
   };
 
+  const isEstadiasDocument = (doc: ApiDocument): boolean => {
+    if (doc.form_id && ESTADIAS_FORM_IDS.includes(doc.form_id)) {
+      return true;
+    }
+    const nombre = doc.nombre.toLowerCase();
+    const estadiasKeywords = [
+      "carta presentación",
+      "carta-presentacion",
+      "carta aceptación",
+      "carta-aceptacion",
+      "carta terminación",
+      "carta-terminacion",
+      "estadía",
+      "estadia"
+    ];
+    return estadiasKeywords.some(keyword => nombre.includes(keyword));
+  };
+
   const getDocumentTipoForFilter = (doc: ApiDocument): string => {
+    // Primero verificar si es estadía
+    if (isEstadiasDocument(doc)) {
+      return "estadias";
+    }
+
+    // Verificar si es tutoría
     if (isTutoriaDocument(doc)) {
       const apartado = (doc.apartado_label || "").toLowerCase();
       if (apartado.includes("carga")) return "carga-academica";
@@ -155,17 +222,37 @@ export function DocumentHistory() {
       return "tutorias";
     }
 
-    if (doc.tipo && doc.tipo !== "documento") return doc.tipo;
-    
+    // Normalizar el tipo del documento
+    const normalizedTipo = (doc.tipo || "").toLowerCase();
+
+    // Mapeo específico para instrumentos (4 formularios → 2 categorías)
+    if (normalizedTipo === "instrumento-30-normal" || normalizedTipo === "instrumento-40-nuevo") {
+      return "instrumento-3040";
+    }
+    if (normalizedTipo === "instrumento-60-nuevo" || normalizedTipo === "instrumento-70-normal") {
+      return "instrumento-6070";
+    }
+
+    // Para otros tipos, devolver el tipo normalizado si existe
+    if (normalizedTipo && normalizedTipo !== "documento" && normalizedTipo !== "undefined") {
+      return normalizedTipo;
+    }
+
+    // Fallback: intentar detectar por el nombre
     const nombre = doc.nombre.toLowerCase();
-    if (nombre.includes("planeación")) return "planeacion";
-    if (nombre.includes("instrumento")) return "instrumento-3040";
+    if (nombre.includes("planeación") || nombre.includes("planeacion")) return "planeacion";
+    if (nombre.includes("instrumento 30") || nombre.includes("instrumento 40")) return "instrumento-3040";
+    if (nombre.includes("instrumento 60") || nombre.includes("instrumento 70")) return "instrumento-6070";
     if (nombre.includes("lista")) return "lista-concentrada";
     if (nombre.includes("asesoría")) return "asesoria";
     if (nombre.includes("portafolio")) return "portafolio-digital";
     if (nombre.includes("acta")) return "acta-final";
     if (nombre.includes("remedial")) return "remedial";
-    if (nombre.includes("estadías")) return "estadias";
+    if (nombre.includes("estadía") || nombre.includes("estadia")) return "estadias";
+    if (nombre.includes("carta presentación") || nombre.includes("carta-presentacion")) return "estadias";
+    if (nombre.includes("carta aceptación") || nombre.includes("carta-aceptacion")) return "estadias";
+    if (nombre.includes("carta terminación") || nombre.includes("carta-terminacion")) return "estadias";
+    
     return "planeacion";
   };
 
@@ -217,7 +304,7 @@ export function DocumentHistory() {
         const transformedDocs: ApiDocument[] = docsBackend.map((doc: any) => {
           let tipo = "planeacion";
           if (doc.form_code) {
-            tipo = doc.form_code;
+            tipo = doc.form_code.toLowerCase().replace(/_/g, '-');
           } else if (doc.apartado_label) {
             tipo = doc.apartado_label.toLowerCase().replace(/\s+/g, '-');
           }
@@ -232,6 +319,8 @@ export function DocumentHistory() {
             materia: doc.materia || "Sin materia",
             parcial: doc.parcial || "N/A",
             grupo: doc.group_code || `Grupo ${doc.group_id || "?"}`,
+            carrera: doc.carrera_label || "",
+            plan: doc.plan || "",
             fecha: doc.submitted_at,
             hora: doc.submitted_at ? new Date(doc.submitted_at).toLocaleTimeString() : null,
             status: doc.status,
@@ -370,54 +459,65 @@ export function DocumentHistory() {
 
             {!isLoading && !loadError && filteredDocuments.map((doc) => {
               const isTutoria = isTutoriaDocument(doc);
+              const isEstadias = isEstadiasDocument(doc);
+              const docTipo = getDocumentTipoForFilter(doc);
+              const tipoDisplayLabel = getTipoLabel(docTipo);
               
-              // --- CORRECCIÓN: Construir información sin duplicar el título ---
-              let infoLine = "";
-              if (isTutoria) {
-                infoLine = doc.materia && doc.materia !== "Sin materia" ? doc.materia : "Documento de tutoría";
-              } else {
-                const parts = [];
-                // Materia
-                if (doc.materia && doc.materia !== "Sin materia") {
-                  parts.push(doc.materia);
-                }
-                // Parcial - CORREGIDO: ya no dice "Parcial Parcial"
-                if (doc.parcial && doc.parcial !== "N/A" && doc.parcial !== "") {
-                  // Si el parcial ya viene con la palabra "Parcial", no la agregamos de nuevo
-                  const parcialStr = String(doc.parcial);
-                  if (parcialStr.toLowerCase().startsWith("parcial ")) {
-                    parts.push(parcialStr);
-                  } else {
-                    parts.push(`Parcial ${parcialStr}`);
-                  }
-                }
-                // Grupo
-                if (doc.grupo && doc.grupo !== "Grupo ?" && doc.grupo !== "?") {
-                  parts.push(`Grupo ${doc.grupo}`);
-                }
-                infoLine = parts.length > 0 ? parts.join(" • ") : "Sin información";
-              }
+              // --- Estilo con badges, igual que en DocumentReview.tsx (admin) ---
+              const fileNameUpper = getFileNameOnly(doc.nombre).toUpperCase().endsWith(".PDF")
+                ? getFileNameOnly(doc.nombre).toUpperCase()
+                : `${getFileNameOnly(doc.nombre).toUpperCase()}.PDF`;
+              const hasMateria = doc.materia && doc.materia !== "Sin materia";
+              const hasGrupo = doc.grupo && doc.grupo !== "Grupo ?" && doc.grupo !== "?";
+              const hasCarrera = Boolean(doc.carrera && doc.carrera.trim());
+              const planLabel = formatPlanLabel(doc.plan);
+              const parcialLabel = formatParcialLabel(doc.parcial);
 
               return (
                 <div
                   key={doc.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors"
+                  className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border transition-colors hover:bg-accent/50"
                 >
                   <div className="flex items-start gap-3 flex-1">
                     <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
                       <FileText className="h-6 w-6 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      {/* Solo el nombre del archivo, sin el título repetido */}
-                      <p className="font-medium">{getFileNameOnly(doc.nombre)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {infoLine}
+                      {/* Nombre del archivo */}
+                      <p className="font-semibold uppercase tracking-wide text-foreground">
+                        {fileNameUpper}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {doc.fecha
-                          ? `${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long", year: "numeric" }).format(new Date(doc.fecha))}${doc.hora ? ` • ${doc.hora}` : ""}`
+
+                      {/* Etiqueta del tipo de formulario/apartado */}
+                      <Badge variant="secondary" className="mt-1 text-xs font-medium">
+                        {tipoDisplayLabel}
+                      </Badge>
+
+                      {/* Badges de información */}
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {hasCarrera && (
+                          <Badge variant="outline" className="text-xs font-medium">{doc.carrera}</Badge>
+                        )}
+                        {planLabel && (
+                          <Badge variant="outline" className="text-xs font-medium">{planLabel}</Badge>
+                        )}
+                        {!isTutoria && !isEstadias && hasMateria && (
+                          <Badge variant="outline" className="text-xs font-medium">{doc.materia}</Badge>
+                        )}
+                        {hasGrupo && (
+                          <Badge variant="outline" className="text-xs font-medium">{`Grupo ${doc.grupo}`}</Badge>
+                        )}
+                        {!isTutoria && !isEstadias && parcialLabel && (
+                          <Badge variant="outline" className="text-xs font-medium">{parcialLabel}</Badge>
+                        )}
+                      </div>
+
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Enviado: {doc.fecha
+                          ? `${new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(doc.fecha))}${doc.hora ? ` ${doc.hora}` : ""}`
                           : "Sin fecha"}
                       </p>
+
                       {doc.observaciones && (
                         <p className="text-xs text-muted-foreground mt-2 bg-muted px-2 py-1 rounded inline-block">
                           {doc.observaciones}

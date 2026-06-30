@@ -384,6 +384,13 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     setLogoutDialogOpen(false);
   }, []);
 
+  const supervisorMenuItems = [
+    { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
+    { id: "supervisor-planeacion", label: "Planeación", icon: FileText },
+    { id: "supervisor-instrumentos", label: "Instrumentos", icon: FileStack },
+    { id: "perfil", label: "Mi Perfil", icon: User },
+  ];
+
   const docenteMenuItems = [
     { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
     { id: "planeacion", label: "Planeación", icon: FileText },
@@ -412,9 +419,13 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     { id: "configuracion", label: "Configuración", icon: Settings },
   ];
 
+  const isSupervisor = user?.role === "supervisor" || user?.roles?.includes("supervisor");
+
   let menuItems = adminMenuItems;
   if (user?.role === "administrador") {
     menuItems = adminMenuItems;
+  } else if (isSupervisor) {
+    menuItems = supervisorMenuItems;
   } else if (canAccessTutorias) {
     menuItems = docenteMenuItems;
   } else {
@@ -555,7 +566,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate text-foreground">{user?.name}</p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {user?.role === "administrador" ? "Administrador" : user?.role === "tutor" ? "Tutor" : "Docente"}
+                  {user?.role === "administrador" ? "Administrador" : user?.role === "supervisor" ? "Supervisor" : user?.role === "tutor" ? "Tutor" : "Docente"}
                 </p>
               </div>
             </button>

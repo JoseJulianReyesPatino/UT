@@ -14,6 +14,9 @@ import Configuration from "./pages/admin/Configuration";
 import EstadiasAdmin from "./pages/admin/Estadias";
 import CalendarioAdmin from "./pages/admin/Calendario";
 import { Profile } from "./pages/docente/Profile";
+import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
+import SupervisorPlaneacion from "./pages/supervisor/SupervisorPlaneacion";
+import SupervisorInstrumentos from "./pages/supervisor/SupervisorInstrumentos";
 import PlaneacionPage from "./pages/docente/Planeacion";
 import Instrumento30Page from "./pages/docente/Instrumento30";
 import Instrumento40Page from "./pages/docente/Instrumento40";
@@ -60,6 +63,7 @@ function AppContent() {
   const [isSplashExiting, setIsSplashExiting] = useState(false);
   const [contentAnimationActive, setContentAnimationActive] = useState(false);
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
+  const isSupervisor = user?.role === "supervisor" || user?.roles?.includes("supervisor");
   const noticeBanner = notice ? (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4 sm:top-6">
       <Alert
@@ -104,6 +108,13 @@ function AppContent() {
           "calendario",
           "configuracion",
           "configuracion-cuenta",
+        ])
+      : (user?.role === "supervisor" || user?.roles?.includes("supervisor"))
+      ? new Set([
+          "dashboard",
+          "supervisor-planeacion",
+          "supervisor-instrumentos",
+          "perfil",
         ])
       : new Set([
           "dashboard",
@@ -356,7 +367,55 @@ function AppContent() {
   };
 
   const renderContent = () => {
-    if (user?.role !== "administrador") {
+    if (user?.role === "administrador") {
+      switch (currentView) {
+        case "dashboard":
+          return <AdminDashboard onNavigate={setCurrentView} />;
+        case "docentes":
+          return <DocenteManagement />;
+        case "tutores":
+          return <Tutores />;
+        case "mensajes":
+          return <Messages initialOpen={deferredMessageOpen} onConsume={() => setDeferredMessageOpen(null)} />;
+        case "documentos":
+          return <DocumentReview initialSection="pendientes" />;
+        case "remediales":
+          return <DocumentReview initialSection="pendientes" initialForm="Remedial" />;
+        case "documentos-revisados":
+          return <DocumentReview initialSection="revisados" />;
+        case "documentos-revisados-hoy":
+          return <DocumentReview initialSection="hoy" />;
+        case "ciclos":
+          return <CiclosEscolares />;
+        case "estadias-admin":
+          return <EstadiasAdmin />;
+        case "calendario":
+          return <CalendarioAdmin />;
+        case "configuracion":
+          return <Configuration />;
+        case "configuracion-cuenta":
+          return <Configuration initialTab="cuenta" />;
+        default:
+          return <AdminDashboard onNavigate={setCurrentView} />;
+      }
+    }
+
+    if (isSupervisor) {
+      switch (currentView) {
+        case "dashboard":
+          return <SupervisorDashboard onNavigate={setCurrentView} />;
+        case "supervisor-planeacion":
+          return <SupervisorPlaneacion />;
+        case "supervisor-instrumentos":
+          return <SupervisorInstrumentos />;
+        case "perfil":
+          return <Profile />;
+        default:
+          return <SupervisorDashboard onNavigate={setCurrentView} />;
+      }
+    }
+
+    {
       const wrapForm = (formId: Parameters<typeof FormAccessGuard>[0]["formId"], title: string, element: React.ReactNode) => (
         <FormAccessGuard formId={formId} title={title}>
           {element}
@@ -412,37 +471,6 @@ function AppContent() {
           return <Profile />;
         default:
           return <DocenteDashboard onNavigate={setCurrentView} />;
-      }
-    } else {
-      switch (currentView) {
-        case "dashboard":
-          return <AdminDashboard onNavigate={setCurrentView} />;
-        case "docentes":
-          return <DocenteManagement />;
-        case "tutores":
-          return <Tutores />;
-        case "mensajes":
-          return <Messages initialOpen={deferredMessageOpen} onConsume={() => setDeferredMessageOpen(null)} />;
-        case "documentos":
-          return <DocumentReview initialSection="pendientes" />;
-        case "remediales":
-          return <DocumentReview initialSection="pendientes" initialForm="Remedial" />;
-        case "documentos-revisados":
-          return <DocumentReview initialSection="revisados" />;
-        case "documentos-revisados-hoy":
-          return <DocumentReview initialSection="hoy" />;
-        case "ciclos":
-          return <CiclosEscolares />;
-        case "estadias-admin":
-          return <EstadiasAdmin />;
-        case "calendario":
-          return <CalendarioAdmin />;
-        case "configuracion":
-          return <Configuration />;
-        case "configuracion-cuenta":
-          return <Configuration initialTab="cuenta" />;
-        default:
-          return <AdminDashboard onNavigate={setCurrentView} />;
       }
     }
   };

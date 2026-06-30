@@ -1,0 +1,354 @@
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Button } from "../../components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { apiFetch } from "../../lib/api";
+import { fetchDocumentBlob } from "../../lib/documents";
+import { Eye, FileText, Search, X, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { toast } from "sonner";
+
+type DocRecord = {
+  id: number;
+  title: string;
+  status: string;
+  submitted_at?: string | null;
+  created_at?: string | null;
+  materia?: string | null;
+  grupo?: string | null;
+  group_code?: string | null;
+  parcial?: string | null;
+  uploaded_by_name?: string | null;
+  form_title?: string | null;
+  carrera_label?: string | null;
+};
+
+const STATUS_LABELS: Record<string, { label: string; className: string }> = {
+  pendiente: { label: "Pendiente", className: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" },
+  revisado: { label: "Revisado", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" },
+  devuelto: { label: "Devuelto", className: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300" },
+  reenviado: { label: "Reenviado", className: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300" },
+};
+
+const getParcialNum = (parcial?: string | null): string => {
+  if (!parcial) return "";
+  const m = parcial.match(/\b([123])\b/);
+  return m ? m[1] : "";
+};
+
+const formatDate = (dateStr?: string | null) => {
+  if (!dateStr) return "—";
+  try {
+    return new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" }).format(new Date(dateStr));
+  } catch { return "—"; }
+};
+
+export default function SupervisorPlaneacion() {
+  const [docs, setDocs] = useState<DocRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [parcialFilter, setParcialFilter] = useState("all");
+  const [carreraFilter, setCarreraFilter] = useState("all");
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState("");
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const prevBlobRef = useRef<string | null>(null);
+
+  const cardCls = "overflow-hidden border-emerald-200/60 bg-white/55 shadow-sm backdrop-blur dark:border-emerald-900/35 dark:bg-slate-950/55";
+  const headerCls = "border-b border-emerald-200/30 p-4 sm:p-6 dark:border-emerald-900/25";
+
+  const loadDocs = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await apiFetch("/documents", { query: { form_id: 1, per_page: 500 } }) as any;
+      const list: DocRecord[] = Array.isArray(res?.data) ? res.data : (Array.isArray(res?.data?.data) ? res.data.data : []);
+      setDocs(list);
+    } catch {
+      toast.error("No fue posible cargar los documentos de planeación");
+      setDocs([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadDocs(); }, [loadDocs]);
+
+  useEffect(() => {
+    return () => {
+      if (prevBlobRef.current) URL.revokeObjectURL(prevBlobRef.current);
+    };
+  }, []);
+
+  const carrerasUnicas = useMemo(() => {
+    const set = new Set<string>();
+    docs.forEach((d) => { if (d.carrera_label) set.add(d.carrera_label); });
+    return Array.from(set).sort();
+  }, [docs]);
+
+  const filtered = useMemo(() => {
+    return docs.filter((d) => {
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const matchText =
+          (d.uploaded_by_name ?? "").toLowerCase().includes(q) ||
+          (d.materia ?? "").toLowerCase().includes(q) ||
+          (d.grupo ?? d.group_code ?? "").toLowerCase().includes(q) ||
+          (d.carrera_label ?? "").toLowerCase().includes(q);
+        if (!matchText) return false;
+      }
+      if (statusFilter !== "all" && (d.status ?? "").toLowerCase() !== statusFilter) return false;
+      if (parcialFilter !== "all" && getParcialNum(d.parcial) !== parcialFilter) return false;
+      if (carreraFilter !== "all" && (d.carrera_label ?? "") !== carreraFilter) return false;
+      return true;
+    });
+  }, [docs, search, statusFilter, parcialFilter, carreraFilter]);
+
+  const hasActiveFilters = search.trim() || statusFilter !== "all" || parcialFilter !== "all" || carreraFilter !== "all";
+
+  const clearFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setParcialFilter("all");
+    setCarreraFilter("all");
+  };
+
+  const handlePreview = async (doc: DocRecord) => {
+    setPreviewTitle(doc.uploaded_by_name ? `${doc.uploaded_by_name} — ${doc.materia ?? "Planeación"}` : (doc.materia ?? "Planeación"));
+    setIsPreviewOpen(true);
+    setIsLoadingPreview(true);
+    setPreviewBlobUrl(null);
+    try {
+      const blob = await fetchDocumentBlob(doc.id);
+      if (prevBlobRef.current) URL.revokeObjectURL(prevBlobRef.current);
+      const url = URL.createObjectURL(blob);
+      prevBlobRef.current = url;
+      setPreviewBlobUrl(url);
+    } catch {
+      toast.error("No fue posible cargar el documento");
+      setIsPreviewOpen(false);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  const statusInfo = (status: string) =>
+    STATUS_LABELS[status.toLowerCase()] ?? { label: status, className: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" };
+
+  return (
+    <div className="flex flex-col gap-4 sm:gap-6 bg-transparent text-slate-900 dark:text-slate-100">
+      {/* Título */}
+      <div className="shrink-0 rounded-2xl sm:rounded-3xl border border-emerald-200/30 p-4 sm:p-6 dark:border-emerald-900/25">
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100">Planeación</h1>
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+          Documentos de planeación enviados por todos los docentes — solo lectura
+        </p>
+      </div>
+
+      {/* Tabla */}
+      <Card className={cardCls}>
+        <CardHeader className={headerCls}>
+          <div className="flex flex-col gap-3">
+            {/* Fila superior: título + contador + botones */}
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base sm:text-lg">Documentos de Planeación</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  {isLoading
+                    ? "Cargando..."
+                    : `${filtered.length} de ${docs.length} documento${docs.length !== 1 ? "s" : ""}`}
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                    Limpiar
+                  </Button>
+                )}
+                <Button variant="outline" size="icon" onClick={loadDocs} disabled={isLoading} title="Actualizar">
+                  <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+            </div>
+
+            {/* Fila de filtros */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              {/* Búsqueda */}
+              <div className="relative flex-1 min-w-[180px]">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por docente, materia..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 pr-8 text-sm h-9"
+                />
+                {search && (
+                  <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Filtro carrera */}
+              <div className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/75 px-2.5 py-1.5 dark:bg-slate-900/65">
+                <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Carrera:</span>
+                <Select value={carreraFilter} onValueChange={setCarreraFilter}>
+                  <SelectTrigger className="h-7 w-[160px] border-0 bg-transparent px-1 text-xs shadow-none focus:ring-0">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {carrerasUnicas.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro parcial */}
+              <div className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/75 px-2.5 py-1.5 dark:bg-slate-900/65">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Parcial:</span>
+                <Select value={parcialFilter} onValueChange={setParcialFilter}>
+                  <SelectTrigger className="h-7 w-[100px] border-0 bg-transparent px-1 text-xs shadow-none focus:ring-0">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="1">Parcial 1</SelectItem>
+                    <SelectItem value="2">Parcial 2</SelectItem>
+                    <SelectItem value="3">Parcial 3</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro estado */}
+              <div className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/75 px-2.5 py-1.5 dark:bg-slate-900/65">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Estado:</span>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-7 w-[110px] border-0 bg-transparent px-1 text-xs shadow-none focus:ring-0">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="pendiente">Pendiente</SelectItem>
+                    <SelectItem value="revisado">Revisado</SelectItem>
+                    <SelectItem value="devuelto">Devuelto</SelectItem>
+                    <SelectItem value="reenviado">Reenviado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+              Cargando documentos...
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
+              <FileText className="h-8 w-8 opacity-40" />
+              <p className="text-sm">{hasActiveFilters ? "Sin resultados para los filtros aplicados" : "No hay documentos de planeación"}</p>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs mt-1">
+                  Limpiar filtros
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-emerald-200/30 dark:border-emerald-900/25 bg-emerald-50/40 dark:bg-emerald-950/10">
+                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">Docente</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">Materia</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300 hidden lg:table-cell">Carrera</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300 hidden sm:table-cell">Grupo</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300 hidden md:table-cell">Parcial</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300 hidden md:table-cell">Fecha</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">Estado</th>
+                    <th className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((doc, idx) => {
+                    const st = statusInfo(doc.status ?? "pendiente");
+                    return (
+                      <tr
+                        key={doc.id}
+                        className={`border-b border-emerald-200/20 dark:border-emerald-900/15 transition-colors hover:bg-emerald-50/30 dark:hover:bg-emerald-950/10 ${idx % 2 === 0 ? "" : "bg-slate-50/20 dark:bg-slate-900/10"}`}
+                      >
+                        <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                          {doc.uploaded_by_name ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[160px] truncate">
+                          {doc.materia ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 hidden lg:table-cell max-w-[180px] truncate text-xs">
+                          {doc.carrera_label ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 hidden sm:table-cell text-xs">
+                          {doc.grupo ?? doc.group_code ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 hidden md:table-cell text-xs">
+                          {doc.parcial ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 hidden md:table-cell text-xs">
+                          {formatDate(doc.submitted_at ?? doc.created_at)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${st.className}`}>
+                            {st.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button size="sm" variant="outline" className="gap-1 text-xs h-7" onClick={() => handlePreview(doc)}>
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Preview dialog */}
+      <Dialog
+        open={isPreviewOpen}
+        onOpenChange={(open) => {
+          setIsPreviewOpen(open);
+          if (!open && prevBlobRef.current) {
+            URL.revokeObjectURL(prevBlobRef.current);
+            prevBlobRef.current = null;
+            setPreviewBlobUrl(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle className="text-sm font-medium truncate">{previewTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {isLoadingPreview ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                Cargando documento...
+              </div>
+            ) : previewBlobUrl ? (
+              <iframe src={previewBlobUrl} className="w-full h-full border-0" title={previewTitle} />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

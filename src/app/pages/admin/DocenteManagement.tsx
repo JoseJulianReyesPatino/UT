@@ -17,7 +17,7 @@ import { useResolvedAvatarUrl } from "../../lib/avatar";
 
 const defaultAvatar = new URL("../../../assets/perfil2.png", import.meta.url).href;
 
-type UserRole = "docente" | "tutor" | "administrador";
+type UserRole = "docente" | "tutor" | "administrador" | "supervisor";
 type StatusFilter = "all" | "activo" | "inactivo";
 
 type Docente = {
@@ -38,7 +38,7 @@ type NuevoUsuarioForm = {
   apellidos: string;
   telefono: string;
   email: string;
-  roles: { docente: boolean; tutor: boolean; administrador: boolean };
+  roles: { docente: boolean; tutor: boolean; administrador: boolean; supervisor: boolean };
 };
 
 const DEFAULT_PASSWORD = "12345678";
@@ -66,6 +66,7 @@ const normalizeRole = (role: ApiUserRole): UserRole | null => {
   const normalized = token.toLowerCase().trim();
 
   if (normalized.includes("admin")) return "administrador";
+  if (normalized.includes("supervisor")) return "supervisor";
   if (normalized.includes("tutor")) return "tutor";
   if (normalized.includes("docente") || normalized.includes("teacher")) return "docente";
   return null;
@@ -246,13 +247,14 @@ const initialForm: NuevoUsuarioForm = {
   apellidos: "",
   telefono: "",
   email: "",
-  roles: { docente: true, tutor: false, administrador: false },
+  roles: { docente: true, tutor: false, administrador: false, supervisor: false },
 };
 
 export function DocenteManagement() {
   const { user: currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [roleFilter, setRoleFilter] = useState<"all" | "docente" | "tutor" | "supervisor">("all");
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
@@ -267,7 +269,7 @@ export function DocenteManagement() {
   const [usersError, setUsersError] = useState<string | null>(null);
   const [newDocente, setNewDocente] = useState<NuevoUsuarioForm>(initialForm);
   const [selectedDocente, setSelectedDocente] = useState<Docente | null>(null);
-  const [editDocente, setEditDocente] = useState({ nombres: "", apellidos: "", telefono: "", email: "", roles: { docente: true, tutor: false, administrador: false } });
+  const [editDocente, setEditDocente] = useState({ nombres: "", apellidos: "", telefono: "", email: "", roles: { docente: true, tutor: false, administrador: false, supervisor: false } });
 
   const loadUsers = async () => {
     setIsLoadingUsers(true);
@@ -314,7 +316,9 @@ export function DocenteManagement() {
 
     const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
+    const matchesRole = roleFilter === "all" || (doc.roles ?? []).includes(roleFilter as UserRole);
+
+    return matchesSearch && matchesStatus && matchesRole;
   });
 
   const statusFilterLabelMap: Record<StatusFilter, string> = {
@@ -344,9 +348,12 @@ export function DocenteManagement() {
       </div>
     );
   } else if (filteredDocentes.length === 0) {
+    const roleLabels: Record<string, string> = { docente: "docentes", tutor: "tutores", supervisor: "supervisores" };
     let emptyMessage = "No hay usuarios que coincidan con los filtros seleccionados.";
-    if (statusFilter === "activo") {
-      emptyMessage = "No hay docentes activos que coincidan con la búsqueda actual.";
+    if (roleFilter !== "all") {
+      emptyMessage = `No hay ${roleLabels[roleFilter] ?? roleFilter} que coincidan con la búsqueda actual.`;
+    } else if (statusFilter === "activo") {
+      emptyMessage = "No hay usuarios activos que coincidan con la búsqueda actual.";
     }
 
     usersListContent = (
@@ -482,14 +489,15 @@ export function DocenteManagement() {
       return;
     }
 
-    if (!editDocente.roles || (!editDocente.roles.docente && !editDocente.roles.tutor)) {
-      toast.error("El usuario debe tener al menos un rol asignado (Docente o Tutor)");
+    if (!editDocente.roles || (!editDocente.roles.docente && !editDocente.roles.tutor && !editDocente.roles.supervisor)) {
+      toast.error("El usuario debe tener al menos un rol asignado (Docente, Tutor o Supervisor)");
       return;
     }
 
     const roles: UserRole[] = [
       ...(editDocente.roles.docente ? (["docente"] as UserRole[]) : []),
       ...(editDocente.roles.tutor ? (["tutor"] as UserRole[]) : []),
+      ...(editDocente.roles.supervisor ? (["supervisor"] as UserRole[]) : []),
       ...(editDocente.roles.administrador ? (["administrador"] as UserRole[]) : []),
     ];
 
@@ -545,7 +553,7 @@ export function DocenteManagement() {
     }
   };
 
-  const hasRole = Boolean(newDocente.roles && (newDocente.roles.docente || newDocente.roles.tutor || newDocente.roles.administrador));
+  const hasRole = Boolean(newDocente.roles && (newDocente.roles.docente || newDocente.roles.tutor || newDocente.roles.administrador || newDocente.roles.supervisor));
   const canCreate = Boolean(newDocente.nombres.trim() && newDocente.apellidos.trim() && newDocente.email.trim() && hasRole);
 
   const handleCreateDocente = async () => {
@@ -570,6 +578,7 @@ export function DocenteManagement() {
     const roles: UserRole[] = [
       ...(newDocente.roles.docente ? (["docente"] as UserRole[]) : []),
       ...(newDocente.roles.tutor ? (["tutor"] as UserRole[]) : []),
+      ...(newDocente.roles.supervisor ? (["supervisor"] as UserRole[]) : []),
       ...(newDocente.roles.administrador ? (["administrador"] as UserRole[]) : []),
     ];
 
@@ -634,9 +643,23 @@ export function DocenteManagement() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
               <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/75 px-3 py-2 dark:bg-slate-900/65">
                 <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Rol:</span>
+                <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as typeof roleFilter)}>
+                  <SelectTrigger className="h-8 w-[130px] border-0 bg-transparent px-2 text-sm shadow-none focus:ring-0">
+                    <SelectValue placeholder="Filtrar rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="docente">Docente</SelectItem>
+                    <SelectItem value="tutor">Tutor</SelectItem>
+                    <SelectItem value="supervisor">Supervisor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/75 px-3 py-2 dark:bg-slate-900/65">
                 <span className="text-sm text-muted-foreground">Estado:</span>
                 <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-                  <SelectTrigger className="h-8 w-[140px] border-0 bg-transparent px-2 text-sm shadow-none focus:ring-0">
+                  <SelectTrigger className="h-8 w-[120px] border-0 bg-transparent px-2 text-sm shadow-none focus:ring-0">
                     <SelectValue placeholder="Filtrar estado" />
                   </SelectTrigger>
                   <SelectContent>
@@ -645,9 +668,6 @@ export function DocenteManagement() {
                     <SelectItem value="inactivo">Inactivos</SelectItem>
                   </SelectContent>
                 </Select>
-                <Badge variant="outline" className="hidden sm:inline-flex">
-                  {statusFilterLabelMap[statusFilter]}
-                </Badge>
               </div>
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -734,13 +754,19 @@ export function DocenteManagement() {
                 <label className="flex items-center gap-2">
                   <Checkbox
                     checked={!!editDocente.roles?.tutor}
-                    onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), tutor: Boolean(val) } }))}
+                    onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), tutor: Boolean(val) } }))}
                   />
                   <span className="text-sm">Tutor</span>
                 </label>
-                {/* Administrador role is managed separately; not editable here */}
+                <label className="flex items-center gap-2">
+                  <Checkbox
+                    checked={!!editDocente.roles?.supervisor}
+                    onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), supervisor: Boolean(val) } }))}
+                  />
+                  <span className="text-sm">Supervisor</span>
+                </label>
               </div>
-              <p className="text-xs text-muted-foreground">Selecciona si el usuario será docente o tutor.</p>
+              <p className="text-xs text-muted-foreground">Selecciona el rol del usuario. El supervisor puede visualizar documentos de todos los docentes.</p>
             </div>
 
           </div>
@@ -867,13 +893,19 @@ export function DocenteManagement() {
                 <label className="flex items-center gap-2">
                   <Checkbox
                     checked={!!newDocente.roles?.tutor}
-                    onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), tutor: Boolean(val) } }))}
+                    onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), tutor: Boolean(val) } }))}
                   />
                   <span className="text-sm">Tutor</span>
                 </label>
-                {/* Administrador role not available when creating users from this form */}
+                <label className="flex items-center gap-2">
+                  <Checkbox
+                    checked={!!newDocente.roles?.supervisor}
+                    onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), supervisor: Boolean(val) } }))}
+                  />
+                  <span className="text-sm">Supervisor</span>
+                </label>
               </div>
-              <p className="text-xs text-muted-foreground">Selecciona si el usuario será docente o tutor.</p>
+              <p className="text-xs text-muted-foreground">Selecciona el rol del usuario. El supervisor puede visualizar documentos de todos los docentes.</p>
             </div>
             
           </div>
