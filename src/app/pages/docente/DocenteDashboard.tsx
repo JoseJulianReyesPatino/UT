@@ -200,8 +200,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           description: 'Pendientes de revisión',
           icon: Clock,
           action: 'historial',
-          cardClass: 'border-slate-200/80 bg-gradient-to-br from-slate-50 via-emerald-50/40 to-slate-100 dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-950',
-          accentClass: 'from-emerald-500 via-emerald-400 to-emerald-300',
+          cardClass: 'bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70',
+          accentClass: 'from-slate-400/35 via-slate-300/20 to-transparent',
         },
         {
           title: 'Documentos Aprobados',
@@ -209,8 +209,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           description: 'Este cuatrimestre',
           icon: CheckCircle2,
           action: 'historial',
-          cardClass: 'border-slate-200/80 bg-gradient-to-br from-slate-50 via-emerald-50/40 to-slate-100 dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-950',
-          accentClass: 'from-emerald-500 via-emerald-400 to-emerald-300',
+          cardClass: 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50/80 border-emerald-200/70 dark:from-emerald-950/20 dark:via-slate-950 dark:to-emerald-950/25 dark:border-emerald-800/60',
+          accentClass: 'from-emerald-400/35 via-emerald-300/20 to-transparent',
         },
         {
           title: 'En Revisión',
@@ -218,8 +218,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           description: 'En revisión',
           icon: AlertCircle,
           action: 'historial',
-          cardClass: 'border-slate-200/80 bg-gradient-to-br from-slate-50 via-emerald-50/40 to-slate-100 dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-950',
-          accentClass: 'from-emerald-500 via-emerald-400 to-emerald-300',
+          cardClass: 'bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70',
+          accentClass: 'from-slate-400/35 via-slate-300/20 to-transparent',
         },
       ];
       setStats(statsArr);
@@ -404,11 +404,18 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   // -----------------------------------------------------------
 
   return (
-    <div className="relative z-0 space-y-8 overflow-hidden rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl pb-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/60 dark:bg-slate-950/30">
+    <div className="relative z-0 space-y-6 overflow-hidden">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -right-10 top-8 h-44 w-44 rounded-[2rem] bg-emerald-100/25 blur-[120px] dark:bg-emerald-500/8" />
-        <div className="absolute left-[8%] top-[34%] h-40 w-40 rounded-[2rem] bg-sky-100/18 blur-[120px] dark:bg-sky-500/8" />
-        <div className="absolute -left-12 bottom-0 h-56 w-56 rounded-[2rem] bg-emerald-200/18 blur-[140px] dark:bg-emerald-600/8" />
+        <div className="absolute -right-12 top-8 h-40 w-40 rounded-full bg-emerald-100/20 blur-3xl dark:bg-emerald-500/5" />
+        <div className="absolute -left-10 bottom-0 h-52 w-52 rounded-full bg-sky-100/10 blur-3xl dark:bg-sky-500/5" />
+        {backgroundIcons.map(({ icon: Icon, className }, index) => (
+          <span
+            key={`${Icon.displayName ?? "icon"}-${index}`}
+            className={`absolute text-emerald-300/15 dark:text-emerald-200/10 ${className}`}
+          >
+            <Icon className="h-full w-full" />
+          </span>
+        ))}
       </div>
 
       <div className="relative z-10">
@@ -475,7 +482,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           </CardContent>
         </Card>
 
-        <div className="relative z-10 mt-3 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <div className="relative z-10 mt-3 grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
           {stats.map((stat) => {
             const Icon = stat.icon;
             const handleClick = () => {
@@ -489,17 +496,19 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                 onClick={handleClick}
                 className="cursor-pointer text-left transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
               >
-                <StatsCard
-                  title={stat.title}
-                  value={stat.value}
-                  description={stat.description}
-                  icon={Icon}
-                  trend={stat.trend}
-                  color={stat.color}
-                  bgColor={stat.bgColor}
-                  cardClass={`${stat.cardClass} bg-white/70 border-slate-200/70 backdrop-blur-xl dark:bg-slate-950/60 dark:border-slate-800/70`}
-                  accentClass={stat.accentClass}
-                />
+                <Card className={`h-full overflow-hidden border shadow-sm hover:shadow-md transition ${stat.cardClass}`}>
+                  <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
+                  <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
+                    <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm">{stat.title}</CardTitle>
+                    <div className="h-9 w-9 rounded-xl bg-emerald-100/80 dark:bg-emerald-950/40 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5 sm:h-10 sm:w-10">
+                      <Icon className="h-4 w-4 text-emerald-700 dark:text-emerald-300" aria-hidden />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="text-2xl leading-none font-bold text-foreground sm:text-2xl">{stat.value}</div>
+                    <p className="mt-1 text-[11px] leading-snug text-foreground/70 sm:text-xs">{stat.description}</p>
+                  </CardContent>
+                </Card>
               </button>
             );
           })}
@@ -507,9 +516,9 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
         <div className="relative z-10 mt-3 grid gap-6 xl:grid-cols-2">
           {/* Card de Documentos Recientes */}
-          <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.05)] dark:border-slate-800/70 dark:bg-slate-950/60">
+          <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Documentos Recientes</CardTitle>
                   <CardDescription className="mt-1 text-slate-500 dark:text-slate-400">Últimos documentos enviados</CardDescription>
@@ -591,9 +600,9 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           </Card>
 
           {/* Card de Próximas Entregas */}
-          <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.05)] dark:border-slate-800/70 dark:bg-slate-950/60">
+          <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Próximas Entregas</CardTitle>
                   <CardDescription className="mt-1 text-slate-500 dark:text-slate-400">Fechas límite importantes</CardDescription>

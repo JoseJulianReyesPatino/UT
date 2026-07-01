@@ -17,6 +17,7 @@ interface User {
   phone?: string;
   area?: string;
   createdAt?: string;
+  supervisorSections?: string[];
 }
 
 interface AuthContextType {
@@ -48,6 +49,7 @@ type ApiLoginResponse = {
     is_active?: boolean;
     created_at?: string | null;
     roles?: ApiRolePayload[];
+    supervisor_sections?: string[] | null;
   };
 };
 
@@ -172,6 +174,7 @@ const mapApiUser = (apiUser: ApiLoginResponse["user"]): User => {
     phone: apiUser.phone ?? undefined,
     area: apiUser.area ?? undefined,
     createdAt: apiUser.created_at ?? undefined,
+    supervisorSections: apiUser.supervisor_sections ?? undefined,
   };
 };
 

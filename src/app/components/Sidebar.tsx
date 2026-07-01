@@ -25,6 +25,7 @@ import {
   FileArchive,
   ChevronDown,
   ChevronRight,
+  Shield,
 } from "lucide-react";
 
 const defaultProfileAvatar = "/src/assets/perfil2.png";
@@ -384,12 +385,41 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     setLogoutDialogOpen(false);
   }, []);
 
-  const supervisorMenuItems = [
-    { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
-    { id: "supervisor-planeacion", label: "Planeación", icon: FileText },
-    { id: "supervisor-instrumentos", label: "Instrumentos", icon: FileStack },
-    { id: "perfil", label: "Mi Perfil", icon: User },
-  ];
+  const supervisorMenuItems = useMemo(() => {
+    const sections = user?.supervisorSections ?? [];
+    const items: SidebarMenuItem[] = [];
+
+    if (sections.includes("planeacion")) {
+      items.push({ id: "supervisor-planeacion", label: "Planeación", icon: FileText });
+    }
+    const hasInstrumento = ["instrumento-30", "instrumento-40", "instrumento-60", "instrumento-70"].some((s) => sections.includes(s));
+    if (hasInstrumento) {
+      items.push({ id: "supervisor-instrumentos", label: "Instrumentos", icon: FileStack });
+    }
+    if (sections.includes("remedial")) {
+      items.push({ id: "supervisor-remedial", label: "Remedial", icon: FileText });
+    }
+    if (sections.includes("lista-concentrada")) {
+      items.push({ id: "supervisor-lista-concentrada", label: "Lista Concentrada", icon: FileStack });
+    }
+    if (sections.includes("asesoria")) {
+      items.push({ id: "supervisor-asesoria", label: "Asesoría", icon: Users });
+    }
+    if (sections.includes("portafolio")) {
+      items.push({ id: "supervisor-portafolio", label: "Portafolio Digital Final", icon: FolderOpen });
+    }
+    if (sections.includes("acta-final")) {
+      items.push({ id: "supervisor-acta-final", label: "Acta Final", icon: FileText });
+    }
+    if (sections.includes("estadias")) {
+      items.push({ id: "supervisor-estadias", label: "Estadías", icon: Briefcase });
+    }
+    if (sections.includes("tutorias")) {
+      items.push({ id: "supervisor-tutorias", label: "Tutorías", icon: CalendarDays });
+    }
+    items.push({ id: "perfil", label: "Mi Perfil", icon: User });
+    return items;
+  }, [user?.supervisorSections]);
 
   const docenteMenuItems = [
     { id: "dashboard", label: "Inicio", icon: LayoutDashboard },

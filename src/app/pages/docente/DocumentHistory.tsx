@@ -6,6 +6,7 @@ import { Input } from "../../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { FileText, Search, Download, Eye, Filter, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import apiFetch from "../../lib/api";
 import { fetchDocumentBlob, getDocumentDownloadUrl, getDocumentFileUrl, getDocumentDisplayFileName } from "../../lib/documents";
 import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
@@ -35,7 +36,7 @@ type ApiDocument = {
 const TUTORIA_FORM_IDS = [8, 9, 10, 11, 12];
 
 // IDs de formularios de estadías (ajusta estos IDs según tu configuración)
-const ESTADIAS_FORM_IDS = [13, 14, 15]; // Ejemplo: carta-presentacion, carta-aceptacion, carta-terminacion
+const ESTADIAS_FORM_IDS = [13, 14, 15];
 
 // Normalizar el título del documento (evitar "undefined")
 const resolveDocumentTitle = (doc: any): string => {
@@ -50,7 +51,6 @@ const resolveDocumentTitle = (doc: any): string => {
 
 // Obtener solo el nombre del archivo sin el título completo
 const getFileNameOnly = (fullName: string): string => {
-  // Si tiene un guión, tomar la última parte
   const parts = fullName.split(' - ');
   if (parts.length > 1) {
     return parts[parts.length - 1].trim();
@@ -153,8 +153,8 @@ export function DocumentHistory() {
     () => [
       { value: "all", label: "Todos los apartados" },
       { value: "planeacion", label: "Planeación" },
-      { value: "instrumento-3040", label: "Instrumento 30/40" },
-      { value: "instrumento-6070", label: "Instrumento 60/70" },
+      { value: "instrumento-3040", label: "Instrumento 30/40%" },
+      { value: "instrumento-6070", label: "Instrumento 60/70%" },
       { value: "lista-concentrada", label: "Lista Concentrada" },
       { value: "asesoria", label: "Asesoría" },
       { value: "portafolio-digital", label: "Portafolio Digital" },
@@ -162,11 +162,6 @@ export function DocumentHistory() {
       { value: "remedial", label: "Remedial" },
       { value: "estadias", label: "Estadías" },
       { value: "tutorias", label: "Tutorías" },
-      { value: "carga-academica", label: "Carga Académica" },
-      { value: "reporte-bajas", label: "Reporte de Bajas" },
-      { value: "concentrado-asesorias", label: "Concentrado de Asesorías y Bajas" },
-      { value: "acta-asistencia-grupal", label: "Acta de Asistencia Grupal" },
-      { value: "ficha-tecnica", label: "Ficha Técnica" },
     ],
     []
   );
@@ -206,12 +201,10 @@ export function DocumentHistory() {
   };
 
   const getDocumentTipoForFilter = (doc: ApiDocument): string => {
-    // Primero verificar si es estadía
     if (isEstadiasDocument(doc)) {
       return "estadias";
     }
 
-    // Verificar si es tutoría
     if (isTutoriaDocument(doc)) {
       const apartado = (doc.apartado_label || "").toLowerCase();
       if (apartado.includes("carga")) return "carga-academica";
@@ -222,10 +215,8 @@ export function DocumentHistory() {
       return "tutorias";
     }
 
-    // Normalizar el tipo del documento
     const normalizedTipo = (doc.tipo || "").toLowerCase();
 
-    // Mapeo específico para instrumentos (4 formularios → 2 categorías)
     if (normalizedTipo === "instrumento-30-normal" || normalizedTipo === "instrumento-40-nuevo") {
       return "instrumento-3040";
     }
@@ -233,12 +224,10 @@ export function DocumentHistory() {
       return "instrumento-6070";
     }
 
-    // Para otros tipos, devolver el tipo normalizado si existe
     if (normalizedTipo && normalizedTipo !== "documento" && normalizedTipo !== "undefined") {
       return normalizedTipo;
     }
 
-    // Fallback: intentar detectar por el nombre
     const nombre = doc.nombre.toLowerCase();
     if (nombre.includes("planeación") || nombre.includes("planeacion")) return "planeacion";
     if (nombre.includes("instrumento 30") || nombre.includes("instrumento 40")) return "instrumento-3040";
@@ -353,13 +342,36 @@ export function DocumentHistory() {
     };
   }, []);
 
+  const ESTADIAS_TIPOS = new Set([
+    "estadias",
+    "carta-presentacion",
+    "carta-aceptacion",
+    "carta-terminacion",
+  ]);
+
+  const TUTORIAS_TIPOS = new Set([
+    "tutorias",
+    "carga-academica",
+    "reporte-bajas",
+    "concentrado-asesorias",
+    "acta-asistencia-grupal",
+    "ficha-tecnica",
+  ]);
+
+  const matchesTipoFilter = (docTipo: string, filter: string): boolean => {
+    if (filter === "all") return true;
+    if (filter === "estadias") return ESTADIAS_TIPOS.has(docTipo);
+    if (filter === "tutorias") return TUTORIAS_TIPOS.has(docTipo);
+    return docTipo === filter;
+  };
+
   const filteredDocuments = documents.filter((doc) => {
     const matchesSearch =
       doc.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.materia.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === "all" || doc.status === filterStatus;
     const docTipo = getDocumentTipoForFilter(doc);
-    const matchesTipo = filterTipo === "all" || docTipo === filterTipo;
+    const matchesTipo = matchesTipoFilter(docTipo, filterTipo);
     return matchesSearch && matchesStatus && matchesTipo;
   });
 
@@ -379,191 +391,218 @@ export function DocumentHistory() {
     }
   }, [filterTipo]);
 
+  // Estilos para el modo oscuro/claro
+  const cardClassName = "overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20";
+  const documentRowClassName = "relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border transition-colors hover:bg-accent/50 dark:hover:bg-accent/30";
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1>Historial de Documentos</h1>
-        <p className="text-muted-foreground">
-          Revisa todos los documentos que has enviado
-        </p>
-      </div>
+    <div className="relative space-y-6 overflow-hidden">
+      <div className="relative space-y-6">
+        <div>
+          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">
+            Historial de Documentos
+          </h1>
+          <p className="text-muted-foreground">
+            Revisa todos los documentos que has enviado
+          </p>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div>
-              <CardTitle>Mis Documentos</CardTitle>
-              <CardDescription>
-                {filteredDocuments.length} documentos encontrados
-              </CardDescription>
+        <Card className={cardClassName}>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div>
+                <CardTitle className="dark:text-white">Mis Documentos</CardTitle>
+                <CardDescription>
+                  {filteredDocuments.length} documentos encontrados
+                </CardDescription>
+              </div>
+              <div className="grid w-full gap-2 sm:w-auto sm:flex sm:flex-row sm:items-center sm:gap-3">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar documento..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
+                  />
+                </div>
+                <Select value={filterTipo} onValueChange={setFilterTipo}>
+                  <SelectTrigger className="w-full min-w-[190px] sm:w-[190px] whitespace-nowrap dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                    <SelectValue placeholder="Tipo" className="whitespace-nowrap" />
+                  </SelectTrigger>
+                  <SelectContent className="dark:bg-slate-900 dark:border-slate-700">
+                    {typeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value} className="dark:text-white dark:hover:bg-slate-800">
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-full min-w-[190px] sm:w-[190px] [&>svg:last-child]:hidden dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <SelectValue placeholder="Estado" />
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent className="dark:bg-slate-900 dark:border-slate-700">
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status.value} value={status.value} className="dark:text-white dark:hover:bg-slate-800">
+                        {status.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="grid w-full gap-2 sm:w-auto sm:flex sm:flex-row sm:items-center sm:gap-3">
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar documento..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Select value={filterTipo} onValueChange={setFilterTipo}>
-                <SelectTrigger className="w-full min-w-[190px] sm:w-[190px] whitespace-nowrap">
-                  <SelectValue placeholder="Tipo" className="whitespace-nowrap" />
-                </SelectTrigger>
-                <SelectContent>
-                  {typeOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-full min-w-[190px] sm:w-[190px] [&>svg:last-child]:hidden">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <SelectValue placeholder="Estado" />
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      {status.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="max-h-[34rem] space-y-3 overflow-y-auto pr-2">
-            {isLoading && (
-              <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                Cargando...
-              </div>
-            )}
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-[34rem] space-y-3 overflow-y-auto pr-2">
+              {isLoading && (
+                <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground dark:border-slate-700">
+                  Cargando...
+                </div>
+              )}
 
-            {!isLoading && loadError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
-                {loadError}
-              </div>
-            )}
+              {!isLoading && loadError && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive dark:border-red-900/30 dark:bg-red-950/10">
+                  {loadError}
+                </div>
+              )}
 
-            {!isLoading && !loadError && filteredDocuments.length === 0 && (
-              <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
-                No hay documentos que coincidan con los filtros actuales.
-              </div>
-            )}
+              {!isLoading && !loadError && filteredDocuments.length === 0 && (
+                <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground dark:border-slate-700">
+                  No hay documentos que coincidan con los filtros actuales.
+                </div>
+              )}
 
-            {!isLoading && !loadError && filteredDocuments.map((doc) => {
-              const isTutoria = isTutoriaDocument(doc);
-              const isEstadias = isEstadiasDocument(doc);
-              const docTipo = getDocumentTipoForFilter(doc);
-              const tipoDisplayLabel = getTipoLabel(docTipo);
-              
-              // --- Estilo con badges, igual que en DocumentReview.tsx (admin) ---
-              const fileNameUpper = getFileNameOnly(doc.nombre).toUpperCase().endsWith(".PDF")
-                ? getFileNameOnly(doc.nombre).toUpperCase()
-                : `${getFileNameOnly(doc.nombre).toUpperCase()}.PDF`;
-              const hasMateria = doc.materia && doc.materia !== "Sin materia";
-              const hasGrupo = doc.grupo && doc.grupo !== "Grupo ?" && doc.grupo !== "?";
-              const hasCarrera = Boolean(doc.carrera && doc.carrera.trim());
-              const planLabel = formatPlanLabel(doc.plan);
-              const parcialLabel = formatParcialLabel(doc.parcial);
+              {!isLoading && !loadError && filteredDocuments.map((doc) => {
+                const isTutoria = isTutoriaDocument(doc);
+                const isEstadias = isEstadiasDocument(doc);
+                const docTipo = getDocumentTipoForFilter(doc);
+                const tipoDisplayLabel = getTipoLabel(docTipo);
+                
+                const fileNameUpper = getFileNameOnly(doc.nombre).toUpperCase().endsWith(".PDF")
+                  ? getFileNameOnly(doc.nombre).toUpperCase()
+                  : `${getFileNameOnly(doc.nombre).toUpperCase()}.PDF`;
+                const hasMateria = doc.materia && doc.materia !== "Sin materia";
+                const hasGrupo = doc.grupo && doc.grupo !== "Grupo ?" && doc.grupo !== "?";
+                const hasCarrera = Boolean(doc.carrera && doc.carrera.trim());
+                const planLabel = formatPlanLabel(doc.plan);
+                const parcialLabel = formatParcialLabel(doc.parcial);
 
-              return (
-                <div
-                  key={doc.id}
-                  className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border transition-colors hover:bg-accent/50"
-                >
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <FileText className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {/* Nombre del archivo */}
-                      <p className="font-semibold uppercase tracking-wide text-foreground">
-                        {fileNameUpper}
-                      </p>
+                return (
+                  <div
+                    key={doc.id}
+                    className={documentRowClassName}
+                  >
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 dark:bg-slate-800">
+                        <FileText className="h-6 w-6 text-muted-foreground dark:text-slate-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold uppercase tracking-wide text-foreground dark:text-white">
+                          {fileNameUpper}
+                        </p>
 
-                      {/* Etiqueta del tipo de formulario/apartado */}
-                      <Badge variant="secondary" className="mt-1 text-xs font-medium">
-                        {tipoDisplayLabel}
-                      </Badge>
+                        <Badge variant="secondary" className="mt-1 text-xs font-medium dark:bg-slate-800 dark:text-slate-200">
+                          {tipoDisplayLabel}
+                        </Badge>
 
-                      {/* Badges de información */}
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {hasCarrera && (
-                          <Badge variant="outline" className="text-xs font-medium">{doc.carrera}</Badge>
-                        )}
-                        {planLabel && (
-                          <Badge variant="outline" className="text-xs font-medium">{planLabel}</Badge>
-                        )}
-                        {!isTutoria && !isEstadias && hasMateria && (
-                          <Badge variant="outline" className="text-xs font-medium">{doc.materia}</Badge>
-                        )}
-                        {hasGrupo && (
-                          <Badge variant="outline" className="text-xs font-medium">{`Grupo ${doc.grupo}`}</Badge>
-                        )}
-                        {!isTutoria && !isEstadias && parcialLabel && (
-                          <Badge variant="outline" className="text-xs font-medium">{parcialLabel}</Badge>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {hasCarrera && (
+                            <Badge variant="outline" className="text-xs font-medium dark:border-slate-700 dark:text-slate-300">
+                              {doc.carrera}
+                            </Badge>
+                          )}
+                          {planLabel && (
+                            <Badge variant="outline" className="text-xs font-medium dark:border-slate-700 dark:text-slate-300">
+                              {planLabel}
+                            </Badge>
+                          )}
+                          {!isTutoria && !isEstadias && hasMateria && (
+                            <Badge variant="outline" className="text-xs font-medium dark:border-slate-700 dark:text-slate-300">
+                              {doc.materia}
+                            </Badge>
+                          )}
+                          {hasGrupo && (
+                            <Badge variant="outline" className="text-xs font-medium dark:border-slate-700 dark:text-slate-300">
+                              {`Grupo ${doc.grupo}`}
+                            </Badge>
+                          )}
+                          {!isTutoria && !isEstadias && parcialLabel && (
+                            <Badge variant="outline" className="text-xs font-medium dark:border-slate-700 dark:text-slate-300">
+                              {parcialLabel}
+                            </Badge>
+                          )}
+                        </div>
+
+                        <p className="mt-1 text-xs text-muted-foreground dark:text-slate-400">
+                          Enviado: {doc.fecha
+                            ? `${new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(doc.fecha))}${doc.hora ? ` ${doc.hora}` : ""}`
+                            : "Sin fecha"}
+                        </p>
+
+                        {doc.observaciones && (
+                          <p className="text-xs text-muted-foreground mt-2 bg-muted px-2 py-1 rounded inline-block dark:bg-slate-800 dark:text-slate-300">
+                            {doc.observaciones}
+                          </p>
                         )}
                       </div>
-
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Enviado: {doc.fecha
-                          ? `${new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(doc.fecha))}${doc.hora ? ` ${doc.hora}` : ""}`
-                          : "Sin fecha"}
-                      </p>
-
-                      {doc.observaciones && (
-                        <p className="text-xs text-muted-foreground mt-2 bg-muted px-2 py-1 rounded inline-block">
-                          {doc.observaciones}
-                        </p>
-                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          doc.status === "revisado"
+                            ? "success"
+                            : doc.status === "pendiente"
+                            ? "outline"
+                            : "destructive"
+                        }
+                        className="dark:border-slate-700"
+                      >
+                        {doc.status === "revisado"
+                          ? "Revisado"
+                          : doc.status === "pendiente"
+                          ? "Pendiente"
+                          : "Devuelto"}
+                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "view")}
+                            disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
+                            className="dark:hover:bg-slate-800"
+                          >
+                            {loadingPdfId === Number(doc.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver documento</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "download")}
+                            disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
+                            className="dark:hover:bg-slate-800"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Descargar documento</TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={
-                        doc.status === "revisado"
-                          ? "success"
-                          : doc.status === "pendiente"
-                          ? "outline"
-                          : "destructive"
-                      }
-                    >
-                      {doc.status === "revisado"
-                        ? "Revisado"
-                        : doc.status === "pendiente"
-                        ? "Pendiente"
-                        : "Devuelto"}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "view")}
-                      disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
-                    >
-                      {loadingPdfId === Number(doc.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "download")}
-                      disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={openPreview} onOpenChange={(val) => {
         if (!val && previewUrl) {
@@ -572,19 +611,19 @@ export function DocumentHistory() {
         }
         setOpenPreview(val);
       }}>
-        <DialogContent className="max-w-4xl w-full">
+        <DialogContent className="max-w-4xl w-full dark:bg-slate-950 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle>{previewTitle}</DialogTitle>
-            <DialogDescription>Vista previa del documento</DialogDescription>
+            <DialogTitle className="dark:text-white">{previewTitle}</DialogTitle>
+            <DialogDescription className="dark:text-slate-400">Vista previa del documento</DialogDescription>
           </DialogHeader>
           {previewUrl ? (
             <iframe
               src={previewUrl}
-              className="h-[70vh] w-full rounded-lg border border-border"
+              className="h-[70vh] w-full rounded-lg border border-border dark:border-slate-700"
               title={previewTitle}
             />
           ) : (
-            <div className="h-[70vh] w-full flex items-center justify-center text-muted-foreground">
+            <div className="h-[70vh] w-full flex items-center justify-center text-muted-foreground dark:text-slate-400">
               Cargando documento...
             </div>
           )}

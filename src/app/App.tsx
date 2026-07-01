@@ -17,6 +17,7 @@ import { Profile } from "./pages/docente/Profile";
 import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import SupervisorPlaneacion from "./pages/supervisor/SupervisorPlaneacion";
 import SupervisorInstrumentos from "./pages/supervisor/SupervisorInstrumentos";
+import SupervisorDocPage from "./pages/supervisor/SupervisorDocPage";
 import PlaneacionPage from "./pages/docente/Planeacion";
 import Instrumento30Page from "./pages/docente/Instrumento30";
 import Instrumento40Page from "./pages/docente/Instrumento40";
@@ -111,9 +112,15 @@ function AppContent() {
         ])
       : (user?.role === "supervisor" || user?.roles?.includes("supervisor"))
       ? new Set([
-          "dashboard",
           "supervisor-planeacion",
           "supervisor-instrumentos",
+          "supervisor-remedial",
+          "supervisor-lista-concentrada",
+          "supervisor-asesoria",
+          "supervisor-portafolio",
+          "supervisor-acta-final",
+          "supervisor-estadias",
+          "supervisor-tutorias",
           "perfil",
         ])
       : new Set([
@@ -141,13 +148,32 @@ function AppContent() {
         ]);
 
     if (!allowedViews.has(currentView)) {
-      setCurrentView("dashboard");
-      sessionStorage.setItem(currentViewStorageKey, "dashboard");
+      const isSup = user?.role === "supervisor" || user?.roles?.includes("supervisor");
+      if (isSup) {
+        const sections = user?.supervisorSections ?? [];
+        const fallback = sections.includes("planeacion")
+          ? "supervisor-planeacion"
+          : sections.some((s) => ["instrumento-30","instrumento-40","instrumento-60","instrumento-70"].includes(s))
+          ? "supervisor-instrumentos"
+          : sections.includes("remedial") ? "supervisor-remedial"
+          : sections.includes("lista-concentrada") ? "supervisor-lista-concentrada"
+          : sections.includes("asesoria") ? "supervisor-asesoria"
+          : sections.includes("portafolio") ? "supervisor-portafolio"
+          : sections.includes("acta-final") ? "supervisor-acta-final"
+          : sections.includes("estadias") ? "supervisor-estadias"
+          : sections.includes("tutorias") ? "supervisor-tutorias"
+          : "perfil";
+        setCurrentView(fallback);
+        sessionStorage.setItem(currentViewStorageKey, fallback);
+      } else {
+        setCurrentView("dashboard");
+        sessionStorage.setItem(currentViewStorageKey, "dashboard");
+      }
     } else {
       sessionStorage.setItem(currentViewStorageKey, currentView);
     }
     setIsLoggingOut(false);
-  }, [currentView, isAuthenticated, isReady, user?.role]);
+  }, [currentView, isAuthenticated, isReady, user?.role, user?.supervisorSections]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -401,17 +427,50 @@ function AppContent() {
     }
 
     if (isSupervisor) {
+      const sections = user?.supervisorSections ?? [];
+      const defaultView = sections.includes("planeacion")
+        ? "supervisor-planeacion"
+        : sections.some((s) => ["instrumento-30","instrumento-40","instrumento-60","instrumento-70"].includes(s))
+        ? "supervisor-instrumentos"
+        : null;
+
       switch (currentView) {
-        case "dashboard":
-          return <SupervisorDashboard onNavigate={setCurrentView} />;
         case "supervisor-planeacion":
           return <SupervisorPlaneacion />;
         case "supervisor-instrumentos":
-          return <SupervisorInstrumentos />;
+          return <SupervisorInstrumentos allowedSections={sections} />;
+        case "supervisor-remedial":
+          return <SupervisorDocPage title="Remedial" formCode="remedial" />;
+        case "supervisor-lista-concentrada":
+          return <SupervisorDocPage title="Lista Concentrada" formCode="lista-concentrada" />;
+        case "supervisor-asesoria":
+          return <SupervisorDocPage title="Asesoría" formCode="asesoria" />;
+        case "supervisor-portafolio":
+          return <SupervisorDocPage title="Portafolio Digital Final" formCode="portafolio-digital" hideColumns={['parcial']} />;
+        case "supervisor-acta-final":
+          return <SupervisorDocPage title="Acta Final" formCode="acta-final" hideColumns={['parcial']} />;
+        case "supervisor-estadias":
+          return <SupervisorDocPage title="Estadías" hideColumns={['materia', 'parcial']} formCodes={[
+            { code: "estadias",           label: "Estadías" },
+            { code: "carta-presentacion", label: "Carta de Presentación" },
+            { code: "carta-aceptacion",   label: "Carta de Aceptación" },
+            { code: "carta-terminacion",  label: "Carta de Terminación" },
+          ]} />;
+        case "supervisor-tutorias":
+          return <SupervisorDocPage title="Tutorías" hideColumns={['materia', 'carrera', 'grupo', 'parcial']} formCodes={[
+            { code: "carga-academica",        label: "Carga Académica" },
+            { code: "reporte-bajas",          label: "Reporte de Bajas" },
+            { code: "concentrado-asesorias",  label: "Concentrado de Asesorías" },
+            { code: "acta-asistencia-grupal", label: "Acta de Asistencia Grupal" },
+            { code: "ficha-tecnica",          label: "Ficha Técnica" },
+          ]} />;
         case "perfil":
           return <Profile />;
         default:
-          return <SupervisorDashboard onNavigate={setCurrentView} />;
+          if (defaultView) {
+            return defaultView === "supervisor-planeacion" ? <SupervisorPlaneacion /> : <SupervisorInstrumentos allowedSections={sections} />;
+          }
+          return <Profile />;
       }
     }
 

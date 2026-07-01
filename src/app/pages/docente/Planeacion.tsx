@@ -303,12 +303,13 @@ export default function PlaneacionPage() {
   const uploadMultipleFiles = async (files: File[], basePayload: any) => {
     const uploadedIds = [];
 
-    for (const file of files) {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       const cleanFileName = file.name.replace(/\.pdf$/i, '').substring(0, 50);
       const title = `${basePayload.materia || "Planeación"} - ${basePayload.parcial || ""} - ${cleanFileName}`.trim();
 
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', file, file.name);
       fd.append('form_id', String(basePayload.form_id));
       fd.append('title', title);
       if (basePayload.apartado_label) fd.append('apartado_label', basePayload.apartado_label);
@@ -320,8 +321,14 @@ export default function PlaneacionPage() {
       if (basePayload.original_document_id) fd.append('original_document_id', String(basePayload.original_document_id));
       if (basePayload.nota) fd.append('nota', basePayload.nota);
 
-      const result = await apiFetch("/documents", { method: "POST", body: fd });
-      uploadedIds.push(result?.data?.id);
+      try {
+        const result = await apiFetch("/documents", { method: "POST", body: fd });
+        uploadedIds.push(result?.data?.id);
+      } catch (err: any) {
+        const label = files.length > 1 ? ` (archivo ${i + 1}: "${file.name}")` : "";
+        const msg = err?.message ?? "No fue posible subir el archivo";
+        throw new Error(`${msg}${label}`);
+      }
     }
 
     return uploadedIds;

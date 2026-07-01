@@ -260,8 +260,8 @@ const ConversationRow = React.memo(({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="truncate text-sm font-semibold text-foreground">{conversation.name}</p>
-              <p className="text-[11px] text-muted-foreground">{conversation.role}</p>
+              <p className="truncate text-sm font-semibold text-foreground dark:text-white">{conversation.name}</p>
+              <p className="text-[11px] text-muted-foreground dark:text-slate-400">{conversation.role}</p>
             </div>
             {conversation.unread > 0 && (
               <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1.5 text-[11px]">
@@ -269,8 +269,8 @@ const ConversationRow = React.memo(({
               </Badge>
             )}
           </div>
-          <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{conversation.lastMessage}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground/90">{conversation.timestamp}</p>
+          <p className="mt-1 line-clamp-1 text-sm text-muted-foreground dark:text-slate-400">{conversation.lastMessage}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground/90 dark:text-slate-500">{conversation.timestamp}</p>
         </div>
       </div>
     </div>
@@ -289,7 +289,7 @@ const SuppressedConversationRow = React.memo(({
   const initials = conversation.avatarFallback || getInitials(conversation.name);
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 py-2 dark:border-slate-700">
       <div className="min-w-0 flex items-center gap-3">
         <Avatar className="h-9 w-9 ring-1 ring-white/80 dark:ring-slate-900/60">
           {showImage && imageUrl ? (
@@ -301,8 +301,8 @@ const SuppressedConversationRow = React.memo(({
           )}
         </Avatar>
         <div className="min-w-0">
-          <p className="truncate font-semibold">{conversation.name}</p>
-          <p className="text-xs text-muted-foreground truncate">{conversation.role}</p>
+          <p className="truncate font-semibold dark:text-white">{conversation.name}</p>
+          <p className="text-xs text-muted-foreground truncate dark:text-slate-400">{conversation.role}</p>
         </div>
       </div>
       <Button
@@ -312,6 +312,7 @@ const SuppressedConversationRow = React.memo(({
         onClick={() => {
           onRestore(conversation.id);
         }}
+        className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
       >
         Restaurar
       </Button>
@@ -370,7 +371,7 @@ const MessageBubble = React.memo(({
         )}
         title={message.timestamp}
       >
-        <div className={cn("text-xs font-medium mb-1", message.isOwn ? "text-white/80" : "text-muted-foreground")}>
+        <div className={cn("text-xs font-medium mb-1", message.isOwn ? "text-white/80" : "text-muted-foreground dark:text-slate-400")}>
           {!message.isOwn && message.sender}
         </div>
 
@@ -395,7 +396,7 @@ const MessageBubble = React.memo(({
         {message.attachments && message.attachments.length > 0 && (
           <div className="mt-3 space-y-2">
             {message.attachments.map((attachment) => (
-              <div key={`${message.id}-${attachment.name}`} className="flex items-center gap-2 rounded-lg border p-2 text-sm bg-muted/40 dark:bg-slate-700/40 min-w-0 overflow-hidden">
+              <div key={`${message.id}-${attachment.name}`} className="flex items-center gap-2 rounded-lg border p-2 text-sm bg-muted/40 dark:bg-slate-700/40 dark:border-slate-700 min-w-0 overflow-hidden">
                 <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground dark:text-slate-400" />
                 <div className="min-w-0 flex-1 flex items-center justify-between">
                   <div className="min-w-0">
@@ -458,13 +459,13 @@ const MessageBubble = React.memo(({
                 <button type="button" onClick={() => setRemoveOpen(true)} className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
                   <Trash className="h-3.5 w-3.5" />
                 </button>
-                <DialogContent>
+                <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
                   <DialogHeader>
-                    <DialogTitle>Eliminar mensaje</DialogTitle>
-                    <DialogDescription>¿Seguro que deseas eliminar este mensaje? Esta acción no se puede deshacer.</DialogDescription>
+                    <DialogTitle className="dark:text-white">Eliminar mensaje</DialogTitle>
+                    <DialogDescription className="dark:text-slate-400">¿Seguro que deseas eliminar este mensaje? Esta acción no se puede deshacer.</DialogDescription>
                   </DialogHeader>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setRemoveOpen(false)}>Cancelar</Button>
+                    <Button variant="outline" onClick={() => setRemoveOpen(false)} className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Cancelar</Button>
                     <Button variant="destructive" onClick={() => { setRemoveOpen(false); onDelete(message.id); }}>Eliminar</Button>
                   </DialogFooter>
                 </DialogContent>
@@ -476,14 +477,14 @@ const MessageBubble = React.memo(({
 
       {editable && onEdit && (
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent>
+          <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
             <DialogHeader>
-              <DialogTitle>Editar mensaje</DialogTitle>
-              <DialogDescription>Modifica el contenido del mensaje y guarda los cambios.</DialogDescription>
+              <DialogTitle className="dark:text-white">Editar mensaje</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">Modifica el contenido del mensaje y guarda los cambios.</DialogDescription>
             </DialogHeader>
-            <Textarea value={editBody} onChange={(event) => setEditBody(event.target.value)} className="min-h-[120px]" />
+            <Textarea value={editBody} onChange={(event) => setEditBody(event.target.value)} className="min-h-[120px] dark:bg-slate-900 dark:border-slate-700 dark:text-white" />
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setEditOpen(false)} className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Cancelar</Button>
               <Button variant="success" onClick={() => { const nextBody = editBody.trim(); if (!nextBody) return; setEditOpen(false); onEdit(message.id, nextBody); }}>
                 Guardar cambios
               </Button>
@@ -511,8 +512,8 @@ function EmptyConversationState({ title, description }: Readonly<{ title: string
   return (
     <div className="flex h-full min-h-[260px] items-center justify-center px-6 py-10 text-center">
       <div className={cn("max-w-sm space-y-2 rounded-3xl border border-dashed p-6 shadow-sm", isDark ? "border-emerald-800 bg-slate-900/60" : "border-emerald-200 bg-white/70")}>
-        <p className="text-base font-semibold text-foreground">{title}</p>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <p className="text-base font-semibold text-foreground dark:text-white">{title}</p>
+        <p className="text-sm text-muted-foreground dark:text-slate-400">{description}</p>
       </div>
     </div>
   );
@@ -1015,7 +1016,6 @@ export function MessagesTeacher(props: Readonly<{
     if (conversationId) {
       setSelectedChat(conversationId);
       if (document) {
-        // Agregar documento como attachment pendiente en lugar de mensaje
         addDocumentAsPending(document);
       }
       void markConversationAsRead(conversationId);
@@ -1039,7 +1039,6 @@ export function MessagesTeacher(props: Readonly<{
           setSelectedChat(found.id);
           setDraftRecipient(null);
           if (document) {
-            // Agregar documento como attachment pendiente en lugar de enviarlo inmediatamente
             addDocumentAsPending(document);
           }
           await loadMessages(found.id);
@@ -1068,7 +1067,6 @@ export function MessagesTeacher(props: Readonly<{
             await loadConversations();
             setSelectedChat(conversationId);
             setDraftRecipient(null);
-            // Agregar documento como attachment pendiente en lugar de enviarlo inmediatamente
             if (document) addDocumentAsPending(document);
             await loadMessages(conversationId);
             await markConversationAsRead(conversationId);
@@ -1416,14 +1414,14 @@ export function MessagesTeacher(props: Readonly<{
       <div className="flex h-[calc(100dvh-64px)] min-h-0 flex-col gap-5 overflow-hidden">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
-            <h1>Mensajes</h1>
+            <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">Mensajes</h1>
             <p className="max-w-2xl text-sm text-muted-foreground hidden sm:block">Mensajería interna con el Administrador</p>
           </div>
         </div>
 
         <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-1">
           <Card className="flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
-            <CardHeader className="border-b border-border/60 bg-background/80 pb-4">
+            <CardHeader className="border-b border-border/60 bg-background/80 pb-4 dark:border-slate-700/60">
               {adminConversation ? (
                 <div className="flex items-start gap-3">
                   <Avatar className="h-11 w-11 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
@@ -1441,22 +1439,22 @@ export function MessagesTeacher(props: Readonly<{
                   </Avatar>
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <CardTitle className="text-base">{adminConversation.name}</CardTitle>
+                      <CardTitle className="text-base dark:text-white">{adminConversation.name}</CardTitle>
                       {adminConversation.unread > 0 && (
                         <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[11px]">
                           {adminConversation.unread}
                         </Badge>
                       )}
                     </div>
-                    <CardDescription>
+                    <CardDescription className="dark:text-slate-400">
                       <span>{adminConversation.role}</span>
                     </CardDescription>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <CardTitle className="text-base">Chat con Administrador</CardTitle>
-                  <CardDescription>Escribe el primer mensaje para iniciar el chat con administración.</CardDescription>
+                  <CardTitle className="text-base dark:text-white">Chat con Administrador</CardTitle>
+                  <CardDescription className="dark:text-slate-400">Escribe el primer mensaje para iniciar el chat con administración.</CardDescription>
                 </div>
               )}
             </CardHeader>
@@ -1492,7 +1490,7 @@ export function MessagesTeacher(props: Readonly<{
               )}
             </CardContent>
 
-            <div className="shrink-0 border-t border-border/60 bg-background/95 p-4 shadow-[0_-12px_30px_rgba(16,185,129,0.06)] backdrop-blur-sm">
+            <div className="shrink-0 border-t border-border/60 bg-background/95 p-4 shadow-[0_-12px_30px_rgba(16,185,129,0.06)] backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-950/95">
               {replyingTo && (
                 <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
                   <div className="min-w-0">
@@ -1511,7 +1509,7 @@ export function MessagesTeacher(props: Readonly<{
                   placeholder="Escribe un mensaje..."
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background/90 px-4 py-3 shadow-inner dark:bg-slate-900 dark:border-slate-700"
+                  className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background/90 px-4 py-3 shadow-inner dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -1555,21 +1553,21 @@ export function MessagesTeacher(props: Readonly<{
     <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-5 overflow-hidden">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
-          <h1>Mensajes</h1>
+          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">Mensajes</h1>
           <p className="max-w-2xl text-sm text-muted-foreground hidden sm:block">Mensajería interna: mensajes, archivos y seguimiento.</p>
         </div>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
         <Card className="hidden sm:flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
-          <CardHeader className="space-y-4 border-b border-border/60 pb-4">
+          <CardHeader className="space-y-4 border-b border-border/60 pb-4 dark:border-slate-700/60">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <CardTitle>Chats</CardTitle>
-                <CardDescription className="hidden sm:block">Conversaciones recientes</CardDescription>
+                <CardTitle className="dark:text-white">Chats</CardTitle>
+                <CardDescription className="hidden sm:block dark:text-slate-400">Conversaciones recientes</CardDescription>
               </div>
               {suppressedConversations.length > 0 && (
-                <Button variant="outline" size="sm" onClick={() => setRestoreDialogOpen(true)}>
+                <Button variant="outline" size="sm" onClick={() => setRestoreDialogOpen(true)} className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">
                   <Eye className="h-4 w-4 mr-1" />
                   Restaurar ({suppressedConversations.length})
                 </Button>
@@ -1577,11 +1575,16 @@ export function MessagesTeacher(props: Readonly<{
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre o mensaje..." className="pl-9" />
+              <Input 
+                value={search} 
+                onChange={(e) => setSearch(e.target.value)} 
+                placeholder="Buscar por nombre o mensaje..." 
+                className="pl-9 dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400" 
+              />
             </div>
             {(user?.role === "administrador" || user?.roles?.includes("administrador")) && (
               <div className="flex items-center justify-end">
-                <Button variant="secondary" size="sm" onClick={() => setNewConversationOpen(true)}>
+                <Button variant="secondary" size="sm" onClick={() => setNewConversationOpen(true)} className="dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700">
                   Nuevo chat
                 </Button>
               </div>
@@ -1613,10 +1616,10 @@ export function MessagesTeacher(props: Readonly<{
         </Card>
 
         <Dialog open={newConversationOpen} onOpenChange={setNewConversationOpen}>
-          <DialogContent>
+          <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
             <DialogHeader>
-              <DialogTitle>Iniciar nuevo chat</DialogTitle>
-              <DialogDescription>Selecciona un {peerRoleLabel.toLowerCase()}. El chat se creará cuando se envíe el primer mensaje.</DialogDescription>
+              <DialogTitle className="dark:text-white">Iniciar nuevo chat</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">Selecciona un {peerRoleLabel.toLowerCase()}. El chat se creará cuando se envíe el primer mensaje.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="relative">
@@ -1625,17 +1628,17 @@ export function MessagesTeacher(props: Readonly<{
                   value={recipientQuery}
                   onChange={(e) => setRecipientQuery(e.target.value)}
                   placeholder={`Buscar ${peerRoleLabel.toLowerCase()} por nombre...`}
-                  className="pl-9"
+                  className="pl-9 dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                 />
               </div>
               {isLoadingRecipients ? (
-                <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground dark:border-slate-700 dark:text-slate-400">
                   Cargando...
                 </div>
               ) : recipientFetchError ? (
                 <p className="text-sm text-destructive">{recipientFetchError}</p>
               ) : (
-                <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-background/80 p-3">
+                <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-background/80 p-3 dark:border-slate-700/70 dark:bg-slate-900/80">
                   {filteredRecipientUsers.length > 0 ? (
                     filteredRecipientUsers.map((recipient) => {
                       const recipientName = recipient.full_name ?? recipient.name ?? "Usuario";
@@ -1648,7 +1651,7 @@ export function MessagesTeacher(props: Readonly<{
                           key={recipient.id}
                           type="button"
                           onClick={() => handleCreateConversation(recipient)}
-                          className="w-full rounded-xl border border-border/60 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/80"
+                          className="w-full rounded-xl border border-border/60 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/80 dark:border-slate-700/60 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
                         >
                           <div className="flex items-center gap-3">
                             <Avatar className="h-10 w-10 ring-1 ring-white/80 dark:ring-slate-900/60">
@@ -1658,15 +1661,15 @@ export function MessagesTeacher(props: Readonly<{
                               </AvatarFallback>
                             </Avatar>
                             <div className="min-w-0">
-                              <p className="truncate font-semibold">{recipientName}</p>
-                              <p className="text-sm text-muted-foreground">{peerRoleLabel}</p>
+                              <p className="truncate font-semibold dark:text-white">{recipientName}</p>
+                              <p className="text-sm text-muted-foreground dark:text-slate-400">{peerRoleLabel}</p>
                             </div>
                           </div>
                         </button>
                       );
                     })
                   ) : (
-                    <p className="text-sm text-muted-foreground">No se encontraron usuarios.</p>
+                    <p className="text-sm text-muted-foreground dark:text-slate-400">No se encontraron usuarios.</p>
                   )}
                 </div>
               )}
@@ -1675,15 +1678,15 @@ export function MessagesTeacher(props: Readonly<{
         </Dialog>
 
         <Dialog open={restoreDialogOpen} onOpenChange={setRestoreDialogOpen}>
-          <DialogContent>
+          <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
             <DialogHeader>
-              <DialogTitle>Restaurar chats suprimidos</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="dark:text-white">Restaurar chats suprimidos</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">
                 Selecciona qué chat deseas restaurar. No se restauran todos automáticamente.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-background/80 p-3">
+            <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-background/80 p-3 dark:border-slate-700/70 dark:bg-slate-900/80">
               {suppressedConversations.length > 0 ? (
                 suppressedConversations.map((conversation) => (
                   <SuppressedConversationRow
@@ -1693,18 +1696,18 @@ export function MessagesTeacher(props: Readonly<{
                   />
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground">No hay chats suprimidos para restaurar.</p>
+                <p className="text-sm text-muted-foreground dark:text-slate-400">No hay chats suprimidos para restaurar.</p>
               )}
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setRestoreDialogOpen(false)}>Cerrar</Button>
+              <Button variant="outline" onClick={() => setRestoreDialogOpen(false)} className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Cerrar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         <Card className="flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
-          <CardHeader className="border-b border-border/60 bg-background/80 pb-4">
+          <CardHeader className="border-b border-border/60 bg-background/80 pb-4 dark:border-slate-700/60">
             {targetConversation ? (
               <div className="flex items-start gap-3">
                 <Avatar className="h-11 w-11 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
@@ -1722,22 +1725,22 @@ export function MessagesTeacher(props: Readonly<{
                 </Avatar>
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <CardTitle className="text-base">{targetConversation.name}</CardTitle>
+                    <CardTitle className="text-base dark:text-white">{targetConversation.name}</CardTitle>
                     {targetConversation.unread > 0 && (
                       <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[11px]">
                         {targetConversation.unread}
                       </Badge>
                     )}
                   </div>
-                  <CardDescription>
+                  <CardDescription className="dark:text-slate-400">
                     <span>{targetConversation.role}</span>
                   </CardDescription>
                 </div>
               </div>
             ) : (
               <div>
-                <CardTitle className="text-base">Selecciona un chat</CardTitle>
-                <CardDescription>Elige una conversación para ver el historial y responder.</CardDescription>
+                <CardTitle className="text-base dark:text-white">Selecciona un chat</CardTitle>
+                <CardDescription className="dark:text-slate-400">Elige una conversación para ver el historial y responder.</CardDescription>
               </div>
             )}
           </CardHeader>
@@ -1773,7 +1776,7 @@ export function MessagesTeacher(props: Readonly<{
             )}
           </CardContent>
 
-          <div className="shrink-0 border-t border-border/60 bg-background/95 p-4 shadow-[0_-12px_30px_rgba(16,185,129,0.06)] backdrop-blur-sm">
+          <div className="shrink-0 border-t border-border/60 bg-background/95 p-4 shadow-[0_-12px_30px_rgba(16,185,129,0.06)] backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-950/95">
             {replyingTo && (
               <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
                 <div className="min-w-0">
@@ -1792,7 +1795,7 @@ export function MessagesTeacher(props: Readonly<{
                 placeholder="Escribe un mensaje..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background/90 px-4 py-3 shadow-inner dark:bg-slate-900 dark:border-slate-700"
+                className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background/90 px-4 py-3 shadow-inner dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();

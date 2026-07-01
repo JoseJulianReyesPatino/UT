@@ -102,7 +102,7 @@ export default function Instrumento60Page() {
     void (async () => {
       try {
         if (!user) return;
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 4, per_page: 50 } });
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 3, per_page: 50 } });
         if (cancelled) return;
         setHistory(Array.isArray(res?.data) ? res.data : []);
       } catch (error) {
@@ -326,7 +326,7 @@ export default function Instrumento60Page() {
       }
       
       const basePayload: any = {
-        form_id: 4,
+        form_id: 3,
         apartado_label: "instrumento-60-nuevo",
         carrera_label: carreraLabel,
         plan: "nuevo-modelo",
@@ -353,7 +353,7 @@ export default function Instrumento60Page() {
       resetForm();
 
       if (user) {
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 4, per_page: 50 } });
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 3, per_page: 50 } });
         setHistory(Array.isArray(res?.data) ? res.data : []);
       }
     } catch (error: any) {

@@ -56,15 +56,6 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // Solo agregar Content-Type si NO es FormData (el navegador lo setea automáticamente para FormData)
-  if (!isFormData) {
-    headers["Content-Type"] = "application/json";
-  }
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
   const candidateBases = path.startsWith("http")
     ? [API_BASE_URL]
     : API_BASE_URL_CANDIDATES.length > 0

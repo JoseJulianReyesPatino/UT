@@ -109,7 +109,7 @@ export default function RemedialPage() {
     void (async () => {
       try {
         if (!user) return;
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 17, per_page: 50 } });
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 20, per_page: 50 } });
         if (cancelled) return;
         setHistory(Array.isArray(res?.data) ? res.data : []);
       } catch (error) {
@@ -357,7 +357,7 @@ export default function RemedialPage() {
       }
       
       const basePayload: any = {
-        form_id: 17,
+        form_id: 20,
         apartado_label: "remedial",
         carrera_label: carreraLabel,
         plan: formData.plan,
@@ -384,7 +384,7 @@ export default function RemedialPage() {
       resetForm();
 
       if (user) {
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 17, per_page: 50 } });
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 20, per_page: 50 } });
         setHistory(Array.isArray(res?.data) ? res.data : []);
       }
     } catch (error: any) {

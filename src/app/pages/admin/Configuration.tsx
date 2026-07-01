@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -12,7 +12,7 @@ import { apiFetch } from "../../lib/api";
 import { API_BASE_URL } from "../../lib/env";
 import { useTheme } from "../../context/ThemeContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronUp, FileText, Grid2x2, Moon, PencilLine, Plus, Search, Sun, Trash2, Users, Settings2 } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronUp, FileText, Grid2x2, Moon, PencilLine, Plus, Search, Shield, Sun, Trash2, Users, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { carrieras } from "../../data/curricula";
 import { clearAvatarCache, getAvatarUrlWithTimestamp, getInitials, useResolvedAvatarUrl } from "../../lib/avatar";
@@ -28,11 +28,28 @@ const getAbsoluteUrl = (url?: string | null): string | undefined => {
   return url;
 };
 
-type ConfigTab = "formularios" | "grupos" | "cuenta";
+type ConfigTab = "formularios" | "grupos" | "cuenta" | "supervisores";
 
 interface ConfigurationProps {
   initialTab?: ConfigTab;
 }
+
+type SupervisorPermission = { user_id: number; user_name: string; email: string; sections: string[] };
+
+const SUPERVISOR_SECTIONS = [
+  { id: "planeacion", label: "Planeación" },
+  { id: "instrumento-30", label: "Instrumento 30%" },
+  { id: "instrumento-40", label: "Instrumento 40%" },
+  { id: "instrumento-60", label: "Instrumento 60%" },
+  { id: "instrumento-70", label: "Instrumento 70%" },
+  { id: "remedial", label: "Remedial" },
+  { id: "lista-concentrada", label: "Lista Concentrada" },
+  { id: "asesoria", label: "Asesoría" },
+  { id: "portafolio", label: "Portafolio Digital Final" },
+  { id: "acta-final", label: "Acta Final" },
+  { id: "estadias", label: "Estadías" },
+  { id: "tutorias", label: "Tutorías" },
+] as const;
 
 type CareerOption = {
   codigo: string;
@@ -168,10 +185,17 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   }>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
+  // Supervisor section permissions
+  const [supervisors, setSupervisors] = useState<SupervisorPermission[]>([]);
+  const [supervisorsLoading, setSupervisorsLoading] = useState(false);
+  const [supervisorDrafts, setSupervisorDrafts] = useState<Record<number, string[]>>({});
+  const [savingSupId, setSavingSupId] = useState<number | null>(null);
+
   const navItems = useMemo(
     () => [
       { value: "formularios" as const, label: "Formularios", icon: FileText, description: "Campos y estructura" },
       { value: "grupos" as const, label: "Grupos", icon: Users, description: "Carreras y cuatrimestres" },
+      { value: "supervisores" as const, label: "Supervisores", icon: Shield, description: "Permisos de secciones" },
       { value: "cuenta" as const, label: "Cuenta", icon: Settings2, description: "Perfil y preferencias" },
     ],
     []
@@ -534,6 +558,57 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     setDeleteConfirmation("");
   };
 
+  const loadSupervisors = useCallback(async () => {
+    setSupervisorsLoading(true);
+    try {
+      const res = await apiFetch('/supervisor-permissions') as any;
+      const data: SupervisorPermission[] = res?.data ?? [];
+      setSupervisors(data);
+      const drafts: Record<number, string[]> = {};
+      data.forEach((s) => { drafts[s.user_id] = [...s.sections]; });
+      setSupervisorDrafts(drafts);
+    } catch {
+      toast.error("No fue posible cargar los supervisores");
+    } finally {
+      setSupervisorsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "supervisores") void loadSupervisors();
+  }, [activeTab, loadSupervisors]);
+
+  const handleSectionChange = (userId: number, sectionId: string, checked: boolean) => {
+    setSupervisorDrafts((prev) => {
+      const current = prev[userId] ?? [];
+      return {
+        ...prev,
+        [userId]: checked
+          ? [...current, sectionId]
+          : current.filter((s) => s !== sectionId),
+      };
+    });
+  };
+
+  const handleSaveSupervisorSections = async (userId: number) => {
+    setSavingSupId(userId);
+    try {
+      await apiFetch(`/supervisor-permissions/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sections: supervisorDrafts[userId] ?? [] }),
+      });
+      toast.success("Permisos actualizados correctamente");
+      setSupervisors((prev) =>
+        prev.map((s) => s.user_id === userId ? { ...s, sections: supervisorDrafts[userId] ?? [] } : s)
+      );
+    } catch {
+      toast.error("No fue posible guardar los permisos");
+    } finally {
+      setSavingSupId(null);
+    }
+  };
+
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -575,12 +650,13 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       return;
     }
 
-    if (normalizedPhone.length !== 10) {
+    if (normalizedPhone.length > 0 && normalizedPhone.length !== 10) {
       toast.error("El teléfono debe contener exactamente 10 números");
       return;
     }
 
     const fullName = `${firstNames} ${lastNames}`.trim();
+    const phoneValue = normalizedPhone.length === 10 ? normalizedPhone : null;
 
     setIsSavingProfile(true);
 
@@ -590,7 +666,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
         formData.append("full_name", fullName);
         formData.append("first_names", firstNames);
         formData.append("last_names", lastNames);
-        formData.append("phone", normalizedPhone);
+        if (phoneValue) formData.append("phone", phoneValue);
         formData.append("avatar", selectedAvatarFile);
 
         // PHP solo parsea $_FILES en POST, nunca en PATCH/PUT.
@@ -607,7 +683,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
             full_name: fullName,
             first_names: firstNames,
             last_names: lastNames,
-            phone: normalizedPhone,
+            phone: phoneValue,
           }),
         });
       }
@@ -640,7 +716,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           name: fullName,
           firstNames,
           lastNames,
-          phone: normalizedPhone,
+          phone: phoneValue ?? undefined,
           avatar: avatarForContext,
         });
 
@@ -1318,6 +1394,112 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {activeTab === "supervisores" && (
+            <div className="space-y-4">
+              <Card className={sectionCardClass}>
+                <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                        <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        Permisos de Supervisores
+                      </CardTitle>
+                      <CardDescription className="text-xs sm:text-sm mt-1">
+                        Asigna las secciones a las que puede acceder cada supervisor. Solo las secciones habilitadas aparecerán en su menú.
+                      </CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => void loadSupervisors()} disabled={supervisorsLoading} className="shrink-0 gap-2 text-sm">
+                      {supervisorsLoading ? "Cargando..." : "Actualizar"}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  {supervisorsLoading ? (
+                    <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+                      Cargando supervisores...
+                    </div>
+                  ) : supervisors.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
+                      <Shield className="h-10 w-10 opacity-30" />
+                      <p className="text-sm">No hay supervisores registrados.</p>
+                      <p className="text-xs">Crea un usuario con rol de supervisor para asignarle permisos.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {supervisors.map((sup) => {
+                        const draft = supervisorDrafts[sup.user_id] ?? [];
+                        const isSaving = savingSupId === sup.user_id;
+                        return (
+                          <div key={sup.user_id} className={`rounded-2xl border p-4 sm:p-5 ${theme === "dark" ? "border-slate-700 bg-slate-900/50" : "border-slate-200 bg-slate-50"}`}>
+                            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                              <div>
+                                <h3 className="font-semibold text-sm sm:text-base">{sup.user_name}</h3>
+                                <p className="text-xs text-muted-foreground">{sup.email}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {draft.length === 0 ? "Sin acceso a ninguna sección" : `${draft.length} sección${draft.length !== 1 ? "es" : ""} habilitada${draft.length !== 1 ? "s" : ""}`}
+                                </p>
+                              </div>
+                              <div className="flex gap-2 shrink-0">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs"
+                                  onClick={() => setSupervisorDrafts((prev) => ({ ...prev, [sup.user_id]: [] }))}
+                                  disabled={isSaving || draft.length === 0}
+                                >
+                                  Quitar todo
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs"
+                                  onClick={() => setSupervisorDrafts((prev) => ({ ...prev, [sup.user_id]: SUPERVISOR_SECTIONS.map((s) => s.id) }))}
+                                  disabled={isSaving || draft.length === SUPERVISOR_SECTIONS.length}
+                                >
+                                  Dar todo
+                                </Button>
+                                <Button
+                                  variant="success"
+                                  size="sm"
+                                  className="text-xs"
+                                  onClick={() => void handleSaveSupervisorSections(sup.user_id)}
+                                  disabled={isSaving}
+                                >
+                                  {isSaving ? "Guardando..." : "Guardar"}
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {SUPERVISOR_SECTIONS.map((section) => {
+                                const isChecked = draft.includes(section.id);
+                                return (
+                                  <div key={section.id} className="flex items-center gap-2">
+                                    <Checkbox
+                                      id={`sup-${sup.user_id}-${section.id}`}
+                                      checked={isChecked}
+                                      disabled={isSaving}
+                                      onCheckedChange={(checked) => handleSectionChange(sup.user_id, section.id, Boolean(checked))}
+                                    />
+                                    <label
+                                      htmlFor={`sup-${sup.user_id}-${section.id}`}
+                                      className={`text-sm cursor-pointer select-none ${isChecked ? "font-medium" : "text-muted-foreground"}`}
+                                    >
+                                      {section.label}
+                                    </label>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       </div>

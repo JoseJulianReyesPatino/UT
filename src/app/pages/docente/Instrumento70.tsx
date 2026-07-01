@@ -100,7 +100,7 @@ export default function Instrumento70Page() {
     void (async () => {
       try {
         if (!user) return;
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 5, per_page: 50 } });
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 19, per_page: 50 } });
         if (cancelled) return;
         setHistory(Array.isArray(res?.data) ? res.data : []);
       } catch (error) {
@@ -324,7 +324,7 @@ export default function Instrumento70Page() {
       }
       
       const basePayload: any = {
-        form_id: 5,
+        form_id: 19,
         apartado_label: "instrumento-70-normal",
         carrera_label: carreraLabel,
         plan: "plan-normal",
@@ -351,7 +351,7 @@ export default function Instrumento70Page() {
       resetForm();
 
       if (user) {
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 5, per_page: 50 } });
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 19, per_page: 50 } });
         setHistory(Array.isArray(res?.data) ? res.data : []);
       }
     } catch (error: any) {
