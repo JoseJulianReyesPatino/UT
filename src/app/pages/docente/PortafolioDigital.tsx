@@ -95,8 +95,9 @@ export default function PortafolioDigitalPage() {
   }, [formData.carrera, formData.cuatrimestre]);
 
   useEffect(() => {
+    if (editingDocumentId !== null) return;
     setFormData((current) => ({ ...current, grupo: "" }));
-  }, [formData.carrera, formData.cuatrimestre]);
+  }, [editingDocumentId, formData.carrera, formData.cuatrimestre]);
 
   useEffect(() => {
     let cancelled = false;

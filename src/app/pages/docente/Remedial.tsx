@@ -101,8 +101,9 @@ export default function RemedialPage() {
   }, [formData.carrera, formData.cuatrimestre]);
 
   useEffect(() => {
+    if (editingDocumentId !== null) return;
     setFormData((current) => ({ ...current, grupo: "", parcial: "" }));
-  }, [formData.carrera, formData.cuatrimestre]);
+  }, [editingDocumentId, formData.carrera, formData.cuatrimestre]);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,29 +234,62 @@ export default function RemedialPage() {
       return "plan-normal";
     };
 
+    const asText = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+
+    const extractTitleParts = (title: unknown) => {
+      const parts = asText(title)
+        .trim()
+        .split(" - ")
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+      return {
+        materia: parts[0] ?? "",
+        parcial: parts[1] ?? "",
+      };
+    };
+
+    const extractCuatrimestreFromGroupCode = (groupCode: unknown, careerCode: string) => {
+      const normalizedGroupCode = asText(groupCode).replaceAll("_", "-").toUpperCase();
+      const normalizedCareerCode = asText(careerCode).replaceAll("_", "").toUpperCase();
+      const suffix = normalizedCareerCode && normalizedGroupCode.startsWith(normalizedCareerCode)
+        ? normalizedGroupCode.slice(normalizedCareerCode.length)
+        : normalizedGroupCode;
+      const match = /^(\d{1,2})/.exec(suffix);
+      return match?.[1] ?? "";
+    };
+
+    const normalizeText = (value: unknown, fallback = "") => {
+      const text = asText(value);
+      if (!text || /^sin materia$/i.test(text) || text === "-") return fallback;
+      return text;
+    };
+
     const planKey = normalizePlanKey(document.plan ?? "");
     const careerCode = findCareerCodeByLabel(document.carrera_label ?? "", planKey as any);
     const allowedCuatrimestres = new Set(Object.keys(cuatrimestresLabels));
-    const rawCuatrimestre = String(document.cuatrimestre ?? "").trim();
-    const fallbackParcial = String(document.parcial ?? "").trim();
+    const rawCuatrimestre = asText(document.cuatrimestre);
+    const titleParts = extractTitleParts(document.title ?? document.file_path ?? "");
     const resolvedCuatrimestre = allowedCuatrimestres.has(rawCuatrimestre)
       ? rawCuatrimestre
-      : (allowedCuatrimestres.has(fallbackParcial) ? fallbackParcial : "");
+      : extractCuatrimestreFromGroupCode(document.group_code ?? document.group ?? "", careerCode);
 
-    const normalizeParcialForForm = (value: unknown): string => {
-      const raw = String(value ?? "").trim();
-      const match = raw.match(/\b([123])\b/);
-      return match ? `Parcial ${match[1]}` : "";
+    const normalizeParcialForForm = (value: unknown, fallback = ""): string => {
+      const raw = asText(value);
+      const candidate = raw || fallback;
+      if (!candidate) return "";
+      const match = /\b([123])\b/.exec(candidate);
+      return match ? `Parcial ${match[1]}` : candidate;
     };
 
     setEditingDocumentId(document.id);
     setFormData({
-      plan: planKey as Plan,
+      plan: planKey,
       carrera: careerCode,
-      cuatrimestre: resolvedCuatrimestre as Cuatrimestre,
-      materia: document.materia ?? "",
-      parcial: normalizeParcialForForm(document.parcial),
-      grupo: document.group_code ? formatGroupCode(document.group_code) : "",
+      cuatrimestre: (allowedCuatrimestres.has(rawCuatrimestre) ? rawCuatrimestre : resolvedCuatrimestre) as Cuatrimestre,
+      materia: normalizeText(document.materia, titleParts.materia),
+      parcial: normalizeParcialForForm(document.parcial, titleParts.parcial),
+      grupo: formatGroupCode(document.group_code ?? document.group ?? ""),
       archivos: [],
       docente: document.docente ?? (user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() : ""),
       nota: document.note ?? document.nota ?? "",
@@ -404,44 +438,44 @@ export default function RemedialPage() {
 
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" className="w-full justify-center rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent sm:w-auto">
+            <Button variant="outline" className="w-full justify-center rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent sm:w-auto dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
               <History className="mr-2 h-4 w-4" />
               Historial
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="sm:max-w-xl overflow-y-auto">
+          <SheetContent side="right" className="sm:max-w-xl overflow-y-auto dark:border-slate-700 dark:bg-slate-950">
             <SheetHeader>
-              <SheetTitle>Historial de archivos</SheetTitle>
-              <SheetDescription>Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
+              <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
+              <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
             </SheetHeader>
             <div className="mt-4 space-y-4">
               {history.length > 0 ? (
-                <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:bg-slate-900/30">
+                <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-700 dark:bg-slate-900/30">
                   <div className="grid gap-3 p-1">
                     {history.map((h) => (
-  <DocumentHistoryCard
-    key={h.id}
-    title={h.title ?? h.file_path}
-    fileName={getUploadedFileName(h)}
-    carrera={h.carrera_label}
-    subject={h.materia}
-    submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-    status={h.status}
-    returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
-    onView={() => openDocument(h.id, "view")}
-    onEdit={() => populateFormForEdit(h)}
-  />
-))}
+                      <DocumentHistoryCard
+                        key={h.id}
+                        title={h.title ?? h.file_path}
+                        fileName={getUploadedFileName(h)}
+                        carrera={h.carrera_label}
+                        subject={h.materia}
+                        submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        status={h.status}
+                        returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
+                        onView={() => openDocument(h.id, "view")}
+                        onEdit={() => populateFormForEdit(h)}
+                      />
+                    ))}
                   </div>
                 </ScrollArea>
               ) : formData.archivos.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No hay archivos cargados en esta sesión ni en el historial.</p>
+                <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
               ) : (
                 <div>
-                  <p className="mb-2 text-sm font-medium">Archivos en esta sesión</p>
+                  <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
                   <ul className="space-y-2">
                     {formData.archivos.map((f, i) => (
-                      <li key={`${f.name}-${i}`} className="text-sm">{f.name}</li>
+                      <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
                     ))}
                   </ul>
                 </div>
@@ -453,13 +487,15 @@ export default function RemedialPage() {
 
       <div className="flex items-center justify-between rounded-md border-l-4 border-emerald-300 bg-emerald-50 p-3 dark:border-emerald-300 dark:bg-emerald-900/10">
         <p className="text-sm font-medium text-black dark:text-white">Recordatorio: Se sube 3 días después de la aplicación de cada parcial.</p>
-        <Button variant="outline" size="sm" onClick={() => window.open(calendarioUrl, "_blank")}>Calendario</Button>
+        <Button variant="outline" size="sm" onClick={() => window.open(calendarioUrl, "_blank")} className="dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+          Calendario
+        </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Formulario Remedial</CardTitle>
-          <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
+      <Card className="dark:border-slate-800/70 dark:bg-slate-950/60">
+        <CardHeader className="dark:border-slate-700">
+          <CardTitle className="dark:text-white">Formulario Remedial</CardTitle>
+          <CardDescription className="dark:text-slate-400">Los campos marcados con * son obligatorios.</CardDescription>
           {editingDocumentId && (
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
               Estás editando el remedial existente. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
@@ -469,40 +505,40 @@ export default function RemedialPage() {
         <CardContent className="space-y-6 p-6 sm:p-8">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 md:col-span-2">
-              <Label className="text-sm font-medium">Plan *</Label>
+              <Label className="text-sm font-medium dark:text-white">Plan *</Label>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Button
                   variant={formData.plan === "nuevo-modelo" ? "success" : "outline"}
                   onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))}
-                  className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left"
+                  className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                 >
                   <span className="text-base font-semibold">Plan Nuevo Modelo</span>
-                  <span className="text-xs text-muted-foreground">TSU e Ingeniería</span>
+                  <span className="text-xs text-muted-foreground dark:text-slate-400">TSU e Ingeniería</span>
                 </Button>
                 <Button
                   variant={formData.plan === "plan-normal" ? "success" : "outline"}
                   onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))}
-                  className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left"
+                  className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                 >
                   <span className="text-base font-semibold">Plan Normal</span>
-                  <span className="text-xs text-muted-foreground">Ingenierías</span>
+                  <span className="text-xs text-muted-foreground dark:text-slate-400">Ingenierías</span>
                 </Button>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Carrera *</Label>
+              <Label className="dark:text-white">Carrera *</Label>
               <Select
                 value={formData.carrera}
                 onValueChange={(value) => setFormData((current) => ({ ...current, carrera: value, cuatrimestre: "", materia: "" }))}
                 disabled={!formData.plan}
               >
-                <SelectTrigger className="rounded-2xl">
+                <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
                   <SelectValue placeholder="Selecciona la carrera" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
                   {carrerasDisponibles.map((career) => (
-                    <SelectItem key={career.codigo} value={career.codigo}>
+                    <SelectItem key={career.codigo} value={career.codigo} className="dark:text-white dark:hover:bg-slate-800">
                       {career.nombre}
                     </SelectItem>
                   ))}
@@ -511,18 +547,18 @@ export default function RemedialPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Cuatrimestre *</Label>
+              <Label className="dark:text-white">Cuatrimestre *</Label>
               <Select 
                 value={formData.cuatrimestre} 
                 onValueChange={(value) => setFormData((current) => ({ ...current, cuatrimestre: value as Cuatrimestre, materia: "" }))} 
                 disabled={!formData.carrera}
               >
-                <SelectTrigger className="rounded-2xl">
+                <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
                   <SelectValue placeholder="Selecciona el cuatrimestre" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
                   {cuatrimestresDisponibles.map((value) => (
-                    <SelectItem key={value} value={value}>
+                    <SelectItem key={value} value={value} className="dark:text-white dark:hover:bg-slate-800">
                       {getCuatrimestreLabel(value)}
                     </SelectItem>
                   ))}
@@ -531,18 +567,18 @@ export default function RemedialPage() {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label>Materia *</Label>
+              <Label className="dark:text-white">Materia *</Label>
               <Select 
                 value={formData.materia} 
                 onValueChange={(value) => setFormData((current) => ({ ...current, materia: value }))} 
                 disabled={!formData.cuatrimestre}
               >
-                <SelectTrigger className="rounded-2xl">
+                <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
                   <SelectValue placeholder="Selecciona la materia" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
                   {materiasDisponibles.map((matter) => (
-                    <SelectItem key={matter.nombre} value={matter.nombre}>
+                    <SelectItem key={matter.nombre} value={matter.nombre} className="dark:text-white dark:hover:bg-slate-800">
                       {matter.nombre}
                     </SelectItem>
                   ))}
@@ -552,29 +588,29 @@ export default function RemedialPage() {
 
             <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Parcial *</Label>
+                <Label className="dark:text-white">Parcial *</Label>
                 <Select value={formData.parcial} onValueChange={(value) => setFormData((current) => ({ ...current, parcial: value }))}>
-                  <SelectTrigger className="rounded-2xl">
+                  <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
                     <SelectValue placeholder="Selecciona el parcial" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
                     {parciales.map((parcial) => (
-                      <SelectItem key={parcial} value={parcial}>{parcial}</SelectItem>
+                      <SelectItem key={parcial} value={parcial} className="dark:text-white dark:hover:bg-slate-800">{parcial}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Grupo *</Label>
+                <Label className="dark:text-white">Grupo *</Label>
                 {groupsOptions.length > 0 ? (
                   <Select value={formData.grupo} onValueChange={(value) => setFormData((c) => ({ ...c, grupo: value }))}>
-                    <SelectTrigger className="rounded-2xl">
+                    <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
                       <SelectValue placeholder="Selecciona el grupo" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
                       {groupsOptions.map((g) => (
-                        <SelectItem key={g.id} value={formatGroupCode(g.group_code)}>
+                        <SelectItem key={g.id} value={formatGroupCode(g.group_code)} className="dark:text-white dark:hover:bg-slate-800">
                           {formatGroupCode(g.group_code)}
                         </SelectItem>
                       ))}
@@ -589,9 +625,9 @@ export default function RemedialPage() {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label>Instrumento en PDF *</Label>
-              <p className="text-sm text-muted-foreground">Adjuntar el documento en formato PDF, con un límite de 5 MB por archivo. Se permite hasta tres archivos.</p>
-              <div className="rounded-3xl border border-dashed border-border bg-background/60 p-6 text-center transition-colors hover:border-primary/50 hover:bg-primary/5">
+              <Label className="dark:text-white">Instrumento en PDF *</Label>
+              <p className="text-sm text-muted-foreground dark:text-slate-400">Adjuntar el documento en formato PDF, con un límite de 5 MB por archivo. Se permite hasta tres archivos.</p>
+              <div className="rounded-3xl border border-dashed border-border bg-background/60 p-6 text-center transition-colors hover:border-primary/50 hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40">
                 <input 
                   type="file" 
                   accept=".pdf" 
@@ -602,12 +638,12 @@ export default function RemedialPage() {
                   disabled={formData.archivos.length >= 3} 
                 />
                 <label htmlFor="remedial-upload" className="block cursor-pointer space-y-3">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary dark:bg-emerald-500/10 dark:text-emerald-400">
                     <Upload className="h-6 w-6" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{getArchivosLabel()}</p>
-                    <p className="text-xs text-muted-foreground">{getEspaciosLabel()}</p>
+                    <p className="text-sm font-medium dark:text-white">{getArchivosLabel()}</p>
+                    <p className="text-xs text-muted-foreground dark:text-slate-400">{getEspaciosLabel()}</p>
                   </div>
                 </label>
               </div>
@@ -622,42 +658,42 @@ export default function RemedialPage() {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label>Nombre del docente</Label>
+              <Label className="dark:text-white">Nombre del docente</Label>
               <div className="relative">
                 <Input
                   value={formData.docente}
                   readOnly
                   placeholder="Nombre del docente"
-                  className="rounded-2xl bg-muted/50 cursor-default select-none pr-10"
+                  className="rounded-2xl bg-muted/50 cursor-default select-none pr-10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                 />
-                <Ban className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Ban className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground dark:text-slate-500" />
               </div>
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <p className="text-sm font-medium">Declaración de autorización</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm font-medium dark:text-white">Declaración de autorización</p>
+              <p className="text-sm text-muted-foreground dark:text-slate-400">
                 Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares 
                 y confirmo la veracidad de la información proporcionada.
               </p>
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label>Nota para administración (opcional)</Label>
+              <Label className="dark:text-white">Nota para administración (opcional)</Label>
               <Textarea 
                 value={formData.nota} 
                 onChange={(event) => setFormData((current) => ({ ...current, nota: event.target.value }))} 
                 placeholder="Agrega información adicional" 
-                className="min-h-[9rem] rounded-2xl"
+                className="min-h-[9rem] rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
               />
             </div>
           </div>
 
-          <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row">
-            <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6">
+          <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row dark:border-slate-700">
+            <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
               Limpiar
             </Button>
-            <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="rounded-2xl sm:px-6">
+            <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
               {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar remedial" : "Enviar remedial"}
             </Button>
           </div>
@@ -666,5 +702,3 @@ export default function RemedialPage() {
     </div>
   );
 }
-
-

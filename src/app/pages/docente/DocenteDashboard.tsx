@@ -275,14 +275,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const loadProximasEntregas = async (docs?: DocumentItem[]) => {
     try {
       setIsLoadingProximas(true);
-      
-      let documents = docs;
-      if (!documents) {
-        const docsPayload = (await apiFetch('/documents?per_page=100', { method: 'GET' })) as any;
-        documents = (docsPayload?.data?.data ?? docsPayload?.data ?? []) as DocumentItem[];
-      }
 
-      const userRoles = user?.roles ?? [];
+      const userRoles = new Set((user?.roles ?? []).map(String));
       
       let allForms: FormItem[] = [];
       let formsLoaded = false;
@@ -291,85 +285,49 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         const formsPayload = await apiFetch('/forms', { method: 'GET' });
         allForms = (formsPayload?.data ?? []) as FormItem[];
         formsLoaded = true;
-        console.log("📋 Total formularios cargados:", allForms.length);
-        console.log("📋 Formularios activos:", allForms.filter(f => f.is_active).length);
       } catch (formError) {
         console.error("❌ Error al cargar formularios:", formError);
       }
 
-      let upcomingFromForms: any[] = [];
-      
-      if (formsLoaded && allForms.length > 0) {
-        console.log("🔍 Roles del usuario:", userRoles);
-        
-        upcomingFromForms = allForms
+      const upcomingFromForms = formsLoaded && allForms.length > 0
+        ? allForms
           .filter((form) => {
             const isActive = form.is_active === true;
-            const hasDueDate = form.due_at && form.due_at !== null && form.due_at !== '';
+            const hasDueDate = Boolean(form.due_at && form.due_at !== '');
             const isFuture = hasDueDate && new Date(form.due_at!) > new Date();
-            const hasAccess = form.access_roles?.some((role) => userRoles.includes(role)) ?? false;
-            
-            if (isActive && hasDueDate) {
-              console.log(`  📄 ${form.title}: activo=${isActive}, dueDate=${form.due_at}, futuro=${isFuture}, acceso=${hasAccess}`);
-            }
-            
+            const hasAccess = form.access_roles?.length ? form.access_roles.some((role) => userRoles.has(role)) : true;
+
             return isActive && hasDueDate && isFuture && hasAccess;
           })
           .map((form) => ({
-            titulo: form.title,
+            titulo: form.section?.trim() || form.title,
+            detalle: form.title,
             fecha: form.due_at!,
             dias: Math.max(0, Math.ceil((new Date(form.due_at!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))),
-            source: 'formulario',
           }))
           .sort((a, b) => a.dias - b.dias)
-          .slice(0, 10);
-          
-        console.log("📅 Entregas desde formularios:", upcomingFromForms.length);
-      }
+          .slice(0, 5)
+        : [];
 
-      const pendingDocuments = (documents || [])
-        .filter((d) => d.status === 'pendiente' && d.fecha)
-        .map((d) => ({
-          titulo: d.nombre ?? 'Documento',
-          fecha: d.fecha!,
-          dias: Math.max(0, Math.ceil((new Date(d.fecha!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))),
-          source: 'documento',
-        }))
-        .sort((a, b) => a.dias - b.dias)
-        .slice(0, 5);
-
-      console.log("📄 Entregas desde documentos:", pendingDocuments.length);
-
-      let combined = [...upcomingFromForms];
-      
-      if (combined.length < 5 && pendingDocuments.length > 0) {
-        const remaining = 5 - combined.length;
-        const docsToAdd = pendingDocuments
-          .filter(p => !combined.some(c => c.titulo === p.titulo))
-          .slice(0, remaining);
-        combined = [...combined, ...docsToAdd];
-      }
-
-      if (combined.length === 0) {
+      if (upcomingFromForms.length === 0) {
         setProximasEntregas([
           {
-            titulo: "No hay entregas programadas",
-            fecha: "Sin fecha límite",
+            titulo: "No hay formularios próximos",
+            fecha: "Sin fechas límite próximas",
             dias: 0,
             isPlaceholder: true,
           }
         ]);
       } else {
-        combined.sort((a, b) => a.dias - b.dias);
-        setProximasEntregas(combined.slice(0, 5));
+        setProximasEntregas(upcomingFromForms);
       }
       
     } catch (error) {
       console.error("❌ Error en loadProximasEntregas:", error);
       setProximasEntregas([
         {
-          titulo: "Error al cargar datos",
-          fecha: "Intenta de nuevo",
+          titulo: "No fue posible cargar los formularios",
+          fecha: "Intenta de nuevo más tarde",
           dias: 0,
           isPlaceholder: true,
         }
@@ -647,12 +605,14 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                       );
                     }
 
-                    const diffMs   = new Date(entrega.fecha).getTime() - Date.now();
-                    const diffHrs  = diffMs / 3_600_000;
-                    const isUrgent  = diffHrs < 24;
+                    const diffMs = new Date(entrega.fecha).getTime() - Date.now();
+                    const diffHrs = diffMs / 3_600_000;
+                    const isUrgent = diffHrs < 24;
                     const isWarning = diffHrs >= 24 && diffHrs < 7 * 24;
                     const tiempoRestante = formatTiempoRestante(entrega.fecha);
-                    const isFromForm = entrega.source === 'formulario';
+                    const detalle = entrega.detalle ?? entrega.titulo;
+                    const isGenericTitle = entrega.titulo?.trim().toLowerCase() === "docentes";
+                    const tituloVisible = isGenericTitle ? "" : entrega.titulo;
                     
                     return (
                       <div
@@ -660,14 +620,14 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                         className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-900/70"
                       >
                         <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-slate-800 dark:text-white">{entrega.titulo}</p>
-                            {isFromForm && (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/30">
-                                Formulario
-                              </Badge>
-                            )}
-                          </div>
+                          {tituloVisible && (
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-slate-800 dark:text-white">{tituloVisible}</p>
+                            </div>
+                          )}
+                          {detalle !== tituloVisible && (
+                            <p className="text-xs text-slate-600 dark:text-slate-400">{detalle}</p>
+                          )}
                           <p className="text-xs text-slate-600 dark:text-slate-400">
                             {new Date(entrega.fecha).toLocaleDateString("es-MX", {
                               day: "2-digit",
