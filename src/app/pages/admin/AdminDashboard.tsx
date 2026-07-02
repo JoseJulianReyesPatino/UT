@@ -6,7 +6,8 @@ import { ResponsiveActionButton } from "../../components/ResponsiveActionButton"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import apiFetch from "../../lib/api";
-import { AUTH_TOKEN_STORAGE_KEY, API_BASE_URL } from "../../lib/env";
+import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { getDocumentFileUrl } from "../../lib/documents";
 import { toast } from "sonner";
 import { 
   Users,
@@ -228,8 +229,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   const getPreviewUrl = useCallback((documentId: number) => {
-    const baseUrl = API_BASE_URL.replace(/\/api\/?$/, "");
-    return `${baseUrl}/api/documents/${documentId}/file`;
+    return getDocumentFileUrl(documentId);
   }, []);
 
   const loadDashboard = useCallback(async () => {

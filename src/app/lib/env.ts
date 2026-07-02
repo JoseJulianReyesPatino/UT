@@ -37,8 +37,9 @@ const configuredFallbacks = unique(
 );
 
 const defaultMode = (() => {
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
+  const win = globalThis.window;
+  if (win) {
+    const hostname = win.location.hostname;
     if (
       hostname === "localhost" ||
       hostname === "127.0.0.1" ||
@@ -56,7 +57,10 @@ const mode = (runtimeEnv.VITE_API_MODE ?? defaultMode).toLowerCase() as
   | "local";
 
 const candidatesByMode = () => {
-  const defaultLocal = "http://localhost:8000/api";
+  const defaultLocal =
+    globalThis.window?.location.protocol === "https:"
+      ? "https://localhost:8000/api"
+      : "http://localhost:8000/api";
 
   if (mode === "public") {
     return unique([
@@ -90,7 +94,7 @@ const candidatesByMode = () => {
 export const API_BASE_URL_CANDIDATES = candidatesByMode();
 
 export const API_BASE_URL =
-  API_BASE_URL_CANDIDATES[0] ?? "http://localhost:8000/api";
+  API_BASE_URL_CANDIDATES[0] ?? defaultLocal;
 
 const apiOrigin = (() => {
   try {

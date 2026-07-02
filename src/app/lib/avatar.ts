@@ -4,19 +4,6 @@ import { resolveApiAssetUrl, AUTH_TOKEN_STORAGE_KEY } from "./env";
 const avatarUrlCache = new Map<string, string>();
 const CACHE_CLEAR_EVENT = "ut-avatar-cache-cleared";
 
-// Obtener la URL base del backend
-const getBackendBaseUrl = (): string => {
-  const apiUrl =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
-  const cleanUrl = apiUrl.replace(/\/api$/, "").replace(/\/$/, "");
-
-  if (!cleanUrl) {
-    return "http://localhost:8000";
-  }
-
-  return cleanUrl;
-};
-
 // Función para obtener URL de avatar con timestamp (con caché persistente)
 export const getAvatarUrlWithTimestamp = (
   url?: string | null,
@@ -55,7 +42,7 @@ export const getAvatarUrlWithTimestamp = (
 
   // Si es una URL relativa — usar resolveApiAssetUrl para obtener el origen correcto (ngrok/local)
   if (url.startsWith("/")) {
-    const fullUrl = resolveApiAssetUrl(url) ?? `${getBackendBaseUrl()}${url}`;
+    const fullUrl = resolveApiAssetUrl(url) ?? url;
 
     if (avatarUrlCache.has(fullUrl)) {
       return avatarUrlCache.get(fullUrl);
@@ -73,7 +60,7 @@ export const getAvatarUrlWithTimestamp = (
 // Función para limpiar la caché (llamar después de actualizar el avatar)
 export const clearAvatarCache = () => {
   avatarUrlCache.clear();
-  window.dispatchEvent(new CustomEvent(CACHE_CLEAR_EVENT));
+  globalThis.window?.dispatchEvent(new CustomEvent(CACHE_CLEAR_EVENT));
 };
 
 // Función para obtener iniciales de un nombre
@@ -153,8 +140,9 @@ export const useResolvedAvatarUrl = (
       setResolvedUrl(undefined);
       setCacheEpoch((v) => v + 1);
     };
-    window.addEventListener(CACHE_CLEAR_EVENT, onCacheCleared);
-    return () => window.removeEventListener(CACHE_CLEAR_EVENT, onCacheCleared);
+    const win = globalThis.window;
+    win?.addEventListener(CACHE_CLEAR_EVENT, onCacheCleared);
+    return () => win?.removeEventListener(CACHE_CLEAR_EVENT, onCacheCleared);
   }, []);
 
   useEffect(() => {

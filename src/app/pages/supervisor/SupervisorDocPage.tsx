@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { apiFetch } from "../../lib/api";
 import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { getDocumentFileUrl } from "../../lib/documents";
 import { Eye, FileText, Search, X, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
@@ -45,8 +46,7 @@ const formatDate = (dateStr?: string | null) => {
 };
 
 const getFileUrl = (documentId: number) => {
-  const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api").replace(/\/api\/?$/, "");
-  return `${baseUrl}/api/documents/${documentId}/file`;
+  return getDocumentFileUrl(documentId);
 };
 
 export interface FormCodeEntry {

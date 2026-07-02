@@ -14,6 +14,7 @@ import { ResponsiveActionButton } from "../../components/ResponsiveActionButton"
 import { carrieras } from "../../data/curricula";
 import apiFetch from "../../lib/api";
 import { formatGroupCode } from "../../../lib/utils";
+import { getDocumentFileUrl } from "../../lib/documents";
 import ChargingImg from "../../../assets/Form_Not_Found.png";
 import { useAuth } from "../../context/AuthContext";
 import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
@@ -337,8 +338,7 @@ const formatDateTimeFromIso = (value?: string) => {
 };
 
 const getPreviewUrl = (documentId: number) => {
-	const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api").replace(/\/api\/?$/, "");
-	return `${baseUrl}/api/documents/${documentId}/file`;
+	return getDocumentFileUrl(documentId);
 };
 
 const normalizeInitialApartadoFilter = (value?: string) => {

@@ -8,33 +8,14 @@ import { StatsCard } from "../../components/StatsCard";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
-import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
-import { getDocumentDisplayFileName, fetchDocumentBlob } from "../../lib/documents";
+import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { getDocumentDisplayFileName, fetchDocumentBlob, getDocumentFileUrl } from "../../lib/documents";
 import {
   FileText,
   Clock,
   CheckCircle2,
   AlertCircle,
   Calendar,
-  ChevronDown,
-  GraduationCap,
-  School,
-  BookOpenText,
-  Landmark,
-  Building2,
-  NotebookPen,
-  Backpack,
-  PencilLine,
-  ClipboardList,
-  HeartHandshake,
-  ScrollText,
-  CircleDollarSign,
-  Trophy,
-  Microscope,
-  Atom,
-  BriefcaseBusiness,
-  BadgeCheck,
-  Presentation,
   Eye,
   RefreshCw,
   Clock2,
@@ -60,26 +41,7 @@ interface DocenteDashboardProps {
   onNavigate?: (view: string) => void;
 }
 
-const backgroundIcons = [
-  { icon: GraduationCap, className: "left-[5%] top-[10%] h-12 w-12 rotate-[-12deg]" },
-  { icon: School, className: "right-[7%] top-[8%] h-14 w-14 rotate-[10deg]" },
-  { icon: BookOpenText, className: "left-[18%] top-[56%] h-10 w-10 rotate-[8deg]" },
-  { icon: Landmark, className: "right-[20%] top-[50%] h-11 w-11 rotate-[-6deg]" },
-  { icon: Building2, className: "left-[46%] top-[12%] h-9 w-9 rotate-[15deg]" },
-  { icon: NotebookPen, className: "right-[6%] bottom-[10%] h-10 w-10 rotate-[-10deg]" },
-  { icon: Backpack, className: "left-[3%] bottom-[7%] h-9 w-9 rotate-[6deg]" },
-  { icon: PencilLine, className: "right-[35%] top-[18%] h-8 w-8 rotate-[-8deg]" },
-  { icon: ClipboardList, className: "left-[62%] bottom-[14%] h-8 w-8 rotate-[7deg]" },
-  { icon: HeartHandshake, className: "left-[70%] top-[22%] h-9 w-9 rotate-[5deg]" },
-  { icon: ScrollText, className: "left-[30%] top-[6%] h-8 w-8 rotate-[11deg]" },
-  { icon: CircleDollarSign, className: "right-[42%] top-[62%] h-9 w-9 rotate-[-9deg]" },
-  { icon: Trophy, className: "left-[74%] bottom-[18%] h-9 w-9 rotate-[14deg]" },
-  { icon: Microscope, className: "left-[55%] top-[72%] h-8 w-8 rotate-[-7deg]" },
-  { icon: Atom, className: "right-[28%] top-[2%] h-7 w-7 rotate-[18deg]" },
-  { icon: BriefcaseBusiness, className: "left-[86%] top-[33%] h-8 w-8 rotate-[-5deg]" },
-  { icon: BadgeCheck, className: "left-[42%] bottom-[3%] h-8 w-8 rotate-[10deg]" },
-  { icon: Presentation, className: "left-[24%] bottom-[18%] h-9 w-9 rotate-[-11deg]" },
-];
+// Decorative background icons were removed
 
 type DocumentItem = {
   id: number;
@@ -158,8 +120,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
   // --- Función para obtener la URL de previsualización ---
   const getPreviewUrl = useCallback((documentId: number) => {
-    const baseUrl = API_BASE_URL.replace(/\/api\/?$/, "");
-    return `${baseUrl}/api/documents/${documentId}/file`;
+    return getDocumentFileUrl(documentId);
   }, []);
 
   // --- Función para cargar la vista previa del documento ---
@@ -366,14 +327,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -right-12 top-8 h-40 w-40 rounded-full bg-emerald-100/20 blur-3xl dark:bg-emerald-500/5" />
         <div className="absolute -left-10 bottom-0 h-52 w-52 rounded-full bg-sky-100/10 blur-3xl dark:bg-sky-500/5" />
-        {backgroundIcons.map(({ icon: Icon, className }, index) => (
-          <span
-            key={`${Icon.displayName ?? "icon"}-${index}`}
-            className={`absolute text-emerald-300/15 dark:text-emerald-200/10 ${className}`}
-          >
-            <Icon className="h-full w-full" />
-          </span>
-        ))}
+        {/* background icons removed */}
       </div>
 
       <div className="relative z-10">
@@ -396,9 +350,17 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                 onClick={() => setIsIntroOpen((current) => !current)}
                 aria-label={isIntroOpen ? "Contraer información" : "Expandir información"}
                 title={isIntroOpen ? "Contraer información" : "Expandir información"}
-                className="h-11 w-11 rounded-2xl border border-slate-200 bg-slate-50 text-emerald-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-900/60 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-slate-800"
+                className="h-11 w-11 rounded-full border-0 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-md transition-transform duration-200 hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60"
               >
-                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isIntroOpen ? "rotate-180" : "rotate-0"}`} />
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className={`h-5 w-5 transform-gpu transition-transform duration-200 ${isIntroOpen ? "rotate-180" : "rotate-0"}`}
+                  aria-hidden
+                >
+                  <polyline points="6 9 12 15 18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </Button>
             </div>
 
@@ -459,7 +421,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                   <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
                     <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm">{stat.title}</CardTitle>
                     <div className="h-9 w-9 rounded-xl bg-emerald-100/80 dark:bg-emerald-950/40 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5 sm:h-10 sm:w-10">
-                      <Icon className="h-4 w-4 text-emerald-700 dark:text-emerald-300" aria-hidden />
+                      {Icon ? <Icon className="h-4 w-4 text-emerald-700 dark:text-emerald-300" aria-hidden /> : null}
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
@@ -540,7 +502,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                             {docStatusLabel}
                           </Badge>
                           <Button
-                            size="icon"
+                            size="sm"
                             variant="ghost"
                             className="h-8 w-8 shrink-0"
                             onClick={() => openDocument(doc)}
