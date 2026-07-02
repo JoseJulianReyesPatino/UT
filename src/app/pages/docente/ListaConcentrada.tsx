@@ -282,7 +282,8 @@ export default function ListaConcentradaPage() {
   const openDocument = async (id: number, action: "view" | "download") => {
     try {
       const blob = await fetchDocumentBlob(id, action === "download");
-      const blobUrl = URL.createObjectURL(blob);
+      const pdfBlob = new Blob([blob], { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(pdfBlob);
 
       if (action === "view") {
         window.open(blobUrl, "_blank");

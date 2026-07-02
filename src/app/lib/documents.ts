@@ -64,6 +64,10 @@ export const fetchDocumentBlob = async (
   const urls = getDocumentFileUrlCandidates(documentId, download);
   let lastError: Error | null = null;
 
+  // httpError tracks when ALL candidates return an HTTP error (e.g. 404)
+  // so we can surface that instead of a raw network error from the last URL.
+  let httpError: Error | null = null;
+
   for (let index = 0; index < urls.length; index += 1) {
     const url = urls[index];
     const isLastCandidate = index === urls.length - 1;
@@ -77,29 +81,37 @@ export const fetchDocumentBlob = async (
       });
 
       if (!res.ok) {
-        const error = new Error(
-          `No se pudo abrir el documento (${res.status} ${res.statusText || ""})`.trim(),
-        );
+        const msg =
+          res.status === 404
+            ? "El archivo PDF no está disponible en el servidor."
+            : `No se pudo abrir el documento (${res.status} ${res.statusText || ""})`.trim();
 
-        if (!isLastCandidate && res.status >= 500) {
-          lastError = error;
-          continue;
-        }
+        const err = new Error(msg);
+        // Attach httpStatus so the catch block can distinguish HTTP vs network errors
+        (err as any).httpStatus = res.status;
 
-        throw error;
+        if (isLastCandidate) throw err;
+        // For 4xx errors, no point trying other URLs (same file, same auth)
+        if (res.status < 500) { lastError = err; break; }
+        lastError = err;
+        continue;
       }
 
       return await res.blob();
     } catch (error: any) {
-      if (!isLastCandidate && !error?.status) {
+      // Re-throw HTTP errors immediately (already handled above)
+      if (error?.httpStatus != null) throw error;
+      // Network error: try next candidate
+      if (!isLastCandidate) {
         lastError = error instanceof Error ? error : new Error("Error de red");
         continue;
       }
-      throw error;
+      // All candidates exhausted with network errors; prefer an HTTP error if we got one
+      throw httpError ?? error;
     }
   }
 
-  throw lastError ?? new Error("No fue posible abrir el documento");
+  throw lastError ?? new Error("El archivo PDF no está disponible en el servidor.");
 };
 
 const safeDecodeURIComponent = (value: string) => {

@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import apiFetch from "../../lib/api";
 import { fetchDocumentBlob, getDocumentDownloadUrl, getDocumentFileUrl, getDocumentDisplayFileName } from "../../lib/documents";
-import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
 
 type ApiDocument = {
   id: number | string;
@@ -144,9 +143,10 @@ export function DocumentHistory() {
     { value: "devuelto", label: "Devueltos" },
   ];
   
-  const [openPreview, setOpenPreview] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewTitle, setPreviewTitle] = useState<string | undefined>(undefined);
+  const [previewDocument, setPreviewDocument] = useState<ApiDocument | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [loadingPdfId, setLoadingPdfId] = useState<number | null>(null);
 
   const typeOptions = useMemo(
@@ -245,32 +245,65 @@ export function DocumentHistory() {
     return "planeacion";
   };
 
-  const openDocumentWithAuth = async (documentId: number, title: string, action: "view" | "download") => {
-    setLoadingPdfId(documentId);
-    try {
-      const blob = await fetchDocumentBlob(documentId, action === "download");
-      const blobUrl = URL.createObjectURL(blob);
+  const openDocumentWithAuth = async (doc: ApiDocument, action: "view" | "download") => {
+    if (action === "view") {
+      setPreviewDocument(doc);
+      return;
+    }
 
-      if (action === "view") {
-        setPreviewUrl(blobUrl);
-        setPreviewTitle(title);
-        setOpenPreview(true);
-      } else {
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = `${title}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-      }
+    setLoadingPdfId(Number(doc.id));
+    try {
+      const blob = await fetchDocumentBlob(Number(doc.id), true);
+      const pdfBlob = new Blob([blob], { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `${doc.nombre}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch (error: any) {
-      console.error("Error loading document:", error);
-      alert(`No se pudo ${action === "view" ? "abrir" : "descargar"} el documento: ${error?.message ?? "documento"}`);
+      alert(`No se pudo descargar el documento: ${error?.message ?? "error"}`);
     } finally {
       setLoadingPdfId(null);
     }
   };
+
+  useEffect(() => {
+    if (!previewDocument) return;
+
+    let isMounted = true;
+
+    const loadPreview = async () => {
+      setPreviewLoading(true);
+      setPreviewError(null);
+      setPreviewBlobUrl(null);
+      try {
+        const blob = await fetchDocumentBlob(Number(previewDocument.id));
+        if (!isMounted) return;
+        const pdfBlob = new Blob([blob], { type: "application/pdf" });
+        setPreviewBlobUrl(URL.createObjectURL(pdfBlob));
+      } catch (error) {
+        if (!isMounted) return;
+        setPreviewError(error instanceof Error ? error.message : "No fue posible abrir el PDF");
+      } finally {
+        if (isMounted) setPreviewLoading(false);
+      }
+    };
+
+    void loadPreview();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [previewDocument]);
+
+  useEffect(() => {
+    return () => {
+      if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+    };
+  }, [previewBlobUrl]);
 
   useEffect(() => {
     let isMounted = true;
@@ -572,7 +605,7 @@ export function DocumentHistory() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "view")}
+                            onClick={() => openDocumentWithAuth(doc, "view")}
                             disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
                             className="dark:hover:bg-slate-800"
                           >
@@ -586,7 +619,7 @@ export function DocumentHistory() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => openDocumentWithAuth(Number(doc.id), doc.nombre, "download")}
+                            onClick={() => openDocumentWithAuth(doc, "download")}
                             disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
                             className="dark:hover:bg-slate-800"
                           >
@@ -604,27 +637,33 @@ export function DocumentHistory() {
         </Card>
       </div>
 
-      <Dialog open={openPreview} onOpenChange={(val) => {
-        if (!val && previewUrl) {
-          URL.revokeObjectURL(previewUrl);
-          setPreviewUrl(null);
-        }
-        setOpenPreview(val);
-      }}>
-        <DialogContent className="max-w-4xl w-full dark:bg-slate-950 dark:border-slate-800">
+      <Dialog open={previewDocument !== null} onOpenChange={(open) => { if (!open) setPreviewDocument(null); }}>
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="dark:text-white">{previewTitle}</DialogTitle>
-            <DialogDescription className="dark:text-slate-400">Vista previa del documento</DialogDescription>
+            <DialogTitle>{previewDocument ? getFileNameOnly(previewDocument.nombre) : ""}</DialogTitle>
+            {previewDocument && (
+              <DialogDescription>
+                {previewDocument.materia ? `${previewDocument.materia} · ` : ""}{previewDocument.carrera}
+              </DialogDescription>
+            )}
           </DialogHeader>
-          {previewUrl ? (
-            <iframe
-              src={previewUrl}
-              className="h-[70vh] w-full rounded-lg border border-border dark:border-slate-700"
-              title={previewTitle}
-            />
-          ) : (
-            <div className="h-[70vh] w-full flex items-center justify-center text-muted-foreground dark:text-slate-400">
-              Cargando documento...
+          {previewDocument && (
+            <div className="flex-1 min-h-0">
+              {previewLoading ? (
+                <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                  <p>Cargando...</p>
+                </div>
+              ) : previewError ? (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                  {previewError}
+                </div>
+              ) : previewBlobUrl ? (
+                <iframe
+                  src={previewBlobUrl}
+                  className="h-[82vh] w-full rounded-lg border border-border"
+                  title={previewDocument.nombre}
+                />
+              ) : null}
             </div>
           )}
         </DialogContent>

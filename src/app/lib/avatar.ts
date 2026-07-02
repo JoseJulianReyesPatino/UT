@@ -59,6 +59,16 @@ export const getAvatarUrlWithTimestamp = (
 
 // Función para limpiar la caché (llamar después de actualizar el avatar)
 export const clearAvatarCache = () => {
+  // Limpiar también los object URLs creados con URL.createObjectURL
+  avatarUrlCache.forEach((value) => {
+    if (value.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(value);
+      } catch {
+        // Ignorar errores al revocar URLs
+      }
+    }
+  });
   avatarUrlCache.clear();
   globalThis.window?.dispatchEvent(new CustomEvent(CACHE_CLEAR_EVENT));
 };
@@ -122,19 +132,21 @@ export const useResolvedAvatarUrl = (
 ): string | undefined => {
   const [cacheEpoch, setCacheEpoch] = useState(0);
   const [resolvedUrl, setResolvedUrl] = useState<string | undefined>(() => {
+    // Si no hay URL, retornar undefined inmediatamente
     if (!url || !isRenderableAvatarSource(url)) {
       return undefined;
     }
 
-    return url.startsWith("data:") ||
-      url.startsWith("blob:") ||
-      url.startsWith("http://") ||
-      url.startsWith("https://") ||
-      url.startsWith("/")
-      ? getAvatarUrlWithTimestamp(url)
-      : undefined;
+    // Para data URLs, retornar directamente sin procesar
+    if (url.startsWith("data:") || url.startsWith("blob:")) {
+      return url;
+    }
+
+    // Para URLs normales, usar getAvatarUrlWithTimestamp
+    return getAvatarUrlWithTimestamp(url);
   });
 
+  // Escuchar eventos de limpieza de caché
   useEffect(() => {
     const onCacheCleared = () => {
       setResolvedUrl(undefined);
@@ -145,14 +157,17 @@ export const useResolvedAvatarUrl = (
     return () => win?.removeEventListener(CACHE_CLEAR_EVENT, onCacheCleared);
   }, []);
 
+  // Efecto principal para resolver la URL
   useEffect(() => {
+    // Si no hay URL o no es renderizable, limpiar y salir
     if (!url || !isRenderableAvatarSource(url)) {
       setResolvedUrl(undefined);
       return;
     }
 
+    // Para data URLs o blob URLs, usarlas directamente sin fetch
     if (url.startsWith("data:") || url.startsWith("blob:")) {
-      setResolvedUrl(getAvatarUrlWithTimestamp(url));
+      setResolvedUrl(url);
       return;
     }
 
@@ -173,17 +188,20 @@ export const useResolvedAvatarUrl = (
       }
     }
 
+    // Verificar caché
     const cachedUrl = avatarUrlCache.get(effectiveUrl);
     if (cachedUrl) {
       setResolvedUrl(cachedUrl);
       return;
     }
 
+    // Si no es ruta protegida, usar timestamp
     if (!isProtectedAvatarRoute(effectiveUrl)) {
       setResolvedUrl(getAvatarUrlWithTimestamp(effectiveUrl));
       return;
     }
 
+    // Para rutas protegidas, hacer fetch con autenticación
     let isActive = true;
     const abortController = new AbortController();
     const absoluteUrl = resolveApiAssetUrl(effectiveUrl) ?? effectiveUrl;
@@ -201,6 +219,15 @@ export const useResolvedAvatarUrl = (
           signal: abortController.signal,
         });
 
+        if (!isActive) return;
+
+        if (response.status === 404) {
+          // Si el avatar no existe (404), limpiar la caché y no mostrar nada
+          avatarUrlCache.delete(effectiveUrl);
+          setResolvedUrl(undefined);
+          return;
+        }
+
         if (!response.ok) {
           throw new Error(`Avatar fetch failed: ${response.status}`);
         }
@@ -213,11 +240,18 @@ export const useResolvedAvatarUrl = (
         const objectUrl = URL.createObjectURL(blob);
         avatarUrlCache.set(effectiveUrl, objectUrl);
         setResolvedUrl(objectUrl);
-      } catch {
+      } catch (error) {
         if (!isActive) {
           return;
         }
 
+        // Si el error es 404 o similar, no mostrar nada
+        if (error instanceof Error && error.message.includes('404')) {
+          setResolvedUrl(undefined);
+          return;
+        }
+
+        // Como fallback, usar la URL con timestamp
         setResolvedUrl(getAvatarUrlWithTimestamp(effectiveUrl));
       }
     })();

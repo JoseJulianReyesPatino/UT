@@ -5,8 +5,7 @@ import { Button } from "../../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { apiFetch } from "../../lib/api";
-import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
-import { getDocumentFileUrl } from "../../lib/documents";
+import { fetchDocumentBlob } from "../../lib/documents";
 import { Eye, FileText, Search, X, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
@@ -45,9 +44,6 @@ const formatDate = (dateStr?: string | null) => {
   } catch { return "—"; }
 };
 
-const getFileUrl = (documentId: number) => {
-  return getDocumentFileUrl(documentId);
-};
 
 export default function SupervisorPlaneacion() {
   const [docs, setDocs] = useState<DocRecord[]>([]);
@@ -103,19 +99,10 @@ export default function SupervisorPlaneacion() {
 
     const load = async () => {
       try {
-        const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-        const headers: Record<string, string> = {
-          Accept: "application/pdf",
-          "ngrok-skip-browser-warning": "true",
-        };
-        if (token) headers.Authorization = `Bearer ${token}`;
-
-        const response = await fetch(getFileUrl(previewDoc.id), { method: "GET", headers, credentials: "include" });
-        if (!response.ok) throw new Error(`No fue posible abrir el PDF (${response.status})`);
-
-        const blob = await response.blob();
+        const blob = await fetchDocumentBlob(previewDoc.id);
         if (!isMounted) return;
-        setPreviewBlobUrl(URL.createObjectURL(blob));
+        const pdfBlob = new Blob([blob], { type: "application/pdf" });
+        setPreviewBlobUrl(URL.createObjectURL(pdfBlob));
       } catch (error) {
         if (!isMounted) return;
         setPreviewError(error instanceof Error ? error.message : "No fue posible abrir el PDF");

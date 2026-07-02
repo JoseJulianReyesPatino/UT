@@ -298,7 +298,7 @@ export default function Tutores() {
   const getDocumentStatusLabel = (doc: TutorDocumentItem) => {
     if ("resubmittedAt" in doc && doc.resubmittedAt) return "Reenviado";
     if (doc.returned) return "Devuelto";
-    if ("reviewedAt" in doc) return "Revisado";
+    if (doc.reviewedAt) return "Revisado";
     return "Pendiente";
   };
 
@@ -510,7 +510,7 @@ export default function Tutores() {
                 {filteredAll.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : filteredAll.map((doc) => {
-                  const isReviewed = "reviewedAt" in doc;
+                  const isReviewed = Boolean(doc.reviewedAt);
                   const isReturned = Boolean(doc.returned);
                   return (
                     <div key={doc.id} className={getDocumentRowClassName(isReturned)}>

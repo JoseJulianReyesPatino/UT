@@ -12,7 +12,7 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { apiFetch } from "../../lib/api";
-import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { fetchDocumentBlob } from "../../lib/documents";
 import { carrieras } from "../../data/curricula";
 
 type CycleStatus = "activo" | "cerrado";
@@ -87,7 +87,7 @@ type DocumentRecord = {
   materia: string;
   parcial: string;
   grupo: string;
-  tipo: "planeacion" | "instrumento-30" | "instrumento-40" | "instrumento-60" | "instrumento-70" | "instrumento-30-40" | "instrumento-60-70" | "lista-concentrada" | "asesoria" | "portafolio" | "acta-final";
+  tipo: "planeacion" | "instrumento-30" | "instrumento-40" | "instrumento-60" | "instrumento-70" | "lista-concentrada" | "asesoria" | "portafolio" | "acta-final";
   pdfUrl?: string;
 };
 
@@ -189,8 +189,6 @@ const getDocumentsModalTitle = (selectedDocumentType: "docentes" | "estadias" | 
         "instrumento-40": "Instrumento 40%",
         "instrumento-60": "Instrumento 60%",
         "instrumento-70": "Instrumento 70%",
-        "instrumento-30-40": "Instrumento 30/40%",
-        "instrumento-60-70": "Instrumento 60/70%",
         "lista-concentrada": "Lista concentrada",
         "asesoria": "Asesoría",
         "portafolio": "Portafolio digital",
@@ -330,8 +328,6 @@ export function CiclosEscolares() {
     "instrumento-40",
     "instrumento-60",
     "instrumento-70",
-    "instrumento-30-40",
-    "instrumento-60-70",
     "lista-concentrada",
     "asesoria",
     "portafolio",
@@ -505,10 +501,6 @@ export function CiclosEscolares() {
         return "Instrumento 60%";
       case "instrumento-70":
         return "Instrumento 70%";
-      case "instrumento-30-40":
-        return "Instrumento 30/40%";
-      case "instrumento-60-70":
-        return "Instrumento 60/70%";
       case "lista-concentrada":
         return "Lista Concentrada";
       case "asesoria":
@@ -1162,56 +1154,27 @@ export function CiclosEscolares() {
       return;
     }
 
-    let cancelled = false;
+    let isMounted = true;
 
     const loadPreview = async () => {
       setPreviewLoading(true);
       setPreviewError(null);
 
       try {
-        const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-        const endpoint = previewDocument.pdfUrl ?? `/documents/${previewDocument.id}/file`;
-        const absoluteUrl = endpoint.startsWith("http")
-          ? endpoint
-          : `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
-
-        const response = await fetch(absoluteUrl, {
-          method: "GET",
-          headers: {
-            Accept: "application/pdf",
-            "ngrok-skip-browser-warning": "true",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          credentials: "include",
-          mode: "cors",
-        });
-
-        if (!response.ok) {
-          throw new Error(`No se pudo abrir el PDF (${response.status})`);
+        const blob = await fetchDocumentBlob(previewDocument.id);
+        if (!isMounted) return;
+        const pdfBlob = new Blob([blob], { type: "application/pdf" });
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        if (previewBlobUrl) {
+          URL.revokeObjectURL(previewBlobUrl);
         }
-
-        const blob = await response.blob();
-        if (blob.type && !blob.type.includes("pdf")) {
-          throw new Error("El archivo recibido no es un PDF válido.");
-        }
-
-        const blobUrl = URL.createObjectURL(blob);
-        if (!cancelled) {
-          if (previewBlobUrl) {
-            URL.revokeObjectURL(previewBlobUrl);
-          }
-          setPreviewBlobUrl(blobUrl);
-        } else {
-          URL.revokeObjectURL(blobUrl);
-        }
+        setPreviewBlobUrl(blobUrl);
       } catch (error) {
-        if (!cancelled) {
-          const message = error instanceof Error ? error.message : "No se pudo cargar la vista previa del PDF.";
-          setPreviewError(message);
-          setPreviewBlobUrl(null);
-        }
+        if (!isMounted) return;
+        setPreviewError(error instanceof Error ? error.message : "No se pudo cargar la vista previa del PDF.");
+        setPreviewBlobUrl(null);
       } finally {
-        if (!cancelled) {
+        if (isMounted) {
           setPreviewLoading(false);
         }
       }
@@ -1220,7 +1183,7 @@ export function CiclosEscolares() {
     void loadPreview();
 
     return () => {
-      cancelled = true;
+      isMounted = false;
     };
   }, [previewDocument]);
 
@@ -1431,8 +1394,6 @@ export function CiclosEscolares() {
       "instrumento-40": 0,
       "instrumento-60": 0,
       "instrumento-70": 0,
-      "instrumento-30-40": 0,
-      "instrumento-60-70": 0,
       "lista-concentrada": 0,
       "asesoria": 0,
       "portafolio": 0,
@@ -1859,8 +1820,7 @@ export function CiclosEscolares() {
               <Button disabled={docenteCountByType["instrumento-40"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-40")} className="justify-center h-24 font-semibold border-2 hover:bg-accent whitespace-normal text-center leading-snug px-3" variant="outline">Instrumento 40% ({docenteCountByType["instrumento-40"]})</Button>
               <Button disabled={docenteCountByType["instrumento-60"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-60")} className="justify-center h-24 font-semibold border-2 hover:bg-accent whitespace-normal text-center leading-snug px-3" variant="outline">Instrumento 60% ({docenteCountByType["instrumento-60"]})</Button>
               <Button disabled={docenteCountByType["instrumento-70"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-70")} className="justify-center h-24 font-semibold border-2 hover:bg-accent whitespace-normal text-center leading-snug px-3" variant="outline">Instrumento 70% ({docenteCountByType["instrumento-70"]})</Button>
-              <Button disabled={docenteCountByType["instrumento-30-40"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-30-40")} className="justify-center h-24 font-semibold border-2 hover:bg-accent whitespace-normal text-center leading-snug px-3" variant="outline">Instrumento 30/40% ({docenteCountByType["instrumento-30-40"]})</Button>
-              <Button disabled={docenteCountByType["instrumento-60-70"] === 0} onClick={() => handleSelectDocumentCategory("instrumento-60-70")} className="justify-center h-24 font-semibold border-2 hover:bg-accent whitespace-normal text-center leading-snug px-3" variant="outline">Instrumento 60/70% ({docenteCountByType["instrumento-60-70"]})</Button>
+
               <Button disabled={docenteCountByType["lista-concentrada"] === 0} onClick={() => handleSelectDocumentCategory("lista-concentrada")} className="justify-center h-24 font-semibold border-2 hover:bg-accent whitespace-normal text-center leading-snug px-3" variant="outline">Lista Concentrada ({docenteCountByType["lista-concentrada"]})</Button>
               <Button disabled={docenteCountByType["asesoria"] === 0} onClick={() => handleSelectDocumentCategory("asesoria")} className="justify-center h-24 font-semibold border-2 hover:bg-accent whitespace-normal text-center leading-snug px-3" variant="outline">Asesoría ({docenteCountByType["asesoria"]})</Button>
               <Button disabled={docenteCountByType["portafolio"] === 0} onClick={() => handleSelectDocumentCategory("portafolio")} className="justify-center h-24 font-semibold border-2 hover:bg-accent whitespace-normal text-center leading-snug px-3" variant="outline">Portafolio Digital ({docenteCountByType["portafolio"]})</Button>

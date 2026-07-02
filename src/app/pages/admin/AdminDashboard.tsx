@@ -6,8 +6,7 @@ import { ResponsiveActionButton } from "../../components/ResponsiveActionButton"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import apiFetch from "../../lib/api";
-import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
-import { getDocumentFileUrl } from "../../lib/documents";
+import { fetchDocumentBlob } from "../../lib/documents";
 import { toast } from "sonner";
 import { 
   Users,
@@ -228,9 +227,6 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
-  const getPreviewUrl = useCallback((documentId: number) => {
-    return getDocumentFileUrl(documentId);
-  }, []);
 
   const loadDashboard = useCallback(async () => {
     setIsLoading(true);
@@ -356,29 +352,10 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
       setPreviewBlobUrl(null);
 
       try {
-        const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-        const headers: Record<string, string> = {
-          Accept: "application/pdf",
-          "ngrok-skip-browser-warning": "true",
-        };
-
-        if (token) {
-          headers.Authorization = `Bearer ${token}`;
-        }
-
-        const response = await fetch(getPreviewUrl(selectedDocument.id), {
-          method: "GET",
-          headers,
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          throw new Error(`No fue posible abrir el PDF (${response.status})`);
-        }
-
-        const blob = await response.blob();
+        const blob = await fetchDocumentBlob(selectedDocument.id);
         if (!isMounted) return;
-        setPreviewBlobUrl(URL.createObjectURL(blob));
+        const pdfBlob = new Blob([blob], { type: "application/pdf" });
+        setPreviewBlobUrl(URL.createObjectURL(pdfBlob));
       } catch (error) {
         if (!isMounted) return;
         setPreviewError(error instanceof Error ? error.message : "No fue posible abrir el PDF");
@@ -392,7 +369,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     return () => {
       isMounted = false;
     };
-  }, [getPreviewUrl, selectedDocument]);
+  }, [selectedDocument]);
 
   /* Small memoized presentational components to reduce re-renders */
   const StatsGrid = React.memo(function StatsGrid({ stats, onNavigate }: { stats: any[]; onNavigate: (view: AdminView) => void }) {

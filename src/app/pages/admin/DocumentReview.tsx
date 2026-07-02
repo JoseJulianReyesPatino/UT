@@ -14,10 +14,9 @@ import { ResponsiveActionButton } from "../../components/ResponsiveActionButton"
 import { carrieras } from "../../data/curricula";
 import apiFetch from "../../lib/api";
 import { formatGroupCode } from "../../../lib/utils";
-import { getDocumentFileUrl } from "../../lib/documents";
+import { fetchDocumentBlob } from "../../lib/documents";
 import ChargingImg from "../../../assets/Form_Not_Found.png";
 import { useAuth } from "../../context/AuthContext";
-import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
 
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
 
@@ -337,9 +336,6 @@ const formatDateTimeFromIso = (value?: string) => {
 	}
 };
 
-const getPreviewUrl = (documentId: number) => {
-	return getDocumentFileUrl(documentId);
-};
 
 const normalizeInitialApartadoFilter = (value?: string) => {
 	if (!value) return "all";
@@ -493,26 +489,10 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			setPreviewBlobUrl(null);
 
 			try {
-				const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-				const headers: Record<string, string> = {
-					Accept: "application/pdf",
-					"ngrok-skip-browser-warning": "true",
-				};
-				if (token) headers.Authorization = `Bearer ${token}`;
-
-				const response = await fetch(getPreviewUrl(previewDocument.id), {
-					method: "GET",
-					headers,
-					credentials: "include",
-				});
-
-				if (!response.ok) {
-					throw new Error(`No fue posible abrir el PDF (${response.status})`);
-				}
-
-				const blob = await response.blob();
+				const blob = await fetchDocumentBlob(previewDocument.id);
 				if (!isMounted) return;
-				setPreviewBlobUrl(URL.createObjectURL(blob));
+				const pdfBlob = new Blob([blob], { type: "application/pdf" });
+				setPreviewBlobUrl(URL.createObjectURL(pdfBlob));
 			} catch (error) {
 				if (!isMounted) return;
 				setPreviewError(error instanceof Error ? error.message : "No fue posible abrir el PDF");

@@ -4,7 +4,7 @@ import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Button } from "../../components/ui/button";
-import { Ban, Upload, FileText, History, X } from "lucide-react";
+import { Ban, Upload, History, Sparkles, CalendarDays, BookOpen, BadgeCheck, Clock3 } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
@@ -271,7 +271,8 @@ export default function PortafolioDigitalPage() {
   const openDocument = async (id: number, action: "view" | "download") => {
     try {
       const blob = await fetchDocumentBlob(id, action === "download");
-      const blobUrl = URL.createObjectURL(blob);
+      const pdfBlob = new Blob([blob], { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(pdfBlob);
 
       if (action === "view") {
         window.open(blobUrl, "_blank");
@@ -370,98 +371,140 @@ export default function PortafolioDigitalPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6" ref={formRef}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold">Portafolio Digital Final</h1>
-          <p className="text-muted-foreground">Envía evidencias del portafolio.</p>
-        </div>
+    <div className="mx-auto max-w-6xl space-y-6 p-2 sm:p-4" ref={formRef}>
+      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-sm font-medium text-emerald-700 shadow-sm dark:border-emerald-500/30 dark:bg-slate-900/70 dark:text-emerald-300">
+              <Sparkles className="h-4 w-4" />
+              Envío de portafolio
+            </div>
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Portafolio Digital</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">Sube tus evidencias de forma ordenada y revisa el historial antes de enviar tu portafolio.</p>
+            </div>
+          </div>
 
-        <div className="flex flex-wrap gap-3">
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" className="w-full justify-center rounded-2xl border-border bg-background px-4 py-5 text-foreground hover:bg-accent sm:w-auto dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
-                <History className="mr-2 h-4 w-4" />
-                Historial
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="sm:max-w-xl overflow-y-auto dark:border-slate-700 dark:bg-slate-950">
-              <SheetHeader>
-                <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
-                <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
-              </SheetHeader>
-              <div className="mt-4 space-y-4">
-                {history.length > 0 ? (
-                  <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-700 dark:bg-slate-900/30">
-                    <div className="grid gap-3 p-1">
-                      {history.map((h) => (
-                        <DocumentHistoryCard
-                          key={h.id}
-                          title={h.title ?? h.file_path}
-                          fileName={getUploadedFileName(h)}
-                          carrera={h.carrera_label}
-                          subject={h.materia}
-                          submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          status={h.status}
-                          returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
-                          onView={() => openDocument(h.id, "view")}
-                          onEdit={() => populateFormForEdit(h)}
-                        />
-                      ))}
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="w-full justify-center rounded-2xl border-slate-200 bg-white/80 px-4 py-5 text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800">
+                  <History className="mr-2 h-4 w-4" />
+                  Historial
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="sm:max-w-xl overflow-y-auto dark:border-slate-700 dark:bg-slate-950">
+                <SheetHeader>
+                  <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
+                  <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-4">
+                  {history.length > 0 ? (
+                    <ScrollArea className="h-[min(78vh,44rem)] rounded-2xl border border-border bg-background/40 pr-2 dark:border-slate-700 dark:bg-slate-900/30">
+                      <div className="grid gap-3 p-2">
+                        {history.map((h) => (
+                          <DocumentHistoryCard
+                            key={h.id}
+                            title={h.title ?? h.file_path}
+                            fileName={getUploadedFileName(h)}
+                            carrera={h.carrera_label}
+                            subject={h.materia}
+                            submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            status={h.status}
+                            returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
+                            onView={() => openDocument(h.id, "view")}
+                            onEdit={() => populateFormForEdit(h)}
+                          />
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : formData.archivos.length === 0 ? (
+                    <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
+                  ) : (
+                    <div>
+                      <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
+                      <ul className="space-y-2">
+                        {formData.archivos.map((f, i) => (
+                          <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
+                        ))}
+                      </ul>
                     </div>
-                  </ScrollArea>
-                ) : formData.archivos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
-                ) : (
-                  <div>
-                    <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
-                    <ul className="space-y-2">
-                      {formData.archivos.map((f, i) => (
-                        <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/10 border-l-4 border-emerald-300 dark:border-emerald-300 rounded-md">
-        <p className="text-sm font-medium text-black dark:text-white">Recordatorio: Se sube en el 3er parcial.</p>
-        <Button variant="outline" size="sm" onClick={() => window.open(calendarioPdf, "_blank")} className="dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
-          Calendario
-        </Button>
+      <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
+        <div className="rounded-[24px] border border-slate-200/80 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+              <CalendarDays className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900 dark:text-white">Recordatorio</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Se sube en el 3er parcial.</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              <Clock3 className="h-4 w-4" />
+              Portafolio listo para revisar
+            </div>
+            <Button variant="outline" size="sm" onClick={() => window.open(calendarioPdf, "_blank")} className="rounded-2xl border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+              Calendario
+            </Button>
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-slate-200/80 bg-slate-50 p-4 text-slate-900 shadow-sm dark:border-slate-800 dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 dark:text-white">
+          <div className="flex items-center gap-2">
+            <BadgeCheck className="h-5 w-5 text-emerald-300" />
+            <p className="font-semibold">Tu envío queda listo</p>
+          </div>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Revisa cada campo, adjunta tus PDF y envía el portafolio con confianza.</p>
+        </div>
       </div>
 
-      <Card className="dark:border-slate-800/70 dark:bg-slate-950/60">
-        <CardHeader className="dark:border-slate-700">
-          <CardTitle className="dark:text-white">Formulario Portafolio Digital</CardTitle>
-          <CardDescription className="dark:text-slate-400">Los campos marcados con * son obligatorios.</CardDescription>
+      <Card className="overflow-hidden border border-slate-200/70 bg-white/90 shadow-[0_24px_90px_-35px_rgba(15,23,42,0.35)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
+        <CardHeader className="border-b border-slate-200/70 bg-gradient-to-r from-emerald-50 via-white to-sky-50 p-6 dark:border-slate-800 dark:from-slate-900/70 dark:via-slate-950 dark:to-slate-900">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-xl text-slate-900 dark:text-white">Formulario de Portafolio Digital</CardTitle>
+              <CardDescription className="mt-1 dark:text-slate-400">Los campos marcados con * son obligatorios.</CardDescription>
+            </div>
+          </div>
           {editingDocumentId && (
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
               Estás editando el portafolio existente. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
             </div>
           )}
         </CardHeader>
-        <CardContent className="space-y-6 p-6 sm:p-8">
+        <CardContent className="space-y-6 p-5 sm:p-8">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2 md:col-span-2">
-              <Label className="text-sm font-medium dark:text-white">Plan *</Label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Button variant={formData.plan === "nuevo-modelo" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))} className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+            <div className="space-y-2 md:col-span-2 rounded-[24px] border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+              <div className="flex items-center gap-2">
+                <div className="rounded-2xl bg-white p-2 shadow-sm dark:bg-slate-800">
+                  <BookOpen className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+                </div>
+                <Label className="text-sm font-semibold dark:text-white">Plan *</Label>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <Button variant={formData.plan === "nuevo-modelo" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))} className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
                   <span className="text-base font-semibold">Plan Nuevo Modelo</span>
                   <span className="text-xs text-muted-foreground dark:text-slate-400">TSU e Ingeniería</span>
                 </Button>
-                <Button variant={formData.plan === "plan-normal" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))} className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+                <Button variant={formData.plan === "plan-normal" ? "success" : "outline"} onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))} className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
                   <span className="text-base font-semibold">Plan Normal</span>
                   <span className="text-xs text-muted-foreground dark:text-slate-400">Ingenierías</span>
                 </Button>
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
               <Label className="dark:text-white">Carrera *</Label>
               <Select value={formData.carrera} onValueChange={(value) => setFormData((current) => ({ ...current, carrera: value, cuatrimestre: "", materia: "" }))} disabled={!formData.plan}>
                 <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
@@ -475,7 +518,7 @@ export default function PortafolioDigitalPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
               <Label className="dark:text-white">Cuatrimestre *</Label>
               <Select value={formData.cuatrimestre} onValueChange={(value) => setFormData((current) => ({ ...current, cuatrimestre: value as Cuatrimestre, materia: "" }))} disabled={!formData.carrera}>
                 <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
@@ -489,7 +532,7 @@ export default function PortafolioDigitalPage() {
               </Select>
             </div>
 
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm md:col-span-2 dark:border-slate-800 dark:bg-slate-900/60">
               <Label className="dark:text-white">Materia *</Label>
               <Select value={formData.materia} onValueChange={(value) => setFormData((current) => ({ ...current, materia: value }))} disabled={!formData.cuatrimestre}>
                 <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
@@ -503,7 +546,7 @@ export default function PortafolioDigitalPage() {
               </Select>
             </div>
 
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm md:col-span-2 dark:border-slate-800 dark:bg-slate-900/60">
               <Label className="dark:text-white">Grupo *</Label>
               {groupsOptions.length > 0 ? (
                 <Select value={formData.grupo} onValueChange={(value) => setFormData((c) => ({ ...c, grupo: value }))}>
@@ -525,7 +568,7 @@ export default function PortafolioDigitalPage() {
               )}
             </div>
 
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm md:col-span-2 dark:border-slate-800 dark:bg-slate-900/60">
               <Label className="dark:text-white">Evidencias (PDF) *</Label>
               <p className="text-sm text-muted-foreground dark:text-slate-400">Adjunta documentos PDF de hasta 5 MB por archivo. Puedes cargar hasta tres archivos en total.</p>
               <div className="rounded-3xl border border-dashed border-border bg-background/60 p-6 text-center transition-colors hover:border-primary/50 hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40">
@@ -550,7 +593,7 @@ export default function PortafolioDigitalPage() {
               )}
             </div>
 
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm md:col-span-2 dark:border-slate-800 dark:bg-slate-900/60">
               <Label className="dark:text-white">Nombre del docente</Label>
               <div className="relative">
                 <Input
@@ -563,15 +606,15 @@ export default function PortafolioDigitalPage() {
               </div>
             </div>
 
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm md:col-span-2 dark:border-slate-800 dark:bg-slate-900/60">
               <p className="text-sm font-medium dark:text-white">Declaración de autorización</p>
               <p className="text-sm text-muted-foreground dark:text-slate-400">
-                Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares 
+                Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares
                 y confirmo la veracidad de la información proporcionada.
               </p>
             </div>
 
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm md:col-span-2 dark:border-slate-800 dark:bg-slate-900/60">
               <Label className="dark:text-white">Nota para administración (opcional)</Label>
               <textarea
                 value={formData.nota}

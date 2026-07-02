@@ -133,7 +133,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     
     try {
       const blob = await fetchDocumentBlob(Number(doc.id));
-      const blobUrl = URL.createObjectURL(blob);
+      const pdfBlob = new Blob([blob], { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(pdfBlob);
       setPreviewBlobUrl(blobUrl);
     } catch (error: any) {
       setPreviewError(error?.message ?? "No fue posible abrir el documento");
