@@ -623,18 +623,22 @@ export function DocenteManagement() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">Gestión de Usuarios</h1>
-          <p className="text-muted-foreground">
-            Administra usuarios y permisos del sistema
-          </p>
-        </div>
-        <Button variant="success" onClick={() => setShowNewDialog(true)} className="shadow-md shadow-emerald-500/20">
-          <UserPlus className="h-4 w-4 mr-2" />
-          Nuevo Usuario
-        </Button>
-      </div>
+      <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60">
+        <CardContent className="space-y-4 p-5 sm:p-6 lg:p-7">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Gestión de Usuarios</h1>
+              <p className="max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+                Administra usuarios y permisos del sistema
+              </p>
+            </div>
+            <Button variant="success" onClick={() => setShowNewDialog(true)} className="shadow-md shadow-emerald-500/20">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Nuevo Usuario
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-emerald-50/60 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20">
         <CardHeader>

@@ -184,25 +184,12 @@ export function Login() {
               </p>
             </div>
 
-            {/* MASCOTA - Bloque independiente con efecto flotante */}
-            <div className="absolute right-[-180px] top-[300px] z-20">
-              <div className="relative w-80 h-80 xl:w-[24rem] xl:h-[24rem] flex items-center justify-center">
-                {/* Efecto de glow detrás del gallo */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[#3BBF82]/10 to-[#3BBF82]/5 rounded-full blur-3xl" />
-                
-                {/* Aro decorativo */}
-                <div className="absolute inset-0 border-2 border-[#3BBF82]/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 " />
-                
-                {/* Imagen del gallo */}
-                <img
-                  src="/src/assets/mascota3.webp"
-                  alt="Mascota institucional"
-                  className="relative z-10 h-full w-full object-contain drop-shadow-2xl transition-transform duration-300 hover:scale-110 origin-center -translate-y-12"
-                />
-                
-                {/* Puntos decorativos alrededor */}
-                <div className="absolute top-0 right-0 w-3 h-3 rounded-full bg-[#3BBF82]/40" />
-                <div className="absolute bottom-0 left-0 w-2 h-2 rounded-full bg-[#3BBF82]/30" />
+            {/* MASCOTA: eliminada por petición. Se mantiene un sutil acabado decorativo sin imagen */}
+            <div className="absolute right-[-120px] top-[320px] z-10 pointer-events-none">
+              <div className="relative w-72 h-72 xl:w-[20rem] xl:h-[20rem] flex items-center justify-center">
+                {/* Sutil glow decorativo sin imagen */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#3BBF82]/8 to-[#3BBF82]/4 rounded-full blur-3xl opacity-80" />
+                <div className="absolute inset-0 border border-[#3BBF82]/12 rounded-full" />
               </div>
             </div>
 

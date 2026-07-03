@@ -14,7 +14,6 @@ import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob, getDocumentDisplayFileName } from "../../lib/documents";
 import { carrieras } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
-import ChargingImg from "../../../assets/Form_Not_Found.png";
 
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
 
@@ -119,9 +118,8 @@ const mapApiDocumentToTutorDocument = (doc: any): TutorDocument => ({
 const emptyStateLegend = "Aún no hay documentos de tutores para mostrar en esta sección. Cuando un tutor suba uno, aparecerá aquí automáticamente.";
 
 const EmptyState = ({ text }: { text: string }) => (
-  <div className="rounded-lg border border-dashed border-border/70 bg-background/70 p-8 text-center text-muted-foreground dark:bg-slate-950/40">
+  <div className="rounded-lg border border-dashed border-border bg-background p-8 text-center text-muted-foreground dark:bg-slate-950">
     <div className="flex flex-col items-center gap-4">
-      <img src={ChargingImg} alt="No forms" className="h-72 w-auto mx-auto" />
       <p>{text}</p>
     </div>
   </div>
@@ -423,57 +421,57 @@ export default function Tutores() {
   const apartadosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.apartado))).filter((apartado) => apartado && apartado.trim().length > 0);
 
   const previewChipClassName =
-    "h-8 rounded-full border-border bg-background/90 px-3 text-xs font-medium text-foreground hover:bg-emerald-50 hover:text-emerald-900 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-200";
+    "h-8 rounded-full border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-emerald-50 hover:text-emerald-900 dark:hover:bg-emerald-950 dark:hover:text-emerald-200";
 
   const previewCardOverlayClassName =
-    "absolute inset-0 z-10 rounded-xl bg-transparent cursor-pointer";
+    "absolute inset-0 z-10 rounded-xl cursor-pointer";
 
   const sectionCardClassName =
-    "overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20";
+    "overflow-hidden border-emerald-200 bg-white shadow-sm dark:border-emerald-900 dark:bg-slate-950";
 
   const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3";
-  const filterSelectTriggerClassName = "w-full text-[13px] leading-tight sm:text-sm";
+  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full text-[13px] leading-tight sm:text-sm";
   const filterSelectValueClassName = "truncate";
 
   const getDocumentRowClassName = (isReturned: boolean) => (
     `relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border transition-colors ${isReturned
-      ? "border-rose-300/70 bg-rose-50/70 hover:bg-rose-50 dark:border-rose-900/60 dark:bg-rose-950/20 dark:hover:bg-rose-950/30"
-      : "border-border hover:bg-accent/50"
+      ? "border-rose-300 bg-rose-50 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950 dark:hover:bg-rose-900"
+      : "border-border hover:bg-accent"
     }`
   );
 
   return (
     <div className="relative space-y-6 overflow-hidden">
-      <div>
-        <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">Gestión de Tutores</h1>
-        <p className="text-muted-foreground">Revisa y administra los documentos enviados por tutores</p>
-      </div>
-
       <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
-        <div className="sm:hidden mb-3">
-          <Select value={activeSection} onValueChange={(v) => setActiveSection(v as ReviewSection)}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Sección" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="pendientes">Pendientes</SelectItem>
-              <SelectItem value="revisados">Revisados</SelectItem>
-              <SelectItem value="hoy">Revisados hoy</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <div className="bg-white dark:bg-slate-950 p-4 rounded-md shadow-sm z-10">
+          <h1 className="text-2xl font-semibold text-emerald-800 dark:text-emerald-300">Gestión de Tutores</h1>
+          <p className="text-muted-foreground">Revisa y administra los documentos enviados por tutores</p>
 
-        <TabsList className="hidden sm:flex w-full gap-2 p-1 px-2 bg-gradient-to-r from-emerald-100 via-emerald-50 to-emerald-50 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 flex-wrap">
-          <TabsTrigger value="all" className="px-3 py-2 text-sm">
+          <div className="sm:hidden mb-3">
+            <Select value={activeSection} onValueChange={(v) => setActiveSection(v as ReviewSection)}>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Sección" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="pendientes">Pendientes</SelectItem>
+                <SelectItem value="revisados">Revisados</SelectItem>
+                <SelectItem value="hoy">Revisados hoy</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
+          <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
             Todos
-            <Badge variant="outline" className="ml-2">{allDocuments.length}</Badge>
+            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{allDocuments.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="pendientes" className="px-3 py-2 text-sm">
+          <TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
             Pendientes
-            <Badge variant="warning" className="ml-2">{filteredPending.length}</Badge>
+            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPending.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="revisados" className="px-3 py-2 text-sm">Revisados</TabsTrigger>
-          <TabsTrigger value="hoy" className="px-3 py-2 text-sm">Revisados hoy</TabsTrigger>
+          <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados</TabsTrigger>
+          <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy</TabsTrigger>
         </TabsList>
+        </div>
 
         <TabsContent value="all" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
@@ -562,7 +560,7 @@ export default function Tutores() {
                         />
                         )}
 
-                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: 'tutor' in doc ? (doc as TutorDocument).tutor : '' }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: 'tutor' in doc ? (doc as TutorDocument).tutor : '' }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
 
                         <ResponsiveActionButton
                           variant="ghost"
@@ -581,7 +579,7 @@ export default function Tutores() {
                                   size="sm"
                                   label="Cancelar"
                                   title="Cancelar devolución"
-                                  className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                                  className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setReturnConfirmation({ type: "cancel-return", document: doc });
@@ -699,7 +697,7 @@ export default function Tutores() {
                         <TooltipContent>Revisar</TooltipContent>
                       </Tooltip>
 
-                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: 'tutor' in doc ? (doc as TutorDocument).tutor : '' }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: 'tutor' in doc ? (doc as TutorDocument).tutor : '' }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
 
                         <ResponsiveActionButton
                           variant="ghost"
@@ -718,7 +716,7 @@ export default function Tutores() {
                               size="sm"
                               label="Cancelar"
                               title="Cancelar devolución"
-                              className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                              className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setReturnConfirmation({ type: "cancel-return", document: doc });
@@ -831,7 +829,7 @@ export default function Tutores() {
                                 </TooltipTrigger>
                                 <TooltipContent>Ver PDF</TooltipContent>
                               </Tooltip>
-                              {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+                              {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.tutor}`}>
@@ -843,7 +841,7 @@ export default function Tutores() {
                               {doc.returned ? (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button variant="outline" size="icon" className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }} aria-label="Cancelar devolución">
+                                    <Button variant="outline" size="icon" className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }} aria-label="Cancelar devolución">
                                       <Undo2 className="h-4 w-4" />
                                     </Button>
                                   </TooltipTrigger>
@@ -938,7 +936,7 @@ export default function Tutores() {
                           <TooltipContent>Ver PDF</TooltipContent>
                         </Tooltip>
 
-                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.tutor}`}>
@@ -954,7 +952,7 @@ export default function Tutores() {
                               <Button
                                 variant="outline"
                                 size="icon"
-                                className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                                className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
                                 onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
                                 aria-label="Cancelar devolución"
                               >
@@ -998,7 +996,7 @@ export default function Tutores() {
                   <p>Cargando...</p>
                 </div>
               ) : previewError ? (
-                <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">
                   {previewError}
                 </div>
               ) : previewBlobUrl ? (
@@ -1031,7 +1029,7 @@ export default function Tutores() {
           </DialogHeader>
 
           {returnConfirmation && (
-            <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+            <div className="rounded-lg border border-border bg-muted p-3 text-sm">
               <p className="font-medium">{ensurePdfExtension(returnConfirmation.document.documento)}</p>
               <p className="text-muted-foreground">{returnConfirmation.document.tutor}</p>
             </div>
@@ -1075,7 +1073,7 @@ export default function Tutores() {
           </DialogHeader>
 
           {reviewConfirmation && (
-            <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+            <div className="rounded-lg border border-border bg-muted p-3 text-sm">
               <p className="font-medium">{ensurePdfExtension(reviewConfirmation.documento)}</p>
               <p className="text-muted-foreground">{reviewConfirmation.tutor}</p>
             </div>
@@ -1104,7 +1102,7 @@ export default function Tutores() {
             <DialogTitle className="flex items-center gap-2"><MessageCircleMore className="h-5 w-5 text-blue-500" />Nota del docente</DialogTitle>
             <DialogDescription>{noteDialog?.tutor}</DialogDescription>
           </DialogHeader>
-          <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm whitespace-pre-wrap">{noteDialog?.nota}</div>
+          <div className="rounded-lg border border-border bg-muted p-4 text-sm whitespace-pre-wrap">{noteDialog?.nota}</div>
           <DialogFooter><Button variant="outline" onClick={() => setNoteDialog(null)}>Cerrar</Button></DialogFooter>
         </DialogContent>
       </Dialog>

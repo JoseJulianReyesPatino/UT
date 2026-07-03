@@ -872,7 +872,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 							</SelectContent>
 						</Select>
 					</div>
-					<TabsList className="hidden sm:flex w-full gap-2 p-1 px-2 bg-gradient-to-r from-emerald-100 via-emerald-50 to-emerald-50 shadow-sm dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 flex-wrap">
+					<TabsList className="hidden sm:flex w-full gap-2 p-1 bg-white dark:bg-slate-950 rounded-full shadow-sm border border-slate-200 dark:border-slate-800 flex-wrap">
 						<TabsTrigger value="all" className="px-3 py-2 text-sm">Todos <Badge variant="outline" className="ml-2">{filteredAllDocuments.length}</Badge></TabsTrigger>
 						<TabsTrigger value="pendientes" className="px-3 py-2 text-sm">Pendientes <Badge variant="warning" className="ml-2">{filteredPendingDocuments.length}</Badge></TabsTrigger>
 						<TabsTrigger value="revisados" className="px-3 py-2 text-sm">Revisados <Badge variant="outline" className="ml-2">{filteredReviewedDocuments.length}</Badge></TabsTrigger>

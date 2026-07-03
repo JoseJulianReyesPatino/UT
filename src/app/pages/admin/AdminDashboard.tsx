@@ -14,12 +14,6 @@ import {
   Clock,
   Eye,
   CheckCircle2,
-  GraduationCap,
-  School,
-  BookOpenText,
-  Landmark,
-  Building2,
-  NotebookPen,
 } from "lucide-react";
 
 type AdminView = "dashboard" | "docentes" | "documentos" | "documentos-revisados" | "documentos-revisados-hoy";
@@ -182,15 +176,6 @@ const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocum
     .map(({ sortAt, ...item }) => item);
 };
 
-const backgroundIcons = [
-  { icon: GraduationCap, className: "left-[6%] top-[18%] h-12 w-12 rotate-[-12deg]" },
-  { icon: School, className: "right-[8%] top-[10%] h-14 w-14 rotate-[10deg]" },
-  { icon: BookOpenText, className: "left-[18%] top-[58%] h-10 w-10 rotate-[8deg]" },
-  { icon: Landmark, className: "right-[22%] top-[52%] h-11 w-11 rotate-[-6deg]" },
-  { icon: Building2, className: "left-[48%] top-[12%] h-9 w-9 rotate-[14deg]" },
-  { icon: NotebookPen, className: "right-[5%] bottom-[10%] h-10 w-10 rotate-[-10deg]" },
-];
-
 export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
   const [reviewedDocuments, setReviewedDocuments] = useState<ReviewedDocument[]>([]);
@@ -251,6 +236,10 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
       setIsLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
 
   useEffect(() => {
     void loadDashboard();
@@ -384,7 +373,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
               onClick={() => onNavigate(stat.action)}
               className="text-left rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Card className={`h-full overflow-hidden border shadow-sm hover:shadow-md transition cursor-pointer ${stat.cardClass}`}>
+              <Card className={`h-full overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-sm transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer ${stat.cardClass}`}>
                 <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
                 <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
                   <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm">{stat.title}</CardTitle>
@@ -420,7 +409,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
                 onOpen(doc);
               }
             }}
-            className="flex flex-col gap-3 p-3 rounded-xl border border-border/70 bg-background/80 hover:bg-accent/60 transition-colors cursor-pointer dark:bg-slate-950/60 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-3 p-3 rounded-2xl border border-slate-200 bg-white/70 hover:bg-slate-100/90 transition-colors cursor-pointer dark:border-slate-800 dark:bg-slate-900/70 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center dark:bg-emerald-950/50 dark:text-emerald-300">
@@ -464,7 +453,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
                 onOpen(activity);
               }
             }}
-            className="w-full text-left flex items-start gap-3 rounded-xl p-3 border border-transparent hover:border-border/70 hover:bg-accent/60 transition-colors cursor-pointer dark:hover:bg-slate-900/50"
+            className="w-full text-left flex items-start gap-3 rounded-2xl p-3 border border-transparent hover:border-slate-200/70 hover:bg-slate-100/90 transition-colors cursor-pointer dark:hover:border-slate-800/70 dark:hover:bg-slate-900/50"
           >
             <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 mt-2 shadow-[0_0_0_4px_rgba(16,185,129,0.12)] dark:shadow-[0_0_0_4px_rgba(16,185,129,0.06)]" />
             <div className="flex-1">
@@ -515,31 +504,27 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -right-12 top-8 h-40 w-40 rounded-full bg-emerald-100/20 blur-3xl dark:bg-emerald-500/5" />
         <div className="absolute -left-10 bottom-0 h-52 w-52 rounded-full bg-sky-100/10 blur-3xl dark:bg-sky-500/5" />
-        {backgroundIcons.map(({ icon: Icon, className }, index) => (
-          <span
-            key={`${Icon.displayName ?? "icon"}-${index}`}
-            className={`absolute text-emerald-300/15 dark:text-emerald-200/10 ${className}`}
-          >
-            <Icon className="h-full w-full" />
-          </span>
-        ))}
       </div>
 
-      <div className="relative z-10 flex items-center justify-between">
-        <div>
-          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">
-            Panel Administrativo
-          </h1>
-          <p className="text-muted-foreground">
-            Gestión y supervisión del sistema académico
-          </p>
-        </div>
+      <div className="relative z-10">
+        <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60 transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
+          <CardContent className="space-y-5 p-5 sm:p-7">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-800 dark:text-white">Panel Administrativo</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Gestión y supervisión del sistema académico con acceso rápido a documentos y actividad.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <StatsGrid stats={stats} onNavigate={onNavigate} />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-emerald-100/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/20 dark:to-emerald-950/20">
+        <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60 transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
           <CardHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-foreground">Documentos Pendientes de Revisión</CardTitle>
@@ -562,7 +547,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-slate-200/70 bg-gradient-to-br from-white via-slate-50/50 to-emerald-100/35 shadow-sm dark:border-slate-900/50 dark:from-slate-950 dark:via-slate-950/20 dark:to-emerald-950/20">
+        <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60 transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
           <CardHeader>
             <CardTitle className="text-foreground">Actividad Reciente</CardTitle>
             <CardDescription>Últimas acciones en el sistema</CardDescription>
