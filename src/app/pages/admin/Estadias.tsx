@@ -239,7 +239,7 @@ export default function Estadias() {
   const emptyStateLegend = "Aún no hay documentos de estadías para mostrar en esta sección. Cuando un docente suba uno, aparecerá aquí automáticamente.";
 
   const EmptyState = ({ text }: { text: string }) => (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-slate-300 shadow-sm backdrop-blur-sm">
+    <div className="rounded-2xl border border-border bg-muted/40 p-8 text-center text-muted-foreground shadow-sm">
       <div className="flex flex-col items-center gap-4">
         <p>{text}</p>
       </div>
@@ -247,25 +247,25 @@ export default function Estadias() {
   );
 
   const previewChipClassName =
-    "h-8 rounded-full border border-white/10 bg-white/5 px-3 text-xs font-medium text-slate-100 shadow-sm hover:bg-white/10 hover:text-white";
+    "h-8 rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground shadow-sm hover:bg-muted";
 
   const previewCardOverlayClassName = "absolute inset-0 z-10 rounded-xl cursor-pointer";
 
   const sectionCardClassName =
-    "overflow-hidden rounded-[22px] border border-white/10 bg-[#05091f]/95 shadow-[0_30px_100px_-48px_rgba(15,23,42,0.9)] backdrop-blur-sm";
+    "overflow-hidden rounded-[22px] border border-border bg-card shadow-sm";
 
   const documentRowClassName =
-    "relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 transition-colors hover:bg-white/10 lg:flex-row lg:items-center lg:justify-between";
+    "relative flex flex-col gap-4 rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted/50 lg:flex-row lg:items-center lg:justify-between";
 
   const getDocumentRowClassName = (isReturned: boolean) => (
     `relative flex flex-col gap-4 rounded-2xl border p-4 transition-colors lg:flex-row lg:items-center lg:justify-between ${isReturned
       ? "border-rose-500/25 bg-rose-500/10 hover:bg-rose-500/15"
-      : "border-white/10 bg-white/5 hover:bg-white/10"
+      : "border-border bg-background hover:bg-muted/50"
     }`
   );
 
   const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3";
-  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full border-white/10 bg-white/5 text-[13px] leading-tight text-slate-100 shadow-sm sm:text-sm";
+  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full text-[13px] leading-tight shadow-sm sm:text-sm";
   const filterSelectValueClassName = "truncate";
 
   const matchesFilters = (doc: { ciclo: string; plan: string; carrera: string; cuatrimestre: string; docente: string; apartado: string; returned?: boolean }) => {
@@ -399,6 +399,12 @@ export default function Estadias() {
   };
 
   const handleReturnDocument = async (documentId: number, comment: string) => {
+    const doc = [...pendingDocuments, ...reviewedDocuments].find((d) => d.id === documentId);
+    const raw = doc?.documento ?? "Documento";
+    const lastSep = raw.lastIndexOf(" - ");
+    const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
+    const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+    const docenteName = doc?.docente ?? "";
     try {
       await apiFetch(`/documents/${documentId}/return`, {
         method: "PATCH",
@@ -406,9 +412,9 @@ export default function Estadias() {
         body: JSON.stringify({ notes: comment.trim() }),
       });
       const returnedAt = new Date().toISOString();
-      setPendingDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt, resubmittedAt: undefined } : doc)));
-      setReviewedDocuments((current) => current.map((doc) => (doc.id === documentId ? { ...doc, returned: true, returnedAt, resubmittedAt: undefined } : doc)));
-      toast.success("Documento marcado como devuelto");
+      setPendingDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned: true, returnedAt, resubmittedAt: undefined } : d)));
+      setReviewedDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned: true, returnedAt, resubmittedAt: undefined } : d)));
+      toast.success(`${fileName} devuelto al docente ${docenteName}`);
     } catch {
       toast.error("No se pudo devolver el documento");
     }
@@ -503,14 +509,14 @@ export default function Estadias() {
     if (!returnConfirmation) return;
     if (returnConfirmation.type === "return") {
       const trimmedComment = returnComment.trim();
-      if (!trimmedComment) {
-        toast.error("Agrega un comentario para devolver el documento");
-        return;
-      }
       void handleReturnDocument(returnConfirmation.document.id, trimmedComment);
     } else {
       setDocumentReturnedState(returnConfirmation.document.id, false);
-      toast.success("Devolución cancelada correctamente");
+      const raw = returnConfirmation.document.documento ?? "Documento";
+      const lastSep = raw.lastIndexOf(" - ");
+      const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
+      const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+      toast.success(`Devolución de ${fileName} cancelada`);
     }
     setReturnComment("");
     setReturnConfirmation(null);
@@ -520,16 +526,10 @@ export default function Estadias() {
     <div className="relative space-y-6 overflow-hidden">
       <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-sm font-medium text-emerald-700 shadow-sm dark:border-emerald-500/30 dark:bg-slate-900/70 dark:text-emerald-300">
-              <FileText className="h-4 w-4" />
-              Revisión de estadías
-            </div>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Revisión de Estadías</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">Revisa y aprueba los documentos enviados por los docentes en el apartado de estadías</p>
-            </div>
+        <div className="relative space-y-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Revisión de Estadías</h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Revisa y aprueba los documentos de estadías enviados por los docentes.</p>
           </div>
         </div>
       </div>
@@ -1150,11 +1150,11 @@ export default function Estadias() {
                   {previewError}
                 </div>
               ) : previewBlobUrl ? (
-                <iframe
-                  src={previewBlobUrl}
-                  className="h-[82vh] w-full rounded-lg border border-border bg-background"
-                  title={previewDocument.documento}
-                />
+                <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border bg-background">
+                  <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
+                    Abrir documento en nueva pestaña
+                  </a>
+                </object>
               ) : (
                 <div className="flex h-[82vh] items-center justify-center text-sm text-muted-foreground">
                   No hay vista previa disponible para este PDF.

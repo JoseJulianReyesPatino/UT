@@ -251,11 +251,11 @@ function DocumentPreviewDialog({ open, document, onOpenChange, onOpenPdf, previe
                   {previewError}
                 </div>
               ) : previewBlobUrl ? (
-                <iframe
-                  src={previewBlobUrl}
-                  title={document.documento}
-                  className="h-[72vh] w-full rounded-md border border-border bg-background"
-                />
+                <object data={previewBlobUrl} type="application/pdf" className="h-[72vh] w-full rounded-md border border-border bg-background">
+                  <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[72vh] items-center justify-center rounded-md border border-dashed border-border bg-background text-sm text-primary underline">
+                    Abrir documento en nueva pestaña
+                  </a>
+                </object>
               ) : (
                 <div className="flex h-[72vh] items-center justify-center text-sm text-muted-foreground">
                   No hay vista previa disponible para este PDF.
@@ -1457,8 +1457,8 @@ export function CiclosEscolares() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">Ciclos Escolares</h1>
-          <p className="text-muted-foreground">Administra los períodos académicos del sistema</p>
+          <h1 className="text-white drop-shadow-sm">Ciclos Escolares</h1>
+          <p className="text-white/80">Administra los períodos académicos del sistema</p>
         </div>
         <Button variant="success" onClick={() => setShowNewDialog(true)} className="shadow-md shadow-emerald-500/20">
           <Plus className="h-4 w-4 mr-2" />

@@ -4,9 +4,12 @@ import { Toaster as Sonner } from "sonner";
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+
   return (
     <Sonner
       className="toaster group"
+      position={isMobile ? "top-center" : "bottom-right"}
       toastOptions={{
         classNames: {
           toast:

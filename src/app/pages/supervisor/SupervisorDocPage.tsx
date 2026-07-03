@@ -395,7 +395,11 @@ export default function SupervisorDocPage({ title, description, formCode, formCo
                   {previewError}
                 </div>
               ) : previewBlobUrl ? (
-                <iframe src={previewBlobUrl} className="h-[82vh] w-full rounded-lg border border-border" title={previewDoc.materia ?? "Documento"} />
+                <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border">
+                  <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
+                    Abrir documento en nueva pestaña
+                  </a>
+                </object>
               ) : null}
             </div>
           )}

@@ -12,7 +12,7 @@ import { apiFetch } from "../../lib/api";
 import { API_BASE_URL } from "../../lib/env";
 import { useTheme } from "../../context/ThemeContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronUp, FileText, Grid2x2, Moon, PencilLine, Plus, Search, Shield, Sun, Trash2, Users, Settings2 } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronUp, FileText, Grid2x2, Moon, PencilLine, Plus, RefreshCw, Search, Shield, Sun, Trash2, Users, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { carrieras } from "../../data/curricula";
 import { clearAvatarCache, getAvatarUrlWithTimestamp, getInitials, useResolvedAvatarUrl } from "../../lib/avatar";
@@ -190,6 +190,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const [supervisorsLoading, setSupervisorsLoading] = useState(false);
   const [supervisorDrafts, setSupervisorDrafts] = useState<Record<number, string[]>>({});
   const [savingSupId, setSavingSupId] = useState<number | null>(null);
+  const [supervisorSearch, setSupervisorSearch] = useState("");
+  const [expandedSupervisors, setExpandedSupervisors] = useState<Set<number>>(new Set());
 
   const navItems = useMemo(
     () => [
@@ -1410,12 +1412,21 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                         Asigna las secciones a las que puede acceder cada supervisor. Solo las secciones habilitadas aparecerán en su menú.
                       </CardDescription>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => void loadSupervisors()} disabled={supervisorsLoading} className="shrink-0 gap-2 text-sm">
-                      {supervisorsLoading ? "Cargando..." : "Actualizar"}
+                    <Button variant="outline" size="icon" onClick={() => void loadSupervisors()} disabled={supervisorsLoading} className="shrink-0 h-8 w-8">
+                      <RefreshCw className={`h-4 w-4 ${supervisorsLoading ? "animate-spin" : ""}`} />
                     </Button>
                   </div>
+                  <div className="relative mt-3">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      placeholder="Buscar por nombre o correo..."
+                      value={supervisorSearch}
+                      onChange={(e) => setSupervisorSearch(e.target.value)}
+                      className="pl-9 text-sm"
+                    />
+                  </div>
                 </CardHeader>
-                <CardContent className="p-4 sm:p-6">
+                <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
                   {supervisorsLoading ? (
                     <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
                       Cargando supervisores...
@@ -1427,74 +1438,99 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                       <p className="text-xs">Crea un usuario con rol de supervisor para asignarle permisos.</p>
                     </div>
                   ) : (
-                    <div className="space-y-6">
-                      {supervisors.map((sup) => {
-                        const draft = supervisorDrafts[sup.user_id] ?? [];
-                        const isSaving = savingSupId === sup.user_id;
-                        return (
-                          <div key={sup.user_id} className={`rounded-2xl border p-4 sm:p-5 ${theme === "dark" ? "border-slate-700 bg-slate-900/50" : "border-slate-200 bg-slate-50"}`}>
-                            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                              <div>
-                                <h3 className="font-semibold text-sm sm:text-base">{sup.user_name}</h3>
-                                <p className="text-xs text-muted-foreground">{sup.email}</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  {draft.length === 0 ? "Sin acceso a ninguna sección" : `${draft.length} sección${draft.length !== 1 ? "es" : ""} habilitada${draft.length !== 1 ? "s" : ""}`}
-                                </p>
-                              </div>
-                              <div className="flex gap-2 shrink-0">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-xs"
-                                  onClick={() => setSupervisorDrafts((prev) => ({ ...prev, [sup.user_id]: [] }))}
-                                  disabled={isSaving || draft.length === 0}
-                                >
-                                  Quitar todo
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-xs"
-                                  onClick={() => setSupervisorDrafts((prev) => ({ ...prev, [sup.user_id]: SUPERVISOR_SECTIONS.map((s) => s.id) }))}
-                                  disabled={isSaving || draft.length === SUPERVISOR_SECTIONS.length}
-                                >
-                                  Dar todo
-                                </Button>
-                                <Button
-                                  variant="success"
-                                  size="sm"
-                                  className="text-xs"
-                                  onClick={() => void handleSaveSupervisorSections(sup.user_id)}
-                                  disabled={isSaving}
-                                >
-                                  {isSaving ? "Guardando..." : "Guardar"}
-                                </Button>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {SUPERVISOR_SECTIONS.map((section) => {
-                                const isChecked = draft.includes(section.id);
-                                return (
-                                  <div key={section.id} className="flex items-center gap-2">
-                                    <Checkbox
-                                      id={`sup-${sup.user_id}-${section.id}`}
-                                      checked={isChecked}
-                                      disabled={isSaving}
-                                      onCheckedChange={(checked) => handleSectionChange(sup.user_id, section.id, Boolean(checked))}
-                                    />
-                                    <label
-                                      htmlFor={`sup-${sup.user_id}-${section.id}`}
-                                      className={`text-sm cursor-pointer select-none ${isChecked ? "font-medium" : "text-muted-foreground"}`}
-                                    >
-                                      {section.label}
-                                    </label>
+                    <div className="divide-y divide-border">
+                      {supervisors
+                        .filter((sup) => {
+                          const q = supervisorSearch.toLowerCase().trim();
+                          if (!q) return true;
+                          return sup.user_name.toLowerCase().includes(q) || sup.email.toLowerCase().includes(q);
+                        })
+                        .map((sup) => {
+                          const draft = supervisorDrafts[sup.user_id] ?? [];
+                          const isSaving = savingSupId === sup.user_id;
+                          const isExpanded = expandedSupervisors.has(sup.user_id);
+                          const toggle = () => setExpandedSupervisors((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(sup.user_id)) next.delete(sup.user_id);
+                            else next.add(sup.user_id);
+                            return next;
+                          });
+                          return (
+                            <div key={sup.user_id}>
+                              <button
+                                type="button"
+                                className="w-full flex items-center justify-between gap-3 py-3 text-left hover:bg-muted/40 rounded-lg px-2 transition-colors"
+                                onClick={toggle}
+                              >
+                                <div className="min-w-0">
+                                  <p className="font-medium text-sm truncate">{sup.user_name}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{sup.email}</p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-xs text-muted-foreground">
+                                    {draft.length === 0 ? "Sin acceso" : `${draft.length} sección${draft.length !== 1 ? "es" : ""}`}
+                                  </span>
+                                  {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                                </div>
+                              </button>
+
+                              {isExpanded && (
+                                <div className="pb-4 px-2 space-y-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+                                    {SUPERVISOR_SECTIONS.map((section) => {
+                                      const isChecked = draft.includes(section.id);
+                                      return (
+                                        <div key={section.id} className="flex items-center gap-2">
+                                          <Checkbox
+                                            id={`sup-${sup.user_id}-${section.id}`}
+                                            checked={isChecked}
+                                            disabled={isSaving}
+                                            onCheckedChange={(checked) => handleSectionChange(sup.user_id, section.id, Boolean(checked))}
+                                          />
+                                          <label
+                                            htmlFor={`sup-${sup.user_id}-${section.id}`}
+                                            className={`text-sm cursor-pointer select-none ${isChecked ? "font-medium" : "text-muted-foreground"}`}
+                                          >
+                                            {section.label}
+                                          </label>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                );
-                              })}
+                                  <div className="flex gap-2 justify-end">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-xs"
+                                      onClick={() => setSupervisorDrafts((prev) => ({ ...prev, [sup.user_id]: [] }))}
+                                      disabled={isSaving || draft.length === 0}
+                                    >
+                                      Quitar todo
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-xs"
+                                      onClick={() => setSupervisorDrafts((prev) => ({ ...prev, [sup.user_id]: SUPERVISOR_SECTIONS.map((s) => s.id) }))}
+                                      disabled={isSaving || draft.length === SUPERVISOR_SECTIONS.length}
+                                    >
+                                      Dar todo
+                                    </Button>
+                                    <Button
+                                      variant="success"
+                                      size="sm"
+                                      className="text-xs"
+                                      onClick={() => void handleSaveSupervisorSections(sup.user_id)}
+                                      disabled={isSaving}
+                                    >
+                                      {isSaving ? "Guardando..." : "Guardar"}
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
                     </div>
                   )}
                 </CardContent>

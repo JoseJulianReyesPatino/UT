@@ -185,10 +185,8 @@ export function Login() {
             </div>
 
             {/* MASCOTA */}
-            <div className="absolute right-[-260px] top-[290px] z-10 pointer-events-auto">
+            <div className="absolute right-[-160px] top-[200px] z-10 pointer-events-auto">
               <div className="group/mascot relative w-88 h-88 xl:w-[26rem] xl:h-[26rem] flex items-center justify-center">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#3BBF82]/10 to-[#3BBF82]/5 rounded-full blur-3xl opacity-80 transition-all duration-500 group-hover/mascot:opacity-100 group-hover/mascot:scale-110" />
-                <div className="absolute inset-0 border border-[#3BBF82]/12 rounded-full transition-all duration-500 group-hover/mascot:border-[#3BBF82]/25 group-hover/mascot:shadow-[0_0_80px_rgba(59,191,130,0.18)]" />
                 <img
                   src={mascotImage}
                   alt="Mascota institucional"

@@ -118,7 +118,7 @@ const mapApiDocumentToTutorDocument = (doc: any): TutorDocument => ({
 const emptyStateLegend = "Aún no hay documentos de tutores para mostrar en esta sección. Cuando un tutor suba uno, aparecerá aquí automáticamente.";
 
 const EmptyState = ({ text }: { text: string }) => (
-  <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-slate-300 shadow-sm backdrop-blur-sm">
+  <div className="rounded-2xl border border-border bg-muted/40 p-8 text-center text-muted-foreground shadow-sm">
     <div className="flex flex-col items-center gap-4">
       <p>{text}</p>
     </div>
@@ -355,13 +355,24 @@ export default function Tutores() {
     const shouldReturn = returnConfirmation.type === 'return';
     if (shouldReturn) {
       const trimmedComment = returnComment.trim();
-      if (!trimmedComment) {
-        toast.error("Agrega un comentario para devolver el documento");
-        return;
+      const result = await setDocumentReturnedState(returnConfirmation.document.id, true, trimmedComment);
+      if (result) {
+        const raw = returnConfirmation.document.documento ?? "Documento";
+        const lastSep = raw.lastIndexOf(" - ");
+        const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
+        const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+        const tutorName = returnConfirmation.document.tutor ?? "";
+        toast.success(`${fileName} devuelto al tutor ${tutorName}`);
       }
-      await setDocumentReturnedState(returnConfirmation.document.id, true, trimmedComment);
     } else {
-      await setDocumentReturnedState(returnConfirmation.document.id, false);
+      const result = await setDocumentReturnedState(returnConfirmation.document.id, false);
+      if (result) {
+        const raw = returnConfirmation.document.documento ?? "Documento";
+        const lastSep = raw.lastIndexOf(" - ");
+        const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
+        const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+        toast.success(`Devolución de ${fileName} cancelada`);
+      }
     }
     setReturnComment("");
     setReturnConfirmation(null);
@@ -427,36 +438,33 @@ export default function Tutores() {
     "absolute inset-0 z-10 rounded-xl cursor-pointer";
 
   const sectionCardClassName =
-    "overflow-hidden rounded-[22px] border border-white/10 bg-[#05091f]/95 shadow-[0_30px_100px_-48px_rgba(15,23,42,0.9)] backdrop-blur-sm";
+    "overflow-hidden rounded-[22px] border border-border bg-card shadow-sm";
 
   const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3";
-  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full border-white/10 bg-white/5 text-[13px] leading-tight text-slate-100 shadow-sm sm:text-sm";
+  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full text-[13px] leading-tight shadow-sm sm:text-sm";
   const filterSelectValueClassName = "truncate";
 
   const getDocumentRowClassName = (isReturned: boolean) => (
     `relative flex flex-col gap-4 rounded-2xl border p-4 transition-colors lg:flex-row lg:items-center lg:justify-between ${isReturned
       ? "border-rose-500/25 bg-rose-500/10 hover:bg-rose-500/15"
-      : "border-white/10 bg-white/5 hover:bg-white/10"
+      : "border-border bg-background hover:bg-muted/50"
     }`
   );
 
   return (
     <div className="relative space-y-6 overflow-hidden">
-      <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
-        <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-sm font-medium text-emerald-700 shadow-sm dark:border-emerald-500/30 dark:bg-slate-900/70 dark:text-emerald-300">
-                <FileText className="h-4 w-4" />
-                Gestión de tutores
-              </div>
-              <div>
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Gestión de Tutores</h1>
-                <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">Revisa y administra los documentos enviados por tutores</p>
-              </div>
-            </div>
+      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+        <div className="relative space-y-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Gestión de Tutores</h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Revisa y aprueba los documentos enviados por los tutores.</p>
+          </div>
+        </div>
+      </div>
 
+      <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
+        <div className="mb-4">
           <div className="sm:hidden mb-3">
             <Select value={activeSection} onValueChange={(v) => setActiveSection(v as ReviewSection)}>
               <SelectTrigger className="w-full"><SelectValue placeholder="Sección" /></SelectTrigger>
@@ -468,20 +476,18 @@ export default function Tutores() {
               </SelectContent>
             </Select>
           </div>
-
           <TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
-          <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
-            Todos
-            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{allDocuments.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
-            Pendientes
-            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPending.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados</TabsTrigger>
-          <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy</TabsTrigger>
-        </TabsList>
-          </div>
+            <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+              Todos
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{allDocuments.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+              Pendientes
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPending.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados</TabsTrigger>
+            <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy</TabsTrigger>
+          </TabsList>
         </div>
 
         <TabsContent value="all" className="space-y-4 mt-6">
@@ -1011,7 +1017,11 @@ export default function Tutores() {
                   {previewError}
                 </div>
               ) : previewBlobUrl ? (
-                <iframe src={previewBlobUrl} className="h-[82vh] w-full rounded-lg border border-border" title={previewDocument.documento} />
+                <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border">
+                <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
+                  Abrir documento en nueva pestaña
+                </a>
+              </object>
               ) : null}
             </div>
           )}

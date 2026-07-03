@@ -82,8 +82,8 @@ export function CalendarioAdmin() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Calendario</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">Sube el calendario institucional y revísalo antes de publicarlo.</p>
+          <h1 className="text-2xl font-semibold text-white drop-shadow-sm">Calendario</h1>
+          <p className="text-sm text-white/80">Sube el calendario institucional y revísalo antes de publicarlo.</p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-emerald-200/70 bg-emerald-50 px-3 py-1 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
           <CalendarDays className="h-4 w-4" />

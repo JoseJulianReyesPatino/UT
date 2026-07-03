@@ -506,13 +506,17 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               variant="ghost"
               size="icon"
               onClick={() => {
-                setCollapsed((prev) => !prev);
+                if (isMobile) {
+                  onMobileOpenChange?.(false);
+                } else {
+                  setCollapsed((prev) => !prev);
+                }
               }}
-              aria-label={isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
-              title={isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
+              aria-label={isMobile ? "Cerrar menú" : isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
+              title={isMobile ? "Cerrar menú" : isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
               className="h-8 w-8 rounded-full border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
             >
-              <ChevronLeft className={cn("h-4 w-4 transition-transform", isCollapsedLocal && "rotate-180")} />
+              <ChevronLeft className={cn("h-4 w-4 transition-transform", !isMobile && isCollapsedLocal && "rotate-180")} />
             </Button>
           </div>
         </div>

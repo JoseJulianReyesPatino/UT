@@ -5,15 +5,17 @@ import { Button } from "../../components/ui/button";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Textarea } from "../../components/ui/textarea";
 import apiFetch from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { toast } from "sonner";
-import { 
+import {
   Users,
   FileText,
   Clock,
   Eye,
   CheckCircle2,
+  Undo2,
 } from "lucide-react";
 
 type AdminView = "dashboard" | "docentes" | "documentos" | "documentos-revisados" | "documentos-revisados-hoy";
@@ -81,6 +83,17 @@ const formatDate = (value?: string | null) => {
   return parsed.toLocaleDateString("es-MX");
 };
 
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "-";
+  const parsed = new Date(value.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return "-";
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const year = parsed.getFullYear();
+  const time = parsed.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  return `${day}/${month}/${year} ${time}`;
+};
+
 const formatRelativeTime = (value?: string | null) => {
   if (!value) return "Sin fecha";
   const parsed = new Date(value.replace(" ", "T"));
@@ -112,7 +125,7 @@ const mapPendingDocument = (doc: ApiDocument): PendingDocument => ({
   id: Number(doc.id),
   docente: doc.uploaded_by_name ?? "Docente",
   documento: doc.title ?? "Documento sin título",
-  carrera: doc.carrera_label ?? "Sin carrera",
+  carrera: doc.carrera_label ?? "",
   tipo: doc.apartado_label ?? doc.form_title ?? "Documento",
   fecha: formatDate(doc.submitted_at),
   revisado: false,
@@ -126,7 +139,7 @@ const mapReviewedDocument = (doc: ApiDocument): ReviewedDocument => {
     id: Number(doc.id),
     docente: doc.uploaded_by_name ?? "Docente",
     documento: doc.title ?? "Documento sin título",
-    carrera: doc.carrera_label ?? "Sin carrera",
+    carrera: doc.carrera_label ?? "",
     tipo: doc.apartado_label ?? doc.form_title ?? "Documento",
     fecha: formatDate(doc.submitted_at),
     reviewedAt: formatDate(reviewedAtIso),
@@ -197,6 +210,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     carrera: string;
     tipo: string;
     fecha: string;
+    submittedAt: string;
   }>(null);
 
   const [selectedActivity, setSelectedActivity] = useState<null | {
@@ -211,6 +225,8 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [returnComment, setReturnComment] = useState("");
 
 
   const loadDashboard = useCallback(async () => {
@@ -276,7 +292,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         value: reviewedDocuments.length,
         description: "Ya abiertos por administración",
         icon: CheckCircle2,
-        trend: `${reviewedDocuments.filter((doc) => isToday(doc.reviewedAtIso)).length} hoy`,
+        trend: "",
         color: "text-emerald-700 dark:text-emerald-300",
         bgColor: "bg-emerald-100/70 dark:bg-emerald-950/40",
         cardClass: "bg-gradient-to-br from-emerald-50 via-white to-emerald-50/80 border-emerald-200/70 dark:from-emerald-950/20 dark:via-slate-950 dark:to-emerald-950/25 dark:border-emerald-800/60",
@@ -317,7 +333,39 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     }
   }, [loadDashboard]);
 
-  const openDocument = useCallback((doc: { id: number; docente: string; documento: string; carrera: string; tipo: string; fecha: string }) => {
+  const handleReturnDocument = useCallback(async (documentId: number, comment: string, docName?: string, docenteName?: string) => {
+    try {
+      await apiFetch(`/documents/${documentId}/return`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: comment.trim() }),
+      });
+      const raw = docName ?? "Documento";
+      const lastSep = raw.lastIndexOf(" - ");
+      const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
+      const nombre = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+      const docente = docenteName ? ` al docente ${docenteName}` : "";
+      toast.success(`${nombre} devuelto${docente}`);
+      await loadDashboard();
+    } catch {
+      toast.error("No se pudo devolver el documento");
+    }
+  }, [loadDashboard]);
+
+  const confirmReturn = useCallback(() => {
+    const trimmed = returnComment.trim();
+    if (!selectedDocument) return;
+    const doc = selectedDocument;
+    setReturnDialogOpen(false);
+    setReturnComment("");
+    setSelectedDocument(null);
+    void handleReturnDocument(doc.id, trimmed, doc.documento, doc.docente);
+    globalThis.dispatchEvent(new CustomEvent("openMessagesConversation", {
+      detail: { recipientName: doc.docente, recipientRole: "Docente", document: { id: doc.id, title: doc.documento, filePath: "" } },
+    }));
+  }, [returnComment, selectedDocument, handleReturnDocument]);
+
+  const openDocument = useCallback((doc: { id: number; docente: string; documento: string; carrera: string; tipo: string; fecha: string; submittedAt: string }) => {
     setSelectedDocument(doc);
   }, []);
 
@@ -418,9 +466,11 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-sm truncate text-foreground">{doc.documento}</p>
                 <p className="text-xs text-muted-foreground">{doc.docente}</p>
-                <Badge variant="outline" className="mt-2 w-fit max-w-full text-[11px]">
-                  {doc.carrera}
-                </Badge>
+                {doc.carrera && (
+                  <Badge variant="outline" className="mt-2 w-fit max-w-full text-[11px]">
+                    {doc.carrera}
+                  </Badge>
+                )}
               </div>
             </div>
             <div className="flex w-full items-center justify-end sm:w-auto sm:shrink-0">
@@ -487,6 +537,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         carrera: relatedDocument.carrera,
         tipo: relatedDocument.tipo,
         fecha: relatedDocument.fecha,
+        submittedAt: relatedDocument.submittedAt,
       });
     }
 
@@ -568,55 +619,65 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         </Card>
       </div>
 
-      <Dialog open={Boolean(selectedDocument)} onOpenChange={(open) => !open && setSelectedDocument(null)}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>Documento abierto</DialogTitle>
-            <DialogDescription>
-              Marca como revisado solo cuando estés listo.
-            </DialogDescription>
+      {/* Dialog de vista previa de documento pendiente */}
+      <Dialog open={Boolean(selectedDocument)} onOpenChange={(open) => { if (!open) setSelectedDocument(null); }}>
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col p-4 gap-3">
+          <DialogHeader className="flex-shrink-0 space-y-0.5">
+            <DialogTitle className="text-sm sm:text-base leading-tight">{selectedDocument?.documento ?? ""}</DialogTitle>
+            {selectedDocument && (
+              <DialogDescription className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs">
+                <span>{selectedDocument.docente}</span>
+                {selectedDocument.carrera && <><span>·</span><span>{selectedDocument.carrera}</span></>}
+                <span>·</span><span>{formatDateTime(selectedDocument.submittedAt)}</span>
+              </DialogDescription>
+            )}
           </DialogHeader>
+
           {selectedDocument && (
-            <Tabs defaultValue="preview" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="preview">Vista previa</TabsTrigger>
-                <TabsTrigger value="details">Detalles</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="preview" className="space-y-3">
-                <div className="rounded-lg border border-border p-2 sm:p-3">
-                  {previewLoading ? (
-                    <p className="text-sm text-muted-foreground">Cargando vista previa...</p>
-                  ) : previewError ? (
-                    <p className="text-sm text-destructive">{previewError}</p>
-                  ) : previewBlobUrl ? (
-                    <iframe
-                      src={previewBlobUrl}
-                      title={selectedDocument.documento}
-                      className="h-[60vh] w-full rounded-md border border-border"
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No hay vista previa disponible.</p>
-                  )}
+            <div style={{ height: "calc(95vh - 130px)" }}>
+              {previewLoading ? (
+                <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                  <p>Cargando...</p>
                 </div>
-              </TabsContent>
-
-              <TabsContent value="details" className="space-y-3">
-                <div className="rounded-lg border border-border p-3">
-                  <p className="text-sm font-medium">{selectedDocument.documento}</p>
-                  <p className="text-xs text-muted-foreground">{selectedDocument.docente}</p>
-                  <p className="text-xs text-muted-foreground">{selectedDocument.carrera}</p>
-                  <p className="text-xs text-muted-foreground">{selectedDocument.tipo}</p>
-                  <p className="text-xs text-muted-foreground">Fecha: {selectedDocument.fecha}</p>
+              ) : previewError ? (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                  {previewError}
                 </div>
-              </TabsContent>
-            </Tabs>
+              ) : previewBlobUrl ? (
+                <object
+                  data={previewBlobUrl}
+                  type="application/pdf"
+                  className="w-full h-full rounded-lg border border-border"
+                >
+                  <a
+                    href={previewBlobUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-full items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline"
+                  >
+                    Abrir documento en nueva pestaña
+                  </a>
+                </object>
+              ) : null}
+            </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedDocument(null)}>
-              Cerrar
+
+          <div className="flex-shrink-0 flex flex-row items-center justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSelectedDocument(null)}>
+              <span className="hidden sm:inline">Cerrar</span>
+              <span className="sm:hidden">✕</span>
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              className="border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-950/40"
+              onClick={() => setReturnDialogOpen(true)}
+            >
+              <Undo2 className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Devolver</span>
+            </Button>
+            <Button
+              size="sm"
               disabled={isReviewing}
               onClick={() => {
                 if (selectedDocument) {
@@ -625,7 +686,38 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
                 }
               }}
             >
-              {isReviewing ? "Guardando..." : "Marcar como revisado"}
+              <CheckCircle2 className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">{isReviewing ? "Guardando..." : "Marcar como revisado"}</span>
+              <span className="sm:hidden">{isReviewing ? "..." : "Revisado"}</span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de devolución con comentario */}
+      <Dialog open={returnDialogOpen} onOpenChange={(open) => { if (!open) { setReturnDialogOpen(false); setReturnComment(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Devolver documento</DialogTitle>
+            <DialogDescription>
+              El comentario se enviará al docente junto con la notificación de devolución.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Comentario para el docente</p>
+            <Textarea
+              value={returnComment}
+              onChange={(e) => setReturnComment(e.target.value)}
+              placeholder="Escribe la razón de devolución del documento..."
+              className="min-h-[100px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setReturnDialogOpen(false); setReturnComment(""); }}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmReturn}>
+              Confirmar devolución
             </Button>
           </DialogFooter>
         </DialogContent>

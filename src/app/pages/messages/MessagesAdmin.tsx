@@ -1465,8 +1465,8 @@ export function MessagesAdmin(props: Readonly<{
       <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-5 overflow-hidden">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
-            <h1>Mensajes</h1>
-            <p className="max-w-2xl text-sm text-muted-foreground hidden sm:block">Mensajería interna con el Administrador</p>
+            <h1 className="text-white drop-shadow-sm">Mensajes</h1>
+            <p className="max-w-2xl text-sm text-white/80 hidden sm:block">Mensajería interna con el Administrador</p>
           </div>
         </div>
 
@@ -1604,8 +1604,8 @@ export function MessagesAdmin(props: Readonly<{
     <div className="flex h-[calc(100dvh-64px)] min-h-0 flex-col gap-5 overflow-hidden">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
-          <h1>Mensajes</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground hidden sm:block">Mensajería interna: mensajes, archivos y seguimiento.</p>
+          <h1 className="text-white drop-shadow-sm">Mensajes</h1>
+          <p className="max-w-2xl text-sm text-white/80 hidden sm:block">Mensajería interna: mensajes, archivos y seguimiento.</p>
         </div>
       </div>
 
