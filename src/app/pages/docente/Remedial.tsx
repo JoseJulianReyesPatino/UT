@@ -1,6 +1,7 @@
 ﻿import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -421,74 +422,69 @@ export default function RemedialPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-2 sm:p-4" ref={formRef}>
-      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-sm font-medium text-emerald-700 shadow-sm dark:border-emerald-500/30 dark:bg-slate-900/70 dark:text-emerald-300">
-              <FileText className="h-4 w-4" />
-              Envío de remedial
-            </div>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Remedial</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">Captura y envía el instrumento de evaluación para Remedial con el mismo estilo que Planeación.</p>
-            </div>
+      <div className="bg-white dark:bg-slate-950 p-4 rounded-md shadow-sm z-10">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-emerald-800 dark:text-emerald-300">Remedial</h1>
+            <p className="text-muted-foreground">Captura y envía el instrumento de evaluación para Remedial con el mismo estilo que Tutores.</p>
           </div>
 
-          <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" className="w-full justify-center rounded-2xl border-slate-200 bg-white/80 px-4 py-5 text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800">
-                  <History className="mr-2 h-4 w-4" />
-                  Historial
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="sm:max-w-xl overflow-y-auto dark:border-slate-700 dark:bg-slate-950">
-                <SheetHeader>
-                  <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
-                  <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
-                </SheetHeader>
-                <div className="mt-4 space-y-4">
-                  {history.length > 0 ? (
-                    <ScrollArea className="h-[min(78vh,44rem)] rounded-2xl border border-border bg-background/40 pr-2 dark:border-slate-700 dark:bg-slate-900/30">
-                      <div className="grid gap-3 p-2">
-                        {history.map((h) => (
-                          <DocumentHistoryCard
-                            key={h.id}
-                            title={h.title ?? h.file_path}
-                            fileName={getUploadedFileName(h)}
-                            carrera={h.carrera_label}
-                            subject={h.materia}
-                            submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                            status={h.status}
-                            returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
-                            onView={() => openDocument(h.id, "view")}
-                            onEdit={() => populateFormForEdit(h)}
-                          />
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  ) : formData.archivos.length === 0 ? (
-                    <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
-                  ) : (
-                    <div>
-                      <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
-                      <ul className="space-y-2">
-                        {formData.archivos.map((f, i) => (
-                          <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
-                        ))}
-                      </ul>
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <ResponsiveActionButton
+                variant="outline"
+                size="sm"
+                label="Historial"
+                title="Abrir historial"
+                icon={<History className="h-4 w-4" />}
+                className="border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+              />
+            </SheetTrigger>
+            <SheetContent side="right" className="sm:max-w-xl overflow-y-auto dark:border-slate-700 dark:bg-slate-950">
+              <SheetHeader>
+                <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
+                <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
+              </SheetHeader>
+              <div className="mt-4 space-y-4">
+                {history.length > 0 ? (
+                  <ScrollArea className="h-[min(78vh,44rem)] rounded-2xl border border-border bg-background/40 pr-2 dark:border-slate-700 dark:bg-slate-900/30">
+                    <div className="grid gap-3 p-2">
+                      {history.map((h) => (
+                        <DocumentHistoryCard
+                          key={h.id}
+                          title={h.title ?? h.file_path}
+                          fileName={getUploadedFileName(h)}
+                          carrera={h.carrera_label}
+                          subject={h.materia}
+                          submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          status={h.status}
+                          returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
+                          onView={() => openDocument(h.id, "view")}
+                          onEdit={() => populateFormForEdit(h)}
+                        />
+                      ))}
                     </div>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+                  </ScrollArea>
+                ) : formData.archivos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
+                ) : (
+                  <div>
+                    <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
+                    <ul className="space-y-2">
+                      {formData.archivos.map((f, i) => (
+                        <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
-        <div className="rounded-[24px] border border-slate-200/80 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+        <div className="rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <div className="flex items-center gap-3">
             <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
               <FileText className="h-5 w-5" />
@@ -504,7 +500,7 @@ export default function RemedialPage() {
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-slate-200/80 bg-slate-50 p-4 text-slate-900 shadow-sm dark:border-slate-800 dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 dark:text-white">
+        <div className="rounded-[24px] border border-slate-200/80 bg-white p-4 text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-white">
           <div className="flex items-center gap-2">
             <div className="rounded-full bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
               <FileText className="h-4 w-4" />
@@ -515,7 +511,7 @@ export default function RemedialPage() {
         </div>
       </div>
 
-      <Card className="overflow-hidden border border-slate-200/70 bg-white/90 shadow-[0_24px_90px_-35px_rgba(15,23,42,0.35)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
+      <Card className="overflow-hidden border-emerald-200 bg-white shadow-sm dark:border-emerald-900 dark:bg-slate-950">
         <CardHeader className="dark:border-slate-700">
           <CardTitle className="dark:text-white">Formulario Remedial</CardTitle>
           <CardDescription className="dark:text-slate-400">Los campos marcados con * son obligatorios.</CardDescription>

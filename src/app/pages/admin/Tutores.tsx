@@ -118,7 +118,7 @@ const mapApiDocumentToTutorDocument = (doc: any): TutorDocument => ({
 const emptyStateLegend = "Aún no hay documentos de tutores para mostrar en esta sección. Cuando un tutor suba uno, aparecerá aquí automáticamente.";
 
 const EmptyState = ({ text }: { text: string }) => (
-  <div className="rounded-lg border border-dashed border-border bg-background p-8 text-center text-muted-foreground dark:bg-slate-950">
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-slate-300 shadow-sm backdrop-blur-sm">
     <div className="flex flex-col items-center gap-4">
       <p>{text}</p>
     </div>
@@ -421,31 +421,41 @@ export default function Tutores() {
   const apartadosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.apartado))).filter((apartado) => apartado && apartado.trim().length > 0);
 
   const previewChipClassName =
-    "h-8 rounded-full border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-emerald-50 hover:text-emerald-900 dark:hover:bg-emerald-950 dark:hover:text-emerald-200";
+    "h-8 rounded-full border border-white/10 bg-white/5 px-3 text-xs font-medium text-slate-100 shadow-sm hover:bg-white/10 hover:text-white";
 
   const previewCardOverlayClassName =
     "absolute inset-0 z-10 rounded-xl cursor-pointer";
 
   const sectionCardClassName =
-    "overflow-hidden border-emerald-200 bg-white shadow-sm dark:border-emerald-900 dark:bg-slate-950";
+    "overflow-hidden rounded-[22px] border border-white/10 bg-[#05091f]/95 shadow-[0_30px_100px_-48px_rgba(15,23,42,0.9)] backdrop-blur-sm";
 
   const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3";
-  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full text-[13px] leading-tight sm:text-sm";
+  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full border-white/10 bg-white/5 text-[13px] leading-tight text-slate-100 shadow-sm sm:text-sm";
   const filterSelectValueClassName = "truncate";
 
   const getDocumentRowClassName = (isReturned: boolean) => (
-    `relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border transition-colors ${isReturned
-      ? "border-rose-300 bg-rose-50 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950 dark:hover:bg-rose-900"
-      : "border-border hover:bg-accent"
+    `relative flex flex-col gap-4 rounded-2xl border p-4 transition-colors lg:flex-row lg:items-center lg:justify-between ${isReturned
+      ? "border-rose-500/25 bg-rose-500/10 hover:bg-rose-500/15"
+      : "border-white/10 bg-white/5 hover:bg-white/10"
     }`
   );
 
   return (
     <div className="relative space-y-6 overflow-hidden">
       <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
-        <div className="bg-white dark:bg-slate-950 p-4 rounded-md shadow-sm z-10">
-          <h1 className="text-2xl font-semibold text-emerald-800 dark:text-emerald-300">Gestión de Tutores</h1>
-          <p className="text-muted-foreground">Revisa y administra los documentos enviados por tutores</p>
+        <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-sm font-medium text-emerald-700 shadow-sm dark:border-emerald-500/30 dark:bg-slate-900/70 dark:text-emerald-300">
+                <FileText className="h-4 w-4" />
+                Gestión de tutores
+              </div>
+              <div>
+                <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Gestión de Tutores</h1>
+                <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">Revisa y administra los documentos enviados por tutores</p>
+              </div>
+            </div>
 
           <div className="sm:hidden mb-3">
             <Select value={activeSection} onValueChange={(v) => setActiveSection(v as ReviewSection)}>
@@ -471,6 +481,7 @@ export default function Tutores() {
           <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados</TabsTrigger>
           <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy</TabsTrigger>
         </TabsList>
+          </div>
         </div>
 
         <TabsContent value="all" className="space-y-4 mt-6">

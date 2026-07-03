@@ -22,7 +22,7 @@ export function Login() {
     : "/src/assets/LogotipoUTSLRC.webp";
   const superiorImage = new URL("../../assets/superior.webp", import.meta.url).href;
   const inferiorImage = new URL("../../assets/inferior.webp", import.meta.url).href;
-  const backgroundImage = new URL("../../assets/ut_imagen13.jpg", import.meta.url).href;
+  const mascotImage = new URL("../../assets/mascota3.webp", import.meta.url).href;
 
   const pageBackground = isDarkMode ? "bg-slate-950" : "bg-gradient-to-br from-slate-50 to-slate-100";
   const cardSurface = isDarkMode
@@ -184,12 +184,16 @@ export function Login() {
               </p>
             </div>
 
-            {/* MASCOTA: eliminada por petición. Se mantiene un sutil acabado decorativo sin imagen */}
-            <div className="absolute right-[-120px] top-[320px] z-10 pointer-events-none">
-              <div className="relative w-72 h-72 xl:w-[20rem] xl:h-[20rem] flex items-center justify-center">
-                {/* Sutil glow decorativo sin imagen */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[#3BBF82]/8 to-[#3BBF82]/4 rounded-full blur-3xl opacity-80" />
-                <div className="absolute inset-0 border border-[#3BBF82]/12 rounded-full" />
+            {/* MASCOTA */}
+            <div className="absolute right-[-260px] top-[290px] z-10 pointer-events-auto">
+              <div className="group/mascot relative w-88 h-88 xl:w-[26rem] xl:h-[26rem] flex items-center justify-center">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#3BBF82]/10 to-[#3BBF82]/5 rounded-full blur-3xl opacity-80 transition-all duration-500 group-hover/mascot:opacity-100 group-hover/mascot:scale-110" />
+                <div className="absolute inset-0 border border-[#3BBF82]/12 rounded-full transition-all duration-500 group-hover/mascot:border-[#3BBF82]/25 group-hover/mascot:shadow-[0_0_80px_rgba(59,191,130,0.18)]" />
+                <img
+                  src={mascotImage}
+                  alt="Mascota institucional"
+                  className="relative z-10 w-full h-full object-contain drop-shadow-[0_22px_40px_rgba(0,0,0,0.22)] transition-transform duration-500 ease-out group-hover/mascot:scale-110 group-hover/mascot:drop-shadow-[0_30px_60px_rgba(59,191,130,0.22)]"
+                />
               </div>
             </div>
 
@@ -336,11 +340,7 @@ export function Login() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className={`w-full h-12 rounded-xl font-semibold text-base shadow-lg transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 ${
-                    isDarkMode
-                      ? "bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white hover:shadow-2xl"
-                      : "bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white hover:shadow-2xl"
-                  }`}
+                  className="w-full h-12 rounded-xl font-semibold text-base shadow-lg transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white hover:shadow-2xl"
                 >
                   {isLoading ? (
                     <>

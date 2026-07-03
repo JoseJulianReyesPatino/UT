@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Eye, FileText, Check, MessageCircleMore, MessageSquare, Undo2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
@@ -11,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import { Textarea } from "../../components/ui/textarea";
 import apiFetch from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
-import ChargingImg from "../../../assets/Form_Not_Found.png";
 import { formatGroupCode } from "../../../lib/utils";
 import { useAuth } from "../../context/AuthContext";
 
@@ -239,34 +239,33 @@ export default function Estadias() {
   const emptyStateLegend = "Aún no hay documentos de estadías para mostrar en esta sección. Cuando un docente suba uno, aparecerá aquí automáticamente.";
 
   const EmptyState = ({ text }: { text: string }) => (
-    <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-slate-300 shadow-sm backdrop-blur-sm">
       <div className="flex flex-col items-center gap-4">
-        <img src={ChargingImg} alt="No forms" className="h-72 w-auto mx-auto" />
         <p>{text}</p>
       </div>
     </div>
   );
 
   const previewChipClassName =
-    "h-8 rounded-full border-border bg-background/90 px-3 text-xs font-medium text-foreground hover:bg-emerald-50 hover:text-emerald-900 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-200";
+    "h-8 rounded-full border border-white/10 bg-white/5 px-3 text-xs font-medium text-slate-100 shadow-sm hover:bg-white/10 hover:text-white";
 
-  const previewCardOverlayClassName = "absolute inset-0 z-10 rounded-xl bg-transparent cursor-pointer";
+  const previewCardOverlayClassName = "absolute inset-0 z-10 rounded-xl cursor-pointer";
 
   const sectionCardClassName =
-    "overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20";
+    "overflow-hidden rounded-[22px] border border-white/10 bg-[#05091f]/95 shadow-[0_30px_100px_-48px_rgba(15,23,42,0.9)] backdrop-blur-sm";
 
   const documentRowClassName =
-    "cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border/70 bg-transparent shadow-sm transition-colors hover:bg-emerald-50/35 hover:border-emerald-300/60 dark:bg-transparent dark:hover:bg-slate-900/55 dark:hover:border-emerald-800/50";
+    "relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 transition-colors hover:bg-white/10 lg:flex-row lg:items-center lg:justify-between";
 
   const getDocumentRowClassName = (isReturned: boolean) => (
-    `relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border transition-colors ${isReturned
-      ? "border-rose-300/70 bg-rose-50/70 hover:bg-rose-50 dark:border-rose-900/60 dark:bg-rose-950/20 dark:hover:bg-rose-950/30"
-      : "border-border hover:bg-accent/50"
+    `relative flex flex-col gap-4 rounded-2xl border p-4 transition-colors lg:flex-row lg:items-center lg:justify-between ${isReturned
+      ? "border-rose-500/25 bg-rose-500/10 hover:bg-rose-500/15"
+      : "border-white/10 bg-white/5 hover:bg-white/10"
     }`
   );
 
-  const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5";
-  const filterSelectTriggerClassName = "w-full text-[13px] leading-tight sm:text-sm";
+  const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3";
+  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full border-white/10 bg-white/5 text-[13px] leading-tight text-slate-100 shadow-sm sm:text-sm";
   const filterSelectValueClassName = "truncate";
 
   const matchesFilters = (doc: { ciclo: string; plan: string; carrera: string; cuatrimestre: string; docente: string; apartado: string; returned?: boolean }) => {
@@ -519,11 +518,20 @@ export default function Estadias() {
 
   return (
     <div className="relative space-y-6 overflow-hidden">
-      <div>
-        <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">
-          Revisión de Estadías
-        </h1>
-        <p className="text-muted-foreground">Revisa y aprueba los documentos enviados por los docentes en el apartado de estadías</p>
+      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-sm font-medium text-emerald-700 shadow-sm dark:border-emerald-500/30 dark:bg-slate-900/70 dark:text-emerald-300">
+              <FileText className="h-4 w-4" />
+              Revisión de estadías
+            </div>
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Revisión de Estadías</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">Revisa y aprueba los documentos enviados por los docentes en el apartado de estadías</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ReviewSection)}>
@@ -539,22 +547,22 @@ export default function Estadias() {
           </Select>
         </div>
 
-        <TabsList className="hidden sm:flex w-full gap-2 p-1 bg-white dark:bg-slate-950 rounded-full shadow-sm border border-slate-200 dark:border-slate-800 flex-wrap">
-          <TabsTrigger value="all" className="px-3 py-2 text-sm">
+        <TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
+          <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
             Todos
-            <Badge variant="outline" className="ml-2">{allDocuments.length}</Badge>
+            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{allDocuments.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="pendientes" className="px-3 py-2 text-sm">
+          <TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
             Pendientes
-            <Badge variant="warning" className="ml-2">{filteredPending.length}</Badge>
+            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPending.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="revisados" className="px-3 py-2 text-sm">Revisados</TabsTrigger>
-          <TabsTrigger value="hoy" className="px-3 py-2 text-sm">Revisados hoy</TabsTrigger>
+          <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados</TabsTrigger>
+          <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4 mt-6">
-          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-emerald-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20">
-            <CardHeader>
+          <Card className={sectionCardClassName}>
+            <CardHeader className="pb-4">
               <div className={filtersGridClassName}>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
@@ -644,50 +652,53 @@ export default function Estadias() {
                           )}
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 pointer-events-auto">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Ver PDF</TooltipContent>
-                        </Tooltip>
+                      <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+                        <ResponsiveActionButton
+                          variant="outline"
+                          size="sm"
+                          label="Ver"
+                          title="Ver PDF"
+                          onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}
+                          icon={<Eye className="h-4 w-4" />}
+                        />
 
-                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
 
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                              <MessageSquare className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Enviar</TooltipContent>
-                        </Tooltip>
+                        <ResponsiveActionButton
+                          variant="ghost"
+                          size="sm"
+                          label="Enviar"
+                          title={`Enviar a mensajes ${doc.docente}`}
+                          onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }}
+                          icon={<MessageSquare className="h-4 w-4" />}
+                        />
 
                         {isReturned ? <Badge variant="destructive">Devuelto</Badge> : <Badge variant={isReviewed ? "success" : "warning"}>{isReviewed ? "Revisado" : "Pendiente"}</Badge>}
 
                         {doc.returned ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button
+                              <ResponsiveActionButton
                                 variant="outline"
-                                size="icon"
-                                className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                                size="sm"
+                                label="Cancelar"
+                                className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
                                 onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
-                                aria-label="Cancelar devolución"
-                              >
-                                <Undo2 className="h-4 w-4" />
-                              </Button>
+                                icon={<Undo2 className="h-4 w-4" />}
+                              />
                             </TooltipTrigger>
                             <TooltipContent>Cancelar devolución</TooltipContent>
                           </Tooltip>
                         ) : (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button variant="destructive" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }} aria-label="Devolver documento">
-                                <Undo2 className="h-4 w-4" />
-                              </Button>
+                              <ResponsiveActionButton
+                                variant="destructive"
+                                size="sm"
+                                label="Devolver"
+                                onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
+                                icon={<Undo2 className="h-4 w-4" />}
+                              />
                             </TooltipTrigger>
                             <TooltipContent>Devolver</TooltipContent>
                           </Tooltip>
@@ -702,8 +713,8 @@ export default function Estadias() {
         </TabsContent>
 
         <TabsContent value="pendientes" className="space-y-4 mt-6">
-          <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20">
-            <CardHeader>
+          <Card className={sectionCardClassName}>
+            <CardHeader className="pb-4">
               <div className={filtersGridClassName}>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
@@ -761,7 +772,8 @@ export default function Estadias() {
                 {!isLoading && !loadError && filteredPending.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : !isLoading && !loadError && filteredPending.map((doc) => (
-                  <div key={doc.id} className="cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                  <div key={doc.id} className={documentRowClassName}>
+                    <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
                     <div className="flex items-start gap-3 flex-1">
                       <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
                         <FileText className="h-6 w-6 text-muted-foreground" />
@@ -780,57 +792,60 @@ export default function Estadias() {
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Ver PDF</TooltipContent>
-                      </Tooltip>
+                    <div className="flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+                      <ResponsiveActionButton
+                        variant="outline"
+                        size="sm"
+                        label="Ver"
+                        title="Ver PDF"
+                        onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}
+                        icon={<Eye className="h-4 w-4" />}
+                      />
 
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setReviewConfirmation(doc); }} aria-label="Revisar documento">
-                            <Check className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Revisar</TooltipContent>
-                      </Tooltip>
+                      <ResponsiveActionButton
+                        variant="outline"
+                        size="sm"
+                        label="Revisar"
+                        title="Revisar documento"
+                        onClick={(e) => { e.stopPropagation(); setReviewConfirmation(doc); }}
+                        icon={<Check className="h-4 w-4" />}
+                      />
 
-                      {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+                      {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
 
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                            <MessageSquare className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Enviar</TooltipContent>
-                      </Tooltip>
+                      <ResponsiveActionButton
+                        variant="ghost"
+                        size="sm"
+                        label="Enviar"
+                        title={`Enviar a mensajes ${doc.docente}`}
+                        onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }}
+                        icon={<MessageSquare className="h-4 w-4" />}
+                      />
 
                       {doc.returned ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button
+                            <ResponsiveActionButton
                               variant="outline"
-                              size="icon"
-                              className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                              size="sm"
+                              label="Cancelar"
+                              className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
                               onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
-                              aria-label="Cancelar devolución"
-                            >
-                              <Undo2 className="h-4 w-4" />
-                            </Button>
+                              icon={<Undo2 className="h-4 w-4" />}
+                            />
                           </TooltipTrigger>
                           <TooltipContent>Cancelar devolución</TooltipContent>
                         </Tooltip>
                       ) : (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="destructive" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }} aria-label="Devolver documento">
-                              <Undo2 className="h-4 w-4" />
-                            </Button>
+                            <ResponsiveActionButton
+                              variant="destructive"
+                              size="sm"
+                              label="Devolver"
+                              onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
+                              icon={<Undo2 className="h-4 w-4" />}
+                            />
                           </TooltipTrigger>
                           <TooltipContent>Devolver</TooltipContent>
                         </Tooltip>
@@ -845,7 +860,7 @@ export default function Estadias() {
 
         <TabsContent value="revisados" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
-            <CardHeader>
+            <CardHeader className="pb-4">
               <div className={filtersGridClassName}>
                 <Select value={filterPlan} onValueChange={setFilterPlan}>
                   <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
@@ -940,40 +955,49 @@ export default function Estadias() {
                               )}
                             </div>
                           </div>
-                          <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Ver PDF</TooltipContent>
-                            </Tooltip>
+                          <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+                            <ResponsiveActionButton
+                              variant="outline"
+                              size="sm"
+                              label="Ver"
+                              title="Ver PDF"
+                              onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}
+                              icon={<Eye className="h-4 w-4" />}
+                            />
 
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                                  <MessageSquare className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Enviar</TooltipContent>
-                            </Tooltip>
+                            <ResponsiveActionButton
+                              variant="ghost"
+                              size="sm"
+                              label="Enviar"
+                              title={`Enviar a mensajes ${doc.docente}`}
+                              onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }}
+                              icon={<MessageSquare className="h-4 w-4" />}
+                            />
 
                             {doc.returned ? (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="outline" size="icon" className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }} aria-label="Cancelar devolución">
-                                    <Undo2 className="h-4 w-4" />
-                                  </Button>
+                                  <ResponsiveActionButton
+                                    variant="outline"
+                                    size="sm"
+                                    label="Cancelar"
+                                    className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
+                                    onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
+                                    icon={<Undo2 className="h-4 w-4" />}
+                                  />
                                 </TooltipTrigger>
                                 <TooltipContent>Cancelar devolución</TooltipContent>
                               </Tooltip>
                             ) : (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="destructive" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }} aria-label="Devolver documento">
-                                    <Undo2 className="h-4 w-4" />
-                                  </Button>
+                                  <ResponsiveActionButton
+                                    variant="destructive"
+                                    size="sm"
+                                    label="Devolver"
+                                    onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
+                                    icon={<Undo2 className="h-4 w-4" />}
+                                  />
                                 </TooltipTrigger>
                                 <TooltipContent>Devolver</TooltipContent>
                               </Tooltip>
@@ -1075,26 +1099,26 @@ export default function Estadias() {
                           )}
                         </div>
                       </div>
-                      <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Ver PDF</TooltipContent>
-                        </Tooltip>
+                      <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+                        <ResponsiveActionButton
+                          variant="outline"
+                          size="sm"
+                          label="Ver"
+                          title="Ver PDF"
+                          onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }}
+                          icon={<Eye className="h-4 w-4" />}
+                        />
 
-                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
 
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.docente}`}>
-                              <MessageSquare className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Enviar</TooltipContent>
-                        </Tooltip>
+                        <ResponsiveActionButton
+                          variant="ghost"
+                          size="sm"
+                          label="Enviar"
+                          title={`Enviar a mensajes ${doc.docente}`}
+                          onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }}
+                          icon={<MessageSquare className="h-4 w-4" />}
+                        />
 
                         {isReturned && <Badge variant="destructive">Devuelto</Badge>}
                         <Badge variant="success">Revisado</Badge>
