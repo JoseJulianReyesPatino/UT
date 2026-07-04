@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { Login } from "./pages/Login";
@@ -62,7 +63,8 @@ function AppContent() {
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== "undefined" ? !navigator.onLine : false);
   const [minimumLoadingElapsed, setMinimumLoadingElapsed] = useState(false);
   const [isSplashExiting, setIsSplashExiting] = useState(false);
-  const [contentAnimationActive, setContentAnimationActive] = useState(false);
+  const prevIsAuthenticatedRef = useRef<boolean | null>(null);
+  const initialSplashPlayedRef = useRef(false);
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
   const isSupervisor = user?.role === "supervisor" || user?.roles?.includes("supervisor");
   const noticeBanner = notice ? (
@@ -80,6 +82,26 @@ function AppContent() {
       </Alert>
     </div>
   ) : null;
+
+  // Cubre el fondo sincrónicamente antes de que el browser pinte cuando hay logout
+  useLayoutEffect(() => {
+    if (prevIsAuthenticatedRef.current !== null && prevIsAuthenticatedRef.current !== isAuthenticated) {
+      if (!isAuthenticated) {
+        document.body.classList.add("splashing");
+      }
+    }
+    prevIsAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
+  // Quita la clase splashing después de que el login haya renderizado
+  useEffect(() => {
+    if (!isAuthenticated && isReady) {
+      const timer = window.setTimeout(() => {
+        document.body.classList.remove("splashing");
+      }, 400);
+      return () => window.clearTimeout(timer);
+    }
+  }, [isAuthenticated, isReady]);
 
   useEffect(() => {
     if (!isReady) {
@@ -280,30 +302,26 @@ function AppContent() {
       return;
     }
 
-    const timer = window.setTimeout(() => {
+    // Ambas actualizaciones en el mismo callback → React 18 las agrupa en un
+    // solo render, evitando el flash de un frame donde shouldShowSplash=false
+    // antes de que isSplashExiting sea true.
+    const enterTimer = window.setTimeout(() => {
       setMinimumLoadingElapsed(true);
+      setIsSplashExiting(true);
     }, 1_500);
 
-    return () => {
-      window.clearTimeout(timer);
-    };
+    return () => window.clearTimeout(enterTimer);
   }, [isReady]);
 
   useEffect(() => {
-    if (!isReady || !minimumLoadingElapsed) {
-      setIsSplashExiting(false);
-      return;
-    }
+    if (!isSplashExiting) return;
 
-    setIsSplashExiting(true);
-    const timer = window.setTimeout(() => {
+    const exitTimer = window.setTimeout(() => {
       setIsSplashExiting(false);
-    }, 450);
+    }, 1800);
 
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [isReady, minimumLoadingElapsed]);
+    return () => window.clearTimeout(exitTimer);
+  }, [isSplashExiting]);
 
   const shouldShowSplash = !isReady || !minimumLoadingElapsed || isSplashExiting;
 
@@ -316,23 +334,11 @@ function AppContent() {
     }
   }, [isReady]);
 
-  // CAMBIO: esto solo controla la animación de entrada del contenido, ya separado
-  // de la manipulación del body.
   useEffect(() => {
     if (!shouldShowSplash) {
-      setContentAnimationActive(true);
+      initialSplashPlayedRef.current = true;
     }
   }, [shouldShowSplash]);
-
-  useEffect(() => {
-    if (!contentAnimationActive) return;
-
-    const timer = window.setTimeout(() => {
-      setContentAnimationActive(false);
-    }, 600);
-
-    return () => window.clearTimeout(timer);
-  }, [contentAnimationActive]);
 
   const cancelLeave = () => setLeaveDialogOpen(false);
 
@@ -340,52 +346,34 @@ function AppContent() {
   // ENCIMA del contenido real (Login o Dashboard), en vez de sustituirlo. Así, cuando
   // se desvanece (fade), revela el contenido que ya está montado debajo — nunca el
   // fondo "pelón" de la página.
-  const splashOverlay = shouldShowSplash ? (
-    <div
-      className={
-        isSplashExiting
-          ? "tv-fullscreen tv-loader-exit fixed inset-0 z-[200] flex min-h-screen items-center justify-center overflow-hidden bg-background text-sm text-muted-foreground"
-          : "tv-fullscreen fixed inset-0 z-[200] flex min-h-screen items-center justify-center overflow-hidden bg-background text-sm text-muted-foreground"
-      }
-    >
-      <div
-        className={
-          isSplashExiting
-            ? "tv-loader-group tv-loader-group-exit relative z-10 flex flex-col items-center justify-center gap-6 px-6 text-center"
-            : "tv-loader-group relative z-10 flex flex-col items-center justify-center gap-6 px-6 text-center"
-        }
-      >
-        <img
-          src={splashLogoSrc}
-          alt="Logo UTSLRC"
-          className="tv-loader-image tv-image-same-size select-none object-contain"
-        />
-      </div>
-    </div>
-  ) : null;
-
-  // CAMBIO: mientras no sabemos si hay sesión (!isReady), no hay nada que montar
-  // detrás, así que solo mostramos el splash.
-  if (!isReady) {
-    return splashOverlay;
-  }
-
- if (!isAuthenticated) {
-    return (
-      <>
-        {noticeBanner}
-        {/* Contenedor exterior sólido y SIN animar: bloquea la imagen de fondo
-           desde el primer frame. La animación de entrada ocurre dentro,
-           encima de este fondo opaco, así nunca se filtra la imagen. */}
-        <div className="fixed inset-0 z-0 bg-background">
-          <div className="h-full animate-page-enter motion-reduce:animate-none">
-            <Login />
+  const splashOverlay = shouldShowSplash
+    ? createPortal(
+        <div
+          className={
+            isSplashExiting
+              ? "tv-fullscreen tv-loader-exit fixed inset-0 z-[9998] flex min-h-screen items-center justify-center overflow-hidden text-sm"
+              : "tv-fullscreen fixed inset-0 z-[9998] flex min-h-screen items-center justify-center overflow-hidden text-sm"
+          }
+          style={{ backgroundColor: theme === "dark" ? "#000000" : "#f8fafc" }}
+        >
+          <div
+            className={
+              isSplashExiting
+                ? "tv-loader-group tv-loader-group-exit relative z-10 flex flex-col items-center justify-center gap-6 px-6 text-center"
+                : "tv-loader-group relative z-10 flex flex-col items-center justify-center gap-6 px-6 text-center"
+            }
+          >
+            <img
+              src={splashLogoSrc}
+              alt="Logo UTSLRC"
+              className="tv-loader-image tv-image-same-size select-none object-contain"
+            />
           </div>
-        </div>
-        {splashOverlay}
-      </>
-    );
-  }
+        </div>,
+        document.body
+      )
+    : null;
+
 
   const confirmLeaveAndLogout = () => {
     setLeaveDialogOpen(false);
@@ -536,7 +524,10 @@ function AppContent() {
 
   return (
     <>
-      {isOffline && (
+      {/* Splash siempre en posición 0 — fiber position estable, sin remount */}
+      {splashOverlay}
+      {noticeBanner}
+      {isAuthenticated && isOffline && (
         <div className="pointer-events-none fixed inset-x-0 top-0 z-[110] flex justify-center px-4 py-4">
           <Alert variant="destructive" className="pointer-events-auto w-[min(100%,36rem)] rounded-2xl border px-5 py-4 shadow-[0_24px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl">
             <AlertDescription className="text-center text-sm font-semibold tracking-wide">
@@ -545,74 +536,93 @@ function AppContent() {
           </Alert>
         </div>
       )}
-      {noticeBanner}
-      <div className={`flex h-screen overflow-hidden ${isLoggingOut ? "animate-page-exit" : "animate-page-enter"} motion-reduce:animate-none`}>
-        <Sidebar
-          currentView={currentView}
-          onNavigate={(view) => {
-            setCurrentView(view);
-            setMobileSidebarOpen(false);
-          }}
-          mobileOpen={mobileSidebarOpen}
-          onMobileOpenChange={setMobileSidebarOpen}
-        />
-        <main className="relative flex-1 overflow-y-auto bg-transparent">
-          <div className="pointer-events-none absolute inset-0 overflow-hidden" />
-          <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur md:hidden">
-            <div className="flex items-center justify-between px-4 py-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setMobileSidebarOpen(true)}
-                className="h-10 w-10"
-                aria-label="Abrir menú"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
 
-              <img
-                src={logoSrc}
-                alt="Logo institucional"
-                className="h-8 w-auto object-contain"
-              />
-
-              <div className="h-10 w-10" />
-            </div>
-          </div>
-          <div className={`container relative z-10 mx-auto max-w-7xl p-6 lg:p-8 ${contentAnimationActive ? "animate-in fade-in slide-in-from-bottom-5 duration-500" : ""}`}>
-            {renderContent()}
-          </div>
-        </main>
-
-        {/* Solo el botón de tema - ELIMINADO el botón de instalación PWA */}
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={toggleTheme}
-          aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-          title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-          className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
+      {/* Login — iris se abre desde círculo pequeño hacia afuera */}
+      {isReady && !isAuthenticated && (
+        <div
+          className={
+            isSplashExiting
+              ? "fixed inset-0 z-[9999] overflow-hidden tv-iris-reveal bg-background"
+              : "fixed inset-0 z-0 bg-background motion-reduce:animate-none"
+          }
         >
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
+          <Login />
+        </div>
+      )}
 
-        <Toaster />
+      {/* Dashboard autenticado — iris se abre desde círculo pequeño hacia afuera */}
+      {isReady && isAuthenticated && (
+        <div
+          className={`fixed inset-0 overflow-hidden${isSplashExiting ? " z-[9999] tv-iris-reveal" : " z-0"}`}
+          style={{ backgroundImage: "url('/src/assets/ut_imagen14.png')", backgroundPosition: "center", backgroundSize: "cover", backgroundRepeat: "no-repeat", backgroundAttachment: "fixed" }}
+        >
+          <div className={`flex h-screen overflow-hidden ${isLoggingOut ? "animate-page-exit" : ""} motion-reduce:animate-none`}>
+            <Sidebar
+              currentView={currentView}
+              onNavigate={(view) => {
+                setCurrentView(view);
+                setMobileSidebarOpen(false);
+              }}
+              mobileOpen={mobileSidebarOpen}
+              onMobileOpenChange={setMobileSidebarOpen}
+            />
+            <main className="relative flex-1 overflow-y-auto bg-transparent">
+              <div className="pointer-events-none absolute inset-0 overflow-hidden" />
+              <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur md:hidden">
+                <div className="flex items-center justify-between px-4 py-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setMobileSidebarOpen(true)}
+                    className="h-10 w-10"
+                    aria-label="Abrir menú"
+                  >
+                    <Menu className="h-5 w-5" />
+                  </Button>
 
-        <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
-          <DialogContent className="rounded-3xl border border-emerald-200/80 bg-white/95 px-6 py-6 shadow-2xl shadow-emerald-300/20 dark:border-slate-700 dark:bg-slate-950/95">
-            <DialogHeader>
-              <DialogTitle>¿Estás seguro que quieres salir del sistema?</DialogTitle>
-            </DialogHeader>
-            <DialogFooter className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button variant="outline" onClick={cancelLeave}>Cancelar</Button>
-              <Button onClick={confirmLeaveAndLogout}>Salir</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-      {splashOverlay}
+                  <img
+                    src={logoSrc}
+                    alt="Logo institucional"
+                    className="h-8 w-auto object-contain"
+                  />
+
+                  <div className="h-10 w-10" />
+                </div>
+              </div>
+              <div className="container relative z-10 mx-auto max-w-7xl p-6 lg:p-8">
+                {renderContent()}
+              </div>
+            </main>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={toggleTheme}
+              aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+              title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+              className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+
+            <Toaster />
+
+            <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+              <DialogContent className="rounded-3xl border border-emerald-200/80 bg-white/95 px-6 py-6 shadow-2xl shadow-emerald-300/20 dark:border-slate-700 dark:bg-slate-950/95">
+                <DialogHeader>
+                  <DialogTitle>¿Estás seguro que quieres salir del sistema?</DialogTitle>
+                </DialogHeader>
+                <DialogFooter className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <Button variant="outline" onClick={cancelLeave}>Cancelar</Button>
+                  <Button onClick={confirmLeaveAndLogout}>Salir</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -333,34 +333,40 @@
   @keyframes loading-enter-soft {
     0% {
       opacity: 0;
-      transform: translateY(16px) scale(0.96) rotateX(8deg);
-      filter: blur(6px);
+      transform: translateY(20px) scale(0.94);
     }
-    55% {
-      opacity: 0.8;
-      transform: translateY(6px) scale(0.99) rotateX(2deg);
-      filter: blur(2px);
+    60% {
+      opacity: 0.9;
+      transform: translateY(4px) scale(0.99);
     }
     100% {
       opacity: 1;
-      transform: translateY(0) scale(1) rotateX(0deg);
-      filter: blur(0);
+      transform: translateY(0) scale(1);
     }
   }
 
-  @keyframes loading-exit-soft {
-    from {
-      opacity: 1;
-      transform: scale(1);
-    }
-    to {
-      opacity: 0;
-      transform: scale(0.98);
-    }
+  @keyframes iris-open {
+    from { clip-path: circle(0% at 50% 50%); }
+    to   { clip-path: circle(150% at 50% 50%); }
   }
 
+  /* Logo: acercamiento suave → desaparece completamente antes del iris */
+  @keyframes loading-logo-zoomfade {
+    0%   { opacity: 1; transform: scale(1); }
+    38%  { opacity: 1; transform: scale(1.15); }
+    65%  { opacity: 0; transform: scale(1.15); }
+    100% { opacity: 0; transform: scale(1.15); }
+  }
+
+  /* Iris: abre el círculo en primer plano, con delay para que el logo ya no se vea */
+  .tv-iris-reveal {
+    animation: iris-open 1s cubic-bezier(0, 0, 0.2, 1) 0.7s both;
+    will-change: clip-path;
+  }
+
+  /* El fondo del splash no necesita animarse — el iris lo cubre todo */
   .tv-loader-exit {
-    animation: loading-exit-soft 0.45s ease-in both;
+    /* sin animación: permanece opaco como telón de fondo mientras el iris se abre */
   }
 
   .tv-loader-group {
@@ -368,8 +374,10 @@
     will-change: opacity, transform;
   }
 
+  /* Logo sale en 0.65s: zoom-in → fade completo */
   .tv-loader-group-exit {
-    animation: loading-exit-soft 0.45s ease-in both;
+    animation: loading-logo-zoomfade 0.65s ease-in both;
+    will-change: opacity, transform;
   }
 
   .tv-loader-image {

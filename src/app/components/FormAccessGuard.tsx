@@ -145,18 +145,35 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
       ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
       : "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-200";
 
-    return (
-      <div className="space-y-4">
-        <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm shadow-sm ${bannerClass}`}>
-          <CalendarClock className="h-4 w-4 shrink-0" />
-          <span>
-            Este formulario cierra el <strong>{formattedDeadline}</strong>
-            {hoursLeft < 24 && " · ¡Tiempo limitado!"}
-          </span>
-        </div>
-        {children}
-      </div>
-    );
+return (
+  <div className="space-y-2">
+    <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
+     <div className={`flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md ${
+  hoursLeft < 24
+    ? "text-rose-100"
+    : hoursLeft < 72
+    ? "text-amber-100"
+    : "text-white"
+} dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100`}>
+  <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+  <span>
+    Cierra el <strong>{formattedDeadline}</strong>
+    {hoursLeft < 24 && " · Tiempo limitado"}
+  </span>
+</div>
+     <Button
+  variant="outline"
+  size="sm"
+  onClick={() => window.open(getCalendarFileUrl(), "_blank")}
+  className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
+>
+  <Calendar className="mr-2 h-4 w-4" />
+  Calendario
+</Button>
+    </div>
+    {children}
+  </div>
+);
   }
 
   return (
@@ -269,3 +286,4 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
     </div>
   );
 }
+

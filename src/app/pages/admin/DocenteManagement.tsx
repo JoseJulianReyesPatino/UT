@@ -7,6 +7,7 @@ import { Label } from "../../components/ui/label";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { UserPlus, Search, Edit, Key, UserCheck, UserX, ShieldAlert, Mail, SlidersHorizontal } from "lucide-react";
@@ -701,9 +702,6 @@ export function DocenteManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Docente</DialogTitle>
-            <DialogDescription>
-              Ajusta los datos del usuario directamente sobre la API.
-            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -748,29 +746,43 @@ export function DocenteManagement() {
             <div className="space-y-2">
               <Label>Roles</Label>
               <div className="flex flex-wrap items-center gap-4">
-                <label className="flex items-center gap-2">
-                  <Checkbox
-                    checked={!!editDocente.roles?.docente}
-                    onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), docente: Boolean(val) } }))}
-                  />
-                  <span className="text-sm">Docente</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox
-                    checked={!!editDocente.roles?.tutor}
-                    onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), tutor: Boolean(val) } }))}
-                  />
-                  <span className="text-sm">Tutor</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox
-                    checked={!!editDocente.roles?.supervisor}
-                    onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), supervisor: Boolean(val) } }))}
-                  />
-                  <span className="text-sm">Supervisor</span>
-                </label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <Checkbox
+                        checked={!!editDocente.roles?.docente}
+                        onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), docente: Boolean(val) } }))}
+                      />
+                      <span className="text-sm">Docente</span>
+                    </label>
+                  </TooltipTrigger>
+                  <TooltipContent>Sube y gestiona documentos académicos: planeaciones, instrumentos, listas, asesorías y portafolio.</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <Checkbox
+                        checked={!!editDocente.roles?.tutor}
+                        onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), tutor: Boolean(val) } }))}
+                      />
+                      <span className="text-sm">Tutor</span>
+                    </label>
+                  </TooltipTrigger>
+                  <TooltipContent>Gestiona documentos de tutoría: carga académica, reportes de bajas, asesorías y fichas técnicas.</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <Checkbox
+                        checked={!!editDocente.roles?.supervisor}
+                        onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), supervisor: Boolean(val) } }))}
+                      />
+                      <span className="text-sm">Supervisor</span>
+                    </label>
+                  </TooltipTrigger>
+                  <TooltipContent>Puede visualizar y revisar documentos de todos los docentes del sistema.</TooltipContent>
+                </Tooltip>
               </div>
-              <p className="text-xs text-muted-foreground">Selecciona el rol del usuario. El supervisor puede visualizar documentos de todos los docentes.</p>
             </div>
 
           </div>
@@ -887,29 +899,43 @@ export function DocenteManagement() {
             <div className="space-y-2">
               <Label>Roles</Label>
               <div className="flex flex-wrap items-center gap-4">
-                <label className="flex items-center gap-2">
-                  <Checkbox
-                    checked={!!newDocente.roles?.docente}
-                    onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), docente: Boolean(val) } }))}
-                  />
-                  <span className="text-sm">Docente</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox
-                    checked={!!newDocente.roles?.tutor}
-                    onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), tutor: Boolean(val) } }))}
-                  />
-                  <span className="text-sm">Tutor</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox
-                    checked={!!newDocente.roles?.supervisor}
-                    onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), supervisor: Boolean(val) } }))}
-                  />
-                  <span className="text-sm">Supervisor</span>
-                </label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <Checkbox
+                        checked={!!newDocente.roles?.docente}
+                        onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), docente: Boolean(val) } }))}
+                      />
+                      <span className="text-sm">Docente</span>
+                    </label>
+                  </TooltipTrigger>
+                  <TooltipContent>Sube y gestiona documentos académicos: planeaciones, instrumentos, listas, asesorías y portafolio.</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <Checkbox
+                        checked={!!newDocente.roles?.tutor}
+                        onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), tutor: Boolean(val) } }))}
+                      />
+                      <span className="text-sm">Tutor</span>
+                    </label>
+                  </TooltipTrigger>
+                  <TooltipContent>Gestiona documentos de tutoría: carga académica, reportes de bajas, asesorías y fichas técnicas.</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <Checkbox
+                        checked={!!newDocente.roles?.supervisor}
+                        onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), supervisor: Boolean(val) } }))}
+                      />
+                      <span className="text-sm">Supervisor</span>
+                    </label>
+                  </TooltipTrigger>
+                  <TooltipContent>Puede visualizar y revisar documentos de todos los docentes del sistema.</TooltipContent>
+                </Tooltip>
               </div>
-              <p className="text-xs text-muted-foreground">Selecciona el rol del usuario. El supervisor puede visualizar documentos de todos los docentes.</p>
             </div>
             
           </div>

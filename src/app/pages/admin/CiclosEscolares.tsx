@@ -218,55 +218,42 @@ type DocumentPreviewDialogProps = {
   open: boolean;
   document: DocumentRecord | TutorDocumentRecord | EstadiasDocumentRecord | RemedialDocumentRecord | null;
   onOpenChange: (open: boolean) => void;
-  onOpenPdf: () => void;
   previewLoading: boolean;
   previewError: string | null;
   previewBlobUrl: string | null;
 };
 
-function DocumentPreviewDialog({ open, document, onOpenChange, onOpenPdf, previewLoading, previewError, previewBlobUrl }: Readonly<DocumentPreviewDialogProps>) {
+function DocumentPreviewDialog({ open, document, onOpenChange, previewLoading, previewError, previewBlobUrl }: Readonly<DocumentPreviewDialogProps>) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-[95vw] max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Vista previa del documento</DialogTitle>
-          <DialogDescription>
-            Vista real del archivo PDF almacenado para el documento seleccionado.
-          </DialogDescription>
+          <DialogTitle>{document?.documento ?? ""}</DialogTitle>
+          {document && (
+            <DialogDescription>
+              {document.docente}{"carrera" in document && document.carrera ? ` · ${document.carrera}` : ""}
+            </DialogDescription>
+          )}
         </DialogHeader>
         {document && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">{document.ciclo}</Badge>
-              {"plan" in document && <Badge variant="outline">{document.plan}</Badge>}
-              {"tipo" in document && <Badge variant="outline">{document.tipo.replaceAll("-", " ")}</Badge>}
-            </div>
-            <div className="rounded-lg border border-border bg-muted/30 p-4 md:p-6">
-              {previewLoading ? (
-                <div className="flex h-[72vh] items-center justify-center text-sm text-muted-foreground">
-                  Cargando PDF...
-                </div>
-              ) : previewError ? (
-                <div className="flex h-[72vh] items-center justify-center text-sm text-destructive">
-                  {previewError}
-                </div>
-              ) : previewBlobUrl ? (
-                <object data={previewBlobUrl} type="application/pdf" className="h-[72vh] w-full rounded-md border border-border bg-background">
-                  <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[72vh] items-center justify-center rounded-md border border-dashed border-border bg-background text-sm text-primary underline">
-                    Abrir documento en nueva pestaña
-                  </a>
-                </object>
-              ) : (
-                <div className="flex h-[72vh] items-center justify-center text-sm text-muted-foreground">
-                  No hay vista previa disponible para este PDF.
-                </div>
-              )}
-            </div>
+          <div className="flex-1 min-h-0">
+            {previewLoading ? (
+              <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                <p>Cargando...</p>
+              </div>
+            ) : previewError ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                {previewError}
+              </div>
+            ) : previewBlobUrl ? (
+              <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border">
+                <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
+                  Abrir documento en nueva pestaña
+                </a>
+              </object>
+            ) : null}
           </div>
         )}
-        <div className="flex justify-end">
-          <Button variant="outline" onClick={onOpenPdf}>Abrir PDF</Button>
-        </div>
       </DialogContent>
     </Dialog>
   );
@@ -556,13 +543,29 @@ export function CiclosEscolares() {
   };
 
   const getDocumentTitle = (row: ApiDocument, tipo: string): string => {
-    const title = (row.title ?? row.nombre ?? "").trim();
-    const path = (row.file_path ?? "").toString();
-    // Extract clean filename without the doc_UUID_ prefix
-    const rawName = path ? (path.split("/").pop() ?? path).replace(/^doc_[^_]+_/, "") : "";
-    const fileName = rawName || title;
     const apartadoLabel = canonicalApartadoForDisplay(tipo);
-    return fileName ? `${apartadoLabel} - ${fileName}` : apartadoLabel;
+
+    const rawTitle = (row.title ?? row.nombre ?? "").trim();
+    if (rawTitle && !/^doc_/i.test(rawTitle)) {
+      // Si el título viene con metadata separada por " - ", tomar solo el último segmento
+      const lastSep = rawTitle.lastIndexOf(" - ");
+      const fileName = lastSep !== -1 ? rawTitle.substring(lastSep + 3).trim() : rawTitle;
+      if (fileName) {
+        const withExt = fileName.toLowerCase().endsWith(".pdf") ? fileName : `${fileName}.pdf`;
+        return `${apartadoLabel} - ${withExt}`;
+      }
+    }
+
+    const path = (row.file_path ?? "").toString();
+    if (path) {
+      const rawName = (path.split("/").pop() ?? path).replace(/^doc_[^_]+_/, "");
+      if (rawName && !/^doc_/i.test(rawName)) {
+        const withExt = rawName.toLowerCase().endsWith(".pdf") ? rawName : `${rawName}.pdf`;
+        return `${apartadoLabel} - ${withExt}`;
+      }
+    }
+
+    return apartadoLabel;
   };
 
   const getCareerFilterOptions = (plan: string) => {
@@ -1777,21 +1780,24 @@ export function CiclosEscolares() {
       <Dialog open={showDocumentTypeSelector} onOpenChange={(open) => { if (!open) closeDocs(); }}>
         <DialogContent className="max-w-3xl">
           <DialogHeader className="pb-2">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-2 mb-1">
               <Button
                 onClick={() => {
                   setShowDocumentTypeSelector(false);
                   setShowDocTypeDialog(true);
                 }}
                 variant="ghost"
-                size="sm"
-                className="h-8 w-auto"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                aria-label="Atrás"
               >
-                <ChevronLeft className="h-5 w-5 mr-2" />Atrás
+                <ChevronLeft className="h-5 w-5" />
               </Button>
-              <DialogTitle className="text-2xl">{selectedDocumentType === "tutores" ? "Seleccionar Tipo de Tutoría" : selectedDocumentType === "estadias" ? "Seleccionar Tipo de Estadías" : "Seleccionar Tipo de Documento"}</DialogTitle>
+              <div>
+                <DialogTitle className="text-2xl">{selectedDocumentType === "tutores" ? "Seleccionar Tipo de Tutoría" : selectedDocumentType === "estadias" ? "Seleccionar Tipo de Estadías" : "Seleccionar Tipo de Documento"}</DialogTitle>
+                <DialogDescription className="text-base mt-0.5">{selectedDocumentType === "tutores" ? "Elige el apartado de tutorías que deseas revisar" : selectedDocumentType === "estadias" ? "Elige el apartado de estadías que deseas revisar" : "Elige el documento que deseas revisar"}</DialogDescription>
+              </div>
             </div>
-            <DialogDescription className="text-base ml-11">{selectedDocumentType === "tutores" ? "Elige el apartado de tutorías que deseas revisar" : selectedDocumentType === "estadias" ? "Elige el apartado de estadías que deseas revisar" : "Elige el documento que deseas revisar"}</DialogDescription>
           </DialogHeader>
           {selectedDocumentType === "tutores" ? (
             <div className="mt-4 max-h-[60vh] overflow-y-auto pr-2">
@@ -1834,7 +1840,7 @@ export function CiclosEscolares() {
       <Dialog open={showDocumentsModal} onOpenChange={(open) => { if (!open) closeDocumentsModal(); }}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader className="pb-2">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-2 mb-1">
               <Button
                 onClick={() => {
                   setShowDocumentsModal(false);
@@ -1845,14 +1851,15 @@ export function CiclosEscolares() {
                   }
                 }}
                 variant="ghost"
-                size="sm"
-                className="h-8 w-auto"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                aria-label="Atrás"
               >
-                <ChevronLeft className="h-5 w-5 mr-2" />Atrás
+                <ChevronLeft className="h-5 w-5" />
               </Button>
               <div>
                 <DialogTitle className="text-2xl">{documentsModalTitle}</DialogTitle>
-                <DialogDescription className="text-base mt-1">{selectedCycle?.nombre}</DialogDescription>
+                <DialogDescription className="text-base mt-0.5">{selectedCycle?.nombre}</DialogDescription>
               </div>
             </div>
           </DialogHeader>
@@ -2215,14 +2222,6 @@ export function CiclosEscolares() {
           if (!open) {
             closeDocumentPreview();
           }
-        }}
-        onOpenPdf={() => {
-          if (!previewBlobUrl) {
-            toast.error("El PDF aún no está disponible para abrirse.");
-            return;
-          }
-
-          window.open(previewBlobUrl, "_blank", "noopener,noreferrer");
         }}
         previewLoading={previewLoading}
         previewError={previewError}
