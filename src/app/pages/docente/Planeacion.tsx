@@ -119,13 +119,13 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
     };
   }, [user]);
 
-const cuatrimestresDisponibles = useMemo(() => {
-  if (!formData.carrera || !formData.plan) return [];
-  const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
-  const carrera = plan[formData.carrera];
-  if (!carrera) return [];
-  return cuatrimestres.filter((c) => c in carrera.cuatrimestres);
-}, [formData.carrera, formData.plan]);
+  const cuatrimestresDisponibles = useMemo(() => {
+    if (!formData.carrera || !formData.plan) return [];
+    const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
+    const carrera = plan[formData.carrera];
+    if (!carrera) return [];
+    return cuatrimestres.filter((c) => c in carrera.cuatrimestres);
+  }, [formData.carrera, formData.plan]);
 
   const materiasDisponibles = useMemo(() => {
     if (!formData.carrera || !formData.cuatrimestre || !formData.plan) return [];
@@ -250,13 +250,13 @@ const cuatrimestresDisponibles = useMemo(() => {
 
     const planKey = normalizePlanKey(document.plan ?? "");
     const careerCode = findCareerCodeByLabel(document.carrera_label ?? "", planKey as any);
-   const allowedCuatrimestres = new Set(Object.keys(cuatrimestresLabels));
-const rawCuatrimestre = String(document.cuatrimestre ?? "").trim();
-const normalizedCuatrimestre = rawCuatrimestre === "0" ? "propedeutico" : rawCuatrimestre;
-const fallbackParcial = String(document.parcial ?? "").trim();
-const resolvedCuatrimestre = allowedCuatrimestres.has(normalizedCuatrimestre)
-  ? normalizedCuatrimestre
-  : (allowedCuatrimestres.has(fallbackParcial) ? fallbackParcial : "");
+    const allowedCuatrimestres = new Set(Object.keys(cuatrimestresLabels));
+    const rawCuatrimestre = String(document.cuatrimestre ?? "").trim();
+    const normalizedCuatrimestre = rawCuatrimestre === "0" ? "propedeutico" : rawCuatrimestre;
+    const fallbackParcial = String(document.parcial ?? "").trim();
+    const resolvedCuatrimestre = allowedCuatrimestres.has(normalizedCuatrimestre)
+      ? normalizedCuatrimestre
+      : (allowedCuatrimestres.has(fallbackParcial) ? fallbackParcial : "");
 
     const normalizeParcialForForm = (value: unknown): string => {
       const raw = String(value ?? "").trim();
@@ -497,8 +497,8 @@ const resolvedCuatrimestre = allowedCuatrimestres.has(normalizedCuatrimestre)
                 </div>
               )}
             </div>
-          </SheetContent>
-        </Sheet>
+       </SheetContent>
+      </Sheet>
       </div>
 
       {/* Título y subtítulo */}
@@ -660,52 +660,66 @@ const resolvedCuatrimestre = allowedCuatrimestres.has(normalizedCuatrimestre)
             <div className="space-y-2 md:col-span-2">
               <Label className="dark:text-white">Documentos (PDF) *</Label>
               <p className="text-sm text-muted-foreground dark:text-slate-400">Adjunta documentos PDF de hasta 5 MB por archivo. Puedes cargar hasta tres archivos en total.</p>
+
+              <input 
+                type="file" 
+                accept=".pdf" 
+                multiple 
+                className="hidden" 
+                id="planeacion-pdf-upload" 
+                onChange={handleFileChange} 
+                disabled={formData.archivos.length >= 3} 
+              />
+
               <div
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
-                className={`rounded-3xl border-2 border-dashed p-6 text-center transition-all ${
+                className={`rounded-3xl border-2 border-dashed transition-all ${
+                  formData.archivos.length === 0 ? "p-6 text-center" : "p-4"
+                } ${
                   isDragging
                     ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30"
                     : "border-border bg-background/60 hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40"
                 }`}
               >
-                <input 
-                  type="file" 
-                  accept=".pdf" 
-                  multiple 
-                  className="hidden" 
-                  id="planeacion-pdf-upload" 
-                  onChange={handleFileChange} 
-                  disabled={formData.archivos.length >= 3} 
-                />
-                <label htmlFor="planeacion-pdf-upload" className={formData.archivos.length >= 3 ? "block space-y-3" : "block cursor-pointer space-y-3"}>
-                  <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full transition-colors ${
-                    isDragging ? "bg-emerald-500 text-white" : "bg-primary/10 text-primary dark:bg-emerald-500/10 dark:text-emerald-400"
-                  }`}>
-                    {formData.archivos.length > 0 ? <FolderOpen className="h-6 w-6" /> : <Upload className="h-6 w-6" />}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium dark:text-white">{getArchivosLabel()}</p>
-                    <p className="text-xs text-muted-foreground dark:text-slate-400">
-                      {isDragging ? "Suelta aquí para cargar" : `${getEspaciosLabel()} · arrastra o haz clic`}
-                    </p>
-                  </div>
-                </label>
-              </div>
+                {formData.archivos.length === 0 ? (
+                  <label htmlFor="planeacion-pdf-upload" className="block cursor-pointer space-y-3">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors dark:bg-emerald-500/10 dark:text-emerald-400">
+                      <Upload className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium dark:text-white">{getArchivosLabel()}</p>
+                      <p className="text-xs text-muted-foreground dark:text-slate-400">
+                        {isDragging ? "Suelta aquí para cargar" : `${getEspaciosLabel()} · arrastra o haz clic`}
+                      </p>
+                    </div>
+                  </label>
+                ) : (
+                  <div className="space-y-3">
+                    <div className={`grid gap-3 ${formData.archivos.length > 1 ? "sm:grid-cols-2" : ""} ${formData.archivos.length > 2 ? "lg:grid-cols-3" : ""}`}>
+                      {formData.archivos.map((archivo, index) => (
+                        <PdfPreview 
+                          key={`${archivo.name}-${archivo.size}-${index}`} 
+                          file={archivo} 
+                          title="Documento cargado" 
+                          onRemove={() => removeFile(index)} 
+                        />
+                      ))}
+                    </div>
 
-              {formData.archivos.length > 0 && (
-                <div className="space-y-2 pt-2">
-                  {formData.archivos.map((archivo, index) => (
-                    <PdfPreview 
-                      key={`${archivo.name}-${archivo.size}-${index}`} 
-                      file={archivo} 
-                      title="Documento cargado" 
-                      onRemove={() => removeFile(index)} 
-                    />
-                  ))}
-                </div>
-              )}
+                    {formData.archivos.length < 3 && (
+                      <label
+                        htmlFor="planeacion-pdf-upload"
+                        className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-background/60 py-3 text-sm text-muted-foreground transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:hover:border-emerald-500/40"
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                        Agregar otro archivo · {getEspaciosLabel()}
+                      </label>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Docente */}

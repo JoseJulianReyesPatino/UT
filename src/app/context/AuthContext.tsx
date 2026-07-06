@@ -29,6 +29,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isReady: boolean;
   notice: { type: "success" | "error"; message: string } | null;
+  preloadForms: () => Promise<any[]>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -184,6 +185,7 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isReady, setIsReady] = useState(false);
   const noticeTimerRef = useRef<number | null>(null);
+  const formsPreloadedRef = useRef(false);
 
   const flashNotice = (type: "success" | "error", message: string) => {
     if (noticeTimerRef.current !== null) {
@@ -196,6 +198,29 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       noticeTimerRef.current = null;
     }, 2600);
   };
+
+  // Función para precargar forms después del login
+  const preloadForms = useCallback(async (): Promise<any[]> => {
+    try {
+      const response = await apiFetch("/forms");
+      const forms = response?.data ?? [];
+      
+      // Guardar en caché global
+      (window as any).__formsCache = {
+        data: forms,
+        timestamp: Date.now()
+      };
+      
+      // Disparar evento para notificar a los componentes
+      window.dispatchEvent(new CustomEvent('ut-forms-loaded', { detail: { forms } }));
+      
+      formsPreloadedRef.current = true;
+      return forms;
+    } catch (error) {
+      console.error("Error preloading forms:", error);
+      return [];
+    }
+  }, []);
 
   const login = async (email: string, password: string) => {
     try {
@@ -211,6 +236,12 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       saveCachedProfile(apiUser);
       flashNotice('success', `¡Bienvenido(a) ${apiUser.name.split(' ')[0]}!`);
       setUser(apiUser);
+
+      // PRECARGA DE FORMS INMEDIATA después del login
+      // Esto asegura que cuando el usuario navegue a cualquier formulario,
+      // los datos ya estén disponibles en caché
+      await preloadForms();
+      
     } catch (err: any) {
       if (err && err.status === 422) {
         flashNotice('error', 'Correo o contraseña inválidos');
@@ -238,12 +269,17 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       // Disparar evento de actualización de usuario
       window.dispatchEvent(new CustomEvent('ut-user-updated', { detail: { user: apiUser } }));
       
+      // Precargar forms también al refrescar usuario
+      if (!formsPreloadedRef.current) {
+        await preloadForms();
+      }
+      
       return apiUser;
     } catch (error) {
       console.error('Error refreshing user:', error);
       return null;
     }
-  }, []);
+  }, [preloadForms]);
 
   useEffect(() => {
     localStorage.removeItem("utslrc-user-profiles");
@@ -260,6 +296,11 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
         const apiUser = mapApiUser(payload.user);
         setUser(apiUser);
         saveCachedProfile(apiUser);
+        
+        // Precargar forms silenciosamente en background al cargar la app
+        if (!formsPreloadedRef.current) {
+          await preloadForms();
+        }
       } catch {
         localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
         setUser(null);
@@ -267,7 +308,7 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
         setIsReady(true);
       }
     })();
-  }, []);
+  }, [preloadForms]);
 
   const logout = () => {
     if (user) {
@@ -277,6 +318,9 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     setUser(null);
     setNotice(null);
     clearAvatarCache();
+    // Limpiar caché de forms al cerrar sesión
+    (window as any).__formsCache = null;
+    formsPreloadedRef.current = false;
   };
 
   const updateProfile = useCallback((updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => {
@@ -298,9 +342,10 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       refreshUser,
       isAuthenticated: !!user, 
       isReady, 
-      notice 
+      notice,
+      preloadForms
     }),
-    [isReady, notice, user, updateProfile, refreshUser]
+    [isReady, notice, user, updateProfile, refreshUser, preloadForms]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

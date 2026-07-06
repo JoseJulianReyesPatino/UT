@@ -12,6 +12,39 @@ import { fetchDocumentBlob } from "../lib/documents";
 import { getBackendFormCode, type FormId, type FormRole } from "../../lib/formConfig";
 import { getCalendarFileUrl } from "../lib/calendar";
 
+// Caché en memoria compartida entre todos los FormAccessGuard de la app.
+// Evita volver a pedir /forms cada vez que el usuario cambia de formulario,
+// que es lo que causaba el "flash" o retraso del chip de fecha límite.
+let formsCache: { data: any[]; timestamp: number } | null = null;
+let formsCachePromise: Promise<any[]> | null = null;
+const FORMS_CACHE_TTL = 2 * 60 * 1000; // 2 minutos
+
+function fetchFormsWithCache(): Promise<any[]> {
+  if (formsCachePromise) return formsCachePromise;
+
+  formsCachePromise = apiFetch("/forms")
+    .then((res) => {
+      const forms = res?.data ?? [];
+      formsCache = { data: forms, timestamp: Date.now() };
+      // Disparar evento para notificar que los forms están disponibles
+      window.dispatchEvent(new CustomEvent('ut-forms-loaded', { detail: { forms } }));
+      return forms;
+    })
+    .finally(() => {
+      formsCachePromise = null;
+    });
+
+  return formsCachePromise;
+}
+
+// Función para precargar forms desde AuthContext
+export function preloadForms(): Promise<any[]> {
+  if (formsCache && Date.now() - formsCache.timestamp < FORMS_CACHE_TTL) {
+    return Promise.resolve(formsCache.data);
+  }
+  return fetchFormsWithCache();
+}
+
 interface FormAccessGuardProps {
   formId: FormId;
   title: string;
@@ -29,36 +62,50 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
-  // Nuevo estado para acceso desde API
-  const [accessRule, setAccessRule] = useState<{ roles: FormRole[]; dueAt: string | null } | null>(null);
-  const [accessLoading, setAccessLoading] = useState(true);
+  const resolveAccessRule = (formsList: any[], targetFormId: FormId) => {
+    const backendCode = getBackendFormCode(targetFormId);
+    const match = formsList.find((item: any) => String(item.form_code).replace(/_/g, "-") === backendCode);
+    return match
+      ? { roles: match.access_roles ?? [], dueAt: match.due_at ?? null }
+      : { roles: [], dueAt: null };
+  };
+
+  const hasFreshCache = Boolean(formsCache && Date.now() - formsCache.timestamp < FORMS_CACHE_TTL);
+
+  // Nuevo estado para acceso desde API — si ya hay caché fresca, se usa de
+  // inmediato (síncrono) sin esperar red, así cambiar de formulario no
+  // muestra ningún retraso ni parpadeo.
+  const [accessRule, setAccessRule] = useState<{ roles: FormRole[]; dueAt: string | null } | null>(
+    () => (hasFreshCache ? resolveAccessRule(formsCache!.data, formId) : null)
+  );
+  const [accessLoading, setAccessLoading] = useState(!hasFreshCache);
   const [accessNetworkError, setAccessNetworkError] = useState(false);
 
   const hasRole = (role: "docente" | "tutor" | "administrador") => user?.role === role || user?.roles?.includes(role);
 
-  // Cargar reglas de acceso desde la API en cada carga
+  // Cargar reglas de acceso desde la API, usando y refrescando la caché compartida
   useEffect(() => {
     let cancelled = false;
 
+    const freshNow = Boolean(formsCache && Date.now() - formsCache.timestamp < FORMS_CACHE_TTL);
+    if (freshNow) {
+      setAccessRule(resolveAccessRule(formsCache!.data, formId));
+      setAccessLoading(false);
+    } else {
+      setAccessLoading(!formsCache);
+    }
+
     void (async () => {
-      setAccessLoading(true);
       try {
-        const res = await apiFetch("/forms");
-        const forms = res?.data ?? [];
-        const backendCode = getBackendFormCode(formId);
-        const match = forms.find((item: any) => String(item.form_code).replace(/_/g, "-") === backendCode);
+        const forms = await fetchFormsWithCache();
         if (!cancelled) {
-          setAccessRule(
-            match
-              ? { roles: match.access_roles ?? [], dueAt: match.due_at ?? null }
-              : { roles: [], dueAt: null }
-          );
+          setAccessRule(resolveAccessRule(forms, formId));
         }
       } catch (error) {
         console.error("Could not load form access rule", error);
         if (!cancelled) {
           setAccessNetworkError(true);
-          setAccessRule({ roles: [], dueAt: null });
+          if (!formsCache) setAccessRule({ roles: [], dueAt: null });
         }
       } finally {
         if (!cancelled) setAccessLoading(false);
@@ -66,6 +113,22 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
     })();
 
     return () => { cancelled = true; };
+  }, [formId]);
+
+  // Escuchar evento de forms precargados
+  useEffect(() => {
+    const handleFormsLoaded = (event: CustomEvent) => {
+      const forms = event.detail?.forms ?? [];
+      if (forms.length > 0) {
+        setAccessRule(resolveAccessRule(forms, formId));
+        setAccessLoading(false);
+      }
+    };
+
+    window.addEventListener('ut-forms-loaded', handleFormsLoaded as EventListener);
+    return () => {
+      window.removeEventListener('ut-forms-loaded', handleFormsLoaded as EventListener);
+    };
   }, [formId]);
 
   const roleAllowed = Boolean(
@@ -162,16 +225,18 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
     setPreviewError(null);
   };
 
-  // Pantalla de carga mientras se resuelve la consulta
+  // IMPORTANTE: no renderizar una pantalla de carga aquí.
+  // Mientras la API responde, mostramos el formulario asumiendo acceso permitido
+  // (stale-while-revalidate). El backend igual valida permisos reales al enviar
+  // el formulario, así que esto es solo una capa de UX, no de seguridad.
+  // Si accessLoading muestra un loader, el usuario ve un "flash" en cada
+  // navegación — no lo reintroduzcas.
+
   if (accessLoading) {
-    return (
-      <div className="flex min-h-[60vh] items-end justify-center pb-32">
-        <div className="text-center">
-          <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-emerald-400 border-t-transparent mx-auto" />
-          <p className="text-base font-medium text-white drop-shadow">Cargando...</p>
-        </div>
-      </div>
-    );
+    if (React.isValidElement(children)) {
+      return React.cloneElement(children as React.ReactElement<any>, { deadlineInfo: null });
+    }
+    return <>{children}</>;
   }
 
   // Error de red — distinto de "formulario cerrado"

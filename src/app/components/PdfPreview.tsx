@@ -45,69 +45,72 @@ export function PdfPreview({ file, title = "Vista previa del PDF", onRemove }: P
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-background px-4 py-3 shadow-sm">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <FileText className="h-4 w-4" />
+      <div className="overflow-hidden rounded-2xl border border-border/70 bg-background shadow-sm">
+        <object data={previewUrl} type="application/pdf" className="h-44 w-full sm:h-52">
+          <div className="flex h-44 items-center justify-center px-3 text-center text-xs text-muted-foreground sm:h-52">
+            <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+              Vista previa no disponible aquí, ábrelo en una pestaña nueva
+            </a>
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{file.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{title}</p>
-          </div>
-        </div>
+        </object>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")}
-          >
-            <ExternalLink className="mr-2 h-4 w-4" />
-            Abrir en otra ventana
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setPreviewOpen(true)}
-          >
-            <Eye className="mr-2 h-4 w-4" />
-            Vista previa
-          </Button>
-          {onRemove ? (
-            <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setRemoveOpen(true)}
-                className="h-9 w-9 shrink-0"
-                aria-label="Eliminar archivo"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-              <AlertDialogContent className="w-[calc(100vw-1rem)] max-w-[32rem] overflow-hidden p-4 sm:w-[min(92vw,32rem)] sm:p-6">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Eliminar archivo</AlertDialogTitle>
-                  <AlertDialogDescription className="break-words leading-6">
-                    Esta acción quitará <span className="block break-all font-medium text-foreground">{file.name}</span> de la lista. No se podrá deshacer.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter className="sm:flex-row">
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      setRemoveOpen(false);
-                      onRemove();
-                    }}
-                  >
-                    Sí, eliminar
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : null}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-muted/20 px-3 py-2">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <FileText className="h-3.5 w-3.5 shrink-0" />
+            <span className="text-xs">Documento cargado</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1">
+            <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+              <a href={previewUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                Abrir en otra ventana
+              </a>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => setPreviewOpen(true)}
+            >
+              <Eye className="mr-1.5 h-3.5 w-3.5" />
+              Ampliar
+            </Button>
+            {onRemove ? (
+              <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setRemoveOpen(true)}
+                  className="h-7 w-7 shrink-0"
+                  aria-label="Eliminar archivo"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+                <AlertDialogContent className="w-[calc(100vw-1rem)] max-w-[32rem] overflow-hidden p-4 sm:w-[min(92vw,32rem)] sm:p-6">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Eliminar archivo</AlertDialogTitle>
+                    <AlertDialogDescription className="break-words leading-6">
+                      Esta acción quitará <span className="block break-all font-medium text-foreground">{file.name}</span> de la lista. No se podrá deshacer.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="sm:flex-row">
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        setRemoveOpen(false);
+                        onRemove();
+                      }}
+                    >
+                      Sí, eliminar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -119,21 +122,21 @@ export function PdfPreview({ file, title = "Vista previa del PDF", onRemove }: P
           </DialogHeader>
 
           <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-muted/20">
-            <iframe
-              src={`${previewUrl}#toolbar=1&navpanes=0`}
-              className="h-full w-full"
-              title={title}
-            />
+            <object data={previewUrl} type="application/pdf" className="h-full w-full">
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                  Tu navegador no puede mostrar el PDF aquí. Ábrelo en una nueva pestaña.
+                </a>
+              </div>
+            </object>
           </div>
 
           <DialogFooter className="pt-1 sm:flex-row">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")}
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Abrir en otra ventana
+            <Button type="button" variant="outline" asChild>
+              <a href={previewUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Abrir en otra ventana
+              </a>
             </Button>
           </DialogFooter>
         </DialogContent>
