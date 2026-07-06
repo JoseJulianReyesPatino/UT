@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { FileText, Eye, MessageCircleMore, MessageSquare, Check, Undo2 } from "lucide-react";
+import { FileText, Eye, Loader2, MessageCircleMore, MessageSquare, Check, RefreshCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
@@ -151,20 +152,21 @@ export default function Tutores() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [returnConfirmation, setReturnConfirmation] = useState<ReturnConfirmation | null>(null);
   const [returnComment, setReturnComment] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [noteDialog, setNoteDialog] = useState<{ nota: string; tutor: string } | null>(null);
-  const [reviewConfirmation, setReviewConfirmation] = useState<TutorPendingDocument | null>(null);
-  const [page, setPage] = useState<number>(1);
-  const [perPage, setPerPage] = useState<number>(20);
-  const [total, setTotal] = useState<number>(0);
+  const [reviewConfirmation, setReviewConfirmation] = useState<TutorDocument | null>(null);
+  // Conteos estables por sección — no se mezclan con los documentos activos del tab
+  const [countAll, setCountAll] = useState(0);
+  const [countPending, setCountPending] = useState(0);
+  const [countReviewed, setCountReviewed] = useState(0);
 
   const buildQueryFromFilters = () => {
-    const q: Record<string, any> = { uploader_role: 'tutor', tutorias_only: 1, page, per_page: perPage };
+    const q: Record<string, any> = { uploader_role: 'tutor', tutorias_only: 1, per_page: 500, page: 1 };
     if (filterTutor !== 'all') q.uploaded_by_name = filterTutor;
     if (filterApartado !== 'all') q.apartado_label = filterApartado;
+    // Solo filtrar por status en la API cuando el usuario elige "Solo devueltos";
+    // el resto se filtra en cliente para que los conteos sean siempre consistentes.
     if (filterReturned === 'returned') q.status = 'devuelto';
-    if (filterReturned === 'not-returned') q.status = 'pendiente';
-    if (activeSection === 'pendientes') q.status = 'pendiente';
-    if (activeSection === 'revisados') q.status = 'revisado';
     return q;
   };
 
@@ -176,6 +178,7 @@ export default function Tutores() {
       return;
     }
 
+    setIsLoading(true);
     try {
       const response = await apiFetch('/documents', { query: buildQueryFromFilters() });
       const documents = Array.isArray(response?.data)
@@ -183,15 +186,19 @@ export default function Tutores() {
             .map(mapApiDocumentToTutorDocument)
             .filter((doc) => tutoriasApartadosPermitidos.has(normalizeApartado(doc.apartado)))
         : [];
-      setPendingDocuments(documents.filter((doc) => doc.status === 'pendiente'));
-      setReviewedDocuments(documents.filter((doc) => doc.status !== 'pendiente'));
-      if (response?.meta) {
-        setTotal(response.meta.total ?? 0);
-        setPage(response.meta.page ?? 1);
-        setPerPage(response.meta.per_page ?? perPage);
-      }
+      const pending = documents.filter((doc) => doc.status === 'pendiente');
+      const reviewed = documents.filter((doc) => doc.status !== 'pendiente');
+      setPendingDocuments(pending);
+      setReviewedDocuments(reviewed);
+
+      // Actualizar conteos siempre, respetando el filtro activo
+      setCountAll(documents.length);
+      setCountPending(pending.length);
+      setCountReviewed(documents.filter((d) => d.status === 'revisado').length);
     } catch (error: any) {
       toast.error(error?.message ?? 'No fue posible cargar los documentos de tutores');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -200,25 +207,19 @@ export default function Tutores() {
     void loadDocuments();
   }, [isAuthenticated, isReady]);
 
-  // reload when filters, section or pagination changes
+  // reload when filters change (section y paginación son client-side)
   useEffect(() => {
     const to = setTimeout(() => { void loadDocuments(); }, 150);
     return () => clearTimeout(to);
-  }, [filterTutor, filterApartado, filterReturned, activeSection, page, perPage]);
-
-  const downloadDocument = async (documentId: number) => {
-    try {
-      const blob = await fetchDocumentBlob(documentId);
-      const blobUrl = URL.createObjectURL(blob);
-      window.open(blobUrl, '_blank');
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-    } catch (err: any) {
-      toast.error(err?.message ?? 'No fue posible descargar el archivo');
-    }
-  };
+  }, [filterTutor, filterApartado, filterReturned]);
 
   const allDocuments = [...pendingDocuments, ...reviewedDocuments];
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const toLocalDateKey = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  const todayKey = toLocalDateKey(new Date().toISOString());
 
   const formatDateOnlyFromKey = (dateKey: string) => {
     try {
@@ -289,9 +290,9 @@ export default function Tutores() {
   };
 
   const filteredPending = pendingDocuments.filter(matchesFilters);
-  const filteredReviewed = reviewedDocuments.filter(matchesFilters);
+  const filteredReviewed = reviewedDocuments.filter((d) => d.status === 'revisado').filter(matchesFilters);
   const filteredAll = allDocuments.filter(matchesFilters);
-  const reviewedToday = filteredReviewed.filter((doc) => doc.reviewedAt?.startsWith(todayKey));
+  const reviewedToday = filteredReviewed.filter((doc) => doc.reviewedAt ? toLocalDateKey(doc.reviewedAt) === todayKey : false);
 
   const getDocumentStatusLabel = (doc: TutorDocumentItem) => {
     if ("resubmittedAt" in doc && doc.resubmittedAt) return "Reenviado";
@@ -301,8 +302,8 @@ export default function Tutores() {
   };
 
   const reviewedByDate = useMemo(() => {
-    return filteredReviewed.reduce<Record<string, TutorReviewedDocument[]>>((groups, doc) => {
-      const date = doc.reviewedAt ? doc.reviewedAt.slice(0, 10) : "";
+    return filteredReviewed.reduce<Record<string, TutorDocument[]>>((groups, doc) => {
+      const date = doc.reviewedAt ? toLocalDateKey(doc.reviewedAt) : "";
       groups[date] = [...(groups[date] || []), doc];
       return groups;
     }, {});
@@ -321,6 +322,9 @@ export default function Tutores() {
       const updated = mapApiDocumentToTutorDocument(response.data);
       setPendingDocuments((current) => current.filter((d) => d.id !== documentId));
       setReviewedDocuments((current) => [updated, ...current.filter((d) => d.id !== documentId)]);
+      // pendiente → revisado: ajustar conteos
+      setCountPending((n) => Math.max(0, n - 1));
+      setCountReviewed((n) => n + 1);
       toast.success('Documento de tutor marcado como revisado');
     } catch (error: any) {
       toast.error(error?.message ?? 'No fue posible marcar el documento como revisado');
@@ -353,6 +357,7 @@ export default function Tutores() {
     if (!returnConfirmation) return;
 
     const shouldReturn = returnConfirmation.type === 'return';
+    const docStatus = returnConfirmation.document.status;
     if (shouldReturn) {
       const trimmedComment = returnComment.trim();
       const result = await setDocumentReturnedState(returnConfirmation.document.id, true, trimmedComment);
@@ -362,6 +367,10 @@ export default function Tutores() {
         const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
         const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
         const tutorName = returnConfirmation.document.tutor ?? "";
+        // Si era pendiente pasa a devuelto → countPending -1
+        // Si era revisado pasa a devuelto  → countReviewed -1
+        if (docStatus === 'pendiente') setCountPending((n) => Math.max(0, n - 1));
+        else if (docStatus === 'revisado') setCountReviewed((n) => Math.max(0, n - 1));
         toast.success(`${fileName} devuelto al tutor ${tutorName}`);
       }
     } else {
@@ -371,6 +380,8 @@ export default function Tutores() {
         const lastSep = raw.lastIndexOf(" - ");
         const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
         const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+        // devuelto → revisado → countReviewed +1
+        setCountReviewed((n) => n + 1);
         toast.success(`Devolución de ${fileName} cancelada`);
       }
     }
@@ -432,7 +443,7 @@ export default function Tutores() {
   const apartadosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.apartado))).filter((apartado) => apartado && apartado.trim().length > 0);
 
   const previewChipClassName =
-    "h-8 rounded-full border border-white/10 bg-white/5 px-3 text-xs font-medium text-slate-100 shadow-sm hover:bg-white/10 hover:text-white";
+    "h-8 rounded-full border border-border bg-background/80 px-3 text-xs font-medium text-foreground shadow-sm hover:bg-muted";
 
   const previewCardOverlayClassName =
     "absolute inset-0 z-10 rounded-xl cursor-pointer";
@@ -443,6 +454,37 @@ export default function Tutores() {
   const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3";
   const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full text-[13px] leading-tight shadow-sm sm:text-sm";
   const filterSelectValueClassName = "truncate";
+
+  const filtersBar = (
+    <div className={filtersGridClassName}>
+      <SearchableSelect
+        value={filterTutor}
+        onValueChange={setFilterTutor}
+        options={tutoresDisponibles.map((t) => ({ value: t, label: t }))}
+        placeholder="Buscar tutor..."
+        allLabel="Todos los tutores"
+      />
+      <SearchableSelect
+        value={filterApartado}
+        onValueChange={setFilterApartado}
+        options={apartadosDisponibles.map((a) => ({ value: a, label: getTutoriasApartadoLabel(a) }))}
+        placeholder="Buscar apartado..."
+        allLabel="Todos los apartados"
+      />
+      <div className="col-span-2 sm:col-span-1">
+        <Select value={filterReturned} onValueChange={setFilterReturned}>
+          <SelectTrigger className={filterSelectTriggerClassName}>
+            <SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los documentos</SelectItem>
+            <SelectItem value="returned">Solo devueltos</SelectItem>
+            <SelectItem value="not-returned">No devueltos</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
 
   const getDocumentRowClassName = (isReturned: boolean) => (
     `relative flex flex-col gap-4 rounded-2xl border p-4 transition-colors lg:flex-row lg:items-center lg:justify-between ${isReturned
@@ -456,9 +498,21 @@ export default function Tutores() {
       <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
         <div className="relative space-y-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Gestión de Tutores</h1>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Revisa y aprueba los documentos enviados por los tutores.</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Gestión de Tutores</h1>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Revisa y aprueba los documentos enviados por los tutores.</p>
+            </div>
+            <button
+              onClick={() => { void loadDocuments(); }}
+              disabled={isLoading}
+              className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-400"
+              title="Actualizar documentos"
+              aria-label="Actualizar documentos"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              <span>Actualizar</span>
+            </button>
           </div>
         </div>
       </div>
@@ -479,50 +533,35 @@ export default function Tutores() {
           <TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
             <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
               Todos
-              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{allDocuments.length}</Badge>
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countAll}</Badge>
             </TabsTrigger>
             <TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
               Pendientes
-              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPending.length}</Badge>
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countPending}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados</TabsTrigger>
-            <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy</TabsTrigger>
+            <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+              Revisados
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countReviewed}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+              Revisados hoy
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{reviewedToday.length}</Badge>
+            </TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="all" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              <div className={filtersGridClassName}>
-                <Select value={filterTutor} onValueChange={setFilterTutor}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los tutores</SelectItem>
-                    {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{getTutoriasApartadoLabel(apartado)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <div className="col-span-2 sm:col-span-1">
-                  <Select value={filterReturned} onValueChange={setFilterReturned}>
-                    <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los documentos</SelectItem>
-                      <SelectItem value="returned">Solo devueltos</SelectItem>
-                      <SelectItem value="not-returned">No devueltos</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              {filtersBar}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {filteredAll.length === 0 ? (
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Cargando documentos...</span>
+                  </div>
+                ) : filteredAll.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : filteredAll.map((doc) => {
                   const isReviewed = Boolean(doc.reviewedAt);
@@ -577,7 +616,7 @@ export default function Tutores() {
                         />
                         )}
 
-                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: 'tutor' in doc ? (doc as TutorDocument).tutor : '' }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: 'tutor' in doc ? (doc as TutorDocument).tutor : '' }); }} aria-label="Ver nota del tutor"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del tutor</TooltipContent></Tooltip>}
 
                         <ResponsiveActionButton
                           variant="ghost"
@@ -589,23 +628,18 @@ export default function Tutores() {
                         />
 
                         {doc.returned ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                                <ResponsiveActionButton
-                                  variant="outline"
-                                  size="sm"
-                                  label="Cancelar"
-                                  title="Cancelar devolución"
-                                  className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setReturnConfirmation({ type: "cancel-return", document: doc });
-                                  }}
-                                  icon={<Undo2 className="h-4 w-4" />}
-                                />
-                            </TooltipTrigger>
-                            <TooltipContent>Cancelar devolución</TooltipContent>
-                          </Tooltip>
+                          <ResponsiveActionButton
+                            variant="outline"
+                            size="sm"
+                            label="Cancelar"
+                            title="Cancelar devolución"
+                            className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReturnConfirmation({ type: "cancel-return", document: doc });
+                            }}
+                            icon={<Undo2 className="h-4 w-4" />}
+                          />
                         ) : (
                             <ResponsiveActionButton
                               variant="destructive"
@@ -620,7 +654,7 @@ export default function Tutores() {
                             />
                         )}
 
-                        <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "warning"}>
+                        <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "success"}>
                           {getDocumentStatusLabel(doc)}
                         </Badge>
                       </div>
@@ -635,36 +669,15 @@ export default function Tutores() {
         <TabsContent value="pendientes" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              <div className={filtersGridClassName}>
-                <Select value={filterTutor} onValueChange={setFilterTutor}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los tutores</SelectItem>
-                    {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{getTutoriasApartadoLabel(apartado)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <div className="col-span-2 sm:col-span-1">
-                  <Select value={filterReturned} onValueChange={setFilterReturned}>
-                    <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los documentos</SelectItem>
-                      <SelectItem value="returned">Solo devueltos</SelectItem>
-                      <SelectItem value="not-returned">No devueltos</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              {filtersBar}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {filteredPending.length === 0 ? (
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Cargando documentos...</span>
+                  </div>
+                ) : filteredPending.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : filteredPending.map((doc) => {
                   const isReturned = Boolean(doc.returned);
@@ -714,7 +727,7 @@ export default function Tutores() {
                         <TooltipContent>Revisar</TooltipContent>
                       </Tooltip>
 
-                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: 'tutor' in doc ? (doc as TutorDocument).tutor : '' }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: 'tutor' in doc ? (doc as TutorDocument).tutor : '' }); }} aria-label="Ver nota del tutor"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del tutor</TooltipContent></Tooltip>}
 
                         <ResponsiveActionButton
                           variant="ghost"
@@ -726,23 +739,18 @@ export default function Tutores() {
                         />
 
                       {doc.returned ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <ResponsiveActionButton
-                              variant="outline"
-                              size="sm"
-                              label="Cancelar"
-                              title="Cancelar devolución"
-                              className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setReturnConfirmation({ type: "cancel-return", document: doc });
-                              }}
-                              icon={<Undo2 className="h-4 w-4" />}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>Cancelar devolución</TooltipContent>
-                        </Tooltip>
+                        <ResponsiveActionButton
+                          variant="outline"
+                          size="sm"
+                          label="Cancelar"
+                          title="Cancelar devolución"
+                          className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReturnConfirmation({ type: "cancel-return", document: doc });
+                          }}
+                          icon={<Undo2 className="h-4 w-4" />}
+                        />
                       ) : (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -773,35 +781,14 @@ export default function Tutores() {
         <TabsContent value="revisados" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              <div className={filtersGridClassName}>
-                <Select value={filterTutor} onValueChange={setFilterTutor}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los tutores</SelectItem>
-                    {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{getTutoriasApartadoLabel(apartado)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <div className="col-span-2 sm:col-span-1">
-                  <Select value={filterReturned} onValueChange={setFilterReturned}>
-                    <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los documentos</SelectItem>
-                      <SelectItem value="returned">Solo devueltos</SelectItem>
-                      <SelectItem value="not-returned">No devueltos</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              {filtersBar}
             </CardHeader>
             <CardContent>
-              {Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Cargando documentos...</span>
+                </div>
+              ) : Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
                 <EmptyState text={emptyStateLegend} />
               ) : (
                 <div className="space-y-6">
@@ -846,7 +833,7 @@ export default function Tutores() {
                                 </TooltipTrigger>
                                 <TooltipContent>Ver PDF</TooltipContent>
                               </Tooltip>
-                              {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+                              {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del tutor"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del tutor</TooltipContent></Tooltip>}
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.tutor}`}>
@@ -867,7 +854,7 @@ export default function Tutores() {
                               ) : (
                                 <ResponsiveActionButton variant="destructive" size="sm" label="Devolver" title="Devolver documento" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} />
                               )}
-                              <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "warning"}>{getDocumentStatusLabel(doc)}</Badge>
+                              <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "success"}>{getDocumentStatusLabel(doc)}</Badge>
                             </div>
                           </div>
                         )})}
@@ -883,36 +870,15 @@ export default function Tutores() {
         <TabsContent value="hoy" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              <div className={filtersGridClassName}>
-                <Select value={filterTutor} onValueChange={setFilterTutor}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por tutor" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los tutores</SelectItem>
-                    {tutoresDisponibles.map((tutor) => <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los apartados</SelectItem>
-                    {apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{getTutoriasApartadoLabel(apartado)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <div className="col-span-2 sm:col-span-1">
-                  <Select value={filterReturned} onValueChange={setFilterReturned}>
-                    <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los documentos</SelectItem>
-                      <SelectItem value="returned">Solo devueltos</SelectItem>
-                      <SelectItem value="not-returned">No devueltos</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              {filtersBar}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {reviewedToday.length === 0 ? (
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Cargando documentos...</span>
+                  </div>
+                ) : reviewedToday.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : (
                   reviewedToday.map((doc) => {
@@ -953,7 +919,7 @@ export default function Tutores() {
                           <TooltipContent>Ver PDF</TooltipContent>
                         </Tooltip>
 
-                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
+                        {doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del tutor"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del tutor</TooltipContent></Tooltip>}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.tutor}`}>
@@ -989,7 +955,7 @@ export default function Tutores() {
                           />
                         )}
 
-                        <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "warning"}>{getDocumentStatusLabel(doc)}</Badge>
+                        <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "success"}>{getDocumentStatusLabel(doc)}</Badge>
                       </div>
                     </div>
                   )})
@@ -1120,7 +1086,7 @@ export default function Tutores() {
       <Dialog open={noteDialog !== null} onOpenChange={(open) => { if (!open) setNoteDialog(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><MessageCircleMore className="h-5 w-5 text-blue-500" />Nota del docente</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><MessageCircleMore className="h-5 w-5 text-blue-500" />Nota del tutor</DialogTitle>
             <DialogDescription>{noteDialog?.tutor}</DialogDescription>
           </DialogHeader>
           <div className="rounded-lg border border-border bg-muted p-4 text-sm whitespace-pre-wrap">{noteDialog?.nota}</div>

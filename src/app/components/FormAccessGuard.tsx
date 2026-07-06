@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { apiFetch } from "../lib/api";
 import { fetchDocumentBlob } from "../lib/documents";
-import { getFormAccessRule, isFormExpired, isFormRoleAllowed, type FormId } from "../../lib/formConfig";
+import { getBackendFormCode, type FormId, type FormRole } from "../../lib/formConfig";
 import { getCalendarFileUrl } from "../lib/calendar";
 
 interface FormAccessGuardProps {
@@ -17,7 +17,6 @@ interface FormAccessGuardProps {
   title: string;
   children: React.ReactNode;
 }
-
 
 export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
   const { formId, title, children } = props;
@@ -30,15 +29,52 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
+  // Nuevo estado para acceso desde API
+  const [accessRule, setAccessRule] = useState<{ roles: FormRole[]; dueAt: string | null } | null>(null);
+  const [accessLoading, setAccessLoading] = useState(true);
+  const [accessNetworkError, setAccessNetworkError] = useState(false);
+
   const hasRole = (role: "docente" | "tutor" | "administrador") => user?.role === role || user?.roles?.includes(role);
 
-  if (!user || hasRole("administrador")) {
-    return <>{children}</>;
-  }
+  // Cargar reglas de acceso desde la API en cada carga
+  useEffect(() => {
+    let cancelled = false;
 
-  const roleAllowed = (isFormRoleAllowed(formId, "docente") && hasRole("docente")) || (isFormRoleAllowed(formId, "tutor") && hasRole("tutor"));
-  const expired = isFormExpired(formId);
-  const dueAt = getFormAccessRule(formId).dueAt;
+    void (async () => {
+      setAccessLoading(true);
+      try {
+        const res = await apiFetch("/forms");
+        const forms = res?.data ?? [];
+        const backendCode = getBackendFormCode(formId);
+        const match = forms.find((item: any) => String(item.form_code).replace(/_/g, "-") === backendCode);
+        if (!cancelled) {
+          setAccessRule(
+            match
+              ? { roles: match.access_roles ?? [], dueAt: match.due_at ?? null }
+              : { roles: [], dueAt: null }
+          );
+        }
+      } catch (error) {
+        console.error("Could not load form access rule", error);
+        if (!cancelled) {
+          setAccessNetworkError(true);
+          setAccessRule({ roles: [], dueAt: null });
+        }
+      } finally {
+        if (!cancelled) setAccessLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [formId]);
+
+  const roleAllowed = Boolean(
+    accessRule &&
+    ((accessRule.roles.includes("docente") && hasRole("docente")) ||
+      (accessRule.roles.includes("tutor") && hasRole("tutor")))
+  );
+  const dueAt = accessRule?.dueAt ?? null;
+  const expired = Boolean(dueAt && new Date(dueAt).getTime() < Date.now());
 
   useEffect(() => {
     let cancelled = false;
@@ -126,54 +162,48 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
     setPreviewError(null);
   };
 
+  // Pantalla de carga mientras se resuelve la consulta
+  if (accessLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-end justify-center pb-32">
+        <div className="text-center">
+          <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-emerald-400 border-t-transparent mx-auto" />
+          <p className="text-base font-medium text-white drop-shadow">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error de red — distinto de "formulario cerrado"
+  if (accessNetworkError) {
+    return (
+      <div className="mx-auto max-w-5xl space-y-4">
+        <FormClosedState
+          title={title}
+          message="No fue posible verificar el acceso al formulario. Revisa tu conexión a internet e intenta recargar la página."
+        />
+      </div>
+    );
+  }
+
+  // Acceso concedido
   if (roleAllowed && !expired) {
-    if (!dueAt) {
-      return <>{children}</>;
+    const deadlineDate = dueAt ? new Date(dueAt) : null;
+    const msLeft = deadlineDate ? deadlineDate.getTime() - Date.now() : null;
+    const hoursLeft = msLeft !== null ? msLeft / (1000 * 60 * 60) : null;
+    const formattedDeadline = deadlineDate
+      ? deadlineDate.toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" })
+      : null;
+
+    const deadlineInfo = formattedDeadline
+      ? { formattedDeadline, isUrgent: hoursLeft !== null && hoursLeft < 24 }
+      : null;
+
+    if (React.isValidElement(children)) {
+      return React.cloneElement(children as React.ReactElement<any>, { deadlineInfo });
     }
 
-    const deadlineDate = new Date(dueAt);
-    const msLeft = deadlineDate.getTime() - Date.now();
-    const hoursLeft = msLeft / (1000 * 60 * 60);
-    const formattedDeadline = deadlineDate.toLocaleString("es-MX", {
-      dateStyle: "long",
-      timeStyle: "short",
-    });
-
-    const bannerClass = hoursLeft < 24
-      ? "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200"
-      : hoursLeft < 72
-      ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
-      : "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-200";
-
-return (
-  <div className="space-y-2">
-    <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
-     <div className={`flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md ${
-  hoursLeft < 24
-    ? "text-rose-100"
-    : hoursLeft < 72
-    ? "text-amber-100"
-    : "text-white"
-} dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100`}>
-  <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-  <span>
-    Cierra el <strong>{formattedDeadline}</strong>
-    {hoursLeft < 24 && " · Tiempo limitado"}
-  </span>
-</div>
-     <Button
-  variant="outline"
-  size="sm"
-  onClick={() => window.open(getCalendarFileUrl(), "_blank")}
-  className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
->
-  <Calendar className="mr-2 h-4 w-4" />
-  Calendario
-</Button>
-    </div>
-    {children}
-  </div>
-);
+    return <>{children}</>;
   }
 
   return (
@@ -286,4 +316,3 @@ return (
     </div>
   );
 }
-

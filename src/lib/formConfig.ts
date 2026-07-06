@@ -31,26 +31,12 @@ export type FormId =
   | "estadias"
   | "tutorias";
 
-const BACKEND_FORM_ALIAS_MAP: Record<string, FormId[]> = {
-  "instrumento-3040": ["instrumento-30-normal", "instrumento-40-nuevo"],
-  "instrumento-6070": ["instrumento-60-nuevo", "instrumento-70-normal"],
-};
-
 export function getBackendFormCode(formId: FormId): string {
-  if (formId === "instrumento-30-normal" || formId === "instrumento-40-nuevo") {
-    return "instrumento-3040";
-  }
-
-  if (formId === "instrumento-60-nuevo" || formId === "instrumento-70-normal") {
-    return "instrumento-6070";
-  }
-
   return formId;
 }
 
 export function getFormIdsForBackendCode(formCode: string): FormId[] {
-  const normalized = formCode.replace(/_/g, "-");
-  return BACKEND_FORM_ALIAS_MAP[normalized] ?? [normalized as FormId];
+  return [formCode.replace(/_/g, "-") as FormId];
 }
 
 export type FormAccessRule = {
@@ -122,6 +108,15 @@ const cloneDefaultFormAccess = (): FormAccessConfig => ({
   estadias: { ...DEFAULT_FORM_ACCESS.estadias },
   tutorias: { ...DEFAULT_FORM_ACCESS.tutorias },
 });
+
+// NUEVA FUNCIÓN: Obtener configuración por defecto sin localStorage
+export function getDefaultFormConfig(): FormConfig {
+  return {
+    docenteFields: [...DEFAULT_FORM_CONFIG.docenteFields],
+    tutorFields: [...DEFAULT_FORM_CONFIG.tutorFields],
+    formAccess: cloneDefaultFormAccess(),
+  };
+}
 
 const normalizeFormConfig = (
   partial?: Partial<FormConfig> | null,

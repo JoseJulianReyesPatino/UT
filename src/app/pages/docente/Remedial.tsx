@@ -343,8 +343,7 @@ export default function RemedialPage() {
     const uploadedIds = [];
 
     for (const file of files) {
-      const cleanFileName = file.name.replace(/\.pdf$/i, "").substring(0, 50);
-      const title = `${basePayload.materia || "Remedial"} - ${basePayload.parcial || ""} - ${cleanFileName}`.trim();
+      const title = file.name.toLowerCase().endsWith(".pdf") ? file.name : `${file.name}.pdf`;
 
       const fd = new FormData();
       fd.append('file', file);

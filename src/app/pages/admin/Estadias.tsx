@@ -4,7 +4,7 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
-import { Eye, FileText, Check, MessageCircleMore, MessageSquare, Undo2 } from "lucide-react";
+import { Eye, FileText, Check, Loader2, MessageCircleMore, MessageSquare, RefreshCw, Undo2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
@@ -14,6 +14,7 @@ import apiFetch from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { formatGroupCode } from "../../../lib/utils";
 import { useAuth } from "../../context/AuthContext";
+import { SearchableSelect } from "../../components/SearchableSelect";
 
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
 
@@ -105,9 +106,11 @@ export default function Estadias() {
   const [reviewedDocuments, setReviewedDocuments] = useState<EstadiaReviewedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [filterPlan, setFilterPlan] = useState("all");
   const [filterCarrera, setFilterCarrera] = useState("all");
   const [filterCuatrimestre, setFilterCuatrimestre] = useState("all");
+  const [filterGrupo, setFilterGrupo] = useState("all");
   const [filterDocente, setFilterDocente] = useState("all");
   const [filterApartado, setFilterApartado] = useState("all");
   const [filterReturned, setFilterReturned] = useState("all");
@@ -122,7 +125,12 @@ export default function Estadias() {
   const [noteDialog, setNoteDialog] = useState<{ nota: string; docente: string } | null>(null);
 
   const allDocuments = [...pendingDocuments, ...reviewedDocuments];
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const toLocalDateKey = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  const todayKey = toLocalDateKey(new Date().toISOString());
 
   const formatDateOnlyFromKey = (dateKey: string) => {
     try {
@@ -180,6 +188,27 @@ export default function Estadias() {
     }
   };
 
+  const resolveApartado = (doc: ApiDocument): string => {
+    const norm = (v: string) =>
+      v.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[\s_]+/g, "-").replace(/-+/g, "-").trim();
+    const match = (s: string | null | undefined): string => {
+      const n = norm(s ?? "");
+      if (n.includes("carta") && n.includes("presentacion")) return "Carta de presentación";
+      if (n.includes("carta") && n.includes("aceptacion")) return "Carta de aceptación";
+      if (n.includes("carta") && n.includes("terminacion")) return "Carta de terminación";
+      if (n.includes("acta") && n.includes("final")) return "Acta final";
+      return "";
+    };
+    return (
+      match(doc.apartado_label) ||
+      match(doc.tipoLabel) ||
+      match(doc.form_title) ||
+      match(doc.tipo) ||
+      match(doc.title ?? doc.nombre) ||
+      "Documento"
+    );
+  };
+
   const isEstadiasDocument = (doc: ApiDocument) => {
     const formId = Number(doc.form_id ?? 0);
     if ([13, 14, 15, 16].includes(formId)) return true;
@@ -211,11 +240,11 @@ export default function Estadias() {
     const base = {
       id: Number(doc.id),
       ciclo: doc.cycle_name?.trim() || "Sin ciclo",
-      plan: doc.plan?.trim() || "Plan Nuevo Modelo",
+      plan: (() => { const v = doc.plan?.trim() ?? ""; return v === "plan_normal" ? "Plan normal" : v === "nuevo_modelo" ? "Nuevo modelo" : v || "Nuevo modelo"; })(),
       cuatrimestre: doc.parcial ?? "-",
       docente: doc.uploaded_by_name?.trim() || "Docente",
       documento: doc.title ?? doc.nombre ?? "Documento sin título",
-      apartado: doc.apartado_label ?? doc.tipoLabel ?? doc.form_title ?? "Documento",
+      apartado: resolveApartado(doc),
       carrera: doc.carrera_label?.trim() || "Sin carrera",
       grupo: formatGroupCode(doc.group?.group_code ?? doc.group_code ?? "-"),
       fecha: doc.submitted_at ?? "",
@@ -268,10 +297,11 @@ export default function Estadias() {
   const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full text-[13px] leading-tight shadow-sm sm:text-sm";
   const filterSelectValueClassName = "truncate";
 
-  const matchesFilters = (doc: { ciclo: string; plan: string; carrera: string; cuatrimestre: string; docente: string; apartado: string; returned?: boolean }) => {
+  const matchesFilters = (doc: { ciclo: string; plan: string; carrera: string; cuatrimestre: string; grupo: string; docente: string; apartado: string; returned?: boolean }) => {
     const matchesPlan = filterPlan === "all" || doc.plan === filterPlan;
     const matchesCarrera = filterCarrera === "all" || doc.carrera === filterCarrera;
     const matchesCuatrimestre = filterCuatrimestre === "all" || doc.cuatrimestre === filterCuatrimestre;
+    const matchesGrupo = filterGrupo === "all" || doc.grupo === filterGrupo;
     const matchesDocente = filterDocente === "all" || doc.docente === filterDocente;
     const matchesApartado = filterApartado === "all" || doc.apartado === filterApartado;
     const isReturned = Boolean(doc.returned);
@@ -279,13 +309,13 @@ export default function Estadias() {
       filterReturned === "all" ||
       (filterReturned === "returned" && isReturned) ||
       (filterReturned === "not-returned" && !isReturned);
-    return matchesPlan && matchesCarrera && matchesCuatrimestre && matchesDocente && matchesApartado && matchesReturned;
+    return matchesPlan && matchesCarrera && matchesCuatrimestre && matchesGrupo && matchesDocente && matchesApartado && matchesReturned;
   };
 
   const filteredPending = pendingDocuments.filter(matchesFilters);
   const filteredReviewed = reviewedDocuments.filter(matchesFilters);
   const filteredAll = allDocuments.filter(matchesFilters);
-  const reviewedToday = filteredReviewed.filter((doc) => doc.reviewedAt.startsWith(todayKey));
+  const reviewedToday = filteredReviewed.filter((doc) => toLocalDateKey(doc.reviewedAt) === todayKey);
 
   useEffect(() => {
     if (!isReady) return;
@@ -338,11 +368,11 @@ export default function Estadias() {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, isReady]);
+  }, [isAuthenticated, isReady, refreshTrigger]);
 
   const reviewedByDate = useMemo(() => {
     return filteredReviewed.reduce<Record<string, EstadiaReviewedDocument[]>>((groups, doc) => {
-      const date = doc.reviewedAt ? doc.reviewedAt.slice(0, 10) : "";
+      const date = doc.reviewedAt ? toLocalDateKey(doc.reviewedAt) : "";
       groups[date] = [...(groups[date] || []), doc];
       return groups;
     }, {});
@@ -352,18 +382,69 @@ export default function Estadias() {
 
   const planesDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.plan));
   const carrerasDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.carrera));
+  const gruposDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.grupo)).sort((a, b) => a.localeCompare(b));
   const cuatrimestresDisponibles = useMemo(() => {
-    if (filterPlan === "Plan Normal") {
-      return ["6", "11"];
-    }
-    if (filterPlan === "Plan Nuevo Modelo") {
-      return ["6", "10"];
-    }
-    return ["6", "10", "11"];
-  }, [filterPlan]);
+    const fromDocs = nonEmptyOptions(allDocuments.map((doc) => doc.cuatrimestre)).sort((a, b) => Number(a) - Number(b));
+    return fromDocs.length > 0 ? fromDocs : ["6", "10", "11"];
+  }, [allDocuments]);
   const docentesDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.docente));
-  const apartadosDisponibles = nonEmptyOptions(["Carta de Presentación", "Carta de Aceptación", "Carta de Terminación", "Acta Final"]);
+  const apartadosDisponibles = nonEmptyOptions(allDocuments.map((doc) => doc.apartado));
   const renderSelectItems = (values: string[]) => nonEmptyOptions(values).map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>);
+
+  const filtersBar = (
+    <div className={filtersGridClassName}>
+      <Select value={filterPlan} onValueChange={setFilterPlan}>
+        <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos los planes</SelectItem>
+          {renderSelectItems(planesDisponibles)}
+        </SelectContent>
+      </Select>
+      <SearchableSelect
+        value={filterCarrera}
+        onValueChange={setFilterCarrera}
+        options={carrerasDisponibles.map((c) => ({ value: c, label: c }))}
+        placeholder="Buscar carrera..."
+        allLabel="Todas las carreras"
+      />
+      <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
+        <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos los cuatrimestres</SelectItem>
+          {renderSelectItems(cuatrimestresDisponibles)}
+        </SelectContent>
+      </Select>
+      <SearchableSelect
+        value={filterGrupo}
+        onValueChange={setFilterGrupo}
+        options={gruposDisponibles.map((g) => ({ value: g, label: g }))}
+        placeholder="Buscar grupo..."
+        allLabel="Todos los grupos"
+      />
+      <SearchableSelect
+        value={filterDocente}
+        onValueChange={setFilterDocente}
+        options={docentesDisponibles.map((d) => ({ value: d, label: d }))}
+        placeholder="Buscar docente..."
+        allLabel="Todos los docentes"
+      />
+      <Select value={filterApartado} onValueChange={setFilterApartado}>
+        <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos los apartados</SelectItem>
+          {renderSelectItems(apartadosDisponibles)}
+        </SelectContent>
+      </Select>
+      <Select value={filterReturned} onValueChange={setFilterReturned}>
+        <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos los documentos</SelectItem>
+          <SelectItem value="returned">Solo devueltos</SelectItem>
+          <SelectItem value="not-returned">No devueltos</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
   React.useEffect(() => {
     if (filterCuatrimestre !== "all" && !cuatrimestresDisponibles.includes(filterCuatrimestre)) {
@@ -375,6 +456,7 @@ export default function Estadias() {
     try {
       await apiFetch(`/documents/${documentId}/review`, {
         method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "revisado" }),
       });
 
@@ -505,18 +587,28 @@ export default function Estadias() {
     };
   }, [previewDocument]);
 
-  const handleConfirmReturnAction = () => {
+  const handleConfirmReturnAction = async () => {
     if (!returnConfirmation) return;
     if (returnConfirmation.type === "return") {
       const trimmedComment = returnComment.trim();
-      void handleReturnDocument(returnConfirmation.document.id, trimmedComment);
+      await handleReturnDocument(returnConfirmation.document.id, trimmedComment);
     } else {
-      setDocumentReturnedState(returnConfirmation.document.id, false);
+      const docId = returnConfirmation.document.id;
       const raw = returnConfirmation.document.documento ?? "Documento";
       const lastSep = raw.lastIndexOf(" - ");
       const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
       const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
-      toast.success(`Devolución de ${fileName} cancelada`);
+      try {
+        await apiFetch(`/documents/${docId}/review`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "revisado", notes: "Devolución cancelada" }),
+        });
+        setDocumentReturnedState(docId, false);
+        toast.success(`Devolución de ${fileName} cancelada`);
+      } catch {
+        toast.error("No se pudo cancelar la devolución");
+      }
     }
     setReturnComment("");
     setReturnConfirmation(null);
@@ -527,9 +619,21 @@ export default function Estadias() {
       <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
         <div className="relative space-y-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Revisión de Estadías</h1>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Revisa y aprueba los documentos de estadías enviados por los docentes.</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Revisión de Estadías</h1>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Revisa y aprueba los documentos de estadías enviados por los docentes.</p>
+            </div>
+            <button
+              onClick={() => setRefreshTrigger((n) => n + 1)}
+              disabled={isLoading}
+              className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-400"
+              title="Actualizar documentos"
+              aria-label="Actualizar documentos"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              <span>Actualizar</span>
+            </button>
           </div>
         </div>
       </div>
@@ -556,58 +660,14 @@ export default function Estadias() {
             Pendientes
             <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPending.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados</TabsTrigger>
-          <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy</TabsTrigger>
+          <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados<Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredReviewed.length}</Badge></TabsTrigger>
+          <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy<Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{reviewedToday.length}</Badge></TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              <div className={filtersGridClassName}>
-                <Select value={filterPlan} onValueChange={setFilterPlan}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los planes</SelectItem>
-                    {renderSelectItems(planesDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las carreras</SelectItem>
-                    {renderSelectItems(carrerasDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los cuatrimestres</SelectItem>
-                    {renderSelectItems(cuatrimestresDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterDocente} onValueChange={setFilterDocente}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Docente" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los docentes</SelectItem>
-                    {renderSelectItems(docentesDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Apartado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los apartados</SelectItem>
-                    {renderSelectItems(apartadosDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los documentos</SelectItem>
-                    <SelectItem value="returned">Solo devueltos</SelectItem>
-                    <SelectItem value="not-returned">No devueltos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {filtersBar}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -624,7 +684,7 @@ export default function Estadias() {
                   const isReturned = Boolean(doc.returned);
 
                   return (
-                    <div key={doc.id} className={documentRowClassName}>
+                    <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
                       <div className="flex items-start gap-3 flex-1">
                         <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
                           <FileText className="h-6 w-6 text-muted-foreground" />
@@ -676,32 +736,24 @@ export default function Estadias() {
                         {isReturned ? <Badge variant="destructive">Devuelto</Badge> : <Badge variant={isReviewed ? "success" : "warning"}>{isReviewed ? "Revisado" : "Pendiente"}</Badge>}
 
                         {doc.returned ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <ResponsiveActionButton
-                                variant="outline"
-                                size="sm"
-                                label="Cancelar"
-                                className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
-                                onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
-                                icon={<Undo2 className="h-4 w-4" />}
-                              />
-                            </TooltipTrigger>
-                            <TooltipContent>Cancelar devolución</TooltipContent>
-                          </Tooltip>
+                          <ResponsiveActionButton
+                            variant="outline"
+                            size="sm"
+                            label="Cancelar"
+                            title="Cancelar devolución"
+                            className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
+                            onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
+                            icon={<Undo2 className="h-4 w-4" />}
+                          />
                         ) : (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <ResponsiveActionButton
-                                variant="destructive"
-                                size="sm"
-                                label="Devolver"
-                                onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
-                                icon={<Undo2 className="h-4 w-4" />}
-                              />
-                            </TooltipTrigger>
-                            <TooltipContent>Devolver</TooltipContent>
-                          </Tooltip>
+                          <ResponsiveActionButton
+                            variant="destructive"
+                            size="sm"
+                            label="Devolver"
+                            title="Devolver"
+                            onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
+                            icon={<Undo2 className="h-4 w-4" />}
+                          />
                         )}
                       </div>
                     </div>
@@ -715,51 +767,7 @@ export default function Estadias() {
         <TabsContent value="pendientes" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              <div className={filtersGridClassName}>
-                <Select value={filterPlan} onValueChange={setFilterPlan}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los planes</SelectItem>
-                    {renderSelectItems(planesDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las carreras</SelectItem>
-                    {renderSelectItems(carrerasDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los cuatrimestres</SelectItem>
-                    {renderSelectItems(cuatrimestresDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterDocente} onValueChange={setFilterDocente}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por docente" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los docentes</SelectItem>
-                    {renderSelectItems(docentesDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los apartados</SelectItem>
-                    {renderSelectItems(apartadosDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los documentos</SelectItem>
-                    <SelectItem value="returned">Solo devueltos</SelectItem>
-                    <SelectItem value="not-returned">No devueltos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {filtersBar}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -771,8 +779,10 @@ export default function Estadias() {
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
                 {!isLoading && !loadError && filteredPending.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
-                ) : !isLoading && !loadError && filteredPending.map((doc) => (
-                  <div key={doc.id} className={documentRowClassName}>
+                ) : !isLoading && !loadError && filteredPending.map((doc) => {
+                  const isReturned = Boolean(doc.returned);
+                  return (
+                  <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
                     <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
                     <div className="flex items-start gap-3 flex-1">
                       <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -792,7 +802,7 @@ export default function Estadias() {
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+                    <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
                       <ResponsiveActionButton
                         variant="outline"
                         size="sm"
@@ -823,36 +833,29 @@ export default function Estadias() {
                       />
 
                       {doc.returned ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <ResponsiveActionButton
-                              variant="outline"
-                              size="sm"
-                              label="Cancelar"
-                              className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
-                              onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
-                              icon={<Undo2 className="h-4 w-4" />}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>Cancelar devolución</TooltipContent>
-                        </Tooltip>
+                        <ResponsiveActionButton
+                          variant="outline"
+                          size="sm"
+                          label="Cancelar"
+                          title="Cancelar devolución"
+                          className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
+                          onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
+                          icon={<Undo2 className="h-4 w-4" />}
+                        />
                       ) : (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <ResponsiveActionButton
-                              variant="destructive"
-                              size="sm"
-                              label="Devolver"
-                              onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
-                              icon={<Undo2 className="h-4 w-4" />}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>Devolver</TooltipContent>
-                        </Tooltip>
+                        <ResponsiveActionButton
+                          variant="destructive"
+                          size="sm"
+                          label="Devolver"
+                          title="Devolver"
+                          onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
+                          icon={<Undo2 className="h-4 w-4" />}
+                        />
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -861,51 +864,7 @@ export default function Estadias() {
         <TabsContent value="revisados" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              <div className={filtersGridClassName}>
-                <Select value={filterPlan} onValueChange={setFilterPlan}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los planes</SelectItem>
-                    {renderSelectItems(planesDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las carreras</SelectItem>
-                    {renderSelectItems(carrerasDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los cuatrimestres</SelectItem>
-                    {renderSelectItems(cuatrimestresDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterDocente} onValueChange={setFilterDocente}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por docente" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los docentes</SelectItem>
-                    {renderSelectItems(docentesDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los apartados</SelectItem>
-                    {renderSelectItems(apartadosDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los documentos</SelectItem>
-                    <SelectItem value="returned">Solo devueltos</SelectItem>
-                    <SelectItem value="not-returned">No devueltos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {filtersBar}
             </CardHeader>
             <CardContent>
               {Object.entries(reviewedByDate).filter(([date]) => date).length === 0 ? (
@@ -975,32 +934,24 @@ export default function Estadias() {
                             />
 
                             {doc.returned ? (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <ResponsiveActionButton
-                                    variant="outline"
-                                    size="sm"
-                                    label="Cancelar"
-                                    className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
-                                    onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
-                                    icon={<Undo2 className="h-4 w-4" />}
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent>Cancelar devolución</TooltipContent>
-                              </Tooltip>
+                              <ResponsiveActionButton
+                                variant="outline"
+                                size="sm"
+                                label="Cancelar"
+                                title="Cancelar devolución"
+                                className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
+                                onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
+                                icon={<Undo2 className="h-4 w-4" />}
+                              />
                             ) : (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <ResponsiveActionButton
-                                    variant="destructive"
-                                    size="sm"
-                                    label="Devolver"
-                                    onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
-                                    icon={<Undo2 className="h-4 w-4" />}
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent>Devolver</TooltipContent>
-                              </Tooltip>
+                              <ResponsiveActionButton
+                                variant="destructive"
+                                size="sm"
+                                label="Devolver"
+                                title="Devolver"
+                                onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
+                                icon={<Undo2 className="h-4 w-4" />}
+                              />
                             )}
 
                             {isReturned && <Badge variant="destructive">Devuelto</Badge>}
@@ -1020,62 +971,22 @@ export default function Estadias() {
 
         <TabsContent value="hoy" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
-            <CardHeader>
-              <div className={filtersGridClassName}>
-                <Select value={filterPlan} onValueChange={setFilterPlan}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los planes</SelectItem>
-                    {renderSelectItems(planesDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por carrera" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las carreras</SelectItem>
-                    {renderSelectItems(carrerasDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por cuatrimestre" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los cuatrimestres</SelectItem>
-                    {renderSelectItems(cuatrimestresDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterDocente} onValueChange={setFilterDocente}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por docente" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los docentes</SelectItem>
-                    {renderSelectItems(docentesDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterApartado} onValueChange={setFilterApartado}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por apartado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los apartados</SelectItem>
-                    {renderSelectItems(apartadosDisponibles)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterReturned} onValueChange={setFilterReturned}>
-                  <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los documentos</SelectItem>
-                    <SelectItem value="returned">Solo devueltos</SelectItem>
-                    <SelectItem value="not-returned">No devueltos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <CardHeader className="pb-4">
+              {filtersBar}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                    {reviewedToday.length === 0 ? (
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Cargando documentos...</span>
+                  </div>
+                ) : reviewedToday.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : (
                   reviewedToday.map((doc) => {
                     const isReturned = Boolean(doc.returned);
                     return (
-                    <div key={doc.id} className={documentRowClassName}>
+                    <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
                         <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
                       <div className="relative z-20 flex items-start gap-3 flex-1 pointer-events-none">
                         <div className="relative z-20 h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 pointer-events-none">

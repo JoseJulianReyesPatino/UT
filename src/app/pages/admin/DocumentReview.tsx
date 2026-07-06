@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Check, Eye, FileText, MessageCircleMore, MessageSquare, Undo2 } from "lucide-react";
+import { Check, Eye, FileText, MessageCircleMore, MessageSquare, RefreshCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "../../components/ui/badge";
@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import { Textarea } from "../../components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import { carrieras } from "../../data/curricula";
 import apiFetch from "../../lib/api";
 import { formatGroupCode } from "../../../lib/utils";
@@ -145,11 +146,14 @@ const canonicalApartado = (value?: string | null) => {
 		case "instrumento-30-40":
 			return "INSTRUMENTO 30%";
 		case "instrumento-40":
+		case "instrumento-40-nuevo":
 			return "INSTRUMENTO 40%";
 		case "instrumento-60":
+		case "instrumento-60-nuevo":
 		case "instrumento-60-70":
 			return "INSTRUMENTO 60%";
 		case "instrumento-70":
+		case "instrumento-70-normal":
 			return "INSTRUMENTO 70%";
 		case "remedial":
 			return "REMEDIAL";
@@ -191,11 +195,14 @@ const friendlyApartado = (value?: string | null) => {
 		case "instrumento-30-40":
 			return "Instrumento 30%";
 		case "instrumento-40":
+		case "instrumento-40-nuevo":
 			return "Instrumento 40%";
 		case "instrumento-60":
+		case "instrumento-60-nuevo":
 		case "instrumento-60-70":
 			return "Instrumento 60%";
 		case "instrumento-70":
+		case "instrumento-70-normal":
 			return "Instrumento 70%";
 		case "remedial":
 			return "Remedial";
@@ -296,6 +303,11 @@ const getDocumentParcial = (doc: ApiDocument) => {
 	return `Parcial ${parcial}`;
 };
 
+const toLocalDateKey = (iso: string) => {
+	const d = new Date(iso);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 const formatDateOnlyFromKey = (dateKey: string) => {
 	try {
 		const date = new Date(`${dateKey}T00:00:00`);
@@ -373,6 +385,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const [filterParcial, setFilterParcial] = useState("all");
 	const [filterApartado, setFilterApartado] = useState(() => normalizeInitialApartadoFilter(initialForm));
 	const [activeSection, setActiveSection] = useState<ReviewSection>(initialSection);
+	const [refreshTrigger, setRefreshTrigger] = useState(0);
 	const [previewDocument, setPreviewDocument] = useState<DocumentItem | null>(null);
 	const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
 	const [previewLoading, setPreviewLoading] = useState(false);
@@ -382,7 +395,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const [noteDialog, setNoteDialog] = useState<{ nota: string; docente: string } | null>(null);
 
 	const allDocuments = [...pendingDocuments, ...reviewedDocuments];
-	const todayKey = new Date().toISOString().slice(0, 10);
+	const todayKey = toLocalDateKey(new Date().toISOString());
 	const defaultApartadoFilter = normalizeInitialApartadoFilter(initialForm);
 	const forcedApartado = getForcedApartadoForRoute(initialForm);
 	const forcedApartadoNormalized = forcedApartado ? normalizeText(forcedApartado) : null;
@@ -418,6 +431,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					statuses.map((status) => apiFetch("/documents", {
 						query: {
 							status,
+							per_page: 500,
 							...(forcedApartado ? { apartado_label: forcedApartado } : {}),
 						},
 					}))
@@ -470,7 +484,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		return () => {
 			isMounted = false;
 		};
-	}, [forcedApartado, isAuthenticated, isReady]);
+	}, [forcedApartado, isAuthenticated, isReady, refreshTrigger]);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -530,7 +544,12 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const docsByParcial = useMemo(() => docsByDocente.filter((doc) => filterParcial === "all" || getParcialFilterValue(doc.parcial) === filterParcial), [docsByDocente, filterParcial]);
 
 	const planesDisponibles = Array.from(new Set(allDocuments.map((doc) => formatPlanLabel(doc.plan, doc.carrera)).filter((value): value is string => Boolean(value))));
-	const carrerasDisponibles = useMemo(() => getCareerFilterOptions(filterPlan), [filterPlan]);
+	const carrerasDisponibles = useMemo(
+		() => Array.from(new Set(docsByPlan.map((doc) => doc.carrera).filter((v): v is string => Boolean(v))))
+			.sort()
+			.map((c) => ({ value: c, label: c })),
+		[docsByPlan]
+	);
 	const cuatrimestresDisponibles = Array.from(new Set(docsByCarrera.map((doc) => getDocumentCuatrimestre(doc)).filter((value): value is string => Boolean(value) && value !== "-")));
 	const materiasDisponibles = Array.from(new Set(docsByCuatrimestre.map((doc) => doc.materia).filter((value): value is string => Boolean(value) && normalizeText(value) !== "sin materia")));
 	const gruposDisponibles = Array.from(new Set(docsByMateria.map((doc) => doc.grupo).filter((value): value is string => Boolean(value) && normalizeText(value) !== "grupo -" && normalizeText(value) !== "-")));
@@ -562,7 +581,6 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		setFilterGrupo("all");
 		setFilterDocente("all");
 		setFilterParcial("all");
-		setFilterApartado(defaultApartadoFilter);
 	}, [filterCarrera]);
 
 	useEffect(() => {
@@ -570,30 +588,29 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		setFilterGrupo("all");
 		setFilterDocente("all");
 		setFilterParcial("all");
-		setFilterApartado(defaultApartadoFilter);
 	}, [filterCuatrimestre]);
 
 	useEffect(() => {
 		setFilterGrupo("all");
 		setFilterDocente("all");
 		setFilterParcial("all");
-		setFilterApartado(defaultApartadoFilter);
 	}, [filterMateria]);
 
 	useEffect(() => {
 		setFilterDocente("all");
 		setFilterParcial("all");
-		setFilterApartado(defaultApartadoFilter);
 	}, [filterGrupo]);
 
 	useEffect(() => {
 		setFilterParcial("all");
-		setFilterApartado(defaultApartadoFilter);
 	}, [filterDocente]);
 
+	// Reset filterApartado solo si la opción seleccionada ya no existe en las disponibles
 	useEffect(() => {
-		setFilterApartado(defaultApartadoFilter);
-	}, [filterParcial]);
+		if (filterApartado !== "all" && filterApartado !== defaultApartadoFilter && !apartadosDisponibles.includes(filterApartado)) {
+			setFilterApartado(defaultApartadoFilter);
+		}
+	}, [apartadosDisponibles, filterApartado, defaultApartadoFilter]);
 
 	const matchesFilters = (doc: DocumentItem) => {
 		const base = doc;
@@ -613,11 +630,11 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const filteredPendingDocuments = pendingDocuments.filter(matchesFilters);
 	const filteredReviewedDocuments = reviewedDocuments.filter(matchesFilters);
 	const filteredAllDocuments = allDocuments.filter(matchesFilters);
-	const reviewedTodayDocuments = filteredReviewedDocuments.filter((doc) => doc.reviewedAt.startsWith(todayKey));
+	const reviewedTodayDocuments = filteredReviewedDocuments.filter((doc) => toLocalDateKey(doc.reviewedAt) === todayKey);
 
 	const reviewedByDate = useMemo(() => {
 		return filteredReviewedDocuments.reduce<Record<string, ReviewedDocument[]>>((groups, doc) => {
-			const date = doc.reviewedAt.slice(0, 10);
+			const date = toLocalDateKey(doc.reviewedAt);
 			groups[date] = [...(groups[date] || []), doc];
 			return groups;
 		}, {});
@@ -752,13 +769,13 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const renderFilters = () => (
 		<div className={filtersGridClassName}>
 			<Select value={filterPlan} onValueChange={setFilterPlan}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Plan" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los planes</SelectItem>{planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}</SelectContent></Select>
-			<Select value={filterCarrera} onValueChange={setFilterCarrera}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Carrera" /></SelectTrigger><SelectContent><SelectItem value="all">Todas las carreras</SelectItem>{carrerasDisponibles.map((carrera) => <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>)}</SelectContent></Select>
+			<SearchableSelect value={filterCarrera} onValueChange={setFilterCarrera} options={carrerasDisponibles} placeholder="Buscar carrera..." allLabel="Todas las carreras" />
 			<Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Cuatrimestre" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los cuatrimestres</SelectItem>{cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{`Cuatrimestre ${cuatrimestre}`}</SelectItem>)}</SelectContent></Select>
-			<Select value={filterMateria} onValueChange={setFilterMateria}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Materia" /></SelectTrigger><SelectContent><SelectItem value="all">Todas las materias</SelectItem>{materiasDisponibles.map((materia) => <SelectItem key={materia} value={materia}>{materia}</SelectItem>)}</SelectContent></Select>
-			<Select value={filterGrupo} onValueChange={setFilterGrupo}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Grupo" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los grupos</SelectItem>{gruposDisponibles.map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}</SelectContent></Select>
-			<Select value={filterDocente} onValueChange={setFilterDocente}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Docente" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los docentes</SelectItem>{docentesDisponibles.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}</SelectContent></Select>
+			<SearchableSelect value={filterMateria} onValueChange={setFilterMateria} options={materiasDisponibles.map((m) => ({ value: m, label: m }))} placeholder="Buscar materia..." allLabel="Todas las materias" />
+			<SearchableSelect value={filterGrupo} onValueChange={setFilterGrupo} options={gruposDisponibles.map((g) => ({ value: g, label: g }))} placeholder="Buscar grupo..." allLabel="Todos los grupos" />
+			<SearchableSelect value={filterDocente} onValueChange={setFilterDocente} options={docentesDisponibles.map((d) => ({ value: d, label: d }))} placeholder="Buscar docente..." allLabel="Todos los docentes" />
 			<Select value={filterParcial} onValueChange={setFilterParcial}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Parcial" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los parciales</SelectItem>{parcialesDisponibles.map((parcial) => <SelectItem key={parcial.value} value={parcial.value}>{parcial.label}</SelectItem>)}</SelectContent></Select>
-			{!forcedApartado && <Select value={filterApartado} onValueChange={setFilterApartado}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Apartado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los apartados</SelectItem>{apartadosDisponibles.map((apartado) => <SelectItem key={apartado} value={apartado}>{apartado}</SelectItem>)}</SelectContent></Select>}
+			{!forcedApartado && <SearchableSelect value={filterApartado} onValueChange={setFilterApartado} options={apartadosDisponibles.map((a) => ({ value: a, label: a }))} placeholder="Buscar apartado..." allLabel="Todos los apartados" />}
 		</div>
 	);
 
@@ -801,8 +818,8 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		const lastSep = doc.documento.lastIndexOf(" - ");
 		const rawName = lastSep !== -1 && doc.documento.substring(lastSep + 3).trim()
 			? doc.documento.substring(lastSep + 3).trim()
-			: getDocumentFileName(doc as ApiDocument);
-		const fileName = rawName.toUpperCase().endsWith(".PDF") ? rawName : `${rawName}.PDF`;
+			: (forcedApartado ? doc.documento : getDocumentFileName(doc as ApiDocument));
+		const fileName = rawName.toUpperCase().endsWith(".PDF") ? rawName : `${rawName}.pdf`;
 		const apartadoTitle = canonicalApartado(doc.apartado);
 		const cuatrimestreLabel = `Cuatrimestre ${getDocumentCuatrimestre(doc as ApiDocument)}`;
 		const parcialLabel = getDocumentParcial(doc as ApiDocument);
@@ -812,15 +829,14 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 				<div className="flex items-start gap-3 flex-1">
 					<div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0"><FileText className="h-6 w-6 text-muted-foreground" /></div>
 					<div className="flex-1 min-w-0">
-						<p className="font-semibold uppercase tracking-wide text-foreground">{apartadoTitle} - {fileName}</p>
+						<p className="font-semibold tracking-wide text-foreground">{forcedApartado ? fileName : `${apartadoTitle} - ${fileName}`}</p>
 						<p className="text-xs text-muted-foreground">{doc.docente} • {doc.carrera}</p>
 						<div className="mt-2 flex flex-wrap gap-2">
-							{!forcedApartado && <Badge variant="outline" className="text-xs">{doc.ciclo}</Badge>}
-							<Badge variant="outline" className="text-xs">{doc.plan}</Badge>
-							{!forcedApartado && <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>}
+								{doc.plan && doc.plan !== "-" && <Badge variant="outline" className="text-xs">{doc.plan}</Badge>}
+							{!forcedApartado && doc.apartado && doc.apartado !== "-" && <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>}
 							{doc.cuatrimestre !== "-" && <Badge variant="outline" className="text-xs">{cuatrimestreLabel}</Badge>}
-							{doc.grupo && <Badge variant="outline" className="text-xs">{`Grupo ${doc.grupo}`}</Badge>}
-							<Badge variant="outline" className="text-xs">{parcialLabel}</Badge>
+							{doc.grupo && doc.grupo !== "-" && <Badge variant="outline" className="text-xs">{`Grupo ${doc.grupo}`}</Badge>}
+							{parcialLabel !== "-" && <Badge variant="outline" className="text-xs">{parcialLabel}</Badge>}
 						</div>
 						{fecha && <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(fecha)}</p>}
 						{"returnedAt" in doc && doc.returnedAt && <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>}
@@ -848,9 +864,21 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			<div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
 				<div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
 				<div className="relative space-y-3">
-					<div>
-						<h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{headingText}</h1>
-						<p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Revisa, aprueba o devuelve los documentos enviados por los docentes.</p>
+					<div className="flex items-start justify-between gap-3">
+						<div>
+							<h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{headingText}</h1>
+							<p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Revisa, aprueba o devuelve los documentos enviados por los docentes.</p>
+						</div>
+						<button
+							onClick={() => setRefreshTrigger((n) => n + 1)}
+							disabled={isLoading}
+							className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-400"
+							title="Actualizar documentos"
+							aria-label="Actualizar documentos"
+						>
+							<RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+							<span>Actualizar</span>
+						</button>
 					</div>
 				</div>
 			</div>

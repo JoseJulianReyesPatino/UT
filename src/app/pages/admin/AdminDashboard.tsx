@@ -6,7 +6,7 @@ import { ResponsiveActionButton } from "../../components/ResponsiveActionButton"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Textarea } from "../../components/ui/textarea";
-import apiFetch from "../../lib/api";
+import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { toast } from "sonner";
 import {
@@ -162,7 +162,7 @@ const countDocentes = (users: ApiUser[]) => users.filter((user) => (user.roles ?
 
 const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocument[]): ActivityItem[] => {
   const reviewedItems: Array<ActivityItem & { sortAt: number }> = reviewed.map((doc) => ({
-    id: Number(`${doc.id}1`),
+    id: doc.id * 10 + 1,
     type: "review",
     title: `Revisado documento de ${doc.docente}`,
     description: doc.documento,
@@ -173,7 +173,7 @@ const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocum
   }));
 
   const pendingItems: Array<ActivityItem & { sortAt: number }> = pending.map((doc) => ({
-    id: Number(`${doc.id}2`),
+    id: doc.id * 10 + 2,
     type: "upload",
     title: `${doc.docente} subió un documento`,
     description: doc.documento,
@@ -257,10 +257,6 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     void loadDashboard();
   }, [loadDashboard]);
 
-  useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
-
   const stats = useMemo(
     () => [
       {
@@ -333,7 +329,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     }
   }, [loadDashboard]);
 
-  const handleReturnDocument = useCallback(async (documentId: number, comment: string, docName?: string, docenteName?: string) => {
+  const handleReturnDocument = useCallback(async (documentId: number, comment: string, docName?: string, docenteName?: string): Promise<boolean> => {
     try {
       await apiFetch(`/documents/${documentId}/return`, {
         method: "PATCH",
@@ -347,22 +343,26 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
       const docente = docenteName ? ` al docente ${docenteName}` : "";
       toast.success(`${nombre} devuelto${docente}`);
       await loadDashboard();
+      return true;
     } catch {
       toast.error("No se pudo devolver el documento");
+      return false;
     }
   }, [loadDashboard]);
 
-  const confirmReturn = useCallback(() => {
+  const confirmReturn = useCallback(async () => {
     const trimmed = returnComment.trim();
     if (!selectedDocument) return;
     const doc = selectedDocument;
     setReturnDialogOpen(false);
     setReturnComment("");
     setSelectedDocument(null);
-    void handleReturnDocument(doc.id, trimmed, doc.documento, doc.docente);
-    globalThis.dispatchEvent(new CustomEvent("openMessagesConversation", {
-      detail: { recipientName: doc.docente, recipientRole: "Docente", document: { id: doc.id, title: doc.documento, filePath: "" } },
-    }));
+    const success = await handleReturnDocument(doc.id, trimmed, doc.documento, doc.docente);
+    if (success) {
+      globalThis.dispatchEvent(new CustomEvent("openMessagesConversation", {
+        detail: { recipientName: doc.docente, recipientRole: "Docente", document: { id: doc.id, title: doc.documento, filePath: "" } },
+      }));
+    }
   }, [returnComment, selectedDocument, handleReturnDocument]);
 
   const openDocument = useCallback((doc: { id: number; docente: string; documento: string; carrera: string; tipo: string; fecha: string; submittedAt: string }) => {
@@ -405,6 +405,10 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
 
     return () => {
       isMounted = false;
+      setPreviewBlobUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
     };
   }, [selectedDocument]);
 
@@ -520,8 +524,8 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   const openRelatedDocument = () => {
     if (!selectedActivity) return;
 
-    const relatedDocument = pendingDocuments.find((item) => item.documento === selectedActivity.related)
-      ?? reviewedDocuments.find((item) => item.documento === selectedActivity.related);
+    const relatedDocument = pendingDocuments.find((item) => item.id === selectedActivity.relatedDocumentId)
+      ?? reviewedDocuments.find((item) => item.id === selectedActivity.relatedDocumentId);
 
     if (relatedDocument && "revisado" in relatedDocument) {
       openDocument(relatedDocument);
@@ -551,31 +555,19 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     : null;
 
   return (
-    <div className="relative z-0 space-y-6 overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -right-12 top-8 h-40 w-40 rounded-full bg-emerald-100/20 blur-3xl dark:bg-emerald-500/5" />
-        <div className="absolute -left-10 bottom-0 h-52 w-52 rounded-full bg-sky-100/10 blur-3xl dark:bg-sky-500/5" />
-      </div>
-
-      <div className="relative z-10">
-        <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60 transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
-          <CardContent className="space-y-5 p-5 sm:p-7">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-2">
-                <h2 className="text-2xl font-semibold tracking-tight text-slate-800 dark:text-white">Panel Administrativo</h2>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Gestión y supervisión del sistema académico con acceso rápido a documentos y actividad.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="relative space-y-6 overflow-hidden">
+      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+        <div className="relative space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Panel Administrativo</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Gestión y supervisión del sistema académico con acceso rápido a documentos y actividad.</p>
+        </div>
       </div>
 
       <StatsGrid stats={stats} onNavigate={onNavigate} />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60 transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
+        <Card className="overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
           <CardHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-foreground">Documentos Pendientes de Revisión</CardTitle>
@@ -598,7 +590,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60 transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
+        <Card className="overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
           <CardHeader>
             <CardTitle className="text-foreground">Actividad Reciente</CardTitle>
             <CardDescription>Últimas acciones en el sistema</CardDescription>

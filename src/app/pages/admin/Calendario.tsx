@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, Download, Eye, FileUp } from "lucide-react";
+import { Download, Eye, FileUp, Loader2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import apiFetch from "../../lib/api";
 import { getCalendarDownloadUrl, getCalendarFileUrl } from "../../lib/calendar";
 
@@ -17,6 +18,7 @@ type CalendarMeta = {
 export function CalendarioAdmin() {
   const [calendar, setCalendar] = useState<CalendarMeta | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -43,26 +45,29 @@ export function CalendarioAdmin() {
 
   const calendarSrc = useMemo(() => getCalendarFileUrl(calendar?.uploadedAt ?? "base"), [calendar?.uploadedAt]);
 
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-
     if (file.type !== "application/pdf") {
       toast.error("El archivo debe ser un PDF");
       return;
     }
+    setPendingFile(file);
+  };
 
+  const handleUploadConfirm = async () => {
+    if (!pendingFile) return;
+    const file = pendingFile;
+    setPendingFile(null);
     setIsLoading(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
-
       const response = await apiFetch("/calendar", {
         method: "POST",
         body: formData,
       });
-
       const data = response?.data;
       setCalendar({
         id: data?.id ?? null,
@@ -79,36 +84,50 @@ export function CalendarioAdmin() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-white drop-shadow-sm">Calendario</h1>
-          <p className="text-sm text-white/80">Sube el calendario institucional y revísalo antes de publicarlo.</p>
-        </div>
-        <div className="flex items-center gap-2 rounded-full border border-emerald-200/70 bg-emerald-50 px-3 py-1 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
-          <CalendarDays className="h-4 w-4" />
-          Admin
+    <div className="relative space-y-6 overflow-hidden">
+      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+        <div className="relative space-y-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Calendario</h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Sube el calendario institucional y revísalo antes de publicarlo.</p>
+          </div>
         </div>
       </div>
 
-      <Card className="border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-slate-50/70 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-950">
+      <Card className="overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
         <CardHeader>
           <CardTitle>Calendario vigente</CardTitle>
-          <CardDescription>El archivo se guarda en la API para que docentes y admin vean la misma versión.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
             <Button type="button" variant="success" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
-              <FileUp className="mr-2 h-4 w-4" />Subir calendario
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+              {isLoading ? "Subiendo..." : "Subir calendario"}
             </Button>
-            <Input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleUpload} disabled={isLoading} />
-            <Button type="button" variant="outline" onClick={() => window.open(calendarSrc, "_blank", "noopener,noreferrer")}>
+            <Input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileSelect} disabled={isLoading} />
+            <Button type="button" variant="outline" disabled={isLoading} onClick={() => window.open(calendarSrc, "_blank", "noopener,noreferrer")}>
               <Eye className="mr-2 h-4 w-4" />Abrir PDF
             </Button>
-            <Button type="button" variant="outline" onClick={() => window.open(getCalendarDownloadUrl(), "_blank", "noopener,noreferrer") }>
+            <Button type="button" variant="outline" disabled={isLoading} onClick={() => window.open(getCalendarDownloadUrl(), "_blank", "noopener,noreferrer")}>
               <Download className="mr-2 h-4 w-4" />Descargar
             </Button>
           </div>
+
+          <Dialog open={!!pendingFile} onOpenChange={(open) => { if (!open) setPendingFile(null); }}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>¿Reemplazar calendario vigente?</DialogTitle>
+                <DialogDescription>
+                  Se sobreescribirá el archivo actual con <span className="font-medium text-foreground">{pendingFile?.name}</span>. Esta acción no se puede deshacer.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setPendingFile(null)}>Cancelar</Button>
+                <Button variant="destructive" onClick={() => void handleUploadConfirm()}>Reemplazar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <div className="rounded-2xl border border-border bg-background/80 p-4 shadow-sm">
             <p className="text-sm font-medium text-foreground">Archivo actual</p>

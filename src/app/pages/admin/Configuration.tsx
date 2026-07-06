@@ -6,13 +6,13 @@ import { Label } from "../../components/ui/label";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { getFormConfig, saveFormConfig, type FormId, type FormRole, type Group } from "../../../lib/formConfig";
+import { getDefaultFormConfig, type FormId, type FormRole, type Group } from "../../../lib/formConfig";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { API_BASE_URL } from "../../lib/env";
 import { useTheme } from "../../context/ThemeContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronUp, FileText, Grid2x2, Moon, PencilLine, Plus, RefreshCw, Search, Shield, Sun, Trash2, Users, Settings2 } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, FileText, Grid2x2, Key, Moon, PencilLine, Plus, RefreshCw, Search, Shield, Sun, Trash2, Users, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { carrieras } from "../../data/curricula";
 import { clearAvatarCache, getAvatarUrlWithTimestamp, getInitials, useResolvedAvatarUrl } from "../../lib/avatar";
@@ -112,11 +112,13 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
   const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
-  const [formConfig, setFormConfig] = useState(getFormConfig());
+  // Estado inicial con getDefaultFormConfig - SIN localStorage
+  const [formConfig, setFormConfig] = useState(getDefaultFormConfig());
   const [formCodeToId, setFormCodeToId] = useState<Record<FormId, number>>({} as Record<FormId, number>);
   const [isFormConfigLoading, setIsFormConfigLoading] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [formDrafts, setFormDrafts] = useState<Record<FormId, { roles: FormRole[]; dueAt: string | null }>>(() => getFormConfig().formAccess);
+  // Estado inicial con getDefaultFormConfig - SIN localStorage
+  const [formDrafts, setFormDrafts] = useState<Record<FormId, { roles: FormRole[]; dueAt: string | null }>>(() => getDefaultFormConfig().formAccess);
   const [savingFormIds, setSavingFormIds] = useState<Record<FormId, boolean>>({} as Record<FormId, boolean>);
 
   const [plan, setPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
@@ -166,6 +168,10 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [groupSearch, setGroupSearch] = useState("");
@@ -203,16 +209,15 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     []
   );
 
+  // useEffect de carga - SIN localStorage, solo API
   useEffect(() => {
-    setFormConfig(getFormConfig());
-
     const loadFormConfig = async () => {
       setIsFormConfigLoading(true);
 
       try {
         const res = await apiFetch('/forms');
-        const savedConfig = getFormConfig();
-        const formAccess = { ...savedConfig.formAccess };
+        const baseConfig = getDefaultFormConfig();
+        const formAccess = { ...baseConfig.formAccess };
         const idMap = {} as Record<FormId, number>;
 
         const forms = res?.data ?? [];
@@ -230,15 +235,14 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           }
 
           formAccess[formId] = {
-            roles: item.access_roles ?? formAccess[formId].roles,
-            dueAt: item.due_at ?? formAccess[formId].dueAt,
+            roles: item.access_roles ?? [],
+            dueAt: item.due_at ?? null,
           };
 
           idMap[formId] = item.id;
         }
 
-        const nextConfig = { ...savedConfig, formAccess };
-        saveFormConfig(nextConfig);
+        const nextConfig = { ...baseConfig, formAccess };
         setFormConfig(nextConfig);
         setFormDrafts(nextConfig.formAccess);
         setFormCodeToId(idMap);
@@ -420,17 +424,14 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     setSavingFormIds((current) => ({ ...current, [formId]: true }));
     const success = await saveFormAccessRule(formId, currentDraft);
     if (success) {
-      setFormConfig((current) => {
-        const next = {
-          ...current,
-          formAccess: {
-            ...current.formAccess,
-            [formId]: currentDraft,
-          },
-        };
-        saveFormConfig(next);
-        return next;
-      });
+      // Solo actualizar estado en memoria, NO localStorage
+      setFormConfig((current) => ({
+        ...current,
+        formAccess: {
+          ...current.formAccess,
+          [formId]: currentDraft,
+        },
+      }));
       toast.success('Configuración guardada');
     }
     setSavingFormIds((current) => ({ ...current, [formId]: false }));
@@ -776,6 +777,10 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+      setIsPasswordOpen(false);
       toast.success("Contraseña actualizada correctamente");
     } catch (error: any) {
       toast.error(error instanceof Error ? error.message : "No fue posible actualizar la contraseña");
@@ -784,33 +789,13 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     }
   };
 
-  const shellClass = theme === "dark"
-    ? "bg-transparent text-slate-100"
-    : "bg-transparent text-slate-900";
-
-  const sidebarClass = theme === "dark"
-    ? "border-emerald-900/40 bg-slate-950/55 text-white backdrop-blur"
-    : "border-emerald-200/60 bg-white/55 text-slate-900 backdrop-blur";
-
-  const sidebarCardClass = theme === "dark"
-    ? "border-b border-white/5 bg-gradient-to-b from-emerald-500/10 to-transparent"
-    : "border-b border-emerald-200/40 bg-gradient-to-b from-emerald-50/70 to-transparent";
-
-  const sectionCardClass = theme === "dark"
-    ? "overflow-hidden border-emerald-900/35 bg-slate-950/55 shadow-sm backdrop-blur"
-    : "overflow-hidden border-emerald-200/60 bg-white/55 shadow-sm backdrop-blur";
-
-  const sectionHeaderClass = theme === "dark"
-    ? "bg-gradient-to-r from-emerald-950/20 to-slate-950/20"
-    : "bg-gradient-to-r from-emerald-50/70 via-white/40 to-slate-50/50";
-
-  const softPanelClass = theme === "dark"
-    ? "rounded-2xl border border-emerald-900/25 bg-slate-950/35 p-4"
-    : "rounded-2xl border border-emerald-200/45 bg-white/45 p-4";
-
-  const softSubpanelClass = theme === "dark"
-    ? "rounded-2xl border border-white/5 bg-slate-950/20 dark:border-emerald-900/20 dark:bg-slate-950/25"
-    : "rounded-2xl border border-emerald-200/35 bg-white/35";
+  const shellClass = "text-foreground";
+  const sidebarClass = "border-border bg-card shadow-sm";
+  const sidebarCardClass = "border-b border-border bg-muted/40";
+  const sectionCardClass = "overflow-hidden border-border bg-card shadow-sm";
+  const sectionHeaderClass = "bg-muted/40 border-b border-border";
+  const softPanelClass = "rounded-[18px] border border-border bg-muted/30 p-4";
+  const softSubpanelClass = "rounded-[16px] border border-border bg-card";
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -840,23 +825,23 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
   return (
     <div className={`flex h-[calc(100vh-64px)] flex-col gap-4 sm:gap-6 overflow-hidden ${shellClass}`}>
-      {/* Header - Mejorado para móvil */}
-      <div className="shrink-0 rounded-2xl sm:rounded-3xl border border-emerald-200/60 bg-white/45 p-4 sm:p-6 shadow-sm backdrop-blur dark:border-emerald-900/35 dark:bg-slate-950/55">
-        <div className="flex flex-col gap-2">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100">Configuración del Sistema</h1>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">Ajustes globales y parámetros del sistema</p>
-          </div>
+      {/* Header */}
+      <div className="relative shrink-0 overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+        <div className="relative">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Configuración del Sistema</h1>
+          <p className="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">Ajustes globales y parámetros del sistema.</p>
         </div>
       </div>
 
       {/* Layout principal - Cambia a columna en móvil */}
       <div className="grid min-h-0 flex-1 gap-4 sm:gap-6 lg:grid-cols-[280px_minmax(0,1fr)] items-start overflow-hidden">
         {/* Sidebar - Mejorado para móvil */}
-        <Card className={`${sidebarClass} shadow-xl self-start ${mobileSectionOpen ? "hidden lg:block" : "block"}`}>
+        <div className={`flex flex-col gap-4 self-start ${mobileSectionOpen ? "hidden lg:flex" : "flex"}`}>
+        <Card className={`${sidebarClass} rounded-[22px] overflow-hidden`}>
           <CardHeader className={`${sidebarCardClass} p-3 sm:p-6`}>
-            <CardTitle className={theme === "dark" ? "text-white text-base sm:text-lg" : "text-slate-900 text-base sm:text-lg"}>Secciones</CardTitle>
-            <CardDescription className={`${theme === "dark" ? "text-slate-400" : "text-slate-500"} text-xs sm:text-sm`}>Navega por la configuración</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Secciones</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Navega por la configuración</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1 sm:space-y-2 p-2 sm:p-3">
             {navItems.map((item) => {
@@ -874,20 +859,16 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                   }}
                   className={`flex w-full items-center gap-2 sm:gap-3 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 text-left transition-all ${
                     isActive
-                      ? (theme === "dark"
-                          ? "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30"
-                          : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70")
-                      : (theme === "dark"
-                          ? "text-slate-300 hover:bg-white/5 hover:text-white"
-                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")
+                      ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-400/15 dark:text-emerald-300 dark:ring-emerald-400/30"
+                      : "text-slate-600 hover:bg-muted hover:text-foreground dark:text-slate-300"
                   }`}
                 >
-                  <span className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl ${isActive ? (theme === "dark" ? "bg-emerald-400/15" : "bg-emerald-100") : (theme === "dark" ? "bg-white/5" : "bg-slate-100")}`}>
-                    <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${isActive ? (theme === "dark" ? "text-emerald-300" : "text-emerald-700") : (theme === "dark" ? "text-slate-300" : "text-slate-500")}`} />
+                  <span className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl ${isActive ? "bg-emerald-100 dark:bg-emerald-400/15" : "bg-muted"}`}>
+                    <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${isActive ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`} />
                   </span>
                   <span className="flex-1 min-w-0">
                     <span className="block text-xs sm:text-sm font-semibold truncate">{item.label}</span>
-                    <span className={`hidden sm:block text-xs ${theme === "dark" ? "text-slate-400" : "text-slate-500"}`}>{item.description}</span>
+                    <span className="hidden sm:block text-xs text-muted-foreground">{item.description}</span>
                   </span>
                 </button>
               );
@@ -895,8 +876,10 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           </CardContent>
         </Card>
 
+        </div>
+
         {/* Contenido principal */}
-        <div className={`h-full min-h-0 space-y-4 sm:space-y-8 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent ${mobileSectionOpen ? "block" : "hidden lg:block"}`}>
+        <div className={`h-full min-h-0 flex flex-col overflow-hidden ${mobileSectionOpen ? "flex" : "hidden lg:flex"}`}>
           <button
             type="button"
             onClick={() => setMobileSectionOpen(false)}
@@ -906,12 +889,12 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
             Volver a secciones
           </button>
           {activeTab === "cuenta" && (
-            <Card className={sectionCardClass}>
-              <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
+            <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
+              <CardHeader className={`${sectionHeaderClass} shrink-0 p-4 sm:p-6`}>
                 <CardTitle className="text-base sm:text-lg">Configuración de tu Cuenta</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">Gestiona tu foto, datos básicos y preferencias visuales.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+              <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 p-4 sm:p-6 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
                 {/* Avatar - Mejorado para móvil */}
                 <div className="flex flex-col sm:flex-row gap-4 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 sm:p-4 sm:items-center dark:border-slate-800 dark:bg-slate-900/60">
                   <Avatar className="h-16 w-16 sm:h-20 sm:w-20 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
@@ -960,23 +943,135 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                   </DialogContent>
                 </Dialog>
 
+                <Dialog
+                  open={isPasswordOpen}
+                  onOpenChange={(open) => {
+                    setIsPasswordOpen(open);
+                    if (!open) {
+                      setCurrentPassword("");
+                      setNewPassword("");
+                      setConfirmPassword("");
+                      setShowCurrentPassword(false);
+                      setShowNewPassword(false);
+                      setShowConfirmPassword(false);
+                    }
+                  }}
+                >
+                  <DialogContent className="max-w-[95vw] sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Cambiar contraseña</DialogTitle>
+                      <DialogDescription>Actualiza tu contraseña de acceso al sistema.</DialogDescription>
+                    </DialogHeader>
+                    <div className="mt-2 space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm">Contraseña actual</Label>
+                        <div className="relative">
+                          <Input
+                            type={showCurrentPassword ? "text" : "password"}
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="Ingresa tu contraseña actual"
+                            autoComplete="new-password"
+                            className="pr-10 text-sm"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                            onClick={() => setShowCurrentPassword((v) => !v)}
+                            aria-label={showCurrentPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                          >
+                            {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Nueva contraseña</Label>
+                        <div className="relative">
+                          <Input
+                            type={showNewPassword ? "text" : "password"}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Ingresa la nueva contraseña"
+                            className="pr-10 text-sm"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                            onClick={() => setShowNewPassword((v) => !v)}
+                            aria-label={showNewPassword ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
+                          >
+                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Confirmar contraseña</Label>
+                        <div className="relative">
+                          <Input
+                            type={showConfirmPassword ? "text" : "password"}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Repite la nueva contraseña"
+                            className="pr-10 text-sm"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                            onClick={() => setShowConfirmPassword((v) => !v)}
+                            aria-label={showConfirmPassword ? "Ocultar confirmación" : "Mostrar confirmación"}
+                          >
+                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter className="mt-2 flex-col sm:flex-row gap-2">
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => setIsPasswordOpen(false)}
+                        disabled={isSavingPassword}
+                        className="w-full sm:w-auto text-sm"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="success"
+                        onClick={handleSavePassword}
+                        disabled={isSavingPassword}
+                        className="w-full sm:w-auto text-sm"
+                      >
+                        {isSavingPassword ? "Guardando..." : "Actualizar contraseña"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
                 {/* Campos de perfil - Mejorado para móvil */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label className="text-sm">Nombres</Label>
-                    <Input value={profileFirstNames} onChange={(e) => setProfileFirstNames(e.target.value)} placeholder="Ej. María Fernanda" className="text-sm" />
+                    <Label htmlFor="cfg-nombres" className="text-sm">Nombres</Label>
+                    <Input id="cfg-nombres" value={profileFirstNames} onChange={(e) => setProfileFirstNames(e.target.value)} placeholder="Ej. María Fernanda" className="text-sm" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm">Apellidos</Label>
-                    <Input value={profileLastNames} onChange={(e) => setProfileLastNames(e.target.value)} placeholder="Ej. González López" className="text-sm" />
+                    <Label htmlFor="cfg-apellidos" className="text-sm">Apellidos</Label>
+                    <Input id="cfg-apellidos" value={profileLastNames} onChange={(e) => setProfileLastNames(e.target.value)} placeholder="Ej. González López" className="text-sm" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm">Correo electrónico</Label>
-                    <Input value={user?.email ?? ""} disabled className="text-sm" />
+                    <Label htmlFor="cfg-correo" className="text-sm">Correo electrónico</Label>
+                    <Input id="cfg-correo" value={user?.email ?? ""} disabled className="text-sm" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm">Teléfono</Label>
+                    <Label htmlFor="cfg-telefono" className="text-sm">Teléfono</Label>
                     <Input
+                      id="cfg-telefono"
                       value={profilePhone}
                       onChange={(e) => setProfilePhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                       inputMode="numeric"
@@ -987,50 +1082,22 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                   </div>
                 </div>
 
-                {/* Cambiar contraseña - Mejorado para móvil */}
-                <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                {/* Seguridad */}
+                <div className="rounded-2xl border border-border bg-muted/30 p-4">
                   <div className="space-y-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Cambiar contraseña</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Actualiza tu contraseña sin salir de esta sección.</p>
+                      <p className="text-sm font-semibold">Seguridad</p>
+                      <p className="text-xs text-muted-foreground">Gestiona el acceso a tu cuenta.</p>
                     </div>
-                    <div className="grid gap-3 sm:gap-4 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label className="text-sm">Contraseña actual</Label>
-                        <Input
-                          type="password"
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                          placeholder="Ingresa tu contraseña actual"
-                          className="text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm">Nueva contraseña</Label>
-                        <Input
-                          type="password"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="Ingresa la nueva contraseña"
-                          className="text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm">Confirmar contraseña</Label>
-                        <Input
-                          type="password"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="Repite la contraseña"
-                          className="text-sm"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <Button variant="outline" onClick={handleSavePassword} disabled={isSavingPassword} className="text-sm">
-                        {isSavingPassword ? "Guardando..." : "Actualizar contraseña"}
-                      </Button>
-                    </div>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      className="w-full justify-start text-sm"
+                      onClick={() => setIsPasswordOpen(true)}
+                    >
+                      <Key className="h-4 w-4 mr-2" />
+                      Cambiar contraseña
+                    </Button>
                   </div>
                 </div>
 
@@ -1060,8 +1127,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           )}
 
           {activeTab === "formularios" && (
-            <Card className={sectionCardClass}>
-              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+            <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
+              <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 p-4 sm:p-6 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
                 <div className={softPanelClass}>
                   <div className="mb-3">
                     <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">Control por formulario</h3>
@@ -1116,7 +1183,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                   const isDraftChanged = JSON.stringify(draftConfig) !== JSON.stringify(savedConfig);
 
                                   return (
-                                    <div key={form.id} className="rounded-2xl border border-emerald-200/35 bg-white/45 dark:border-emerald-900/20 dark:bg-slate-950/30">
+                                    <div key={form.id} className="rounded-[14px] border border-border bg-card">
                                       <button
                                         type="button"
                                         onClick={() => toggleFormItem(form.id)}
@@ -1230,8 +1297,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           )}
 
           {activeTab === "grupos" && (
-            <Card className={sectionCardClass}>
-              <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
+            <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
+              <CardHeader className={`${sectionHeaderClass} shrink-0 p-4 sm:p-6`}>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
                     <CardTitle className="text-base sm:text-lg">Grupos</CardTitle>
@@ -1243,7 +1310,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0 sm:pt-0">
+              <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0 sm:pt-0 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
                 {/* Lista de grupos - Mejorado para móvil */}
                 <div className={softPanelClass}>
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1278,12 +1345,12 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                   {/* CONTENEDOR CON SCROLL PARA GRUPOS - Ajustado para móvil */}
                   <div className="mt-4 space-y-4 max-h-[400px] sm:max-h-[500px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
                     {filteredGroups.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-emerald-200/45 bg-white/40 px-4 py-6 text-sm text-slate-500 dark:border-emerald-900/25 dark:bg-slate-950/35">
+                      <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
                         No hay grupos que coincidan con la búsqueda.
                       </div>
                     ) : (
                       <>
-                        <div className="rounded-2xl border border-emerald-200/40 bg-white/45 p-3 sm:p-4 dark:border-emerald-900/25 dark:bg-slate-950/35">
+                        <div className="rounded-[18px] border border-border bg-card p-3 sm:p-4">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-3 dark:border-slate-800">
                             <div>
                               <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
@@ -1297,12 +1364,12 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                           {/* CONTENEDOR INTERNO CON SCROLL PARA LAS CARRERAS - Ajustado para móvil */}
                           <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-3 max-h-[300px] sm:max-h-[400px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
                             {selectedPlanCareerGroups.length === 0 ? (
-                              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40">
+                              <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
                                 No hay grupos creados para este plan.
                               </div>
                             ) : (
                               selectedPlanCareerGroups.map(({ career, groups: careerGroups }) => (
-                                <div key={career.codigo} className="rounded-2xl border border-emerald-200/35 bg-white/35 dark:border-emerald-900/20 dark:bg-slate-950/25">
+                                <div key={career.codigo} className="rounded-[14px] border border-border bg-card/60">
                                   <button
                                     type="button"
                                     onClick={() => setOpenCareer(openCareer === career.codigo ? null : career.codigo)}
@@ -1346,7 +1413,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                               {isOpen && (
                                                 <div className="space-y-1.5 p-2">
                                                   {byCuat[cuat].map((g) => (
-                                                    <div key={g.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 rounded-xl border border-emerald-200/35 bg-white/40 px-3 sm:px-4 py-2 sm:py-3 dark:border-emerald-900/20 dark:bg-slate-950/30">
+                                                    <div key={g.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 rounded-xl border border-border bg-muted/20 px-3 sm:px-4 py-2 sm:py-3">
                                                       <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">
                                                         <p className="truncate font-medium text-xs sm:text-sm">{g.name}</p>
                                                         <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Grupo {g.groupNumber}</p>
@@ -1357,7 +1424,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                                           size="icon"
                                                           onClick={() => handleStartEditGroup(g)}
                                                           disabled={Boolean(editingGroupId)}
-                                                          className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border-emerald-200/60 bg-white/60 text-slate-700 hover:bg-emerald-50 hover:text-slate-900 dark:border-emerald-900/30 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-900"
+                                                          className="h-8 w-8 sm:h-9 sm:w-9 rounded-full"
                                                           aria-label={`Editar grupo ${g.name}`}
                                                           title="Editar grupo"
                                                         >
@@ -1399,9 +1466,9 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           )}
 
           {activeTab === "supervisores" && (
-            <div className="space-y-4">
-              <Card className={sectionCardClass}>
-                <CardHeader className={`${sectionHeaderClass} p-4 sm:p-6`}>
+            <div className="flex flex-col flex-1 min-h-0 space-y-4">
+              <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
+                <CardHeader className={`${sectionHeaderClass} shrink-0 p-4 sm:p-6`}>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                       <CardTitle className="text-base sm:text-lg flex items-center gap-2">
@@ -1426,7 +1493,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                     />
                   </div>
                 </CardHeader>
-                <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+                <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 pt-0 sm:pt-0 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
                   {supervisorsLoading ? (
                     <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
                       Cargando supervisores...
@@ -1579,20 +1646,20 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => {
+              onClick={async () => {
                 if (!deleteTarget) return;
                 if (deleteConfirmation.trim() !== deleteTarget.label.trim()) {
                   toast.error(`Debes escribir "${deleteTarget.label}" para confirmar`);
                   return;
                 }
                 setIsLoading(true);
-                setTimeout(() => {
-                  deleteTarget.onConfirm();
+                try {
+                  await deleteTarget.onConfirm();
+                } finally {
                   setDeleteTarget(null);
                   setDeleteConfirmation("");
                   setIsLoading(false);
-                  toast.success("Elemento eliminado");
-                }, 400);
+                }
               }}
               disabled={isLoading}
               className="w-full sm:w-auto text-sm"

@@ -244,7 +244,7 @@ function AppContent() {
             if (formId in nextAccess) {
               nextAccess[formId] = {
                 roles: form.access_roles ?? nextAccess[formId].roles,
-                dueAt: form.due_at ?? nextAccess[formId].dueAt,
+                dueAt: form.due_at !== undefined ? form.due_at : nextAccess[formId].dueAt,
               };
             }
           }

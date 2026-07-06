@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -7,7 +6,7 @@ import { Input } from "../../components/ui/input";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { Textarea } from "../../components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { ChevronLeft, CornerUpLeft, Paperclip, PencilLine, Search, Send, X, Trash, EyeOff, Eye } from "lucide-react";
+import { ChevronLeft, CornerUpLeft, Paperclip, PencilLine, Plus, Search, Send, X, Trash, EyeOff, Eye } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import downloadIcon from "../../../assets/icons/download-circle.svg";
 import apiFetch from "../../lib/api";
@@ -1463,65 +1462,66 @@ export function MessagesAdmin(props: Readonly<{
 
     return (
       <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-5 overflow-hidden">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-white drop-shadow-sm">Mensajes</h1>
-            <p className="max-w-2xl text-sm text-white/80 hidden sm:block">Mensajería interna con el Administrador</p>
+        <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+          <div className="relative">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Mensajes</h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Mensajería interna con el Administrador.</p>
           </div>
         </div>
 
         <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-1">
-          <Card className="flex min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20">
-            <CardHeader className="border-b border-border/60 bg-background/80 pb-4">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
+            {/* Cabecera del chat docente */}
+            <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3">
               {adminConversation ? (
-                <div className="flex items-start gap-3">
-                  <Avatar className="h-11 w-11 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10 shrink-0 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
                     {activeConversationAvatarUrl ? (
-                      <AvatarImage 
-                        src={activeConversationAvatarUrl} 
-                        alt={adminConversation.name} 
-                        className="h-full w-full object-cover" 
+                      <AvatarImage
+                        src={activeConversationAvatarUrl}
+                        alt={adminConversation.name}
+                        className="h-full w-full object-cover"
                       />
                     ) : (
-                      <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-medium">
+                      <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-semibold">
                         {adminConversation.avatarFallback || getInitials(adminConversation.name)}
                       </AvatarFallback>
                     )}
                   </Avatar>
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <CardTitle className="text-base">{adminConversation.name}</CardTitle>
+                      <p className="text-sm font-semibold text-foreground leading-tight">{adminConversation.name}</p>
                       {adminConversation.unread > 0 && (
                         <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[11px]">
                           {adminConversation.unread}
                         </Badge>
                       )}
                     </div>
-                    <CardDescription>
-                      <span>{adminConversation.role}</span>
-                    </CardDescription>
+                    <p className="text-xs text-muted-foreground">{adminConversation.role}</p>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <CardTitle className="text-base">Chat con Administrador</CardTitle>
-                  <CardDescription>Escribe el primer mensaje para iniciar el chat con administración.</CardDescription>
+                  <p className="text-sm font-semibold text-foreground">Chat con Administrador</p>
+                  <p className="text-xs text-muted-foreground">Escribe el primer mensaje para iniciar el chat con administración.</p>
                 </div>
               )}
-            </CardHeader>
+            </div>
 
-            <CardContent className="min-h-0 flex-1 p-0 overflow-x-hidden">
+            {/* Área de mensajes */}
+            <div className="min-h-0 flex-1 overflow-hidden">
               {adminConversation ? (
-                <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
-                  <div className="w-full min-w-0 overflow-x-hidden space-y-4 px-3 pb-2 pt-1 pr-4">
+                <ScrollArea className="h-full bg-muted/20">
+                  <div className="w-full min-w-0 overflow-x-hidden space-y-4 px-4 pb-2 pt-3">
                     {adminConversation.messages.length > 0 ? (
                       adminConversation.messages.map((messageItem) => (
-                        <MessageBubble 
+                        <MessageBubble
                           key={messageItem.id}
-                          message={messageItem} 
-                          onReply={setReplyingTo} 
-                          onDelete={handleDeleteMessage} 
-                          onEdit={handleEditMessage} 
+                          message={messageItem}
+                          onReply={setReplyingTo}
+                          onDelete={handleDeleteMessage}
+                          onEdit={handleEditMessage}
                         />
                       ))
                     ) : (
@@ -1539,9 +1539,10 @@ export function MessagesAdmin(props: Readonly<{
                   description="Estamos conectando tu chat con el administrador, un momento por favor."
                 />
               )}
-            </CardContent>
+            </div>
 
-            <div className="shrink-0 border-t border-border/60 bg-background/95 p-4 shadow-[0_-12px_30px_rgba(16,185,129,0.06)] backdrop-blur-sm">
+            {/* Pie: redacción */}
+            <div className="shrink-0 border-t border-border/60 bg-card p-4">
               {replyingTo && (
                 <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
                   <div className="min-w-0">
@@ -1560,7 +1561,7 @@ export function MessagesAdmin(props: Readonly<{
                   placeholder="Escribe un mensaje..."
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background/90 px-4 py-3 shadow-inner dark:bg-slate-900 dark:border-slate-700"
+                  className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background px-4 py-3"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -1575,7 +1576,7 @@ export function MessagesAdmin(props: Readonly<{
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="rounded-full border-emerald-200/70 bg-white/80 px-4 shadow-sm hover:bg-emerald-50 text-foreground dark:bg-slate-800/50 dark:border-emerald-900/40 dark:text-white dark:hover:bg-slate-800/70"
+                      className="rounded-full px-4"
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Paperclip className="h-4 w-4 mr-1" />
@@ -1591,7 +1592,7 @@ export function MessagesAdmin(props: Readonly<{
                 </div>
               </div>
             </div>
-          </Card>
+          </div>
         </div>
       </div>
     );
@@ -1602,52 +1603,70 @@ export function MessagesAdmin(props: Readonly<{
   // ─────────────────────────────────────────────────────────────────────────────
  return (
     <div className="flex h-[calc(100dvh-64px)] min-h-0 flex-col gap-5 overflow-hidden">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-white drop-shadow-sm">Mensajes</h1>
-          <p className="max-w-2xl text-sm text-white/80 hidden sm:block">Mensajería interna: mensajes, archivos y seguimiento.</p>
+      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+        <div className="relative">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Mensajes</h1>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Mensajería interna: mensajes, archivos y seguimiento.</p>
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-6 sm:grid-cols-[300px_minmax(0,1fr)]">
-        <Card className={cn("min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20", mobileView === 'list' ? "flex" : "hidden sm:flex")}>
-          <CardHeader className="space-y-4 border-b border-border/60 pb-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <CardTitle>Chats</CardTitle>
-                  {filteredConversations.filter((c) => c.unread > 0).length > 0 && (
-                    <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1.5 text-[11px]">
-                      {filteredConversations.filter((c) => c.unread > 0).length}
-                    </Badge>
-                  )}
-                </div>
-                <CardDescription className="hidden sm:block">Conversaciones recientes</CardDescription>
+      <div className="grid min-h-0 flex-1 gap-4 sm:grid-cols-[300px_minmax(0,1fr)]">
+        {/* ── Panel izquierdo: lista de conversaciones ── */}
+        <div className={cn("overflow-hidden rounded-[22px] border border-border bg-card shadow-sm min-h-0 flex-col", mobileView === 'list' ? "flex" : "hidden sm:flex")}>
+          {/* Cabecera */}
+          <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <p className="text-base font-semibold text-foreground">Chats</p>
+                {filteredConversations.filter((c) => c.unread > 0).length > 0 && (
+                  <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1.5 text-[11px]">
+                    {filteredConversations.filter((c) => c.unread > 0).length}
+                  </Badge>
+                )}
               </div>
-              {suppressedConversations.length > 0 && (
-                <Button variant="outline" size="sm" onClick={() => setRestoreDialogOpen(true)}>
-                  <Eye className="h-4 w-4 mr-1" />
-                  Restaurar ({suppressedConversations.length})
-                </Button>
-              )}
+              <div className="flex items-center gap-1.5">
+                {suppressedConversations.length > 0 && (
+                  <button
+                    type="button"
+                    title={`Restaurar chats (${suppressedConversations.length})`}
+                    onClick={() => setRestoreDialogOpen(true)}
+                    className="relative inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground shadow-sm transition hover:border-emerald-400 hover:text-emerald-700 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+                      {suppressedConversations.length}
+                    </span>
+                  </button>
+                )}
+                {(user?.role === "administrador" || user?.roles?.includes("administrador")) && (
+                  <button
+                    type="button"
+                    title="Nuevo chat"
+                    onClick={() => setNewConversationOpen(true)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre o mensaje..." className="pl-9" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por nombre o mensaje..."
+                className="pl-9 rounded-xl border-border/70 bg-background/80 text-sm"
+              />
             </div>
-            {(user?.role === "administrador" || user?.roles?.includes("administrador")) && (
-              <div className="flex items-center justify-end">
-                <Button variant="secondary" size="sm" onClick={() => setNewConversationOpen(true)}>
-                  Nuevo chat
-                </Button>
-              </div>
-            )}
-          </CardHeader>
+          </div>
 
-          <CardContent className="min-h-0 flex-1 p-0">
-            <ScrollArea className="h-full pr-1">
+          {/* Lista */}
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <ScrollArea className="h-full">
               {filteredConversations.length > 0 ? (
-                <div className="space-y-1.5 py-2">
+                <div className="space-y-1 py-2">
                   {filteredConversations.map((conversation) => (
                     <ConversationRow
                       key={`${conversation.id}-${avatarVersion}`}
@@ -1665,8 +1684,8 @@ export function MessagesAdmin(props: Readonly<{
                 />
               )}
             </ScrollArea>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         <Dialog open={newConversationOpen} onOpenChange={setNewConversationOpen}>
           <DialogContent>
@@ -1746,65 +1765,66 @@ export function MessagesAdmin(props: Readonly<{
           </DialogContent>
         </Dialog>
 
-        <Card className={cn("min-h-0 flex-col overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-cyan-950/20", mobileView === 'chat' ? "flex" : "hidden sm:flex")}>
-          <CardHeader className="border-b border-border/60 bg-background/80 pb-4">
+        {/* ── Panel derecho: vista del chat ── */}
+        <div className={cn("overflow-hidden rounded-[22px] border border-border bg-card shadow-sm min-h-0 flex-col", mobileView === 'chat' ? "flex" : "hidden sm:flex")}>
+          {/* Cabecera del chat */}
+          <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3">
             <button
               type="button"
               onClick={() => setMobileView('list')}
-              className="sm:hidden flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2 -ml-1"
+              className="sm:hidden mb-2 -ml-1 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               <ChevronLeft className="h-4 w-4" />
               Chats
             </button>
             {targetConversation ? (
-              <div className="flex items-start gap-3">
-                <Avatar className="h-11 w-11 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10 shrink-0 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
                   {activeConversationAvatarUrl ? (
-                    <AvatarImage 
+                    <AvatarImage
                       src={activeConversationAvatarUrl}
                       alt={targetConversation.name}
-                      className="h-full w-full object-cover" 
+                      className="h-full w-full object-cover"
                     />
                   ) : (
-                    <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-medium">
+                    <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-semibold">
                       {targetConversation.avatarFallback || getInitials(targetConversation.name)}
                     </AvatarFallback>
                   )}
                 </Avatar>
-                <div className="min-w-0 flex-1 space-y-1">
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <CardTitle className="text-base">{targetConversation.name}</CardTitle>
+                    <p className="text-sm font-semibold text-foreground leading-tight">{targetConversation.name}</p>
                     {targetConversation.unread > 0 && (
                       <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[11px]">
                         {targetConversation.unread}
                       </Badge>
                     )}
                   </div>
-                  <CardDescription>
-                    <span>{targetConversation.role}</span>
-                  </CardDescription>
+                  <p className="text-xs text-muted-foreground">{targetConversation.role}</p>
                 </div>
               </div>
             ) : (
               <div>
-                <CardTitle className="text-base">Selecciona un chat</CardTitle>
-                <CardDescription>Elige una conversación para ver el historial y responder.</CardDescription>
+                <p className="text-sm font-semibold text-foreground">Selecciona un chat</p>
+                <p className="text-xs text-muted-foreground">Elige una conversación para ver el historial y responder.</p>
               </div>
             )}
-          </CardHeader>
+          </div>
 
-          <CardContent className="min-h-0 flex-1 p-0 overflow-x-hidden">
+          {/* Área de mensajes */}
+          <div className="min-h-0 flex-1 overflow-hidden">
             {targetConversation ? (
-              <ScrollArea className="h-full bg-gradient-to-b from-slate-50/60 via-white to-cyan-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-cyan-950/20">
-                <div className="w-full min-w-0 overflow-x-hidden space-y-4 px-3 pb-2 pt-1 pr-4">
+              <ScrollArea className="h-full bg-muted/20">
+                <div className="w-full min-w-0 overflow-x-hidden space-y-4 px-4 pb-2 pt-3">
                   {targetConversation.messages.length > 0 ? (
                     targetConversation.messages.map((messageItem) => (
-                      <MessageBubble 
+                      <MessageBubble
                         key={messageItem.id}
-                        message={messageItem} 
-                        onReply={setReplyingTo} 
-                        onDelete={handleDeleteMessage} 
-                        onEdit={handleEditMessage} 
+                        message={messageItem}
+                        onReply={setReplyingTo}
+                        onDelete={handleDeleteMessage}
+                        onEdit={handleEditMessage}
                       />
                     ))
                   ) : (
@@ -1822,9 +1842,10 @@ export function MessagesAdmin(props: Readonly<{
                 description="Selecciona una conversación del panel lateral para ver el historial y responder."
               />
             )}
-          </CardContent>
+          </div>
 
-          <div className="shrink-0 border-t border-border/60 bg-background/95 p-4 shadow-[0_-12px_30px_rgba(16,185,129,0.06)] backdrop-blur-sm">
+          {/* Pie: redacción de mensaje */}
+          <div className="shrink-0 border-t border-border/60 bg-card p-4">
             {replyingTo && (
               <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
                 <div className="min-w-0">
@@ -1843,7 +1864,7 @@ export function MessagesAdmin(props: Readonly<{
                 placeholder="Escribe un mensaje..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background/90 px-4 py-3 shadow-inner dark:bg-slate-900 dark:border-slate-700"
+                className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background px-4 py-3"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -1858,7 +1879,7 @@ export function MessagesAdmin(props: Readonly<{
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="rounded-full border-emerald-200/70 bg-white/80 px-4 shadow-sm hover:bg-emerald-50 text-foreground dark:bg-slate-800/50 dark:border-emerald-900/40 dark:text-white dark:hover:bg-slate-800/70"
+                    className="rounded-full px-4"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Paperclip className="h-4 w-4 mr-1" />
@@ -1874,7 +1895,7 @@ export function MessagesAdmin(props: Readonly<{
               </div>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

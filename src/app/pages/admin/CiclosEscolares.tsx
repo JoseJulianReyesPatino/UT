@@ -6,7 +6,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Calendar, Check, ChevronLeft, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
+import { AlertTriangle, Calendar, Check, ChevronLeft, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
@@ -1443,30 +1443,26 @@ export function CiclosEscolares() {
     ? (tutorCountByType[selectedTutorCategory] ?? 0)
     : totalTutorDocuments;
 
+  const loadedDocsTotal = totalDocenteDocuments + totalEstadiasDocuments + totalTutorDocuments + totalRemedialDocuments;
+  const apiDocsTotal = selectedCycle ? (documentCountByCycleId[selectedCycle.id] ?? loadedDocsTotal) : loadedDocsTotal;
+  const isDocsTruncated = !isLoadingDocuments && apiDocsTotal > loadedDocsTotal;
+
   const documentsModalTitle = getDocumentsModalTitle(selectedDocumentType, selectedDocumentCategory, selectedEstadiasCategory, selectedTutorCategory);
 
   return (
     <div className="relative space-y-6 overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -top-20 right-10 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl dark:bg-emerald-500/10" />
-        <div className="absolute top-28 left-6 h-px w-36 rotate-12 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
-        <div className="absolute bottom-16 right-24 h-2 w-2 rounded-full bg-emerald-500/40" />
-        <div className="absolute top-36 left-1/2 grid grid-cols-4 gap-2 opacity-30">
-          {Array.from({ length: 12 }, (_, index) => (
-            <span key={index} className="h-1.5 w-1.5 rounded-full bg-emerald-400/50" />
-          ))}
+      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Ciclos Escolares</h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Administra los períodos académicos del sistema.</p>
+          </div>
+          <Button variant="success" onClick={() => setShowNewDialog(true)} className="self-start sm:self-auto shadow-md shadow-emerald-500/20">
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Ciclo
+          </Button>
         </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-white drop-shadow-sm">Ciclos Escolares</h1>
-          <p className="text-white/80">Administra los períodos académicos del sistema</p>
-        </div>
-        <Button variant="success" onClick={() => setShowNewDialog(true)} className="shadow-md shadow-emerald-500/20">
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Ciclo
-        </Button>
       </div>
 
       <div className="grid gap-4">
@@ -1476,13 +1472,16 @@ export function CiclosEscolares() {
           return (
             <Card
               key={ciclo.id}
-              className="overflow-hidden cursor-pointer border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/40 to-emerald-50/50 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20"
+              className="overflow-hidden rounded-[22px] border border-border bg-card shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
               tabIndex={0}
               onClick={() => openDocsForCycle(ciclo)}
               onKeyDown={(e) => {
                 if ((e as React.KeyboardEvent).key === "Enter") openDocsForCycle(ciclo);
               }}
             >
+              {ciclo.status === "activo" && (
+                <div className="h-1 bg-gradient-to-r from-emerald-400/80 via-emerald-300/50 to-transparent" />
+              )}
               <CardHeader>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="space-y-1 min-w-0">
@@ -1732,7 +1731,13 @@ export function CiclosEscolares() {
                 : `¿Qué documentos deseas revisar para ${selectedCycle?.nombre}?`}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 mt-6">
+          {isDocsTruncated && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>Solo se cargaron {loadedDocsTotal} de {apiDocsTotal} documentos. Algunos pueden no aparecer en la lista.</span>
+            </div>
+          )}
+          <div className="grid gap-4 mt-2">
             <Button
               onClick={() => handleSelectDocType("docentes")}
               className="justify-start h-28 text-left flex flex-col items-start p-5 border-2 rounded-lg transition-all hover:shadow-lg"
@@ -1740,7 +1745,7 @@ export function CiclosEscolares() {
               disabled={isLoadingDocuments || totalDocenteDocuments === 0}
             >
               <FileText className="h-6 w-6 mb-3" />
-              <span className="font-semibold text-lg">Documentos Docentes ({totalDocenteDocuments})</span>
+              <span className="font-semibold text-lg">Documentos Docentes {isLoadingDocuments ? "" : `(${totalDocenteDocuments})`}</span>
               <span className="text-sm text-muted-foreground">Planeación, instrumentos, listas, asesorías y portafolio.</span>
             </Button>
             <Button
@@ -1750,7 +1755,7 @@ export function CiclosEscolares() {
               disabled={isLoadingDocuments || totalEstadiasDocuments === 0}
             >
               <FileText className="h-6 w-6 mb-3" />
-              <span className="font-semibold text-lg">Documentos de Estadías ({totalEstadiasDocuments})</span>
+              <span className="font-semibold text-lg">Documentos de Estadías {isLoadingDocuments ? "" : `(${totalEstadiasDocuments})`}</span>
               <span className="text-sm text-muted-foreground">Cartas, aceptación, terminación y acta final.</span>
             </Button>
             <Button
@@ -1760,7 +1765,7 @@ export function CiclosEscolares() {
               disabled={isLoadingDocuments || totalTutorDocuments === 0}
             >
               <FileText className="h-6 w-6 mb-3" />
-              <span className="font-semibold text-lg">Documentos Tutores ({totalTutorDocuments})</span>
+              <span className="font-semibold text-lg">Documentos Tutores {isLoadingDocuments ? "" : `(${totalTutorDocuments})`}</span>
               <span className="text-sm text-muted-foreground">Carga académica, reportes, concentrados y fichas.</span>
             </Button>
             <Button
@@ -1770,7 +1775,7 @@ export function CiclosEscolares() {
               disabled={isLoadingDocuments || totalRemedialDocuments === 0}
             >
               <FileText className="h-6 w-6 mb-3" />
-              <span className="font-semibold text-lg">Documentos Remediales ({totalRemedialDocuments})</span>
+              <span className="font-semibold text-lg">Documentos Remediales {isLoadingDocuments ? "" : `(${totalRemedialDocuments})`}</span>
               <span className="text-sm text-muted-foreground">Actividades y actas de recuperación académica.</span>
             </Button>
           </div>

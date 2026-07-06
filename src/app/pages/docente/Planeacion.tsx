@@ -1,13 +1,14 @@
 ﻿import React, { useMemo, useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Button } from "../../components/ui/button";
-import { Ban, History, Upload, Users2, FolderOpen } from "lucide-react";
+import { Ban, History, Upload, FolderOpen, Calendar, CalendarClock } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
+import { getCalendarFileUrl } from "../../lib/calendar";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { DocumentHistoryCard } from "../../components/DocumentHistoryCard";
@@ -42,7 +43,7 @@ const initialFormData: PlaneacionFormData = {
   nota: "",
 };
 
-export default function PlaneacionPage() {
+export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null }) {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
@@ -430,81 +431,92 @@ const resolvedCuatrimestre = allowedCuatrimestres.has(normalizedCuatrimestre)
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-2" ref={formRef}>
-      {/* Header con recordatorio integrado */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-white drop-shadow-sm dark:text-white">Planeación</h1>
-          <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
-            Recordatorio: se sube 3 días después de la aplicación de cada parcial.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm" className="w-full justify-center rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 sm:w-auto dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
-                <History className="mr-2 h-4 w-4" />
-                Historial
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="sm:max-w-xl overflow-y-auto dark:border-slate-700 dark:bg-slate-950">
-              <SheetHeader>
-                <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
-                <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
-              </SheetHeader>
-              <div className="mt-4 space-y-4">
-                {history.length > 0 ? (
-                  <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-700 dark:bg-slate-900/30">
-                    <div className="grid gap-3 p-1">
-                      {history.map((h) => (
-                        <DocumentHistoryCard
-                          key={h.id}
-                          title=""
-                          fileName={getUploadedFileName(h)}
-                          carrera={h.carrera_label}
-                          subject={h.materia}
-                          submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          status={h.status}
-                          returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
-                          onView={() => openPreview(h)}
-                          onEdit={() => populateFormForEdit(h)}
-                        />
-                      ))}
-                    </div>
-                  </ScrollArea>
-                ) : formData.archivos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
-                ) : (
-                  <div>
-                    <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
-                    <ul className="space-y-2">
-                      {formData.archivos.map((f, i) => (
-                        <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
-                      ))}
-                    </ul>
+    <div className="max-w-4xl mx-auto space-y-1" ref={formRef}>
+      {/* Fila superior: fecha límite + acciones */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {deadlineInfo && (
+          <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+            <span>
+              Cierra el <strong>{deadlineInfo.formattedDeadline}</strong>
+              {deadlineInfo.isUrgent && " · Tiempo limitado"}
+            </span>
+          </div>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.open(getCalendarFileUrl(), "_blank")}
+          className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
+        >
+          <Calendar className="mr-2 h-4 w-4" />
+          Calendario
+        </Button>
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+              <History className="mr-2 h-4 w-4" />
+              Historial
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="sm:max-w-xl overflow-y-auto dark:border-slate-700 dark:bg-slate-950">
+            <SheetHeader>
+              <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
+              <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
+            </SheetHeader>
+            <div className="mt-4 space-y-4">
+              {history.length > 0 ? (
+                <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-700 dark:bg-slate-900/30">
+                  <div className="grid gap-3 p-1">
+                    {history.map((h) => (
+                      <DocumentHistoryCard
+                        key={h.id}
+                        title=""
+                        fileName={getUploadedFileName(h)}
+                        carrera={h.carrera_label}
+                        subject={h.materia}
+                        submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        status={h.status}
+                        returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
+                        onView={() => openPreview(h)}
+                        onEdit={() => populateFormForEdit(h)}
+                      />
+                    ))}
                   </div>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
+                </ScrollArea>
+              ) : formData.archivos.length === 0 ? (
+                <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
+              ) : (
+                <div>
+                  <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
+                  <ul className="space-y-2">
+                    {formData.archivos.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Título y subtítulo */}
+      <div className="space-y-1 pt-1">
+        <h1 className="text-3xl font-bold text-white drop-shadow-sm dark:text-white">Planeación</h1>
+        <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
+          Recordatorio: se sube 3 días después de la aplicación de cada parcial.
+        </p>
       </div>
 
       <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
-        <CardHeader className="border-b border-border/80 bg-card pb-5 dark:border-border/80 dark:bg-card dark:border-slate-700">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <CardTitle className="dark:text-white">Formulario de Planeación</CardTitle>
-              <CardDescription className="dark:text-slate-400">Los campos marcados con * son obligatorios.</CardDescription>
-            </div>
-          </div>
+        <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
+          <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Los campos marcados con * son obligatorios.</p>
           {editingDocumentId && (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
               Estás editando la planeación existente. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
             </div>
           )}
-        </CardHeader>
-        <CardContent className="relative space-y-6 p-6 sm:p-8">
           <div className="grid gap-4 md:grid-cols-2">
             {/* Selector de Plan */}
             <div className="space-y-2 md:col-span-2">
@@ -543,11 +555,7 @@ const resolvedCuatrimestre = allowedCuatrimestres.has(normalizedCuatrimestre)
 
             {/* Información académica */}
             <div className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4 dark:border-slate-800/70 dark:bg-slate-900/30 md:col-span-2 md:p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                <Users2 className="h-4 w-4" />
-                <span>Información académica</span>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
+               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label className="dark:text-white">Carrera *</Label>
                   <Select 

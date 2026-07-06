@@ -306,7 +306,7 @@ export function DocenteManagement() {
 
   const resetEditForm = () => {
     setSelectedDocente(null);
-    setEditDocente({ nombres: "", apellidos: "", telefono: "", email: "", roles: { docente: true, tutor: false, administrador: false } });
+    setEditDocente({ nombres: "", apellidos: "", telefono: "", email: "", roles: { docente: true, tutor: false, administrador: false, supervisor: false } });
   };
 
   const filteredDocentes = docentes.filter((doc) => {
@@ -431,6 +431,7 @@ export function DocenteManagement() {
         docente: (docente.roles || []).includes("docente"),
         tutor: (docente.roles || []).includes("tutor"),
         administrador: (docente.roles || []).includes("administrador"),
+        supervisor: (docente.roles || []).includes("supervisor"),
       },
     });
     setShowEditDialog(true);
@@ -543,7 +544,7 @@ export function DocenteManagement() {
 
       toast.success("Contraseña restablecida", {
         id: toastId,
-        description: `${selectedDocente.nombre}. Contraseña temporal: ${DEFAULT_PASSWORD}`,
+        description: `Se asignó una contraseña temporal a ${selectedDocente.nombre}.`,
       });
       setShowResetDialog(false);
       resetEditForm();
@@ -613,33 +614,19 @@ export function DocenteManagement() {
 
   return (
     <div className="relative space-y-6 overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -top-20 right-10 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl dark:bg-emerald-500/10" />
-        <div className="absolute top-28 left-6 h-px w-36 rotate-12 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
-        <div className="absolute bottom-16 right-24 h-2 w-2 rounded-full bg-emerald-500/40" />
-        <div className="absolute top-36 left-1/2 grid grid-cols-4 gap-2 opacity-30">
-          {Array.from({ length: 12 }, (_, index) => (
-            <span key={index} className="h-1.5 w-1.5 rounded-full bg-emerald-400/50" />
-          ))}
+      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Gestión de Usuarios</h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Administra usuarios y permisos del sistema.</p>
+          </div>
+          <Button variant="success" onClick={() => setShowNewDialog(true)} className="self-start sm:self-auto shadow-md shadow-emerald-500/20">
+            <UserPlus className="h-4 w-4 mr-2" />
+            Nuevo Usuario
+          </Button>
         </div>
       </div>
-
-      <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60">
-        <CardContent className="space-y-4 p-5 sm:p-6 lg:p-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Gestión de Usuarios</h1>
-              <p className="max-w-2xl text-sm text-slate-600 dark:text-slate-400">
-                Administra usuarios y permisos del sistema
-              </p>
-            </div>
-            <Button variant="success" onClick={() => setShowNewDialog(true)} className="shadow-md shadow-emerald-500/20">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Nuevo Usuario
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-emerald-50/60 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20">
         <CardHeader>
@@ -701,7 +688,12 @@ export function DocenteManagement() {
       }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Docente</DialogTitle>
+            <DialogTitle>
+              {selectedDocente?.roles?.includes("supervisor") ? "Editar Supervisor"
+                : selectedDocente?.roles?.includes("tutor") ? "Editar Tutor"
+                : selectedDocente?.roles?.includes("docente") ? "Editar Docente"
+                : "Editar Usuario"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
