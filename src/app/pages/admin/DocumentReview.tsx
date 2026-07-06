@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Eye, FileText, MessageCircleMore, MessageSquare, RefreshCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/too
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { SearchableSelect } from "../../components/SearchableSelect";
 import { carrieras } from "../../data/curricula";
-import apiFetch from "../../lib/api";
+import { apiFetch } from "../../lib/api";
 import { formatGroupCode } from "../../../lib/utils";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { useAuth } from "../../context/AuthContext";
@@ -370,6 +370,37 @@ const extractApiDocuments = (payload: unknown): ApiDocument[] => {
 	return [];
 };
 
+const mapApiDocument = (doc: ApiDocument, kind: "pending" | "reviewed"): PendingDocument | ReviewedDocument => {
+	const base = {
+		id: Number(doc.id),
+		ciclo: doc.cycle_name?.trim() || "Sin ciclo",
+		plan: formatPlanLabel(doc.plan, doc.carrera_label),
+		docente: doc.uploaded_by_name ?? "Docente",
+		documento: doc.title ?? "Documento sin título",
+		apartado: friendlyApartado(doc.apartado_label ?? doc.form_title ?? "Documento"),
+		carrera: doc.carrera_label ?? "Sin carrera",
+		materia: doc.materia ?? "Sin materia",
+		cuatrimestre: getDocumentCuatrimestre(doc),
+		grupo: formatGroupCode(doc.group?.group_code ?? doc.group_code ?? "-"),
+		parcial: doc.parcial ?? "-",
+		file_path: doc.file_path ?? null,
+		fecha: doc.submitted_at ?? "",
+		returned: doc.status === "devuelto",
+		returnedAt: doc.returned_at ?? undefined,
+		resubmittedAt: doc.resubmitted_at ?? undefined,
+		nota: doc.nota ?? null,
+	};
+
+	if (kind === "reviewed") {
+		return {
+			...base,
+			reviewedAt: doc.reviewed_at ?? doc.submitted_at ?? new Date().toISOString(),
+		};
+	}
+
+	return base;
+};
+
 export default function DocumentReview({ initialSection = "all", initialForm }: DocumentReviewProps) {
 	const { isReady, isAuthenticated } = useAuth();
 	const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
@@ -543,17 +574,32 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const docsByDocente = useMemo(() => docsByGrupo.filter((doc) => matchesNormalized(doc.docente, filterDocente)), [docsByGrupo, filterDocente]);
 	const docsByParcial = useMemo(() => docsByDocente.filter((doc) => filterParcial === "all" || getParcialFilterValue(doc.parcial) === filterParcial), [docsByDocente, filterParcial]);
 
-	const planesDisponibles = Array.from(new Set(allDocuments.map((doc) => formatPlanLabel(doc.plan, doc.carrera)).filter((value): value is string => Boolean(value))));
+	const planesDisponibles = useMemo(
+		() => Array.from(new Set(allDocuments.map((doc) => formatPlanLabel(doc.plan, doc.carrera)).filter((value): value is string => Boolean(value)))),
+		[allDocuments]
+	);
 	const carrerasDisponibles = useMemo(
 		() => Array.from(new Set(docsByPlan.map((doc) => doc.carrera).filter((v): v is string => Boolean(v))))
 			.sort()
 			.map((c) => ({ value: c, label: c })),
 		[docsByPlan]
 	);
-	const cuatrimestresDisponibles = Array.from(new Set(docsByCarrera.map((doc) => getDocumentCuatrimestre(doc)).filter((value): value is string => Boolean(value) && value !== "-")));
-	const materiasDisponibles = Array.from(new Set(docsByCuatrimestre.map((doc) => doc.materia).filter((value): value is string => Boolean(value) && normalizeText(value) !== "sin materia")));
-	const gruposDisponibles = Array.from(new Set(docsByMateria.map((doc) => doc.grupo).filter((value): value is string => Boolean(value) && normalizeText(value) !== "grupo -" && normalizeText(value) !== "-")));
-	const docentesDisponibles = Array.from(new Set(docsByGrupo.map((doc) => doc.docente).filter((value): value is string => Boolean(value))));
+	const cuatrimestresDisponibles = useMemo(
+		() => Array.from(new Set(docsByCarrera.map((doc) => getDocumentCuatrimestre(doc)).filter((value): value is string => Boolean(value) && value !== "-"))),
+		[docsByCarrera]
+	);
+	const materiasDisponibles = useMemo(
+		() => Array.from(new Set(docsByCuatrimestre.map((doc) => doc.materia).filter((value): value is string => Boolean(value) && normalizeText(value) !== "sin materia"))),
+		[docsByCuatrimestre]
+	);
+	const gruposDisponibles = useMemo(
+		() => Array.from(new Set(docsByMateria.map((doc) => doc.grupo).filter((value): value is string => Boolean(value) && normalizeText(value) !== "grupo -" && normalizeText(value) !== "-"))),
+		[docsByMateria]
+	);
+	const docentesDisponibles = useMemo(
+		() => Array.from(new Set(docsByGrupo.map((doc) => doc.docente).filter((value): value is string => Boolean(value)))),
+		[docsByGrupo]
+	);
 	const parcialesDisponibles = PARCIAL_FILTER_OPTIONS;
 	const apartadosDisponibles = forcedApartado
 		? Array.from(new Set(docsByParcial.map((doc) => friendlyApartado(doc.apartado)).filter((value): value is string => Boolean(value))))
@@ -612,7 +658,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		}
 	}, [apartadosDisponibles, filterApartado, defaultApartadoFilter]);
 
-	const matchesFilters = (doc: DocumentItem) => {
+	const matchesFilters = useCallback((doc: DocumentItem) => {
 		const base = doc;
 		return (
 			(!forcedApartadoNormalized || normalizeText(friendlyApartado(base.apartado)) === forcedApartadoNormalized) &&
@@ -625,12 +671,12 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			(filterParcial === "all" || getParcialFilterValue(base.parcial) === filterParcial) &&
 			matchesNormalized(friendlyApartado(base.apartado), filterApartado)
 		);
-	};
+	}, [forcedApartadoNormalized, filterPlan, filterCarrera, filterCuatrimestre, filterMateria, filterGrupo, filterDocente, filterParcial, filterApartado]);
 
-	const filteredPendingDocuments = pendingDocuments.filter(matchesFilters);
-	const filteredReviewedDocuments = reviewedDocuments.filter(matchesFilters);
-	const filteredAllDocuments = allDocuments.filter(matchesFilters);
-	const reviewedTodayDocuments = filteredReviewedDocuments.filter((doc) => toLocalDateKey(doc.reviewedAt) === todayKey);
+	const filteredPendingDocuments = useMemo(() => pendingDocuments.filter(matchesFilters), [pendingDocuments, matchesFilters]);
+	const filteredReviewedDocuments = useMemo(() => reviewedDocuments.filter(matchesFilters), [reviewedDocuments, matchesFilters]);
+	const filteredAllDocuments = useMemo(() => allDocuments.filter(matchesFilters), [allDocuments, matchesFilters]);
+	const reviewedTodayDocuments = useMemo(() => filteredReviewedDocuments.filter((doc) => toLocalDateKey(doc.reviewedAt) === todayKey), [filteredReviewedDocuments, todayKey]);
 
 	const reviewedByDate = useMemo(() => {
 		return filteredReviewedDocuments.reduce<Record<string, ReviewedDocument[]>>((groups, doc) => {
@@ -734,10 +780,11 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		if (!pendingAction) return "";
 		if (pendingAction.type === "review") return `Vas a marcar como revisado: ${pendingAction.document.documento}`;
 		if (pendingAction.type === "send") {
-			const doc = pendingAction.document as any;
-			const recipientRole = doc.tutor ? 'tutor' : 'docente';
-			const recipientName = doc.tutor ?? doc.docente ?? '';
-			return `Vas a compartirle el documento ${pendingAction.document.documento} al ${recipientRole} ${recipientName}`;
+			const doc = pendingAction.document;
+			const tutorName = "tutor" in doc && typeof doc.tutor === "string" ? doc.tutor : null;
+			const recipientRole = tutorName ? "tutor" : "docente";
+			const recipientName = tutorName ?? doc.docente ?? "";
+			return `Vas a compartirle el documento ${doc.documento} al ${recipientRole} ${recipientName}`;
 		}
 		return `Vas a devolver: ${pendingAction.document.documento}`;
 	})();
@@ -778,37 +825,6 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			{!forcedApartado && <SearchableSelect value={filterApartado} onValueChange={setFilterApartado} options={apartadosDisponibles.map((a) => ({ value: a, label: a }))} placeholder="Buscar apartado..." allLabel="Todos los apartados" />}
 		</div>
 	);
-
-	const mapApiDocument = (doc: ApiDocument, kind: "pending" | "reviewed"): PendingDocument | ReviewedDocument => {
-		const base = {
-			id: Number(doc.id),
-			ciclo: doc.cycle_name?.trim() || "Sin ciclo",
-			plan: formatPlanLabel(doc.plan, doc.carrera_label),
-			docente: doc.uploaded_by_name ?? "Docente",
-			documento: doc.title ?? "Documento sin título",
-			apartado: friendlyApartado(doc.apartado_label ?? doc.form_title ?? "Documento"),
-			carrera: doc.carrera_label ?? "Sin carrera",
-			materia: doc.materia ?? "Sin materia",
-			cuatrimestre: getDocumentCuatrimestre(doc),
-			grupo: formatGroupCode(doc.group?.group_code ?? doc.group_code ?? "-"),
-			parcial: doc.parcial ?? "-",
-			file_path: doc.file_path ?? null,
-			fecha: doc.submitted_at ?? "",
-			returned: doc.status === "devuelto",
-			returnedAt: doc.returned_at ?? undefined,
-			resubmittedAt: doc.resubmitted_at ?? undefined,
-			nota: doc.nota ?? null,
-		};
-
-		if (kind === "reviewed") {
-			return {
-				...base,
-				reviewedAt: doc.reviewed_at ?? doc.submitted_at ?? new Date().toISOString(),
-			};
-		}
-
-		return base;
-	};
 
 	const renderDocumentRow = (doc: DocumentItem) => {
 		const isReviewed = "reviewedAt" in doc;
@@ -896,10 +912,10 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 						</Select>
 					</div>
 					<TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
-						<TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Todos <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredAllDocuments.length}</Badge></TabsTrigger>
-						<TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Pendientes <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPendingDocuments.length}</Badge></TabsTrigger>
-						<TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredReviewedDocuments.length}</Badge></TabsTrigger>
-						<TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{reviewedTodayDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Todos <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredAllDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Pendientes <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPendingDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredReviewedDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{reviewedTodayDocuments.length}</Badge></TabsTrigger>
 					</TabsList>
 
 					<TabsContent value="all" className="space-y-4 mt-6">

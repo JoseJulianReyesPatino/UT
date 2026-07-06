@@ -518,6 +518,50 @@ function EmptyConversationState({ title, description }: Readonly<{ title: string
   );
 }
 
+function ConversationListSkeleton() {
+  return (
+    <div className="space-y-1 py-2" aria-busy="true" aria-label="Cargando conversaciones">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="mx-2 my-1 animate-pulse rounded-2xl border border-transparent px-3 py-3.5">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 h-9 w-9 shrink-0 rounded-full bg-muted" />
+            <div className="flex-1 space-y-2 pt-0.5">
+              <div className="h-3 w-3/5 rounded-full bg-muted" />
+              <div className="h-2.5 w-2/5 rounded-full bg-muted" />
+              <div className="h-2.5 w-full rounded-full bg-muted" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MessageListSkeleton() {
+  return (
+    <div className="space-y-4 px-4 pb-2 pt-3" aria-busy="true" aria-label="Cargando mensajes">
+      <div className="flex animate-pulse items-end gap-2">
+        <div className="h-8 w-8 shrink-0 rounded-full bg-muted" />
+        <div className="h-14 w-2/5 rounded-2xl bg-muted" />
+      </div>
+      <div className="flex animate-pulse items-end justify-end">
+        <div className="h-20 w-1/2 rounded-2xl bg-muted" />
+      </div>
+      <div className="flex animate-pulse items-end gap-2">
+        <div className="h-8 w-8 shrink-0 rounded-full bg-muted" />
+        <div className="h-10 w-1/3 rounded-2xl bg-muted" />
+      </div>
+      <div className="flex animate-pulse items-end justify-end">
+        <div className="h-16 w-2/5 rounded-2xl bg-muted" />
+      </div>
+      <div className="flex animate-pulse items-end gap-2">
+        <div className="h-8 w-8 shrink-0 rounded-full bg-muted" />
+        <div className="h-12 w-3/5 rounded-2xl bg-muted" />
+      </div>
+    </div>
+  );
+}
+
 export function MessagesTeacher(props: Readonly<{
   initialOpen?: { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string; filePath?: string } } | null;
   onConsume?: () => void;
@@ -544,8 +588,9 @@ export function MessagesTeacher(props: Readonly<{
   const [avatarVersion, setAvatarVersion] = useState(0);
   const [draftRecipient, setDraftRecipient] = useState<DraftRecipient | null>(null);
   const [suppressedChatIds, setSuppressedChatIds] = useState<number[]>([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const deniedConversationIdsRef = useRef<Set<number>>(new Set());
-  
+
   const peerRoleLabel = "Administrador";
   const recipientRoleCode = "administrador";
   const isTeacher = true;
@@ -937,6 +982,21 @@ export function MessagesTeacher(props: Readonly<{
     return () => clearInterval(interval);
   }, [isReady, selectedChat, user?.id]);
 
+  // Cuando la carga inicial termina y hay una conversación seleccionada sin mensajes,
+  // cargar sus mensajes de inmediato en lugar de esperar el intervalo de 8 segundos.
+  const initialMessageLoadedRef = useRef(false);
+  useEffect(() => {
+    if (isInitialLoad || initialMessageLoadedRef.current || !selectedChat) return;
+    initialMessageLoadedRef.current = true;
+    const conv = conversations.find(c => c.id === selectedChat);
+    if (conv?.messages.length) return;
+    setIsLoadingMessages(true);
+    void loadMessagesRef.current(selectedChat)
+      .then(() => setIsLoadingMessages(false))
+      .catch(() => setIsLoadingMessages(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialLoad, selectedChat]);
+
   // Carga inicial: obtener conversaciones. Si docente no tiene chat con admin, solo preparar borrador.
   useEffect(() => {
     if (!isReady) return;
@@ -1174,11 +1234,15 @@ export function MessagesTeacher(props: Readonly<{
   };
 
   const handleConversationSelect = (conversationId: number) => {
+    const conv = conversations.find(c => c.id === conversationId);
+    if (!conv?.messages.length) setIsLoadingMessages(true);
     setSelectedChat(conversationId);
     setDraftRecipient(null);
     setReplyingTo(null);
     updateConversation(conversationId, (conversation) => ({ ...conversation, unread: 0 }));
-    void Promise.all([loadMessages(conversationId), markConversationAsRead(conversationId)]);
+    void Promise.all([loadMessages(conversationId), markConversationAsRead(conversationId)])
+      .then(() => setIsLoadingMessages(false))
+      .catch(() => setIsLoadingMessages(false));
   };
 
   const handleRemoveAttachment = (removeIndex: number) => {
@@ -1608,7 +1672,9 @@ export function MessagesTeacher(props: Readonly<{
 
           <div className="min-h-0 flex-1 overflow-hidden">
             <ScrollArea className="h-full">
-              {filteredConversations.length > 0 ? (
+              {isInitialLoad && conversations.length === 0 ? (
+                <ConversationListSkeleton />
+              ) : filteredConversations.length > 0 ? (
                 <div className="space-y-1 py-2">
                   {filteredConversations.map((conversation) => (
                     <ConversationRow
@@ -1761,17 +1827,21 @@ export function MessagesTeacher(props: Readonly<{
           <div className="min-h-0 flex-1 overflow-hidden">
             {targetConversation ? (
               <ScrollArea className="h-full bg-muted/20">
-                <div className="w-full min-w-0 space-y-4 px-4 pb-2 pt-3">
-                  {targetConversation.messages.length > 0 ? (
-                    targetConversation.messages.map((messageItem) => (
-                      <MessageBubble
-                        key={messageItem.id}
-                        message={messageItem}
-                        onReply={setReplyingTo}
-                        onDelete={handleDeleteMessage}
-                        onEdit={handleEditMessage}
-                      />
-                    ))
+                <div className="w-full min-w-0 overflow-x-hidden">
+                  {isLoadingMessages && !targetConversation.messages.length ? (
+                    <MessageListSkeleton />
+                  ) : targetConversation.messages.length > 0 ? (
+                    <div className="space-y-4 px-4 pb-2 pt-3">
+                      {targetConversation.messages.map((messageItem) => (
+                        <MessageBubble
+                          key={messageItem.id}
+                          message={messageItem}
+                          onReply={setReplyingTo}
+                          onDelete={handleDeleteMessage}
+                          onEdit={handleEditMessage}
+                        />
+                      ))}
+                    </div>
                   ) : (
                     <EmptyConversationState
                       title="Sin mensajes"

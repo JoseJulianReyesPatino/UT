@@ -53,7 +53,7 @@ type ActivityItem = {
   type: "review" | "upload";
   title: string;
   description: string;
-  time: string;
+  timestamp: string;
   related: string;
   relatedDocumentId: number;
 };
@@ -166,7 +166,7 @@ const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocum
     type: "review",
     title: `Revisado documento de ${doc.docente}`,
     description: doc.documento,
-    time: formatRelativeTime(doc.reviewedAtIso),
+    timestamp: doc.reviewedAtIso,
     related: doc.documento,
     relatedDocumentId: doc.id,
     sortAt: new Date(doc.reviewedAtIso.replace(" ", "T")).getTime() || 0,
@@ -177,7 +177,7 @@ const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocum
     type: "upload",
     title: `${doc.docente} subió un documento`,
     description: doc.documento,
-    time: formatRelativeTime(doc.submittedAt),
+    timestamp: doc.submittedAt,
     related: doc.documento,
     relatedDocumentId: doc.id,
     sortAt: new Date(doc.submittedAt.replace(" ", "T")).getTime() || 0,
@@ -189,6 +189,114 @@ const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocum
     .map(({ sortAt, ...item }) => item);
 };
 
+const StatsGrid = React.memo(function StatsGrid({ stats, onNavigate }: { stats: any[]; onNavigate: (view: AdminView) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      {stats.map((stat) => {
+        const Icon = stat.icon;
+        return (
+          <button
+            key={stat.title}
+            type="button"
+            onClick={() => onNavigate(stat.action)}
+            className="text-left rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Card className={`h-full overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-sm transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer ${stat.cardClass}`}>
+              <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
+              <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm">{stat.title}</CardTitle>
+                <div className={`h-9 w-9 rounded-xl ${stat.bgColor} flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5 sm:h-10 sm:w-10`}>
+                  <Icon className={`h-4 w-4 ${stat.color}`} aria-hidden />
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-2xl leading-none font-bold text-foreground sm:text-2xl">{stat.value}</div>
+                <p className="mt-1 text-[11px] leading-snug text-foreground/70 sm:text-xs">{stat.description}</p>
+                <p className={`mt-1 text-[11px] font-medium sm:text-xs ${stat.color}`}>{stat.trend}</p>
+              </CardContent>
+            </Card>
+          </button>
+        );
+      })}
+    </div>
+  );
+});
+
+const PendingList = React.memo(function PendingList({ items, onOpen }: { items: PendingDocument[]; onOpen: (doc: PendingDocument) => void }) {
+  return (
+    <div className="max-h-[22rem] space-y-4 overflow-y-auto pr-2 sm:max-h-[24rem]">
+      {items.filter((doc) => !doc.revisado).map((doc) => (
+        <div
+          key={doc.id}
+          role="button"
+          tabIndex={0}
+          onClick={() => onOpen(doc)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onOpen(doc);
+            }
+          }}
+          className="flex flex-col gap-3 p-3 rounded-2xl border border-slate-200 bg-white/70 hover:bg-slate-100/90 transition-colors cursor-pointer dark:border-slate-800 dark:bg-slate-900/70 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center dark:bg-emerald-950/50 dark:text-emerald-300">
+              <FileText className="h-5 w-5 text-muted-foreground" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-sm truncate text-foreground">{doc.documento}</p>
+              <p className="text-xs text-muted-foreground">{doc.docente}</p>
+              {doc.carrera && (
+                <Badge variant="outline" className="mt-2 w-fit max-w-full text-[11px]">
+                  {doc.carrera}
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div className="flex w-full items-center justify-end sm:w-auto sm:shrink-0">
+            <ResponsiveActionButton
+              icon={<Eye className="h-4 w-4" aria-hidden />}
+              label="Abrir"
+              size="sm"
+              variant="ghost"
+              tabIndex={-1}
+              className="pointer-events-none w-full justify-center sm:w-auto sm:min-w-[6rem]"
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+});
+
+const ActivityList = React.memo(function ActivityList({ items, onOpen }: { items: ActivityItem[]; onOpen: (a: ActivityItem) => void }) {
+  return (
+    <div className="max-h-[22rem] space-y-4 overflow-y-auto pr-2 sm:max-h-[24rem]">
+      {items.map((activity) => (
+        <button
+          key={activity.id}
+          type="button"
+          onClick={() => onOpen(activity)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onOpen(activity);
+            }
+          }}
+          className="w-full text-left flex items-start gap-3 rounded-2xl p-3 border border-transparent hover:border-slate-200/70 hover:bg-slate-100/90 transition-colors cursor-pointer dark:hover:border-slate-800/70 dark:hover:bg-slate-900/50"
+        >
+          <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 mt-2 shadow-[0_0_0_4px_rgba(16,185,129,0.12)] dark:shadow-[0_0_0_4px_rgba(16,185,129,0.06)]" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-foreground">{activity.title}</p>
+            <p className="text-xs text-muted-foreground">{activity.description}</p>
+          </div>
+          <p className="text-xs text-muted-foreground whitespace-nowrap">{formatRelativeTime(activity.timestamp)}</p>
+        </button>
+      ))}
+    </div>
+  );
+});
+
 export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
   const [reviewedDocuments, setReviewedDocuments] = useState<ReviewedDocument[]>([]);
@@ -196,6 +304,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   const [docentesTotal, setDocentesTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [, setTimeTick] = useState(0);
   const showReloadLoader = useMemo(() => {
     if (typeof window === "undefined") return false;
 
@@ -213,15 +322,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     submittedAt: string;
   }>(null);
 
-  const [selectedActivity, setSelectedActivity] = useState<null | {
-    id: number;
-    type: string;
-    title: string;
-    description: string;
-    time: string;
-    related: string;
-    relatedDocumentId: number;
-  }>(null);
+  const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -369,7 +470,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     setSelectedDocument(doc);
   }, []);
 
-  const openActivity = useCallback((activity: { id: number; type: string; title: string; description: string; time: string; related: string; relatedDocumentId: number }) => {
+  const openActivity = useCallback((activity: ActivityItem) => {
     setSelectedActivity(activity);
   }, []);
 
@@ -412,114 +513,10 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     };
   }, [selectedDocument]);
 
-  /* Small memoized presentational components to reduce re-renders */
-  const StatsGrid = React.memo(function StatsGrid({ stats, onNavigate }: { stats: any[]; onNavigate: (view: AdminView) => void }) {
-    return (
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <button
-              key={stat.title}
-              type="button"
-              onClick={() => onNavigate(stat.action)}
-              className="text-left rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <Card className={`h-full overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-sm transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer ${stat.cardClass}`}>
-                <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
-                <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm">{stat.title}</CardTitle>
-                  <div className={`h-9 w-9 rounded-xl ${stat.bgColor} flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5 sm:h-10 sm:w-10`}>
-                    <Icon className={`h-4 w-4 ${stat.color}`} aria-hidden />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="text-2xl leading-none font-bold text-foreground sm:text-2xl">{stat.value}</div>
-                  <p className="mt-1 text-[11px] leading-snug text-foreground/70 sm:text-xs">{stat.description}</p>
-                  <p className={`mt-1 text-[11px] font-medium sm:text-xs ${stat.color}`}>{stat.trend}</p>
-                </CardContent>
-              </Card>
-            </button>
-          );
-        })}
-      </div>
-    );
-  });
-
-  const PendingList = React.memo(function PendingList({ items, onOpen }: { items: typeof pendingDocuments; onOpen: (doc: any) => void }) {
-    return (
-      <div className="max-h-[22rem] space-y-4 overflow-y-auto pr-2 sm:max-h-[24rem]">
-        {items.filter((doc) => !doc.revisado).map((doc) => (
-          <div
-            key={doc.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => onOpen(doc)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onOpen(doc);
-              }
-            }}
-            className="flex flex-col gap-3 p-3 rounded-2xl border border-slate-200 bg-white/70 hover:bg-slate-100/90 transition-colors cursor-pointer dark:border-slate-800 dark:bg-slate-900/70 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center dark:bg-emerald-950/50 dark:text-emerald-300">
-                <FileText className="h-5 w-5 text-muted-foreground" aria-hidden />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-sm truncate text-foreground">{doc.documento}</p>
-                <p className="text-xs text-muted-foreground">{doc.docente}</p>
-                {doc.carrera && (
-                  <Badge variant="outline" className="mt-2 w-fit max-w-full text-[11px]">
-                    {doc.carrera}
-                  </Badge>
-                )}
-              </div>
-            </div>
-            <div className="flex w-full items-center justify-end sm:w-auto sm:shrink-0">
-              <ResponsiveActionButton
-                icon={<Eye className="h-4 w-4" aria-hidden />}
-                label="Abrir"
-                size="sm"
-                variant="ghost"
-                tabIndex={-1}
-                className="pointer-events-none w-full justify-center sm:w-auto sm:min-w-[6rem]"
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  });
-
-  const ActivityList = React.memo(function ActivityList({ items, onOpen }: { items: typeof recentActivity; onOpen: (a: any) => void }) {
-    return (
-      <div className="max-h-[22rem] space-y-4 overflow-y-auto pr-2 sm:max-h-[24rem]">
-        {items.map((activity) => (
-          <button
-            key={activity.id}
-            type="button"
-            onClick={() => onOpen(activity)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onOpen(activity);
-              }
-            }}
-            className="w-full text-left flex items-start gap-3 rounded-2xl p-3 border border-transparent hover:border-slate-200/70 hover:bg-slate-100/90 transition-colors cursor-pointer dark:hover:border-slate-800/70 dark:hover:bg-slate-900/50"
-          >
-            <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 mt-2 shadow-[0_0_0_4px_rgba(16,185,129,0.12)] dark:shadow-[0_0_0_4px_rgba(16,185,129,0.06)]" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">{activity.title}</p>
-              <p className="text-xs text-muted-foreground">{activity.description}</p>
-            </div>
-            <p className="text-xs text-muted-foreground whitespace-nowrap">{activity.time}</p>
-          </button>
-        ))}
-      </div>
-    );
-  });
+  useEffect(() => {
+    const id = setInterval(() => setTimeTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const openRelatedDocument = () => {
     if (!selectedActivity) return;
@@ -734,7 +731,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
                 <div className="rounded-lg border border-border p-3">
                   <p className="text-sm font-medium">{selectedActivity.title}</p>
                   <p className="text-xs text-muted-foreground">{selectedActivity.description}</p>
-                  <p className="text-xs text-muted-foreground">{selectedActivity.time}</p>
+                  <p className="text-xs text-muted-foreground">{formatRelativeTime(selectedActivity.timestamp)}</p>
                   <p className="text-xs text-muted-foreground">Relacionado: {selectedActivity.related}</p>
                 </div>
               </TabsContent>

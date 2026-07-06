@@ -554,7 +554,17 @@ function AppContent() {
       {isReady && isAuthenticated && (
         <div
           className={`fixed inset-0 overflow-hidden${isSplashExiting ? " z-[9999] tv-iris-reveal" : " z-0"}`}
-          style={{ backgroundImage: "url('/src/assets/ut_imagen14.png')", backgroundPosition: "center", backgroundSize: "cover", backgroundRepeat: "no-repeat", backgroundAttachment: "fixed" }}
+          style={{
+            backgroundImage: theme === "dark"
+              ? "url('/src/assets/ut_imagen14.png')"
+              : "linear-gradient(rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.10)), url('/src/assets/ut_imagen14.png')",
+            backgroundColor: theme === "dark" ? "#000000" : "transparent",
+            backgroundBlendMode: theme === "dark" ? "normal" : "screen",
+            backgroundPosition: "center",
+            backgroundSize: "cover",
+            backgroundRepeat: "no-repeat",
+            backgroundAttachment: "fixed",
+          }}
         >
           <div className={`flex h-screen overflow-hidden ${isLoggingOut ? "animate-page-exit" : ""} motion-reduce:animate-none`}>
             <Sidebar

@@ -16,7 +16,12 @@ body {
   background-attachment: fixed;
 }
 
-html.dark body {
+html:not(.dark) body {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.10)),
+    url('/src/assets/ut_imagen14.png');
+  background-color: transparent;
+  background-blend-mode: screen;
 }
 
 body.splashing {

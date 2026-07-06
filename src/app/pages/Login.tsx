@@ -1,38 +1,38 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent } from "../components/ui/card";
-import { Loader2, Mail, Lock, Eye, EyeOff, Moon, Sun } from "lucide-react";
+import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon } from "lucide-react";
 
 export function Login() {
+  const THEME_TOGGLE_COOLDOWN_MS = 700;
   const topDots = Array.from({ length: 16 }, (_, index) => `login-dot-top-${index}`);
   const bottomDots = Array.from({ length: 15 }, (_, index) => `login-dot-bottom-${index}`);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const lastThemeToggleRef = useRef(0);
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const isDarkMode = theme === "dark";
-  const logoSrc = isDarkMode 
-    ? "/src/assets/LogotipoUTSLRC-BLANCO.webp"
-    : "/src/assets/LogotipoUTSLRC.webp";
+  const isDark = theme === "dark";
+  const logoSrc = isDark ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
   const superiorImage = new URL("../../assets/superior.webp", import.meta.url).href;
   const inferiorImage = new URL("../../assets/inferior.webp", import.meta.url).href;
-  const mascotImage = new URL("../../assets/mascota3.webp", import.meta.url).href;
 
-  const pageBackground = isDarkMode ? "bg-slate-950" : "bg-gradient-to-br from-slate-50 to-slate-100";
-  const cardSurface = isDarkMode
+  const pageBackground = isDark
+    ? "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950"
+    : "bg-gradient-to-br from-white via-slate-50 to-white";
+  const cardSurface = isDark
     ? "bg-slate-950/85 border-slate-800/80 shadow-[0_24px_70px_rgba(0,0,0,0.45)]"
-    : "bg-white/90 border-slate-200/60 shadow-[0_24px_70px_rgba(0,0,0,0.1)]";
-  const labelText = isDarkMode ? "text-slate-200" : "text-slate-700";
-  const helperText = isDarkMode ? "text-slate-400" : "text-slate-600";
-  const inputClasses = isDarkMode
-    ? "h-12 rounded-xl border bg-slate-900/80 pl-12 pr-14 text-base text-slate-100 placeholder:text-slate-500 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 hover:border-slate-600 border-slate-700"
-    : "h-12 rounded-xl border bg-slate-50 pl-12 pr-14 text-base text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 hover:border-slate-300 border-slate-200";
+    : "bg-white border-slate-100/50 shadow-2xl";
+  const labelText = isDark ? "text-slate-200" : "text-slate-700";
+  const helperText = isDark ? "text-slate-400" : "text-slate-500";
+  const inputClasses =
+    "h-12 rounded-xl border bg-white/95 pl-12 pr-14 text-base text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 hover:border-slate-300 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:border-slate-700 dark:hover:border-slate-600";
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -46,10 +46,18 @@ export function Login() {
     }
   };
 
+  const handleThemeToggle = () => {
+    const now = Date.now();
+    if (now - lastThemeToggleRef.current < THEME_TOGGLE_COOLDOWN_MS) {
+      return;
+    }
+    lastThemeToggleRef.current = now;
+    toggleTheme();
+  };
+
   return (
-    <div className={`${isDarkMode ? "dark" : "light"} ${pageBackground} min-h-screen overflow-hidden relative transition-colors duration-200`}>
+    <div className={`${pageBackground} min-h-screen overflow-hidden relative`}>
       {/* BACKGROUND - Gradientes y decoraciones mejoradas */}
-      <div className={`absolute inset-0 ${isDarkMode ? "bg-slate-950/75" : "bg-transparent"}`} />
       <div className="absolute inset-0">
         <img
           src={superiorImage}
@@ -87,24 +95,6 @@ export function Login() {
         <div className="absolute bottom-[26%] left-[7%] w-28 h-px bg-gradient-to-r from-transparent via-[#3BBF82]/18 to-transparent -rotate-12 dark:via-[#3BBF82]/28" />
         <div className="absolute bottom-[8%] right-[46%] w-20 h-20 rounded-full border border-[#3BBF82]/10 opacity-40 dark:border-[#3BBF82]/25" />
       </div>
-
-      {/* Botón de cambio de tema - Esquina inferior derecha */}
-      <button
-        onClick={toggleTheme}
-        className="fixed bottom-8 right-8 p-3 rounded-full z-50 transition-all duration-300 hover:scale-110 shadow-lg"
-        style={{
-          backgroundColor: isDarkMode ? "rgba(59, 191, 130, 0.2)" : "rgba(59, 191, 130, 0.15)",
-          border: `2px solid ${isDarkMode ? "rgba(59, 191, 130, 0.4)" : "rgba(59, 191, 130, 0.3)"}`
-        }}
-        aria-label={isDarkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-        title={isDarkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-      >
-        {isDarkMode ? (
-          <Sun className="h-6 w-6 text-yellow-400" />
-        ) : (
-          <Moon className="h-6 w-6 text-slate-700" />
-        )}
-      </button>
 
       <div className="relative z-10 min-h-screen grid lg:grid-cols-2">
         {/* ===================================================== */}
@@ -149,49 +139,40 @@ export function Login() {
 
             {/* TÍTULO - Bloque independiente */}
             <div className="absolute left-0 top-16 max-w-[38rem]">
-              <h1 
-                className={`text-[58px] lg:text-[64px] leading-[0.98] font-black tracking-tight ${
-                  isDarkMode ? "text-slate-50" : "text-slate-900"
-                }`}
-                style={{
-                  textShadow: isDarkMode 
-                    ? "0 2px 8px rgba(0,0,0,0.6)" 
-                    : "0 2px 4px rgba(0,0,0,0.1)"
-                }}
-              >
+              <h1 className="text-[58px] lg:text-[64px] leading-[0.98] font-black tracking-tight text-slate-900 dark:text-slate-50 drop-shadow-sm">
                 <span className="whitespace-nowrap">Sistema de Gestión</span>
-                <span className={`hidden lg:block ${
-                  isDarkMode ? "text-emerald-300" : "text-[#3BBF82]"
-                }`}>Académica Digital</span>
+                <span className="hidden lg:block text-[#3BBF82] dark:text-emerald-300">Académica Digital</span>
               </h1>
             </div>
 
             {/* TEXTO - Bloque independiente */}
             <div className="absolute left-0 top-[210px] max-w-[38rem]">
-              <p 
-                className={`text-lg lg:text-xl leading-relaxed font-medium text-justify ${
-                  isDarkMode ? "text-slate-300" : "text-slate-600"
-                }`}
-                style={{
-                  textShadow: isDarkMode 
-                    ? "0 1px 4px rgba(0,0,0,0.4)" 
-                    : "0 1px 2px rgba(0,0,0,0.08)"
-                }}
-              >
+              <p className={`${isDark ? "text-slate-300" : "text-slate-600"} text-lg lg:text-xl leading-relaxed font-medium text-justify`}>
                 Esta plataforma digital facilita la transición hacia el uso eficiente de documentos
                 digitales, optimizando los flujos de trabajo de suma y documentación pertinentes en la
                 institución.
               </p>
             </div>
 
-            {/* MASCOTA */}
-            <div className="absolute right-[-160px] top-[200px] z-10 pointer-events-auto">
-              <div className="group/mascot relative w-88 h-88 xl:w-[26rem] xl:h-[26rem] flex items-center justify-center">
+            {/* MASCOTA - Bloque independiente con efecto flotante */}
+            <div className="absolute right-[-180px] top-[300px] z-20">
+              <div className="relative w-80 h-80 xl:w-[24rem] xl:h-[24rem] flex items-center justify-center">
+                {/* Efecto de glow detrás del gallo */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#3BBF82]/10 to-[#3BBF82]/5 rounded-full blur-3xl" />
+                
+                {/* Aro decorativo */}
+                <div className="absolute inset-0 border-2 border-[#3BBF82]/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 " />
+                
+                {/* Imagen del gallo */}
                 <img
-                  src={mascotImage}
+                  src="/src/assets/mascota3.webp"
                   alt="Mascota institucional"
-                  className="relative z-10 w-full h-full object-contain drop-shadow-[0_22px_40px_rgba(0,0,0,0.22)] transition-transform duration-500 ease-out group-hover/mascot:scale-110 group-hover/mascot:drop-shadow-[0_30px_60px_rgba(59,191,130,0.22)]"
+                  className="relative z-10 h-full w-full object-contain drop-shadow-2xl transition-transform duration-300 hover:scale-110 origin-center -translate-y-12"
                 />
+                
+                {/* Puntos decorativos alrededor */}
+                <div className="absolute top-0 right-0 w-3 h-3 rounded-full bg-[#3BBF82]/40" />
+                <div className="absolute bottom-0 left-0 w-2 h-2 rounded-full bg-[#3BBF82]/30" />
               </div>
             </div>
 
@@ -260,7 +241,7 @@ export function Login() {
               <div className="text-center mb-8">
                 <div className="mb-6">
                   <div className="w-16 h-1 bg-gradient-to-r from-[#3BBF82] to-[#2da06a] rounded-full mx-auto mb-4" />
-                  <p className={`text-sm font-semibold ${isDarkMode ? "text-[#3BBF82]" : "text-[#2da06a]"} uppercase tracking-wider`}>
+                  <p className="text-sm font-semibold text-[#3BBF82] uppercase tracking-wider">
                     Bienvenido
                   </p>
                 </div>
@@ -270,9 +251,7 @@ export function Login() {
                 </p>
               </div>
 
-              <div className={`h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-8 ${
-                isDarkMode ? "dark:via-slate-700" : ""
-              }`} />
+              <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-8 dark:via-slate-700" />
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2 group/email">
@@ -280,11 +259,7 @@ export function Login() {
                     Correo Electrónico
                   </Label>
                   <div className="relative">
-                    <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 group-focus-within/email:text-[#3BBF82] transition-colors ${
-                      isDarkMode
-                        ? "text-slate-400 dark:text-slate-500"
-                        : "text-slate-500"
-                    }`} />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 group-focus-within/email:text-[#3BBF82] transition-colors" />
                     <Input
                       id="email"
                       type="email"
@@ -303,11 +278,7 @@ export function Login() {
                     Contraseña
                   </Label>
                   <div className="relative">
-                    <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 group-focus-within/password:text-[#3BBF82] transition-colors ${
-                      isDarkMode
-                        ? "text-slate-400 dark:text-slate-500"
-                        : "text-slate-500"
-                    }`} />
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 group-focus-within/password:text-[#3BBF82] transition-colors" />
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
@@ -324,11 +295,7 @@ export function Login() {
                       onClick={() => setShowPassword((s) => !s)}
                       aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                       title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                      className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors duration-200 ${
-                        isDarkMode
-                          ? "text-slate-500 hover:text-[#3BBF82] dark:text-slate-400"
-                          : "text-slate-400 hover:text-[#3BBF82]"
-                      }`}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-[#3BBF82] transition-colors duration-200 dark:text-slate-400"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -338,7 +305,7 @@ export function Login() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full h-12 rounded-xl font-semibold text-base shadow-lg transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white hover:shadow-2xl"
+                  className="w-full h-12 rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white font-semibold text-base shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
                 >
                   {isLoading ? (
                     <>
@@ -353,11 +320,7 @@ export function Login() {
                 <div className="text-center mt-3">
                   <button
                     type="button"
-                    className={`text-sm font-medium ${
-                      isDarkMode
-                        ? "text-[#3BBF82] hover:underline"
-                        : "text-[#2da06a] hover:underline"
-                    }`}
+                    className="text-sm text-[#3BBF82] hover:underline font-medium"
                     aria-label="Olvidaste la contraseña"
                   >
                     ¿Olvidaste la contraseña?
@@ -369,7 +332,17 @@ export function Login() {
         </div>
       </div>
 
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        onClick={handleThemeToggle}
+        aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+        title={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+        className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
+      >
+        {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      </Button>
     </div>
   );
 }
-

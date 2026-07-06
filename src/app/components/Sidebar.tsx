@@ -232,12 +232,15 @@ function SidebarInstrumentSection({
   );
 }
 
+const LOGO_LIGHT = "/src/assets/LogotipoUTSLRC.webp";
+const LOGO_DARK = "/src/assets/LogotipoUTSLRC-BLANCO.webp";
+
 export function Sidebar(props: Readonly<SidebarProps>) {
   const { currentView, onNavigate, mobileOpen, onMobileOpenChange } = props;
   const { user, logout } = useAuth();
   const { theme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
-  const logoSrc = theme === "dark" ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
+
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [instrumento3040Open, setInstrumento3040Open] = useState(false);
@@ -496,9 +499,15 @@ export function Sidebar(props: Readonly<SidebarProps>) {
             {!isCollapsedLocal && (
               <div className="absolute left-1/2 -translate-x-1/2">
                 <img
-                  src={logoSrc}
+                  src={LOGO_LIGHT}
                   alt="Logo"
-                  className="h-10 w-auto object-contain"
+                  className={theme === "dark" ? "absolute w-0 h-0 opacity-0 pointer-events-none" : "h-10 w-auto object-contain"}
+                />
+                <img
+                  src={LOGO_DARK}
+                  alt="Logo"
+                  aria-hidden
+                  className={theme === "dark" ? "h-10 w-auto object-contain" : "absolute w-0 h-0 opacity-0 pointer-events-none"}
                 />
               </div>
             )}

@@ -106,6 +106,22 @@ const FORM_ROLE_LABELS: Record<FormRole, string> = {
   tutor: "Tutor",
 };
 
+type PasswordStrength = { score: number; label: string; color: string };
+
+function getPasswordStrength(password: string): PasswordStrength {
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[a-z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+
+  if (score <= 2) return { score, label: "Débil", color: "bg-red-500" };
+  if (score === 3) return { score, label: "Media", color: "bg-yellow-500" };
+  if (score === 4) return { score, label: "Fuerte", color: "bg-emerald-500" };
+  return { score, label: "Muy fuerte", color: "bg-emerald-600" };
+}
+
 export function Configuration(props: Readonly<ConfigurationProps>) {
   const { initialTab = "formularios" } = props;
   const { user, updateProfile, refreshUser } = useAuth();
@@ -279,10 +295,10 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     if (shouldInitializeFromUser) {
       setProfileFirstNames(user.firstNames ?? "");
       setProfileLastNames(user.lastNames ?? "");
+      setProfilePhone(user.phone ?? "");
       loadedProfileUserId.current = String(user.id);
     }
 
-    setProfilePhone(user.phone ?? "");
     setProfileAvatar(user.avatar);
   }, [user]);
 
@@ -751,8 +767,9 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       return;
     }
 
-    if (newPassword.length < 8) {
-      toast.error("La nueva contraseña debe tener al menos 8 caracteres");
+    const strength = getPasswordStrength(newPassword);
+    if (strength.score < 4) {
+      toast.error("La contraseña es demasiado débil. Usa mayúsculas, minúsculas, números y caracteres especiales");
       return;
     }
 
@@ -995,6 +1012,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                             onChange={(e) => setNewPassword(e.target.value)}
                             placeholder="Ingresa la nueva contraseña"
                             className="pr-10 text-sm"
+                            autoComplete="new-password"
                           />
                           <Button
                             type="button"
@@ -1007,6 +1025,25 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                             {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </Button>
                         </div>
+                        {newPassword.length > 0 && (() => {
+                          const strength = getPasswordStrength(newPassword);
+                          return (
+                            <div className="space-y-1.5">
+                              <div className="flex gap-1">
+                                {[1, 2, 3, 4, 5].map((step) => (
+                                  <div
+                                    key={step}
+                                    className={`h-1.5 flex-1 rounded-full transition-colors ${step <= strength.score ? strength.color : "bg-muted"}`}
+                                  />
+                                ))}
+                              </div>
+                              <p className={`text-xs font-medium ${strength.score < 4 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                {strength.label}
+                                {strength.score < 4 && " — usa mayúsculas, minúsculas, números y caracteres especiales"}
+                              </p>
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm">Confirmar contraseña</Label>
@@ -1127,8 +1164,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           )}
 
           {activeTab === "formularios" && (
-            <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
-              <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 p-4 sm:p-6 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
+            <Card className={sectionCardClass}>
+              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
                 <div className={softPanelClass}>
                   <div className="mb-3">
                     <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">Control por formulario</h3>
@@ -1855,10 +1892,10 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
       {/* Loader - Ajustado para móvil */}
       {isLoading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center" role="status" aria-live="polite">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div className="relative z-10 flex flex-col items-center gap-3 rounded-lg bg-white/90 p-6 shadow-lg dark:bg-slate-900/90 max-w-[90vw]">
-            <svg className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-emerald-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-emerald-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
             </svg>

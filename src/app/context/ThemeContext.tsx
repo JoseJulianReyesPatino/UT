@@ -44,9 +44,16 @@ export function ThemeProvider(props: Readonly<{ children: ReactNode }>) {
   };
 
   const updateTheme = (newTheme: Theme) => {
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
+    const html = document.documentElement;
+    html.classList.add("no-transitions");
     applyTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    setTheme(newTheme);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        html.classList.remove("no-transitions");
+      });
+    });
   };
 
   const toggleTheme = () => {

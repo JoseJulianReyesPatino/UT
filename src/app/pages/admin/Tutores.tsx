@@ -151,6 +151,7 @@ export default function Tutores() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [returnConfirmation, setReturnConfirmation] = useState<ReturnConfirmation | null>(null);
+  const [isConfirmingReturn, setIsConfirmingReturn] = useState(false);
   const [returnComment, setReturnComment] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [noteDialog, setNoteDialog] = useState<{ nota: string; tutor: string } | null>(null);
@@ -354,39 +355,40 @@ export default function Tutores() {
   };
 
   const handleConfirmReturnAction = async () => {
-    if (!returnConfirmation) return;
-
-    const shouldReturn = returnConfirmation.type === 'return';
-    const docStatus = returnConfirmation.document.status;
-    if (shouldReturn) {
-      const trimmedComment = returnComment.trim();
-      const result = await setDocumentReturnedState(returnConfirmation.document.id, true, trimmedComment);
-      if (result) {
-        const raw = returnConfirmation.document.documento ?? "Documento";
-        const lastSep = raw.lastIndexOf(" - ");
-        const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
-        const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
-        const tutorName = returnConfirmation.document.tutor ?? "";
-        // Si era pendiente pasa a devuelto → countPending -1
-        // Si era revisado pasa a devuelto  → countReviewed -1
-        if (docStatus === 'pendiente') setCountPending((n) => Math.max(0, n - 1));
-        else if (docStatus === 'revisado') setCountReviewed((n) => Math.max(0, n - 1));
-        toast.success(`${fileName} devuelto al tutor ${tutorName}`);
+    if (!returnConfirmation || isConfirmingReturn) return;
+    setIsConfirmingReturn(true);
+    try {
+      const shouldReturn = returnConfirmation.type === 'return';
+      const docStatus = returnConfirmation.document.status;
+      if (shouldReturn) {
+        const trimmedComment = returnComment.trim();
+        const result = await setDocumentReturnedState(returnConfirmation.document.id, true, trimmedComment);
+        if (result) {
+          const raw = returnConfirmation.document.documento ?? "Documento";
+          const lastSep = raw.lastIndexOf(" - ");
+          const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
+          const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+          const tutorName = returnConfirmation.document.tutor ?? "";
+          if (docStatus === 'pendiente') setCountPending((n) => Math.max(0, n - 1));
+          else if (docStatus === 'revisado') setCountReviewed((n) => Math.max(0, n - 1));
+          toast.success(`${fileName} devuelto al tutor ${tutorName}`);
+        }
+      } else {
+        const result = await setDocumentReturnedState(returnConfirmation.document.id, false);
+        if (result) {
+          const raw = returnConfirmation.document.documento ?? "Documento";
+          const lastSep = raw.lastIndexOf(" - ");
+          const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
+          const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+          setCountReviewed((n) => n + 1);
+          toast.success(`Devolución de ${fileName} cancelada`);
+        }
       }
-    } else {
-      const result = await setDocumentReturnedState(returnConfirmation.document.id, false);
-      if (result) {
-        const raw = returnConfirmation.document.documento ?? "Documento";
-        const lastSep = raw.lastIndexOf(" - ");
-        const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
-        const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
-        // devuelto → revisado → countReviewed +1
-        setCountReviewed((n) => n + 1);
-        toast.success(`Devolución de ${fileName} cancelada`);
-      }
+      setReturnComment("");
+      setReturnConfirmation(null);
+    } finally {
+      setIsConfirmingReturn(false);
     }
-    setReturnComment("");
-    setReturnConfirmation(null);
   };
 
   const handleShareToMessages = (doc: TutorDocumentItem) => {
@@ -438,6 +440,10 @@ export default function Tutores() {
 
     return () => {
       cancelled = true;
+      setPreviewBlobUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
     };
   }, [previewDocument]);
   const apartadosDisponibles = Array.from(new Set(allDocuments.map((doc) => doc.apartado))).filter((apartado) => apartado && apartado.trim().length > 0);
@@ -531,21 +537,21 @@ export default function Tutores() {
             </Select>
           </div>
           <TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
-            <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+            <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
               Todos
-              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countAll}</Badge>
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countAll}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+            <TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
               Pendientes
-              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countPending}</Badge>
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countPending}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+            <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
               Revisados
-              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countReviewed}</Badge>
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countReviewed}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+            <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
               Revisados hoy
-              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{reviewedToday.length}</Badge>
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{reviewedToday.length}</Badge>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1040,6 +1046,7 @@ export default function Tutores() {
             <Button
               variant={returnConfirmation?.type === "return" ? "destructive" : "success"}
               onClick={handleConfirmReturnAction}
+              disabled={isConfirmingReturn}
             >
               {returnConfirmation?.type === "return" ? "Sí, devolver" : "Sí, cancelar devolución"}
             </Button>

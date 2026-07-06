@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -260,9 +260,20 @@ function DocumentPreviewDialog({ open, document, onOpenChange, previewLoading, p
 }
 
 const initialCycles: AcademicCycle[] = [];
-
 const initialDocuments: DocumentRecord[] = [];
 const initialTutorDocuments: TutorDocumentRecord[] = [];
+
+const DOCENTE_TYPES: DocumentRecord["tipo"][] = [
+  "planeacion", "instrumento-30", "instrumento-40", "instrumento-60",
+  "instrumento-70", "lista-concentrada", "asesoria", "portafolio", "acta-final",
+];
+const ESTADIAS_TYPES: EstadiasDocumentType[] = [
+  "carta-presentacion", "carta-aceptacion", "carta-terminacion", "estadias",
+];
+const TUTOR_TYPES: TutorDocumentType[] = [
+  "carga-academica", "reporte-bajas", "concentrado-asesorias", "acta-asistencia", "ficha-tecnica",
+];
+
 
 export function CiclosEscolares() {
   const [showNewDialog, setShowNewDialog] = useState(false);
@@ -307,34 +318,9 @@ export function CiclosEscolares() {
   const [tutorDocuments, setTutorDocuments] = useState<TutorDocumentRecord[]>(initialTutorDocuments);
   const [remedialDocuments, setRemedialDocuments] = useState<RemedialDocumentRecord[]>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const [isSubmittingCycle, setIsSubmittingCycle] = useState(false);
   const [documentCountByCycleId, setDocumentCountByCycleId] = useState<Record<number, number>>({});
-
-  const docenteTypes: DocumentRecord["tipo"][] = [
-    "planeacion",
-    "instrumento-30",
-    "instrumento-40",
-    "instrumento-60",
-    "instrumento-70",
-    "lista-concentrada",
-    "asesoria",
-    "portafolio",
-    "acta-final",
-  ];
-
-  const estadiasTypes: EstadiasDocumentType[] = [
-    "carta-presentacion",
-    "carta-aceptacion",
-    "carta-terminacion",
-    "estadias",
-  ];
-
-  const tutorTypes: TutorDocumentType[] = [
-    "carga-academica",
-    "reporte-bajas",
-    "concentrado-asesorias",
-    "acta-asistencia",
-    "ficha-tecnica",
-  ];
+  const loadDocumentsGeneration = useRef(0);
 
   const normalizeTipo = (tipo: string | null | undefined): string => {
     if (!tipo) return "";
@@ -637,15 +623,18 @@ export function CiclosEscolares() {
   };
 
   const loadDocumentsForCycle = async (cycle: AcademicCycle): Promise<void> => {
+    loadDocumentsGeneration.current += 1;
+    const generation = loadDocumentsGeneration.current;
     setIsLoadingDocuments(true);
     try {
       const response = await apiFetch(`/documents?cycle_id=${cycle.id}&per_page=200`, { method: "GET" });
+      if (loadDocumentsGeneration.current !== generation) return;
       const rows = ((response.data?.data ?? response.data) as ApiDocument[]) ?? [];
       const totalInCycle = getDocumentsTotalFromResponse(response, rows.length);
       setDocumentCountByCycleId((current) => ({ ...current, [cycle.id]: totalInCycle }));
 
       const docentes: DocumentRecord[] = rows
-        .filter((row) => docenteTypes.includes(resolveRowTipo(row) as DocumentRecord["tipo"]))
+        .filter((row) => DOCENTE_TYPES.includes(resolveRowTipo(row) as DocumentRecord["tipo"]))
         .map((row) => {
           const tipo = resolveRowTipo(row) as DocumentRecord["tipo"];
           return {
@@ -665,7 +654,7 @@ export function CiclosEscolares() {
         });
 
       const estadiasDocs: EstadiasDocumentRecord[] = rows
-        .filter((row) => estadiasTypes.includes(resolveRowTipo(row) as EstadiasDocumentType))
+        .filter((row) => ESTADIAS_TYPES.includes(resolveRowTipo(row) as EstadiasDocumentType))
         .map((row) => {
           const tipo = resolveRowTipo(row) as EstadiasDocumentType;
           return {
@@ -682,7 +671,7 @@ export function CiclosEscolares() {
         });
 
       const tutores: TutorDocumentRecord[] = rows
-        .filter((row) => tutorTypes.includes(resolveRowTipo(row) as TutorDocumentType))
+        .filter((row) => TUTOR_TYPES.includes(resolveRowTipo(row) as TutorDocumentType))
         .map((row) => ({
           id: row.id,
           ciclo: cycle.nombre,
@@ -719,14 +708,6 @@ export function CiclosEscolares() {
         ...tutores.map((d) => d.id),
         ...remediales.map((d) => d.id),
       ]);
-      const unclassified = rows.filter((row) => !classifiedIds.has(row.id));
-      if (unclassified.length > 0) {
-        console.warn(
-          `[CiclosEscolares] ${unclassified.length} documento(s) sin clasificar en ciclo "${cycle.nombre}":`,
-          unclassified.map((r) => ({ id: r.id, form_code: r.form_code, tipo: r.tipo, apartado_label: r.apartado_label }))
-        );
-      }
-
       const classifiedTotal = docentes.length + estadiasDocs.length + tutores.length + remediales.length;
       setDocumentCountByCycleId((current) => ({ ...current, [cycle.id]: classifiedTotal }));
 
@@ -735,13 +716,14 @@ export function CiclosEscolares() {
       setTutorDocuments(tutores);
       setRemedialDocuments(remediales);
     } catch (error) {
+      if (loadDocumentsGeneration.current !== generation) return;
       setDocuments([]);
       setEstadiasDocuments([]);
       setTutorDocuments([]);
       setRemedialDocuments([]);
       toast.error("No fue posible cargar los documentos del ciclo");
     } finally {
-      setIsLoadingDocuments(false);
+      if (loadDocumentsGeneration.current === generation) setIsLoadingDocuments(false);
     }
   };
 
@@ -892,6 +874,13 @@ export function CiclosEscolares() {
       return;
     }
 
+    if (newCycleForm.fechaInicio >= newCycleForm.fechaFin) {
+      toast.error("La fecha de inicio debe ser anterior a la fecha de fin");
+      return;
+    }
+
+    if (isSubmittingCycle) return;
+    setIsSubmittingCycle(true);
     try {
       const response = await apiFetch("/cycles", {
         method: "POST",
@@ -923,6 +912,8 @@ export function CiclosEscolares() {
       setShowNewDialog(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al crear el ciclo");
+    } finally {
+      setIsSubmittingCycle(false);
     }
   };
 
@@ -951,6 +942,8 @@ export function CiclosEscolares() {
         }
       }
 
+    if (isSubmittingCycle) return;
+    setIsSubmittingCycle(true);
     try {
       const response = await apiFetch(`/cycles/${selectedCycle.id}`, {
         method: "PATCH",
@@ -980,8 +973,9 @@ export function CiclosEscolares() {
       setShowEditDialog(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al actualizar el ciclo");
+    } finally {
+      setIsSubmittingCycle(false);
     }
-
   };
 
   const deleteCycle = async () => {
@@ -991,6 +985,8 @@ export function CiclosEscolares() {
       toast.error("Escribe exactamente el nombre del ciclo para eliminarlo");
       return;
     }
+    if (isSubmittingCycle) return;
+    setIsSubmittingCycle(true);
     try {
       await apiFetch(`/cycles/${selectedCycle.id}`, {
         method: "DELETE",
@@ -1002,21 +998,28 @@ export function CiclosEscolares() {
         return next;
       });
       setDocuments((current) => current.filter((document) => document.ciclo !== selectedCycle.nombre));
+      setEstadiasDocuments((current) => current.filter((document) => document.ciclo !== selectedCycle.nombre));
+      setTutorDocuments((current) => current.filter((document) => document.ciclo !== selectedCycle.nombre));
+      setRemedialDocuments((current) => current.filter((document) => document.ciclo !== selectedCycle.nombre));
       toast.success(`Ciclo ${selectedCycle.nombre} eliminado correctamente`);
       setShowDeleteDialog(false);
       setSelectedCycle(null);
       setDeleteConfirmationName("");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al eliminar el ciclo");
+    } finally {
+      setIsSubmittingCycle(false);
     }
   };
 
   const performConfirm = async () => {
     if (!confirmDialog.ciclo || !confirmDialog.type) return;
+    if (isSubmittingCycle) return;
+    setIsSubmittingCycle(true);
 
     const ciclo = confirmDialog.ciclo;
-    if (confirmDialog.type === "close") {
-      try {
+    try {
+      if (confirmDialog.type === "close") {
         const response = await apiFetch(`/cycles/${ciclo.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -1024,11 +1027,7 @@ export function CiclosEscolares() {
         });
         setCiclos((current) => current.map((cycle) => (cycle.id === ciclo.id ? mapApiCycle(response.data) : cycle)));
         toast.success(`Ciclo ${ciclo.nombre} cerrado correctamente`);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Error al cerrar el ciclo");
-      }
-    } else {
-      try {
+      } else {
         const response = await apiFetch(`/cycles/${ciclo.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -1045,9 +1044,11 @@ export function CiclosEscolares() {
           return cycle;
         }));
         toast.success(`Ciclo ${ciclo.nombre} activado correctamente`);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Error al activar el ciclo");
       }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al procesar el ciclo");
+    } finally {
+      setIsSubmittingCycle(false);
     }
     setConfirmDialog({ open: false });
   };
@@ -1187,6 +1188,10 @@ export function CiclosEscolares() {
 
     return () => {
       isMounted = false;
+      setPreviewBlobUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
     };
   }, [previewDocument]);
 
@@ -1640,7 +1645,7 @@ export function CiclosEscolares() {
             <Button variant="outline" onClick={() => setShowNewDialog(false)}>
               Cancelar
             </Button>
-            <Button variant="success" onClick={createCycle}>
+            <Button variant="success" onClick={createCycle} disabled={isSubmittingCycle}>
               Crear Ciclo
             </Button>
           </DialogFooter>
@@ -1683,7 +1688,7 @@ export function CiclosEscolares() {
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>
               Cancelar
             </Button>
-            <Button variant="success" onClick={updateCycle}>
+            <Button variant="success" onClick={updateCycle} disabled={isSubmittingCycle}>
               Guardar Cambios
             </Button>
           </DialogFooter>
@@ -1713,7 +1718,7 @@ export function CiclosEscolares() {
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={deleteCycle} disabled={deleteConfirmationName.trim() !== selectedCycle?.nombre}>
+            <Button variant="destructive" onClick={deleteCycle} disabled={isSubmittingCycle || deleteConfirmationName.trim() !== selectedCycle?.nombre}>
               <Trash2 className="h-4 w-4 mr-2" />
               Eliminar Ciclo
             </Button>
@@ -2243,7 +2248,7 @@ export function CiclosEscolares() {
           </DialogHeader>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setConfirmDialog({ open: false })}>Cancelar</Button>
-            <Button variant="destructive" onClick={performConfirm}>{confirmDialog.type === "close" ? "Cerrar Ciclo" : "Activar Ciclo"}</Button>
+            <Button variant="destructive" onClick={performConfirm} disabled={isSubmittingCycle}>{confirmDialog.type === "close" ? "Cerrar Ciclo" : "Activar Ciclo"}</Button>
           </div>
         </DialogContent>
       </Dialog>

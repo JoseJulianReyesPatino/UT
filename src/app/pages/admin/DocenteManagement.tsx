@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -309,18 +309,18 @@ export function DocenteManagement() {
     setEditDocente({ nombres: "", apellidos: "", telefono: "", email: "", roles: { docente: true, tutor: false, administrador: false, supervisor: false } });
   };
 
-  const filteredDocentes = docentes.filter((doc) => {
-    const matchesSearch =
-      doc.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (doc.roles ?? []).join(", ").toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
-
-    const matchesRole = roleFilter === "all" || (doc.roles ?? []).includes(roleFilter as UserRole);
-
-    return matchesSearch && matchesStatus && matchesRole;
-  });
+  const filteredDocentes = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return docentes.filter((doc) => {
+      const matchesSearch =
+        doc.nombre.toLowerCase().includes(term) ||
+        doc.email.toLowerCase().includes(term) ||
+        (doc.roles ?? []).join(", ").toLowerCase().includes(term);
+      const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
+      const matchesRole = roleFilter === "all" || (doc.roles ?? []).includes(roleFilter as UserRole);
+      return matchesSearch && matchesStatus && matchesRole;
+    });
+  }, [docentes, searchTerm, statusFilter, roleFilter]);
 
   const statusFilterLabelMap: Record<StatusFilter, string> = {
     all: "Todos",
@@ -832,7 +832,11 @@ export function DocenteManagement() {
           }
         }}
         onEmailChange={setStatusConfirmationEmail}
-        onCancel={() => setShowStatusDialog(false)}
+        onCancel={() => {
+          setShowStatusDialog(false);
+          setSelectedDocente(null);
+          setStatusConfirmationEmail("");
+        }}
         onConfirm={confirmToggleStatus}
         isChangingStatus={isChangingStatus}
       />

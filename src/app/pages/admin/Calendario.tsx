@@ -5,7 +5,7 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import apiFetch from "../../lib/api";
+import { apiFetch } from "../../lib/api";
 import { getCalendarDownloadUrl, getCalendarFileUrl } from "../../lib/calendar";
 
 type CalendarMeta = {
@@ -106,10 +106,10 @@ export function CalendarioAdmin() {
               {isLoading ? "Subiendo..." : "Subir calendario"}
             </Button>
             <Input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileSelect} disabled={isLoading} />
-            <Button type="button" variant="outline" disabled={isLoading} onClick={() => window.open(calendarSrc, "_blank", "noopener,noreferrer")}>
+            <Button type="button" variant="outline" disabled={isLoading || !calendar} onClick={() => window.open(calendarSrc, "_blank", "noopener,noreferrer")}>
               <Eye className="mr-2 h-4 w-4" />Abrir PDF
             </Button>
-            <Button type="button" variant="outline" disabled={isLoading} onClick={() => window.open(getCalendarDownloadUrl(), "_blank", "noopener,noreferrer")}>
+            <Button type="button" variant="outline" disabled={isLoading || !calendar} onClick={() => window.open(getCalendarDownloadUrl(), "_blank", "noopener,noreferrer")}>
               <Download className="mr-2 h-4 w-4" />Descargar
             </Button>
           </div>

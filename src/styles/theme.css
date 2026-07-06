@@ -156,6 +156,14 @@
     }
   }
 
+  html.no-transitions,
+  html.no-transitions *,
+  html.no-transitions *::before,
+  html.no-transitions *::after {
+    transition: none !important;
+    animation-duration: 0.01ms !important;
+  }
+
   body {
     @apply bg-background text-foreground;
     position: relative;
@@ -183,7 +191,7 @@
     inset: 0;
     z-index: -2;
     pointer-events: none;
-    background: rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.04);
     transition: background-color 300ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 

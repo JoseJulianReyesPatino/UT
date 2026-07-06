@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Textarea } from "../../components/ui/textarea";
-import apiFetch from "../../lib/api";
+import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { formatGroupCode } from "../../../lib/utils";
 import { useAuth } from "../../context/AuthContext";
@@ -121,6 +121,7 @@ export default function Estadias() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [reviewConfirmation, setReviewConfirmation] = useState<EstadiaPendingDocument | null>(null);
   const [returnConfirmation, setReturnConfirmation] = useState<{ type: "return" | "cancel-return"; document: EstadiaDocumentItem } | null>(null);
+  const [isConfirmingReturn, setIsConfirmingReturn] = useState(false);
   const [returnComment, setReturnComment] = useState("");
   const [noteDialog, setNoteDialog] = useState<{ nota: string; docente: string } | null>(null);
 
@@ -584,34 +585,43 @@ export default function Estadias() {
 
     return () => {
       cancelled = true;
+      setPreviewBlobUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
     };
   }, [previewDocument]);
 
   const handleConfirmReturnAction = async () => {
-    if (!returnConfirmation) return;
-    if (returnConfirmation.type === "return") {
-      const trimmedComment = returnComment.trim();
-      await handleReturnDocument(returnConfirmation.document.id, trimmedComment);
-    } else {
-      const docId = returnConfirmation.document.id;
-      const raw = returnConfirmation.document.documento ?? "Documento";
-      const lastSep = raw.lastIndexOf(" - ");
-      const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
-      const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
-      try {
-        await apiFetch(`/documents/${docId}/review`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "revisado", notes: "Devolución cancelada" }),
-        });
-        setDocumentReturnedState(docId, false);
-        toast.success(`Devolución de ${fileName} cancelada`);
-      } catch {
-        toast.error("No se pudo cancelar la devolución");
+    if (!returnConfirmation || isConfirmingReturn) return;
+    setIsConfirmingReturn(true);
+    try {
+      if (returnConfirmation.type === "return") {
+        const trimmedComment = returnComment.trim();
+        await handleReturnDocument(returnConfirmation.document.id, trimmedComment);
+      } else {
+        const docId = returnConfirmation.document.id;
+        const raw = returnConfirmation.document.documento ?? "Documento";
+        const lastSep = raw.lastIndexOf(" - ");
+        const baseName = lastSep !== -1 ? raw.substring(lastSep + 3).trim() : raw;
+        const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+        try {
+          await apiFetch(`/documents/${docId}/review`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "revisado", notes: "Devolución cancelada" }),
+          });
+          setDocumentReturnedState(docId, false);
+          toast.success(`Devolución de ${fileName} cancelada`);
+        } catch {
+          toast.error("No se pudo cancelar la devolución");
+        }
       }
+      setReturnComment("");
+      setReturnConfirmation(null);
+    } finally {
+      setIsConfirmingReturn(false);
     }
-    setReturnComment("");
-    setReturnConfirmation(null);
   };
 
   return (
@@ -652,16 +662,16 @@ export default function Estadias() {
         </div>
 
         <TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
-          <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+          <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
             Todos
-            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{allDocuments.length}</Badge>
+            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredAll.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+          <TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
             Pendientes
-            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPending.length}</Badge>
+            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPending.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados<Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredReviewed.length}</Badge></TabsTrigger>
-          <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy<Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{reviewedToday.length}</Badge></TabsTrigger>
+          <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados<Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredReviewed.length}</Badge></TabsTrigger>
+          <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy<Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{reviewedToday.length}</Badge></TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4 mt-6">
@@ -1143,7 +1153,7 @@ export default function Estadias() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => { setReturnConfirmation(null); setReturnComment(""); }}>Cancelar</Button>
-            <Button variant={returnConfirmation?.type === "return" ? "destructive" : "success"} onClick={handleConfirmReturnAction}>
+            <Button variant={returnConfirmation?.type === "return" ? "destructive" : "success"} onClick={handleConfirmReturnAction} disabled={isConfirmingReturn}>
               {returnConfirmation?.type === "return" ? "Sí, devolver" : "Sí, cancelar devolución"}
             </Button>
           </DialogFooter>
