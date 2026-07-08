@@ -26,6 +26,7 @@ type ApiDocument = {
   observaciones?: string | null;
   fileUrl?: string | null;
   downloadUrl?: string | null;
+  has_file?: boolean;
   form_id?: number;
   apartado_label?: string;
   isTutoria?: boolean;
@@ -276,6 +277,11 @@ export function DocumentHistory() {
     let isMounted = true;
 
     const loadPreview = async () => {
+      if (previewDocument.has_file === false) {
+        setPreviewError("El archivo de este documento no está disponible en el servidor.");
+        setPreviewLoading(false);
+        return;
+      }
       setPreviewLoading(true);
       setPreviewError(null);
       setPreviewBlobUrl(null);
@@ -424,28 +430,24 @@ export function DocumentHistory() {
     }
   }, [filterTipo]);
 
-  // Estilos para el modo oscuro/claro
-  const cardClassName = "overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/40 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/10 dark:to-emerald-950/20";
-  const documentRowClassName = "relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-lg border border-border transition-colors hover:bg-accent/50 dark:hover:bg-accent/30";
-
   return (
     <div className="relative space-y-6 overflow-hidden">
       <div className="relative space-y-6">
         <div>
-          <h1 className="bg-gradient-to-r from-emerald-700 via-slate-900 to-emerald-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-white dark:to-emerald-300">
+          <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
             Historial de Documentos
           </h1>
-          <p className="text-muted-foreground">
+          <p className="mt-2 text-white/90 drop-shadow-sm dark:text-slate-400">
             Revisa todos los documentos que has enviado
           </p>
         </div>
 
-        <Card className={cardClassName}>
+        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
           <CardHeader>
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <div>
                 <CardTitle className="dark:text-white">Mis Documentos</CardTitle>
-                <CardDescription>
+                <CardDescription className="dark:text-slate-400">
                   {filteredDocuments.length} documentos encontrados
                 </CardDescription>
               </div>
@@ -456,11 +458,11 @@ export function DocumentHistory() {
                     placeholder="Buscar documento..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
+                    className="pl-9 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                   />
                 </div>
                 <Select value={filterTipo} onValueChange={setFilterTipo}>
-                  <SelectTrigger className="w-full min-w-[190px] sm:w-[190px] whitespace-nowrap dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                  <SelectTrigger className="w-full min-w-[190px] sm:w-[190px] whitespace-nowrap rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white">
                     <SelectValue placeholder="Tipo" className="whitespace-nowrap" />
                   </SelectTrigger>
                   <SelectContent className="dark:bg-slate-900 dark:border-slate-700">
@@ -472,7 +474,7 @@ export function DocumentHistory() {
                   </SelectContent>
                 </Select>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-full min-w-[190px] sm:w-[190px] [&>svg:last-child]:hidden dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                  <SelectTrigger className="w-full min-w-[190px] sm:w-[190px] [&>svg:last-child]:hidden rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white">
                     <span className="flex min-w-0 items-center gap-2">
                       <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <SelectValue placeholder="Estado" />
@@ -492,19 +494,19 @@ export function DocumentHistory() {
           <CardContent>
             <div className="max-h-[34rem] space-y-3 overflow-y-auto pr-2">
               {isLoading && (
-                <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground dark:border-slate-700">
+                <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground dark:border-slate-700 dark:text-slate-400">
                   Cargando...
                 </div>
               )}
 
               {!isLoading && loadError && (
-                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive dark:border-red-900/30 dark:bg-red-950/10">
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive dark:border-red-900/30 dark:bg-red-950/10 dark:text-red-400">
                   {loadError}
                 </div>
               )}
 
               {!isLoading && !loadError && filteredDocuments.length === 0 && (
-                <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground dark:border-slate-700">
+                <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground dark:border-slate-700 dark:text-slate-400">
                   No hay documentos que coincidan con los filtros actuales.
                 </div>
               )}
@@ -527,10 +529,10 @@ export function DocumentHistory() {
                 return (
                   <div
                     key={doc.id}
-                    className={documentRowClassName}
+                    className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-2xl border border-border/70 transition-colors hover:bg-accent/50 dark:border-slate-700 dark:hover:bg-slate-900/50"
                   >
                     <div className="flex items-start gap-3 flex-1">
-                      <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 dark:bg-slate-800">
+                      <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center shrink-0 dark:bg-slate-800">
                         <FileText className="h-6 w-6 text-muted-foreground dark:text-slate-400" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -538,33 +540,33 @@ export function DocumentHistory() {
                           {fileNameUpper}
                         </p>
 
-                        <Badge variant="secondary" className="mt-1 text-xs font-medium dark:bg-slate-800 dark:text-slate-200">
+                        <Badge variant="secondary" className="mt-1 text-xs font-medium rounded-full dark:bg-slate-800 dark:text-slate-200">
                           {tipoDisplayLabel}
                         </Badge>
 
                         <div className="mt-2 flex flex-wrap gap-2">
                           {hasCarrera && (
-                            <Badge variant="outline" className="text-xs font-medium dark:border-slate-700 dark:text-slate-300">
+                            <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
                               {doc.carrera}
                             </Badge>
                           )}
                           {planLabel && (
-                            <Badge variant="outline" className="text-xs font-medium dark:border-slate-700 dark:text-slate-300">
+                            <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
                               {planLabel}
                             </Badge>
                           )}
                           {!isTutoria && !isEstadias && hasMateria && (
-                            <Badge variant="outline" className="text-xs font-medium dark:border-slate-700 dark:text-slate-300">
+                            <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
                               {doc.materia}
                             </Badge>
                           )}
                           {hasGrupo && (
-                            <Badge variant="outline" className="text-xs font-medium dark:border-slate-700 dark:text-slate-300">
+                            <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
                               {`Grupo ${doc.grupo}`}
                             </Badge>
                           )}
                           {!isTutoria && !isEstadias && parcialLabel && (
-                            <Badge variant="outline" className="text-xs font-medium dark:border-slate-700 dark:text-slate-300">
+                            <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
                               {parcialLabel}
                             </Badge>
                           )}
@@ -592,7 +594,7 @@ export function DocumentHistory() {
                             ? "outline"
                             : "destructive"
                         }
-                        className="dark:border-slate-700"
+                        className="rounded-full dark:border-slate-700"
                       >
                         {doc.status === "revisado"
                           ? "Revisado"
@@ -606,13 +608,13 @@ export function DocumentHistory() {
                             variant="ghost"
                             size="icon"
                             onClick={() => openDocumentWithAuth(doc, "view")}
-                            disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
-                            className="dark:hover:bg-slate-800"
+                            disabled={doc.has_file === false || loadingPdfId === Number(doc.id)}
+                            className="rounded-xl dark:hover:bg-slate-800"
                           >
                             {loadingPdfId === Number(doc.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Ver documento</TooltipContent>
+                        <TooltipContent>{doc.has_file === false ? "Archivo no disponible en el servidor" : "Ver documento"}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -620,13 +622,13 @@ export function DocumentHistory() {
                             variant="ghost"
                             size="icon"
                             onClick={() => openDocumentWithAuth(doc, "download")}
-                            disabled={!doc.fileUrl || loadingPdfId === Number(doc.id)}
-                            className="dark:hover:bg-slate-800"
+                            disabled={doc.has_file === false || loadingPdfId === Number(doc.id)}
+                            className="rounded-xl dark:hover:bg-slate-800"
                           >
                             <Download className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Descargar documento</TooltipContent>
+                        <TooltipContent>{doc.has_file === false ? "Archivo no disponible en el servidor" : "Descargar documento"}</TooltipContent>
                       </Tooltip>
                     </div>
                   </div>
@@ -638,11 +640,11 @@ export function DocumentHistory() {
       </div>
 
       <Dialog open={previewDocument !== null} onOpenChange={(open) => { if (!open) setPreviewDocument(null); }}>
-        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col dark:bg-slate-950 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle>{previewDocument ? getFileNameOnly(previewDocument.nombre) : ""}</DialogTitle>
+            <DialogTitle className="dark:text-white">{previewDocument ? getFileNameOnly(previewDocument.nombre) : ""}</DialogTitle>
             {previewDocument && (
-              <DialogDescription>
+              <DialogDescription className="dark:text-slate-400">
                 {previewDocument.materia ? `${previewDocument.materia} · ` : ""}{previewDocument.carrera}
               </DialogDescription>
             )}
@@ -650,7 +652,7 @@ export function DocumentHistory() {
           {previewDocument && (
             <div className="flex-1 min-h-0">
               {previewLoading ? (
-                <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground dark:border-slate-700 dark:text-slate-400">
                   <p>Cargando...</p>
                 </div>
               ) : previewError ? (
@@ -658,8 +660,8 @@ export function DocumentHistory() {
                   {previewError}
                 </div>
               ) : previewBlobUrl ? (
-                <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border">
-                  <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
+                <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border dark:border-slate-700">
+                  <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline dark:border-slate-700 dark:text-emerald-400">
                     Abrir documento en nueva pestaña
                   </a>
                 </object>

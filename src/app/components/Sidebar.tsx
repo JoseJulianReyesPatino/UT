@@ -303,15 +303,27 @@ export function Sidebar(props: Readonly<SidebarProps>) {
 
     void loadUnreadMessagesCount();
 
+    let lastCountUpdateTime = 0;
+
+    const handleCountUpdated = (e: Event) => {
+      lastCountUpdateTime = Date.now();
+      const count = (e as CustomEvent<{ unread: number }>).detail?.unread;
+      if (typeof count === 'number' && isMounted) setUnreadMessagesCount(count);
+    };
+
     const handleMessagesUpdated = () => {
+      // Omitir llamada a API si ya recibimos el total preciso hace menos de 500ms
+      if (Date.now() - lastCountUpdateTime < 500) return;
       void loadUnreadMessagesCount();
     };
 
+    window.addEventListener('ut-messages-count-updated', handleCountUpdated as EventListener);
     window.addEventListener('ut-messages-updated', handleMessagesUpdated as EventListener);
     const intervalId = window.setInterval(loadUnreadMessagesCount, 30000);
 
     return () => {
       isMounted = false;
+      window.removeEventListener('ut-messages-count-updated', handleCountUpdated as EventListener);
       window.removeEventListener('ut-messages-updated', handleMessagesUpdated as EventListener);
       window.clearInterval(intervalId);
     };

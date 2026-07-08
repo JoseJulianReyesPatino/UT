@@ -45,20 +45,20 @@ export function PdfPreview({ file, title = "Vista previa del PDF", onRemove }: P
 
   return (
     <>
-      <div className="overflow-hidden rounded-2xl border border-border/70 bg-background shadow-sm">
-        <object data={previewUrl} type="application/pdf" className="h-44 w-full sm:h-52">
-          <div className="flex h-44 items-center justify-center px-3 text-center text-xs text-muted-foreground sm:h-52">
-            <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-              Vista previa no disponible aquí, ábrelo en una pestaña nueva
-            </a>
-          </div>
-        </object>
+     <div className="overflow-hidden rounded-2xl border border-border/70 bg-background shadow-sm dark:border-slate-700 dark:bg-slate-900">
+  <object data={previewUrl} type="application/pdf" className="h-44 w-full sm:h-52">
+    <div className="flex h-44 items-center justify-center px-3 text-center text-xs text-muted-foreground sm:h-52 dark:bg-slate-900 dark:text-slate-400">
+      <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline dark:text-emerald-400">
+        Vista previa no disponible aquí, ábrelo en una pestaña nueva
+      </a>
+    </div>
+  </object>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-muted/20 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <FileText className="h-3.5 w-3.5 shrink-0" />
-            <span className="text-xs">Documento cargado</span>
-          </div>
+  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-muted/20 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">
+    <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground dark:text-slate-300">
+      <FileText className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate text-xs font-medium">{file.name}</span>
+    </div>
 
           <div className="flex flex-wrap items-center gap-1">
             <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
@@ -89,37 +89,43 @@ export function PdfPreview({ file, title = "Vista previa del PDF", onRemove }: P
                 >
                   <X className="h-3.5 w-3.5" />
                 </Button>
-                <AlertDialogContent className="w-[calc(100vw-1rem)] max-w-[32rem] overflow-hidden p-4 sm:w-[min(92vw,32rem)] sm:p-6">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Eliminar archivo</AlertDialogTitle>
-                    <AlertDialogDescription className="break-words leading-6">
-                      Esta acción quitará <span className="block break-all font-medium text-foreground">{file.name}</span> de la lista. No se podrá deshacer.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter className="sm:flex-row">
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => {
-                        setRemoveOpen(false);
-                        onRemove();
-                      }}
-                    >
-                      Sí, eliminar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
+<AlertDialogContent
+  className="w-[calc(100vw-1rem)] max-w-[32rem] overflow-hidden p-4 dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md sm:w-[min(92vw,32rem)] sm:p-6"
+  overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
+>  <AlertDialogHeader>
+    <AlertDialogTitle className="dark:text-white">Eliminar archivo</AlertDialogTitle>
+    <AlertDialogDescription className="text-justify break-words leading-6 dark:text-slate-400">
+  Esta acción quitará <span className="break-all font-medium text-foreground dark:text-slate-200">{file.name}</span> de la lista. No se podrá deshacer.
+</AlertDialogDescription>
+  </AlertDialogHeader>
+  <AlertDialogFooter className="sm:flex-row">
+    <AlertDialogCancel className="dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">Cancelar</AlertDialogCancel>
+    <AlertDialogAction
+      onClick={() => {
+        setRemoveOpen(false);
+        onRemove();
+      }}
+      className="dark:bg-rose-600 dark:text-white dark:hover:bg-rose-700"
+    >
+      Sí, eliminar
+    </AlertDialogAction>
+  </AlertDialogFooter>
+</AlertDialogContent>
               </AlertDialog>
             ) : null}
           </div>
         </div>
       </div>
 
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="flex h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none flex-col overflow-hidden p-4 sm:h-[94vh] sm:w-[min(98vw,80rem)] sm:p-6">
-          <DialogHeader className="min-w-0 space-y-1 pr-6 text-left">
-            <DialogTitle className="break-words text-left">{file.name}</DialogTitle>
-            <DialogDescription className="break-words">{title}</DialogDescription>
-          </DialogHeader>
+     <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+  <DialogContent
+    className="flex h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none flex-col overflow-hidden p-4 dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md sm:h-[94vh] sm:w-[min(98vw,80rem)] sm:p-6"
+    overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
+  >
+    <DialogHeader className="min-w-0 space-y-1 pr-6 text-left">
+      <DialogTitle className="break-words text-left dark:text-white">{file.name}</DialogTitle>
+      <DialogDescription className="break-words dark:text-slate-400">{title}</DialogDescription>
+    </DialogHeader>
 
           <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-muted/20">
             <object data={previewUrl} type="application/pdf" className="h-full w-full">

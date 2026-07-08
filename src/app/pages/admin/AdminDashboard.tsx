@@ -121,10 +121,12 @@ const isToday = (value?: string | null) => {
   );
 };
 
+const addPdfExt = (name: string) => name.toUpperCase().endsWith(".PDF") ? name : `${name}.pdf`;
+
 const mapPendingDocument = (doc: ApiDocument): PendingDocument => ({
   id: Number(doc.id),
   docente: doc.uploaded_by_name ?? "Docente",
-  documento: doc.title ?? "Documento sin título",
+  documento: addPdfExt(doc.title ?? "Documento sin título"),
   carrera: doc.carrera_label ?? "",
   tipo: doc.apartado_label ?? doc.form_title ?? "Documento",
   fecha: formatDate(doc.submitted_at),
@@ -138,7 +140,7 @@ const mapReviewedDocument = (doc: ApiDocument): ReviewedDocument => {
   return {
     id: Number(doc.id),
     docente: doc.uploaded_by_name ?? "Docente",
-    documento: doc.title ?? "Documento sin título",
+    documento: addPdfExt(doc.title ?? "Documento sin título"),
     carrera: doc.carrera_label ?? "",
     tipo: doc.apartado_label ?? doc.form_title ?? "Documento",
     fecha: formatDate(doc.submitted_at),

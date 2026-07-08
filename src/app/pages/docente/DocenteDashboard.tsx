@@ -41,8 +41,6 @@ interface DocenteDashboardProps {
   onNavigate?: (view: string) => void;
 }
 
-// Decorative background icons were removed
-
 type DocumentItem = {
   id: number;
   nombre: string;
@@ -65,6 +63,47 @@ type FormItem = {
   due_at?: string | null;
   access_roles?: string[];
 };
+
+// --- Arreglo de banners para el carrusel ---
+const introBanners = [
+  "/images/intro-banner-1.jpg",
+  "/images/intro-banner-2.jpg",
+  "/images/intro-banner-3.jpg",
+  "/images/intro-banner-4.jpg",
+];
+
+// --- Componente del carrusel (ocupa todo el cuadro) ---
+function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: string[]; href: string; intervalMs?: number }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const timer = setInterval(() => {
+      setActiveIndex((current) => (current + 1) % images.length);
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [images.length, intervalMs]);
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="relative block h-48 w-full overflow-hidden rounded-2xl transition-transform duration-200 hover:scale-[1.01] sm:h-56"
+    >
+      {images.map((src, index) => (
+        <img
+          key={src}
+          src={src}
+          alt="Antes de comenzar - Manual Docente"
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out ${
+            index === activeIndex ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ))}
+    </a>
+  );
+}
 
 export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const { onNavigate } = props;
@@ -328,18 +367,18 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -right-12 top-8 h-40 w-40 rounded-full bg-emerald-100/20 blur-3xl dark:bg-emerald-500/5" />
         <div className="absolute -left-10 bottom-0 h-52 w-52 rounded-full bg-sky-100/10 blur-3xl dark:bg-sky-500/5" />
-        {/* background icons removed */}
       </div>
 
       <div className="relative z-10">
-        <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60">
+        {/* Card de bienvenida con carrusel */}
+        <Card className="overflow-hidden rounded-3xl border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
           <CardContent className="space-y-5 p-5 sm:p-7">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-2">
                 <h2 className="text-2xl font-semibold tracking-tight text-slate-800 dark:text-white">Antes de comenzar</h2>
                 {!isIntroOpen && (
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Haz clic en el caret para ver la documentación y las indicaciones iniciales.
+                    Haz clic en el caret para ver los banners informativos.
                   </p>
                 )}
               </div>
@@ -351,7 +390,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                 onClick={() => setIsIntroOpen((current) => !current)}
                 aria-label={isIntroOpen ? "Contraer información" : "Expandir información"}
                 title={isIntroOpen ? "Contraer información" : "Expandir información"}
-                className="h-11 w-11 rounded-full border-0 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-md transition-transform duration-200 hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60"
+                className="h-11 w-11 rounded-2xl border-0 bg-emerald-600 text-white shadow-md transition-transform duration-200 hover:scale-105 hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 dark:bg-emerald-700 dark:hover:bg-emerald-800"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -366,43 +405,12 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             </div>
 
             {isIntroOpen && (
-              <div className="rounded-[22px] border border-slate-200/80 bg-gradient-to-br from-slate-50 via-emerald-50/35 to-slate-100 p-5 shadow-sm ring-1 ring-slate-200/70 dark:border-emerald-900/60 dark:from-emerald-950/15 dark:via-slate-950 dark:to-slate-900 dark:ring-emerald-900/20 sm:p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="max-w-3xl space-y-3">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50/95 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-emerald-700 shadow-sm dark:border-emerald-900/60 dark:bg-slate-900/60 dark:text-emerald-300">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                      Nuevo ingreso
-                    </span>
-                    <div>
-                      <h3 className="text-xl font-semibold text-slate-800 dark:text-white">Antes de comenzar</h3>
-                      <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
-                        Revisa la guía inicial y completa la configuración antes de empezar a cargar documentos.
-                      </p>
-                    </div>
-                    <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                      <p>
-                        Es fundamental leer la documentación proporcionada, ya que explica detalladamente el funcionamiento completo del sistema.
-                      </p>
-                      <p>
-                        Además, es necesario completar la configuración de su perfil antes de proceder con otras acciones.
-                      </p>
-                      <p className="font-medium text-slate-800 dark:text-slate-200">Gracias por su atención y colaboración.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 lg:items-end">
-                    <Button asChild className="w-full rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-600 lg:w-auto">
-                      <a href={manualDocenteUrl} target="_blank" rel="noreferrer">
-                        Manual Docente
-                      </a>
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              <AutoFadeBannerCarousel images={introBanners} href={manualDocenteUrl} />
             )}
           </CardContent>
         </Card>
 
+        {/* Stats cards */}
         <div className="relative z-10 mt-3 grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
           {stats.map((stat) => {
             const Icon = stat.icon;
@@ -417,17 +425,17 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                 onClick={handleClick}
                 className="cursor-pointer text-left transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
               >
-                <Card className={`h-full overflow-hidden border shadow-sm hover:shadow-md transition ${stat.cardClass}`}>
+                <Card className={`h-full overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60 hover:shadow-md transition ${stat.cardClass}`}>
                   <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
                   <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm">{stat.title}</CardTitle>
+                    <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm dark:text-white">{stat.title}</CardTitle>
                     <div className="h-9 w-9 rounded-xl bg-emerald-100/80 dark:bg-emerald-950/40 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5 sm:h-10 sm:w-10">
                       {Icon ? <Icon className="h-4 w-4 text-emerald-700 dark:text-emerald-300" aria-hidden /> : null}
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <div className="text-2xl leading-none font-bold text-foreground sm:text-2xl">{stat.value}</div>
-                    <p className="mt-1 text-[11px] leading-snug text-foreground/70 sm:text-xs">{stat.description}</p>
+                    <div className="text-2xl leading-none font-bold text-foreground dark:text-white sm:text-2xl">{stat.value}</div>
+                    <p className="mt-1 text-[11px] leading-snug text-foreground/70 sm:text-xs dark:text-slate-400">{stat.description}</p>
                   </CardContent>
                 </Card>
               </button>
@@ -435,9 +443,10 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           })}
         </div>
 
+        {/* Documentos Recientes y Próximas Entregas */}
         <div className="relative z-10 mt-3 grid gap-6 xl:grid-cols-2">
           {/* Card de Documentos Recientes */}
-          <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60">
+          <Card className="overflow-hidden rounded-3xl border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -484,9 +493,9 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                     return (
                       <div
                         key={doc.id}
-                        className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white/70 p-3 transition-colors hover:bg-slate-100/90 dark:border-slate-800 dark:bg-slate-900/70 dark:hover:bg-slate-900"
+                        className="flex min-w-0 items-center gap-3 rounded-2xl border border-border/70 bg-card/70 p-3 transition-colors hover:bg-accent/50 dark:border-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-900"
                       >
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                           <FileText className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -496,20 +505,25 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                               {[doc.materia, doc.grupo].filter(Boolean).join(' · ')}
                             </p>
                           )}
+                          {doc.fecha && (
+                            <p className="truncate text-[11px] text-slate-500 dark:text-slate-500">
+                              {formatDate(doc.fecha)}
+                            </p>
+                          )}
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                          <Badge variant={docStatusVariant} className="inline-flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-xs">
+                          <Badge variant={docStatusVariant} className="inline-flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-xs rounded-full dark:border-slate-700">
                             <DocStatusIcon className="h-3.5 w-3.5" />
                             {docStatusLabel}
                           </Badge>
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-8 w-8 shrink-0"
+                            className="h-9 w-9 shrink-0 rounded-xl hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
                             onClick={() => openDocument(doc)}
                             aria-label="Ver documento"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-5 w-5 text-slate-600 dark:text-slate-400" />
                           </Button>
                         </div>
                       </div>
@@ -521,14 +535,14 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           </Card>
 
           {/* Card de Próximas Entregas */}
-          <Card className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-slate-800/70 dark:bg-slate-950/60">
+          <Card className="overflow-hidden rounded-3xl border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Próximas Entregas</CardTitle>
                   <CardDescription className="mt-1 text-slate-500 dark:text-slate-400">Fechas límite importantes</CardDescription>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-muted-foreground dark:bg-slate-800 dark:text-slate-300">
                   <Calendar className="h-5 w-5" />
                 </div>
               </div>
@@ -558,7 +572,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                       return (
                         <div
                           key={index}
-                          className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-900/70"
+                          className="flex items-center justify-between rounded-2xl border border-border/70 bg-card/70 p-3 dark:border-slate-700 dark:bg-slate-900/70"
                         >
                           <div>
                             <p className="text-sm font-semibold text-slate-800 dark:text-white">{entrega.titulo}</p>
@@ -580,12 +594,12 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                     return (
                       <div
                         key={`${entrega.titulo}-${index}`}
-                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-900/70"
+                        className="flex items-center justify-between rounded-2xl border border-border/70 bg-card/70 p-3 dark:border-slate-700 dark:bg-slate-900/70"
                       >
                         <div>
                           {tituloVisible && (
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold text-slate-800 dark:text-white">{tituloVisible}</p>
+                              <p className="text-sm font-bold text-slate-900 dark:text-white">{tituloVisible}</p>
                             </div>
                           )}
                           {detalle !== tituloVisible && (
@@ -623,14 +637,14 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
       {/* Diálogo de vista previa del documento */}
       <Dialog open={Boolean(selectedDocument)} onOpenChange={(open) => { if (!open) closePreview(); }}>
-        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col dark:bg-slate-950 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle>{selectedDocument?.nombre || "Documento"}</DialogTitle>
+            <DialogTitle className="dark:text-white">{selectedDocument?.nombre || "Documento"}</DialogTitle>
           </DialogHeader>
           {selectedDocument && (
             <div className="flex-1 min-h-0">
               {previewLoading ? (
-                <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground dark:border-slate-700 dark:text-slate-400">
                   <p>Cargando...</p>
                 </div>
               ) : previewError ? (
@@ -638,8 +652,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                   {previewError}
                 </div>
               ) : previewBlobUrl ? (
-                <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border">
-                  <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
+                <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border dark:border-slate-700">
+                  <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline dark:border-slate-700 dark:text-emerald-400">
                     Abrir documento en nueva pestaña
                   </a>
                 </object>

@@ -1,19 +1,21 @@
 ﻿import React, { useMemo, useState, useEffect } from "react";
-import { ArrowLeft, Ban, ChevronRight, FileText, Upload, X, History } from "lucide-react";
+import { ArrowLeft, Ban, ChevronRight, FileText, Upload, X, History, Calendar, CalendarClock, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 import { PdfPreview } from "../../components/PdfPreview";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { DocumentHistoryCard } from "../../components/DocumentHistoryCard";
+import { getCalendarFileUrl } from "../../lib/calendar";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
-import { fetchDocumentBlob, getDocumentDisplayFileName } from "../../lib/documents";
+import { fetchDocumentBlob } from "../../lib/documents";
 
 type DocumentoTutorias =
   | "carga-academica"
@@ -41,6 +43,7 @@ interface TutoriasFormData {
 interface TutoriasPageProps {
   initialType?: DocumentoTutorias | null;
   onNavigateHome?: () => void;
+  deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null;
 }
 
 const documentTypes: DocumentoConfig[] = [
@@ -98,7 +101,7 @@ const initialFormData: TutoriasFormData = {
 };
 
 export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
-  const { initialType = null, onNavigateHome } = props;
+  const { initialType = null, onNavigateHome, deadlineInfo } = props;
   const { user } = useAuth();
   const [selectedType, setSelectedType] = useState<DocumentoTutorias | null>(initialType);
   const [formData, setFormData] = useState<TutoriasFormData>(initialFormData);
@@ -106,6 +109,11 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewItem, setPreviewItem] = useState<{ id: number; nombre: string } | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const selectedConfig = useMemo(
     () => documentTypes.find((type) => type.id === selectedType) ?? null,
@@ -161,11 +169,8 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
     setSelectedType(type);
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files) return;
-
-    const newFiles = Array.from(files);
+  const processFiles = (fileList: FileList | File[]) => {
+    const newFiles = Array.from(fileList);
     const totalFiles = formData.archivos.length + newFiles.length;
 
     if (totalFiles > 3) {
@@ -190,6 +195,26 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
       archivos: [...current.archivos, ...newFiles],
     }));
   };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files) return;
+    processFiles(event.target.files);
+    event.target.value = "";
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+    if (formData.archivos.length >= 3) return;
+    if (event.dataTransfer.files?.length) processFiles(event.dataTransfer.files);
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (formData.archivos.length < 3) setIsDragging(true);
+  };
+
+  const handleDragLeave = () => setIsDragging(false);
 
   const removeFile = (index: number) => {
     setFormData((current) => ({
@@ -234,27 +259,27 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
     return 'Documento.pdf';
   };
 
-  const openDocument = async (id: number, action: "view" | "download") => {
+  const openPreview = async (doc: any) => {
+    const nombre = getUploadedFileName(doc);
+    setPreviewItem({ id: doc.id, nombre });
+    setPreviewBlobUrl(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
     try {
-      const blob = await fetchDocumentBlob(id, action === "download");
-      const pdfBlob = new Blob([blob], { type: "application/pdf" });
-      const blobUrl = URL.createObjectURL(pdfBlob);
-
-      if (action === "view") {
-        window.open(blobUrl, "_blank");
-      } else {
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = "";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      const blob = await fetchDocumentBlob(doc.id);
+      setPreviewBlobUrl(URL.createObjectURL(blob));
     } catch {
-      toast.error("No fue posible abrir el documento");
+      setPreviewError("No fue posible cargar el documento.");
+    } finally {
+      setPreviewLoading(false);
     }
+  };
+
+  const closePreview = () => {
+    if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+    setPreviewBlobUrl(null);
+    setPreviewItem(null);
+    setPreviewError(null);
   };
 
   const populateFormForEdit = (document: any) => {
@@ -270,19 +295,26 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
   const uploadMultipleFiles = async (files: File[], basePayload: any) => {
     const uploadedIds = [];
 
-    for (const file of files) {
-      const title = `${basePayload.title} - ${file.name}`;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const title = file.name.replace(/\.pdf$/i, "").substring(0, 50);
 
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', file, file.name);
       fd.append('form_id', String(basePayload.form_id));
       fd.append('title', title);
       if (basePayload.apartado_label) fd.append('apartado_label', basePayload.apartado_label);
       if (basePayload.original_document_id) fd.append('original_document_id', String(basePayload.original_document_id));
       if (basePayload.nota) fd.append('nota', basePayload.nota);
 
-      const result = await apiFetch("/documents", { method: "POST", body: fd });
-      uploadedIds.push(result?.data?.id);
+      try {
+        const result = await apiFetch("/documents", { method: "POST", body: fd });
+        uploadedIds.push(result?.data?.id);
+      } catch (err: any) {
+        const label = files.length > 1 ? ` (archivo ${i + 1}: "${file.name}")` : "";
+        const msg = err?.message ?? "No fue posible subir el archivo";
+        throw new Error(`${msg}${label}`);
+      }
     }
 
     return uploadedIds;
@@ -332,114 +364,101 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
     }
   };
 
-  const docenteNombre = user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "" : "";
-
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-2 sm:p-4">
-      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-sm font-medium text-emerald-700 shadow-sm dark:border-emerald-500/30 dark:bg-slate-900/70 dark:text-emerald-300">
-              <FileText className="h-4 w-4" />
-              Envío de tutorías
-            </div>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Tutorías</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">Seleccione el tipo de archivo que desea subir con el mismo diseño de Planeación.</p>
-            </div>
+    <div className="max-w-4xl mx-auto space-y-1">
+      {/* Fila superior: fecha límite + acciones */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {deadlineInfo && (
+          <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+            <span>
+              Cierra el <strong>{deadlineInfo.formattedDeadline}</strong>
+              {deadlineInfo.isUrgent && " · Tiempo limitado"}
+            </span>
           </div>
-
-          {selectedConfig && (
-            <div className="flex flex-wrap gap-2 lg:justify-end">
-              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" className="w-full justify-center rounded-2xl border-slate-200 bg-white/80 px-4 py-5 text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800">
-                    <History className="mr-2 h-4 w-4" />
-                    Historial
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="sm:max-w-xl overflow-y-auto dark:border-slate-700 dark:bg-slate-950">
-                  <SheetHeader>
-                    <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
-                    <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
-                  </SheetHeader>
-                  <div className="mt-4 space-y-4">
-                    {history.length > 0 ? (
-                      <ScrollArea className="h-[min(78vh,44rem)] rounded-2xl border border-border bg-background/40 pr-2 dark:border-slate-700 dark:bg-slate-900/30">
-                        <div className="grid gap-3 p-2">
-                          {history.map((h) => (
-                            <DocumentHistoryCard
-                              key={h.id}
-                              title={h.title ?? h.file_path}
-                              fileName={getUploadedFileName(h)}
-                              carrera={h.carrera_label}
-                              subject={h.materia}
-                              submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                              status={h.status}
-                              returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
-                              onView={() => openDocument(h.id, "view")}
-                              onEdit={() => populateFormForEdit(h)}
-                            />
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    ) : formData.archivos.length === 0 ? (
-                      <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
-                    ) : (
-                      <div>
-                        <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
-                        <ul className="space-y-2">
-                          {formData.archivos.map((f, i) => (
-                            <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.open(getCalendarFileUrl(), "_blank")}
+          className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
+        >
+          <Calendar className="mr-2 h-4 w-4" />
+          Calendario
+        </Button>
+        {selectedConfig && (
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+                <History className="mr-2 h-4 w-4" />
+                Historial
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className="sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
+              overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
+            >
+              <SheetHeader>
+                <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
+                <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
+              </SheetHeader>
+              <div className="mt-4 space-y-4">
+                {history.length > 0 ? (
+                  <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
+                    <div className="grid gap-3 p-1">
+                      {history.map((h) => (
+                        <DocumentHistoryCard
+                          key={h.id}
+                          title=""
+                          fileName={getUploadedFileName(h)}
+                          carrera={h.carrera_label}
+                          subject={h.materia}
+                          submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          status={h.status}
+                          returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
+                          onView={() => openPreview(h)}
+                          onEdit={() => populateFormForEdit(h)}
+                        />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                ) : formData.archivos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
+                ) : (
+                  <div>
+                    <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
+                    <ul className="space-y-2">
+                      {formData.archivos.map((f, i) => (
+                        <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
+                      ))}
+                    </ul>
                   </div>
-                </SheetContent>
-              </Sheet>
-            </div>
-          )}
-        </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
-        <div className="rounded-[24px] border border-slate-200/80 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-              <FileText className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-semibold text-slate-900 dark:text-white">Recordatorio</p>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Adjunta los documentos PDF para continuar con la revisión.</p>
-            </div>
-          </div>
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-            <History className="h-4 w-4" />
-            Envío en tiempo
-          </div>
-        </div>
-
-        <div className="rounded-[24px] border border-slate-200/80 bg-slate-50 p-4 text-slate-900 shadow-sm dark:border-slate-800 dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 dark:text-white">
-          <div className="flex items-center gap-2">
-            <div className="rounded-full bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-              <FileText className="h-4 w-4" />
-            </div>
-            <p className="font-semibold">Tu envío queda listo</p>
-          </div>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Revisa cada campo, adjunta tus PDF y envía el documento con confianza.</p>
-        </div>
+      {/* Título y subtítulo */}
+      <div className="space-y-1.5 pt-1">
+        <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
+          {selectedConfig ? selectedConfig.titulo : "Tutorías"}
+        </h1>
+        <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
+          {selectedConfig 
+            ? selectedConfig.descripcion 
+            : "Selecciona el tipo de archivo que deseas subir"}
+        </p>
       </div>
 
       {selectedConfig === null ? (
-        <Card className="dark:border-slate-800/70 dark:bg-slate-950/60">
-          <CardHeader className="dark:border-slate-700">
-            <CardTitle className="dark:text-white">Tipos de archivo</CardTitle>
-            <CardDescription className="dark:text-slate-400">Elige una opción para abrir su formulario correspondiente.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+          <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
+            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Selecciona una opción para continuar</p>
+            
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
               {documentTypes.map((type) => (
                 <Button
                   key={type.id}
@@ -458,32 +477,37 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden dark:border-slate-800/70 dark:bg-slate-950/60">
-          <CardHeader className="border-b bg-muted/30 dark:border-slate-700">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-1">
-                <CardTitle className="text-2xl tracking-tight dark:text-white">{selectedConfig.titulo}</CardTitle>
-                <CardDescription className="dark:text-slate-400">{selectedConfig.descripcion}</CardDescription>
-                {editingDocumentId && (
-                  <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-                    Estás editando el documento. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
-                  </div>
-                )}
+        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+          <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Los campos marcados con * son obligatorios.</p>
               </div>
-              <Button variant="outline" onClick={() => { setSelectedType(null); setEditingDocumentId(null); }} className="sm:self-start dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => { setSelectedType(null); setEditingDocumentId(null); }} 
+                className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white"
+              >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Cambiar tipo
               </Button>
             </div>
-          </CardHeader>
 
-          <CardContent className="space-y-5 pt-6">
-            <div className="space-y-2 text-sm">
-              <p className="font-medium dark:text-white">Subir archivo *</p>
-              <p className="text-muted-foreground dark:text-slate-400">
-                Adjuntar el documento en formato PDF, con un límite de 5 MB por archivo. En caso de ser necesario, se permite la carga simultánea de hasta tres archivos.
-              </p>
-              <div className="rounded-2xl border-2 border-dashed border-slate-200 p-6 text-center transition-colors hover:border-primary/40 dark:border-slate-700 dark:hover:border-emerald-500/40">
+            {editingDocumentId && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                Estás editando el documento. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+              </div>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Documentos */}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="dark:text-white">Subir archivo *</Label>
+                <p className="text-sm text-muted-foreground dark:text-slate-400">
+                  Adjuntar el documento en formato PDF, con un límite de 5 MB por archivo. En caso de ser necesario, se permite la carga simultánea de hasta tres archivos.
+                </p>
+
                 <input
                   type="file"
                   multiple
@@ -492,88 +516,131 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
                   onChange={handleFileChange}
                   disabled={formData.archivos.length >= 3}
                 />
-                <label htmlFor="tutorias-pdf-upload" className="block cursor-pointer space-y-2">
-                  <Upload className="mx-auto h-8 w-8 text-muted-foreground dark:text-slate-500" />
-                  <p className="text-sm font-medium dark:text-white">{selectedConfig.etiquetaCarga}</p>
-                  <p className="text-xs text-muted-foreground dark:text-slate-400">{getArchivosLabel()}</p>
-                  <p className="text-xs text-muted-foreground dark:text-slate-400">{getEspaciosLabel()}</p>
-                </label>
-              </div>
 
-              {formData.archivos.length > 0 && (
-                <div className="space-y-2">
-                  {formData.archivos.map((archivo, index) => (
-                    <div
-                      key={`${archivo.name}-${archivo.size}-${index}`}
-                      className="flex items-center justify-between rounded-lg border border-success/20 bg-success/10 p-3 dark:border-emerald-800/50 dark:bg-emerald-950/20"
-                    >
-                      <div className="flex flex-1 items-center gap-2 text-sm">
-                        <FileText className="h-4 w-4 text-success dark:text-emerald-400" />
-                        <span className="font-medium dark:text-white">{archivo.name}</span>
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={`rounded-3xl border-2 border-dashed transition-all ${
+                    formData.archivos.length === 0 ? "p-6 text-center" : "p-4"
+                  } ${
+                    isDragging
+                      ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30"
+                      : "border-border bg-background/60 hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40"
+                  }`}
+                >
+                  {formData.archivos.length === 0 ? (
+                    <label htmlFor="tutorias-pdf-upload" className="block cursor-pointer space-y-3">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors dark:bg-emerald-500/10 dark:text-emerald-400">
+                        <Upload className="h-6 w-6" />
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => removeFile(index)} className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400">
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div>
+                        <p className="text-sm font-medium dark:text-white">{selectedConfig.etiquetaCarga}</p>
+                        <p className="text-xs text-muted-foreground dark:text-slate-400">
+                          {isDragging ? "Suelta aquí para cargar" : `${getArchivosLabel()} · ${getEspaciosLabel()}`}
+                        </p>
+                      </div>
+                    </label>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className={`grid gap-3 ${formData.archivos.length > 1 ? "sm:grid-cols-2" : ""} ${formData.archivos.length > 2 ? "lg:grid-cols-3" : ""}`}>
+                        {formData.archivos.map((archivo, index) => (
+                          <PdfPreview
+                            key={`${archivo.name}-${archivo.size}-${index}`}
+                            file={archivo}
+                            title="Documento cargado"
+                            onRemove={() => removeFile(index)}
+                          />
+                        ))}
+                      </div>
+
+                      {formData.archivos.length < 3 && (
+                        <label
+                          htmlFor="tutorias-pdf-upload"
+                          className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-background/60 py-3 text-sm text-muted-foreground transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:hover:border-emerald-500/40"
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                          Agregar otro archivo · {getEspaciosLabel()}
+                        </label>
+                      )}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
+              </div>
 
-              {formData.archivos.length > 0 && (
-                <div className="space-y-2 pt-2">
-                  {formData.archivos.map((archivo, index) => (
-                    <PdfPreview
-                      key={`preview-${archivo.name}-${archivo.size}-${index}`}
-                      file={archivo}
-                      title={`Vista previa - ${archivo.name}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label className="dark:text-white">Nota para administrador (opcional)</Label>
-              <Textarea
-                value={formData.nota}
-                onChange={(event) => setFormData((current) => ({ ...current, nota: event.target.value }))}
-                placeholder="Agrega una nota para revisión"
-                className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="dark:text-white">Nombre del docente *</Label>
-              <div className="relative">
-                <Input
-                  value={formData.docente}
-                  readOnly
-                  placeholder="Nombre del docente"
-                  className="rounded-2xl bg-muted/50 cursor-default select-none pr-10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              {/* Nota */}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="dark:text-white">Nota para administración (opcional)</Label>
+                <Textarea
+                  value={formData.nota}
+                  onChange={(event) => setFormData((current) => ({ ...current, nota: event.target.value }))}
+                  placeholder="Agrega una nota para revisión"
+                  className="min-h-[9rem] rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
                 />
-                <Ban className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground dark:text-slate-500" />
+              </div>
+
+              {/* Docente */}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="dark:text-white">Nombre del docente *</Label>
+                <div className="relative">
+                  <Input
+                    value={formData.docente}
+                    readOnly
+                    placeholder="Nombre del docente"
+                    className="rounded-2xl bg-muted/50 cursor-default select-none pr-10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  />
+                  <Ban className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground dark:text-slate-500" />
+                </div>
+              </div>
+
+              {/* Autorización */}
+              <div className="space-y-2 md:col-span-2">
+                <p className="text-sm font-medium dark:text-white">Declaración de autorización</p>
+                <p className="text-sm text-muted-foreground dark:text-slate-400">
+                  Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares 
+                  y confirmo la veracidad de la información proporcionada.
+                </p>
               </div>
             </div>
 
-            <div className="space-y-2 text-sm">
-              <p className="font-medium dark:text-white">Declaración de autorización</p>
-              <p className="text-muted-foreground dark:text-slate-400">
-                Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares 
-                y confirmo la veracidad de la información proporcionada.
-              </p>
-            </div>
-
-            <div className="flex gap-3 pt-4 border-t dark:border-slate-700">
-              <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+            {/* Footer con acciones */}
+            <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
+              <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
                 Limpiar
               </Button>
-              <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="min-w-36 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
+              <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
                 {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar documento" : "Enviar"}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Diálogo de vista previa */}
+      <Dialog open={previewItem !== null} onOpenChange={(open) => { if (!open) closePreview(); }}>
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{previewItem?.nombre ?? "Documento"}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {previewLoading ? (
+              <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                <p>Cargando...</p>
+              </div>
+            ) : previewError ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                {previewError}
+              </div>
+            ) : previewBlobUrl ? (
+              <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border">
+                <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
+                  Abrir documento en nueva pestaña
+                </a>
+              </object>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

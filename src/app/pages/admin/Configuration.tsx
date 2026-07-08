@@ -90,6 +90,7 @@ const FORM_DEFINITIONS: Array<{ id: FormId; title: string; description: string; 
   { id: "asesoria", title: "Asesoría", description: "Registro de asesorías", section: "docentes" },
   { id: "portafolio-digital", title: "Portafolio Digital", description: "Entrega de evidencias", section: "docentes" },
   { id: "acta-final", title: "Acta Final", description: "Cierre del periodo", section: "docentes" },
+  { id: "remedial", title: "Remedial", description: "Documentos de evaluación remedial", section: "docentes" },
   { id: "carga-academica", title: "Carga Académica", description: "Registro de carga académica", section: "tutorias" },
   { id: "reporte-bajas", title: "Reporte de Bajas", description: "Seguimiento de bajas reportadas", section: "tutorias" },
   { id: "concentrado-asesorias", title: "Concentrado de Asesorías", description: "Concentrado general de asesorías", section: "tutorias" },
@@ -478,6 +479,24 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       ...current,
       dueAt: value || null,
     }));
+  };
+
+  const handleCloseForm = async (formId: FormId) => {
+    const past = new Date(Date.now() - 60_000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const pastLocal = `${past.getFullYear()}-${pad(past.getMonth() + 1)}-${pad(past.getDate())}T${pad(past.getHours())}:${pad(past.getMinutes())}`;
+    const nextRule = { ...(formDrafts[formId] ?? formConfig.formAccess[formId]), dueAt: pastLocal };
+    setSavingFormIds((current) => ({ ...current, [formId]: true }));
+    const success = await saveFormAccessRule(formId, nextRule);
+    if (success) {
+      setFormConfig((current) => ({
+        ...current,
+        formAccess: { ...current.formAccess, [formId]: nextRule },
+      }));
+      setFormDrafts((current) => ({ ...current, [formId]: nextRule }));
+      toast.success("Formulario cerrado");
+    }
+    setSavingFormIds((current) => ({ ...current, [formId]: false }));
   };
 
   const handleAddGroup = async () => {
@@ -1164,8 +1183,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           )}
 
           {activeTab === "formularios" && (
-            <Card className={sectionCardClass}>
-              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+            <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
+              <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 p-4 sm:p-6 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
                 <div className={softPanelClass}>
                   <div className="mb-3">
                     <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">Control por formulario</h3>
@@ -1203,7 +1222,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                           {isOpen && (
                             <div className="border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20">
                               {/* SCROLL SOLO EN LA LISTA DE FORMULARIOS - Título de sección queda fijo */}
-                              <div className="space-y-2 max-h-[320px] sm:max-h-[420px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
+                              <div className="space-y-2 pr-1 sm:pr-2">
                                 {section.forms.map((form) => {
                                   const savedConfig = formConfig.formAccess[form.id];
                                   const draftConfig = formDrafts[form.id] ?? savedConfig;
@@ -1218,6 +1237,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
                                   const isOpenItem = Boolean(openFormItems[form.id]);
                                   const isDraftChanged = JSON.stringify(draftConfig) !== JSON.stringify(savedConfig);
+                                  const isFormOpen = savedConfig.dueAt === null || new Date(savedConfig.dueAt) > new Date();
 
                                   return (
                                     <div key={form.id} className="rounded-[14px] border border-border bg-card">
@@ -1263,6 +1283,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                                 id={`deadline-${form.id}`}
                                                 type="datetime-local"
                                                 value={draftConfig.dueAt ?? ""}
+                                                min={new Date().toISOString().slice(0, 16)}
                                                 onChange={(event) => handleDeadlineChange(form.id, event.target.value)}
                                                 disabled={draftConfig.dueAt === null}
                                                 className="text-sm"
@@ -1297,24 +1318,39 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                               {!isTutoriasForm && <p className="text-xs text-muted-foreground">Selecciona si el formulario aplica para Docente, Tutor o ambos.</p>}
                                             </div>
                                           </div>
-                                          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              onClick={() => handleResetForm(form.id)}
-                                              disabled={!isDraftChanged || Boolean(savingFormIds[form.id])}
-                                              className="w-full sm:w-auto text-sm"
-                                            >
-                                              Cancelar
-                                            </Button>
-                                            <Button
-                                              type="button"
-                                              onClick={() => handleSaveForm(form.id)}
-                                              disabled={!isDraftChanged || Boolean(savingFormIds[form.id])}
-                                              className="w-full sm:w-auto text-sm"
-                                            >
-                                              {savingFormIds[form.id] ? 'Guardando...' : 'Guardar cambios'}
-                                            </Button>
+                                          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-between">
+                                            <div>
+                                              {isFormOpen && (
+                                                <Button
+                                                  type="button"
+                                                  variant="destructive"
+                                                  onClick={() => handleCloseForm(form.id)}
+                                                  disabled={Boolean(savingFormIds[form.id])}
+                                                  className="w-full sm:w-auto text-sm"
+                                                >
+                                                  Cerrar formulario
+                                                </Button>
+                                              )}
+                                            </div>
+                                            <div className="flex flex-col gap-2 sm:flex-row">
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => handleResetForm(form.id)}
+                                                disabled={!isDraftChanged || Boolean(savingFormIds[form.id])}
+                                                className="w-full sm:w-auto text-sm"
+                                              >
+                                                Cancelar
+                                              </Button>
+                                              <Button
+                                                type="button"
+                                                onClick={() => handleSaveForm(form.id)}
+                                                disabled={!isDraftChanged || Boolean(savingFormIds[form.id])}
+                                                className="w-full sm:w-auto text-sm"
+                                              >
+                                                {savingFormIds[form.id] ? 'Guardando...' : 'Guardar cambios'}
+                                              </Button>
+                                            </div>
                                           </div>
                                         </div>
                                       )}

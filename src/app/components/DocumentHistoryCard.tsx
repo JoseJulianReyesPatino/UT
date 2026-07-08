@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { CheckCircle2, Clock2, Undo2, X } from "lucide-react";
+import { CheckCircle2, Clock2, Undo2, Eye, PencilLine, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ interface DocumentHistoryCardProps {
   fileName: string;
   carrera?: string;
   subject?: string;
+  grupo?: string;
   submittedAt: string;
   status?: string;
   returnedComment?: string;
@@ -41,6 +42,7 @@ export function DocumentHistoryCard({
   fileName,
   carrera,
   subject,
+  grupo,
   submittedAt,
   status,
   returnedComment,
@@ -53,8 +55,7 @@ export function DocumentHistoryCard({
 
   return (
     <>
-      <div className="group rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary sm:p-5">
-        <div className="flex flex-col gap-4">
+<div className="group rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary dark:border-slate-800/70 dark:bg-slate-900/30 dark:hover:border-emerald-500/40 sm:p-5">      <div className="flex flex-col gap-4">
           {/* Fila 1: Fecha y Badge */}
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">{submittedAt}</span>
@@ -71,12 +72,19 @@ export function DocumentHistoryCard({
             </p>
           </div>
 
-          {/* Fila 3: Carrera */}
-          {carrera ? (
-            <div>
-              <p className="text-sm text-foreground break-words">
-                Carrera: {carrera}
-              </p>
+          {/* Fila 3: Carrera y Grupo */}
+          {(carrera || grupo) ? (
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {carrera ? (
+                <p className="text-sm text-foreground break-words">
+                  Carrera: {carrera}
+                </p>
+              ) : null}
+              {grupo ? (
+                <p className="text-sm text-foreground break-words">
+                  Grupo: {grupo}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -92,9 +100,11 @@ export function DocumentHistoryCard({
           {/* Botones */}
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" className="min-w-[5.5rem]" onClick={onView}>
+              <Eye className="mr-1.5 h-3.5 w-3.5" />
               Ver
             </Button>
             <Button size="sm" variant="secondary" className="min-w-[5.5rem]" onClick={onEdit}>
+              <PencilLine className="mr-1.5 h-3.5 w-3.5" />
               Editar
             </Button>
             {isDevuelto && returnedComment ? (
@@ -113,17 +123,17 @@ export function DocumentHistoryCard({
 
       {/* Diálogo de Motivo */}
       <Dialog open={openMotivo} onOpenChange={setOpenMotivo}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Motivo de devolución</DialogTitle>
-          </DialogHeader>
-          <div className="bg-muted/50 rounded-lg p-4 border border-border">
-            <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-              {returnedComment}
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
+  <DialogContent className="max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
+    <DialogHeader>
+      <DialogTitle className="dark:text-white">Motivo de devolución</DialogTitle>
+    </DialogHeader>
+    <div className="rounded-lg border border-border bg-muted/50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
+      <p className="text-sm text-foreground whitespace-pre-wrap break-words dark:text-slate-200">
+        {returnedComment}
+      </p>
+    </div>
+  </DialogContent>
+</Dialog>
     </>
   );
 }

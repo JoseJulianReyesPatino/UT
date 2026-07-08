@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { resolveApiAssetUrl, AUTH_TOKEN_STORAGE_KEY } from "./env";
 
 const avatarUrlCache = new Map<string, string>();
+const inFlightFetches = new Map<string, Promise<string | undefined>>();
 const CACHE_CLEAR_EVENT = "ut-avatar-cache-cleared";
 
 // Función para obtener URL de avatar con timestamp (con caché persistente)
@@ -59,17 +60,17 @@ export const getAvatarUrlWithTimestamp = (
 
 // Función para limpiar la caché (llamar después de actualizar el avatar)
 export const clearAvatarCache = () => {
-  // Limpiar también los object URLs creados con URL.createObjectURL
   avatarUrlCache.forEach((value) => {
-    if (value.startsWith('blob:')) {
+    if (value.startsWith("blob:")) {
       try {
         URL.revokeObjectURL(value);
       } catch {
-        // Ignorar errores al revocar URLs
+        // ignorar
       }
     }
   });
   avatarUrlCache.clear();
+  inFlightFetches.clear();
   globalThis.window?.dispatchEvent(new CustomEvent(CACHE_CLEAR_EVENT));
 };
 
@@ -125,6 +126,51 @@ const toFetchHeaders = () => {
     headers.Authorization = `Bearer ${token}`;
   }
   return headers;
+};
+
+// Fetch autenticado con deduplicación: si ya hay un request en vuelo para
+// la misma URL, reutiliza la Promise en lugar de abrir una segunda conexión.
+const fetchAvatarBlob = (absoluteUrl: string, effectiveUrl: string): Promise<string | undefined> => {
+  const inFlight = inFlightFetches.get(effectiveUrl);
+  if (inFlight) return inFlight;
+
+  const promise = (async (): Promise<string | undefined> => {
+    try {
+      const response = await fetch(absoluteUrl, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          ...toFetchHeaders(),
+          "ngrok-skip-browser-warning": "true",
+        },
+      });
+
+      if (response.status === 404) {
+        avatarUrlCache.delete(effectiveUrl);
+        return undefined;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Avatar fetch failed: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      avatarUrlCache.set(effectiveUrl, objectUrl);
+      return objectUrl;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("404")) {
+        return undefined;
+      }
+      return getAvatarUrlWithTimestamp(effectiveUrl);
+    } finally {
+      inFlightFetches.delete(effectiveUrl);
+    }
+  })();
+
+  inFlightFetches.set(effectiveUrl, promise);
+  return promise;
 };
 
 export const useResolvedAvatarUrl = (
@@ -201,64 +247,17 @@ export const useResolvedAvatarUrl = (
       return;
     }
 
-    // Para rutas protegidas, hacer fetch con autenticación
+    // Para rutas protegidas, hacer fetch con autenticación (deduplicado)
     let isActive = true;
-    const abortController = new AbortController();
     const absoluteUrl = resolveApiAssetUrl(effectiveUrl) ?? effectiveUrl;
 
-    (async () => {
-      try {
-        const response = await fetch(absoluteUrl, {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            ...toFetchHeaders(),
-            "ngrok-skip-browser-warning": "true",
-          },
-          signal: abortController.signal,
-        });
-
-        if (!isActive) return;
-
-        if (response.status === 404) {
-          // Si el avatar no existe (404), limpiar la caché y no mostrar nada
-          avatarUrlCache.delete(effectiveUrl);
-          setResolvedUrl(undefined);
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error(`Avatar fetch failed: ${response.status}`);
-        }
-
-        const blob = await response.blob();
-        if (!isActive) {
-          return;
-        }
-
-        const objectUrl = URL.createObjectURL(blob);
-        avatarUrlCache.set(effectiveUrl, objectUrl);
-        setResolvedUrl(objectUrl);
-      } catch (error) {
-        if (!isActive) {
-          return;
-        }
-
-        // Si el error es 404 o similar, no mostrar nada
-        if (error instanceof Error && error.message.includes('404')) {
-          setResolvedUrl(undefined);
-          return;
-        }
-
-        // Como fallback, usar la URL con timestamp
-        setResolvedUrl(getAvatarUrlWithTimestamp(effectiveUrl));
-      }
-    })();
+    fetchAvatarBlob(absoluteUrl, effectiveUrl).then((result) => {
+      if (!isActive) return;
+      setResolvedUrl(result);
+    });
 
     return () => {
       isActive = false;
-      abortController.abort();
     };
   }, [url, cacheEpoch]);
 

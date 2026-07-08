@@ -30,6 +30,7 @@ type EstadiaPendingDocument = {
   grupo: string;
   fecha: string;
   file_path?: string | null;
+  has_file?: boolean;
   returned?: boolean;
   returnedAt?: string;
   resubmittedAt?: string;
@@ -47,6 +48,7 @@ type EstadiaReviewedDocument = {
   carrera: string;
   grupo: string;
   file_path?: string | null;
+  has_file?: boolean;
   reviewedAt: string;
   fecha?: string;
   returned?: boolean;
@@ -250,6 +252,7 @@ export default function Estadias() {
       grupo: formatGroupCode(doc.group?.group_code ?? doc.group_code ?? "-"),
       fecha: doc.submitted_at ?? "",
       file_path: doc.file_path ?? null,
+      has_file: (doc as any).has_file ?? (doc.file_path != null ? undefined : false),
       returned: doc.status === "devuelto",
       returnedAt: doc.returned_at ?? undefined,
       resubmittedAt: doc.resubmitted_at ?? undefined,
@@ -557,6 +560,12 @@ export default function Estadias() {
     let cancelled = false;
 
     const loadPreview = async () => {
+      if (previewDocument.has_file === false) {
+        setPreviewError("El archivo de este documento no está disponible en el servidor. El docente debe volver a subirlo.");
+        setPreviewLoading(false);
+        return;
+      }
+
       setPreviewLoading(true);
       setPreviewError(null);
 

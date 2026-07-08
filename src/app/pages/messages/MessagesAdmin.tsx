@@ -629,6 +629,7 @@ export function MessagesAdmin(props: Readonly<{
   const deniedConversationIdsRef = useRef<Set<number>>(new Set());
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [confirmedLoadedChatId, setConfirmedLoadedChatId] = useState<number | null>(null);
 
   const peerRoleLabel = "Docente";
   const recipientRoleCodes = ["docente", "tutor"];
@@ -957,6 +958,8 @@ export function MessagesAdmin(props: Readonly<{
       }
       console.error('loadMessages error', err);
       return [];
+    } finally {
+      setConfirmedLoadedChatId(conversationId);
     }
   }, [isReady, normalizeMessage, user?.id]);
 
@@ -965,7 +968,12 @@ export function MessagesAdmin(props: Readonly<{
     try {
       await apiFetch(`/conversations/${conversationId}/read`, { method: 'PATCH' });
       setConversations((current) => current.map((c) => (c.id === conversationId ? { ...c, unread: 0 } : c)));
-      await updateUnreadCount();
+      // Calcular el nuevo total localmente para no hacer una llamada API extra
+      const newTotal = conversationsRef.current.reduce(
+        (sum, c) => sum + (c.id === conversationId ? 0 : (c.unread || 0)),
+        0
+      );
+      window.dispatchEvent(new CustomEvent('ut-messages-count-updated', { detail: { unread: newTotal } }));
       window.dispatchEvent(new Event('ut-messages-updated'));
     } catch (err) {
       if (isUnauthenticatedError(err)) return;
@@ -976,7 +984,7 @@ export function MessagesAdmin(props: Readonly<{
       }
       console.error('Error marking conversation as read:', err);
     }
-  }, [isReady, updateUnreadCount, user?.id]);
+  }, [isReady, user?.id]);
 
   const resolveTeacherAdminDraft = useCallback(async () => {
     if (!isTeacher) return;
@@ -1020,9 +1028,13 @@ export function MessagesAdmin(props: Readonly<{
 
   const loadMessagesRef = useRef(loadMessages);
   const loadConversationsRef = useRef(loadConversations);
+  const conversationsRef = useRef(conversations);
+  const markConversationAsReadRef = useRef(markConversationAsRead);
 
   useEffect(() => { loadMessagesRef.current = loadMessages; }, [loadMessages]);
   useEffect(() => { loadConversationsRef.current = loadConversations; }, [loadConversations]);
+  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
+  useEffect(() => { markConversationAsReadRef.current = markConversationAsRead; }, [markConversationAsRead]);
 
   useEffect(() => {
     if (!isReady || !user?.id || !selectedChat) return;
@@ -1033,12 +1045,13 @@ export function MessagesAdmin(props: Readonly<{
     return () => clearInterval(interval);
   }, [isReady, selectedChat, user?.id]);
 
-  // Cuando la carga inicial termina y hay una conversación seleccionada sin mensajes,
-  // cargar sus mensajes de inmediato en lugar de esperar el intervalo de 8 segundos.
+  // Cuando la carga inicial termina y hay una conversación seleccionada:
+  // marcar como leída (para bajar el badge de inmediato) y cargar mensajes si no hay en caché.
   const initialMessageLoadedRef = useRef(false);
   useEffect(() => {
     if (isInitialLoad || initialMessageLoadedRef.current || !selectedChat) return;
     initialMessageLoadedRef.current = true;
+    void markConversationAsReadRef.current(selectedChat);
     const conv = conversations.find(c => c.id === selectedChat);
     if (conv?.messages.length) return;
     setIsLoadingMessages(true);
@@ -1883,7 +1896,7 @@ export function MessagesAdmin(props: Readonly<{
             {targetConversation ? (
               <ScrollArea className="h-full bg-muted/20">
                 <div className="w-full min-w-0 overflow-x-hidden">
-                  {isLoadingMessages && !targetConversation.messages.length ? (
+                  {(isLoadingMessages || confirmedLoadedChatId !== selectedChat) && !targetConversation.messages.length ? (
                     <MessageListSkeleton />
                   ) : targetConversation.messages.length > 0 ? (
                     <div className="space-y-4 px-4 pb-2 pt-3">

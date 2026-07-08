@@ -117,7 +117,6 @@ export function Profile() {
   const handleRemoveAvatar = useCallback(async () => {
     const hadServerAvatar = user?.avatar && user.avatar !== "/api/default-avatar";
 
-    // Limpiar inmediatamente el estado local
     setSelectedAvatarFile(null);
     setAvatarPreview(undefined);
 
@@ -125,29 +124,23 @@ export function Profile() {
       fileInputRef.current.value = "";
     }
 
-    // Si no tenía avatar en el servidor, no hacer nada más
     if (!hadServerAvatar) {
-      // Actualizar el usuario localmente sin avatar
       updateProfile({ avatar: undefined });
       return;
     }
 
     try {
-      // Llamar al backend para eliminar el avatar
       await apiFetch("/auth/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ remove_avatar: true }),
       });
 
-      // Limpiar caché de avatares
       clearAvatarCache();
 
-      // Refrescar usuario
       const refreshedUser = await refreshUser();
       
       if (refreshedUser) {
-        // Actualizar el perfil sin avatar
         updateProfile({ 
           avatar: undefined,
           name: refreshedUser.name,
@@ -156,7 +149,6 @@ export function Profile() {
         });
       }
 
-      // Disparar evento para actualizar otros componentes
       window.dispatchEvent(new CustomEvent('ut-avatar-updated', { 
         detail: { userId: user?.id, avatarUrl: undefined } 
       }));
@@ -204,12 +196,10 @@ export function Profile() {
 
       await apiFetch("/auth/profile", requestOptions);
 
-      // Solo limpiar caché si se subió una nueva foto
       if (selectedAvatarFile) {
         clearAvatarCache();
       }
 
-      // Refrescar usuario para obtener los nuevos datos
       const refreshedUser = await refreshUser();
 
       if (refreshedUser) {
@@ -222,7 +212,6 @@ export function Profile() {
           area: refreshedUser.area,
         });
 
-        // Si no hay avatar seleccionado, mantener el avatar existente
         if (!selectedAvatarFile) {
           setAvatarPreview(refreshedUser.avatar && refreshedUser.avatar !== "/api/default-avatar" ? refreshedUser.avatar : defaultProfileAvatar);
         }
@@ -234,7 +223,6 @@ export function Profile() {
         fileInputRef.current.value = "";
       }
 
-      // Disparar evento para actualizar otros componentes
       window.dispatchEvent(new CustomEvent('ut-avatar-updated', { 
         detail: { userId: user.id, avatarUrl: refreshedUser?.avatar } 
       }));
@@ -306,15 +294,12 @@ export function Profile() {
 
   const avatarInitials = getInitials(`${firstName} ${lastName}`);
   
-  // Determinar si el usuario tiene avatar en el servidor
   const hasServerAvatar = user?.avatar && user.avatar !== "/api/default-avatar";
   
-  // Resolver la URL del avatar del servidor (solo si existe)
   const resolvedServerAvatar = useResolvedAvatarUrl(
     hasServerAvatar ? user.avatar : null
   );
 
-  // Priorizar: 1) preview en base64 (instantáneo), 2) avatar del servidor, 3) default
   const visibleAvatar = (selectedAvatarFile && avatarPreview?.startsWith("data:"))
     ? avatarPreview
     : (resolvedServerAvatar ?? defaultProfileAvatar);
@@ -344,23 +329,25 @@ export function Profile() {
     <div className="relative min-h-[calc(100vh-2rem)] overflow-hidden">
       <div className="relative z-10 space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Mi Perfil</h1>
-          <p className="text-muted-foreground">
+          <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
+            Mi Perfil
+          </h1>
+          <p className="mt-2 text-white/90 drop-shadow-sm dark:text-slate-400">
             Gestiona tu información personal y preferencias
           </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2 dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-xl dark:shadow-[0_18px_50px_rgba(2,6,23,0.6)]">
+          <Card className="lg:col-span-2 overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader>
-              <CardTitle>Información Personal</CardTitle>
-              <CardDescription>
+              <CardTitle className="dark:text-white">Información Personal</CardTitle>
+              <CardDescription className="dark:text-slate-400">
                 Actualiza tus datos de perfil
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20">
+                <Avatar className="h-20 w-20 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
                   <AvatarImage
                     src={visibleAvatar}
                     alt={user?.name ?? "Foto de perfil"}
@@ -368,10 +355,10 @@ export function Profile() {
                     className="cursor-pointer"
                   />
                   <AvatarFallback
-                    className="bg-transparent p-0 overflow-hidden cursor-pointer"
+                    className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-medium cursor-pointer"
                     onClick={() => setIsAvatarOpen(true)}
                   >
-                    <img src={defaultProfileAvatar} alt="Foto de perfil" className="h-full w-full object-cover" />
+                    {avatarInitials || "?"}
                   </AvatarFallback>
                 </Avatar>
                 <div>
@@ -380,6 +367,7 @@ export function Profile() {
                       variant="outline"
                       size="sm"
                       onClick={() => fileInputRef.current?.click()}
+                      className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                     >
                       <Upload className="mr-2 h-4 w-4" />
                       Cambiar Foto
@@ -390,6 +378,7 @@ export function Profile() {
                         size="sm"
                         type="button"
                         onClick={handleRemoveAvatar}
+                        className="rounded-2xl dark:hover:bg-slate-800 dark:text-slate-300"
                       >
                         Quitar foto
                       </Button>
@@ -402,7 +391,7 @@ export function Profile() {
                     className="hidden"
                     onChange={handleAvatarChange}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-1 dark:text-slate-400">
                     JPG, PNG o WEBP. Máximo 8MB
                   </p>
                 </div>
@@ -410,45 +399,47 @@ export function Profile() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Nombre</Label>
+                  <Label className="dark:text-white">Nombre</Label>
                   <Input
                     value={firstName}
                     onChange={(event) => setFirstName(event.target.value)}
                     placeholder="Primer nombre"
+                    className="rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Apellido</Label>
+                  <Label className="dark:text-white">Apellido</Label>
                   <Input
                     value={lastName}
                     onChange={(event) => setLastName(event.target.value)}
                     placeholder="Apellidos completos"
+                    className="rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Correo Electrónico</Label>
-                <Input value={user?.email ?? ""} disabled className="bg-muted/40" />
+                <Label className="dark:text-white">Correo Electrónico</Label>
+                <Input value={user?.email ?? ""} disabled className="rounded-2xl bg-muted/40 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-700" />
               </div>
 
               <div className="space-y-2">
-                <Label>Rol</Label>
+                <Label className="dark:text-white">Rol</Label>
                 <div className="flex items-center gap-2">
                   <Input 
                     value={roleLabel} 
                     disabled 
-                    className="flex-1"
+                    className="flex-1 rounded-2xl bg-muted/40 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-700"
                   />
-                  <Badge variant="outline">
+                  <Badge variant="outline" className="rounded-full dark:border-slate-700 dark:text-slate-300">
                     {roleLabel}
                   </Badge>
                 </div>
               </div>
 
-              <div className="pt-4 flex gap-2">
-                <Button variant="outline" onClick={handleCancelChanges}>Cancelar</Button>
-                <Button variant="success" onClick={handleSaveChanges} disabled={isSavingProfile}>
+              <div className="pt-4 flex gap-2 border-t border-border dark:border-slate-700">
+                <Button variant="outline" onClick={handleCancelChanges} className="rounded-2xl dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Cancelar</Button>
+                <Button variant="success" onClick={handleSaveChanges} disabled={isSavingProfile} className="rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
                   {isSavingProfile ? "Guardando..." : "Guardar Cambios"}
                 </Button>
               </div>
@@ -456,10 +447,10 @@ export function Profile() {
           </Card>
 
           <Dialog open={isAvatarOpen} onOpenChange={setIsAvatarOpen}>
-            <DialogContent>
+            <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
               <DialogHeader>
-                <DialogTitle>Foto de perfil</DialogTitle>
-                <DialogDescription>Vista previa de tu imagen de perfil</DialogDescription>
+                <DialogTitle className="dark:text-white">Foto de perfil</DialogTitle>
+                <DialogDescription className="dark:text-slate-400">Vista previa de tu imagen de perfil</DialogDescription>
               </DialogHeader>
               <div className="mt-4 flex justify-center">
                 <img src={visibleAvatar} alt={`Foto de perfil de ${user?.name}`} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
@@ -468,21 +459,21 @@ export function Profile() {
           </Dialog>
 
           <Dialog open={isPasswordOpen} onOpenChange={setIsPasswordOpen}>
-            <DialogContent>
+            <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
               <DialogHeader>
-                <DialogTitle>Cambiar contraseña</DialogTitle>
-                <DialogDescription>Actualiza tu contraseña de acceso</DialogDescription>
+                <DialogTitle className="dark:text-white">Cambiar contraseña</DialogTitle>
+                <DialogDescription className="dark:text-slate-400">Actualiza tu contraseña de acceso</DialogDescription>
               </DialogHeader>
               <div className="mt-4 space-y-4">
                 <div className="space-y-2">
-                  <Label>Contraseña actual</Label>
+                  <Label className="dark:text-white">Contraseña actual</Label>
                   <div className="relative">
                     <Input
                       type={showCurrentPassword ? "text" : "password"}
                       value={currentPassword}
                       onChange={(event) => setCurrentPassword(event.target.value)}
                       placeholder="Ingresa tu contraseña actual"
-                      className="pr-10"
+                      className="pr-10 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                     />
                     <Button
                       type="button"
@@ -497,14 +488,14 @@ export function Profile() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Nueva contraseña</Label>
+                  <Label className="dark:text-white">Nueva contraseña</Label>
                   <div className="relative">
                     <Input
                       type={showNewPassword ? "text" : "password"}
                       value={newPassword}
                       onChange={(event) => setNewPassword(event.target.value)}
                       placeholder="Ingresa la nueva contraseña"
-                      className="pr-10"
+                      className="pr-10 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                     />
                     <Button
                       type="button"
@@ -519,14 +510,14 @@ export function Profile() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Confirmar contraseña</Label>
+                  <Label className="dark:text-white">Confirmar contraseña</Label>
                   <div className="relative">
                     <Input
                       type={showConfirmPassword ? "text" : "password"}
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
                       placeholder="Repite la nueva contraseña"
-                      className="pr-10"
+                      className="pr-10 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                     />
                     <Button
                       type="button"
@@ -546,6 +537,7 @@ export function Profile() {
                     type="button"
                     onClick={() => setIsPasswordOpen(false)}
                     disabled={isSavingPassword}
+                    className="rounded-2xl dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
                   >
                     Cancelar
                   </Button>
@@ -554,6 +546,7 @@ export function Profile() {
                     variant="success"
                     onClick={handlePasswordSave}
                     disabled={isSavingPassword}
+                    className="rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white"
                   >
                     {isSavingPassword ? "Guardando..." : "Actualizar contraseña"}
                   </Button>
@@ -563,31 +556,31 @@ export function Profile() {
           </Dialog>
 
           <div className="space-y-6">
-            <Card className="dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-xl dark:shadow-[0_18px_50px_rgba(2,6,23,0.6)]">
+            <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
               <CardHeader>
-                <CardTitle>Información de Cuenta</CardTitle>
+                <CardTitle className="dark:text-white">Información de Cuenta</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3 text-sm">
-                  <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                    <Calendar className="h-4 w-4" />
+                  <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center dark:bg-slate-800">
+                    <Calendar className="h-4 w-4 text-muted-foreground dark:text-slate-400" />
                   </div>
                   <div>
-                    <p className="font-medium">Miembro desde</p>
-                    <p className="text-muted-foreground capitalize">{memberSinceLabel}</p>
+                    <p className="font-medium dark:text-white">Miembro desde</p>
+                    <p className="text-muted-foreground capitalize dark:text-slate-400">{memberSinceLabel}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-xl dark:shadow-[0_18px_50px_rgba(2,6,23,0.6)]">
+            <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
               <CardHeader>
-                <CardTitle>Seguridad</CardTitle>
+                <CardTitle className="dark:text-white">Seguridad</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button
                   variant="outline"
-                  className="w-full justify-start"
+                  className="w-full justify-start rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                   type="button"
                   onClick={() => setIsPasswordOpen(true)}
                 >
@@ -600,28 +593,28 @@ export function Profile() {
         </div>
 
         {user?.role !== "administrador" && (
-          <Card className="dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-xl dark:shadow-[0_18px_50px_rgba(2,6,23,0.6)]">
+          <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader>
-              <CardTitle>Estadísticas</CardTitle>
-              <CardDescription>Resumen de tu actividad</CardDescription>
+              <CardTitle className="dark:text-white">Estadísticas</CardTitle>
+              <CardDescription className="dark:text-slate-400">Resumen de tu actividad</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-4">
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Documentos Enviados</p>
-                  <p className="text-2xl font-bold">{profileStats.documentsSent}</p>
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">Documentos Enviados</p>
+                  <p className="text-2xl font-bold dark:text-white">{profileStats.documentsSent}</p>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Revisados</p>
-                  <p className="text-2xl font-bold text-success">{profileStats.documentsReviewed}</p>
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">Revisados</p>
+                  <p className="text-2xl font-bold text-success dark:text-emerald-400">{profileStats.documentsReviewed}</p>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">En Revisión</p>
-                  <p className="text-2xl font-bold text-emerald-600">{profileStats.documentsPending}</p>
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">En Revisión</p>
+                  <p className="text-2xl font-bold text-emerald-600 dark:text-amber-400">{profileStats.documentsPending}</p>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Devueltos</p>
-                  <p className="text-2xl font-bold text-destructive">{profileStats.documentsReturned}</p>
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">Devueltos</p>
+                  <p className="text-2xl font-bold text-destructive dark:text-rose-400">{profileStats.documentsReturned}</p>
                 </div>
               </div>
             </CardContent>

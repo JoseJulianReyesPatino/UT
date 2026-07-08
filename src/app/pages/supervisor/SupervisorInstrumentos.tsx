@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
-import { Input } from "../../components/ui/input";
+import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
-import { Eye, FileText, Search, X, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { Eye, FileText, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 type DocRecord = {
@@ -24,19 +26,20 @@ type DocRecord = {
   carrera_label?: string | null;
 };
 
-const INSTRUMENTOS = [
-  { key: "30", label: "Instrumento 30%", sublabel: "Plan Normal", form_code: "instrumento-30-normal" },
-  { key: "40", label: "Instrumento 40%", sublabel: "Plan Nuevo Modelo", form_code: "instrumento-40-nuevo" },
-  { key: "60", label: "Instrumento 60%", sublabel: "Plan Nuevo Modelo", form_code: "instrumento-60-nuevo" },
-  { key: "70", label: "Instrumento 70%", sublabel: "Plan Normal", form_code: "instrumento-70-normal" },
-] as const;
+type InstrumentoKey = "30" | "40" | "60" | "70";
+type SectionKey = "all" | "pendientes" | "revisados" | "devueltos";
 
-type TabKey = "30" | "40" | "60" | "70";
+const INSTRUMENTOS = [
+  { key: "30" as InstrumentoKey, label: "Instrumento 30%", sublabel: "Plan Normal",      form_code: "instrumento-30-normal" },
+  { key: "40" as InstrumentoKey, label: "Instrumento 40%", sublabel: "Plan Nuevo Modelo", form_code: "instrumento-40-nuevo" },
+  { key: "60" as InstrumentoKey, label: "Instrumento 60%", sublabel: "Plan Nuevo Modelo", form_code: "instrumento-60-nuevo" },
+  { key: "70" as InstrumentoKey, label: "Instrumento 70%", sublabel: "Plan Normal",      form_code: "instrumento-70-normal" },
+] as const;
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pendiente: { label: "Pendiente", className: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" },
-  revisado: { label: "Revisado", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" },
-  devuelto: { label: "Devuelto", className: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300" },
+  revisado:  { label: "Revisado",  className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" },
+  devuelto:  { label: "Devuelto",  className: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300" },
   reenviado: { label: "Reenviado", className: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300" },
 };
 
@@ -46,42 +49,45 @@ const getParcialNum = (parcial?: string | null): string => {
   return m ? m[1] : "";
 };
 
-const formatDate = (dateStr?: string | null) => {
-  if (!dateStr) return "—";
+const formatSentFecha = (fecha?: string | null) => {
+  if (!fecha) return "";
   try {
-    return new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" }).format(new Date(dateStr));
-  } catch { return "—"; }
+    const normalized = fecha.includes(" ") && !fecha.includes("T") ? fecha.replace(" ", "T") : fecha;
+    const date = new Date(normalized);
+    if (Number.isNaN(date.getTime())) return fecha;
+    const datePart = date.toLocaleDateString("es-MX", { year: "numeric", month: "2-digit", day: "2-digit" });
+    const timePart = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
+    return `${datePart} ${timePart}`;
+  } catch { return fecha; }
 };
 
-
-type FilterState = { search: string; status: string; parcial: string; carrera: string };
-const defaultFilter = (): FilterState => ({ search: "", status: "all", parcial: "all", carrera: "all" });
+type FilterState = { carrera: string; docente: string; grupo: string; parcial: string };
+const defaultFilter = (): FilterState => ({ carrera: "all", docente: "all", grupo: "all", parcial: "all" });
 
 interface SupervisorInstrumentosProps {
   allowedSections?: string[];
 }
 
 export default function SupervisorInstrumentos({ allowedSections }: Readonly<SupervisorInstrumentosProps>) {
-  const allowedTabs = useMemo<TabKey[]>(() => {
-    if (!allowedSections || allowedSections.length === 0) {
-      return ["30", "40", "60", "70"];
-    }
-    const map: Record<string, TabKey> = {
+  const allowedTabs = useMemo<InstrumentoKey[]>(() => {
+    if (!allowedSections || allowedSections.length === 0) return ["30", "40", "60", "70"];
+    const map: Record<string, InstrumentoKey> = {
       "instrumento-30": "30",
       "instrumento-40": "40",
       "instrumento-60": "60",
       "instrumento-70": "70",
     };
-    return (["30", "40", "60", "70"] as TabKey[]).filter((k) => {
+    return (["30", "40", "60", "70"] as InstrumentoKey[]).filter((k) => {
       const section = Object.keys(map).find((s) => map[s] === k);
       return section ? allowedSections.includes(section) : false;
     });
   }, [allowedSections]);
 
-  const [activeTab, setActiveTab] = useState<TabKey>(() => allowedTabs[0] ?? "30");
-  const [docs, setDocs] = useState<Record<TabKey, DocRecord[]>>({ "30": [], "40": [], "60": [], "70": [] });
-  const [loading, setLoading] = useState<Record<TabKey, boolean>>({ "30": true, "40": true, "60": true, "70": true });
-  const [filters, setFilters] = useState<Record<TabKey, FilterState>>({
+  const [activeInstrumento, setActiveInstrumento] = useState<InstrumentoKey>(() => allowedTabs[0] ?? "30");
+  const [activeSection, setActiveSection] = useState<SectionKey>("all");
+  const [docs, setDocs] = useState<Record<InstrumentoKey, DocRecord[]>>({ "30": [], "40": [], "60": [], "70": [] });
+  const [loading, setLoading] = useState<Record<InstrumentoKey, boolean>>({ "30": true, "40": true, "60": true, "70": true });
+  const [filters, setFilters] = useState<Record<InstrumentoKey, FilterState>>({
     "30": defaultFilter(), "40": defaultFilter(), "60": defaultFilter(), "70": defaultFilter(),
   });
   const [previewDoc, setPreviewDoc] = useState<DocRecord | null>(null);
@@ -89,14 +95,15 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
-  const cardCls = "overflow-hidden border-emerald-200/60 bg-white/55 shadow-sm backdrop-blur dark:border-emerald-900/35 dark:bg-slate-950/55";
-  const headerCls = "border-b border-emerald-200/30 p-4 sm:p-6 dark:border-emerald-900/25";
-
-  const loadDocs = useCallback(async (key: TabKey, form_code: string) => {
+  const loadDocs = useCallback(async (key: InstrumentoKey, form_code: string) => {
     setLoading((prev) => ({ ...prev, [key]: true }));
     try {
-      const res = await apiFetch("/documents", { query: { form_code, per_page: 500 } }) as any;
-      const list: DocRecord[] = Array.isArray(res?.data) ? res.data : (Array.isArray(res?.data?.data) ? res.data.data : []);
+      const res = (await apiFetch("/documents", { query: { form_code, per_page: 500 } })) as any;
+      const list: DocRecord[] = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.data?.data)
+        ? res.data.data
+        : [];
       setDocs((prev) => ({ ...prev, [key]: list }));
     } catch {
       toast.error("No fue posible cargar los documentos");
@@ -107,17 +114,15 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
   }, []);
 
   useEffect(() => {
-    INSTRUMENTOS.filter((i) => allowedTabs.includes(i.key)).forEach(({ key, form_code }) => void loadDocs(key as TabKey, form_code));
+    INSTRUMENTOS.filter((i) => allowedTabs.includes(i.key)).forEach(({ key, form_code }) =>
+      void loadDocs(key, form_code)
+    );
   }, [loadDocs, allowedTabs]);
 
-  // Revoca el blob anterior cuando cambia
   useEffect(() => {
-    return () => {
-      if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
-    };
+    return () => { if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl); };
   }, [previewBlobUrl]);
 
-  // Carga el PDF cuando se selecciona un documento
   useEffect(() => {
     if (!previewDoc) {
       setPreviewBlobUrl(null);
@@ -125,18 +130,15 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
       setPreviewError(null);
       return;
     }
-
     let isMounted = true;
     setPreviewLoading(true);
     setPreviewError(null);
     setPreviewBlobUrl(null);
-
     const load = async () => {
       try {
         const blob = await fetchDocumentBlob(previewDoc.id);
         if (!isMounted) return;
-        const pdfBlob = new Blob([blob], { type: "application/pdf" });
-        setPreviewBlobUrl(URL.createObjectURL(pdfBlob));
+        setPreviewBlobUrl(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
       } catch (error) {
         if (!isMounted) return;
         setPreviewError(error instanceof Error ? error.message : "No fue posible abrir el PDF");
@@ -144,21 +146,17 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
         if (isMounted) setPreviewLoading(false);
       }
     };
-
     void load();
     return () => { isMounted = false; };
   }, [previewDoc]);
 
-  const setFilter = (key: TabKey, partial: Partial<FilterState>) =>
+  const setFilter = (key: InstrumentoKey, partial: Partial<FilterState>) =>
     setFilters((prev) => ({ ...prev, [key]: { ...prev[key], ...partial } }));
 
-  const clearFilters = (key: TabKey) =>
-    setFilters((prev) => ({ ...prev, [key]: defaultFilter() }));
-
-  const currentInstrumento = INSTRUMENTOS.find((i) => i.key === activeTab)!;
-  const currentDocs = docs[activeTab] ?? [];
-  const isCurrentLoading = loading[activeTab] ?? false;
-  const currentFilter = filters[activeTab];
+  const currentInstrumento = INSTRUMENTOS.find((i) => i.key === activeInstrumento)!;
+  const currentDocs = docs[activeInstrumento] ?? [];
+  const isCurrentLoading = loading[activeInstrumento] ?? false;
+  const currentFilter = filters[activeInstrumento];
 
   const carrerasUnicas = useMemo(() => {
     const set = new Set<string>();
@@ -166,53 +164,200 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
     return Array.from(set).sort();
   }, [currentDocs]);
 
+  const docentesUnicos = useMemo(() => {
+    const set = new Set<string>();
+    currentDocs.forEach((d) => { if (d.uploaded_by_name) set.add(d.uploaded_by_name); });
+    return Array.from(set).sort();
+  }, [currentDocs]);
+
+  const gruposUnicos = useMemo(() => {
+    const set = new Set<string>();
+    currentDocs.forEach((d) => { const g = d.grupo ?? d.group_code; if (g) set.add(g); });
+    return Array.from(set).sort();
+  }, [currentDocs]);
+
   const filtered = useMemo(() => {
     const f = currentFilter;
     return currentDocs.filter((d) => {
-      if (f.search.trim()) {
-        const q = f.search.toLowerCase();
-        const matchText =
-          (d.uploaded_by_name ?? "").toLowerCase().includes(q) ||
-          (d.materia ?? "").toLowerCase().includes(q) ||
-          (d.grupo ?? d.group_code ?? "").toLowerCase().includes(q) ||
-          (d.carrera_label ?? "").toLowerCase().includes(q);
-        if (!matchText) return false;
-      }
-      if (f.status !== "all" && (d.status ?? "").toLowerCase() !== f.status) return false;
-      if (f.parcial !== "all" && getParcialNum(d.parcial) !== f.parcial) return false;
       if (f.carrera !== "all" && (d.carrera_label ?? "") !== f.carrera) return false;
+      if (f.docente !== "all" && (d.uploaded_by_name ?? "") !== f.docente) return false;
+      if (f.grupo !== "all" && (d.grupo ?? d.group_code ?? "") !== f.grupo) return false;
+      if (f.parcial !== "all" && getParcialNum(d.parcial) !== f.parcial) return false;
       return true;
     });
   }, [currentDocs, currentFilter]);
 
-  const hasActiveFilters =
-    currentFilter.search.trim() || currentFilter.status !== "all" ||
-    currentFilter.parcial !== "all" || currentFilter.carrera !== "all";
+  const activeDocuments = useMemo(() => {
+    if (activeSection === "pendientes") return filtered.filter((d) => ["pendiente", "reenviado"].includes((d.status ?? "").toLowerCase()));
+    if (activeSection === "revisados") return filtered.filter((d) => (d.status ?? "").toLowerCase() === "revisado");
+    if (activeSection === "devueltos") return filtered.filter((d) => (d.status ?? "").toLowerCase() === "devuelto");
+    return filtered;
+  }, [filtered, activeSection]);
+
+  const countAll = filtered.length;
+  const countPendientes = filtered.filter((d) => ["pendiente", "reenviado"].includes((d.status ?? "").toLowerCase())).length;
+  const countRevisados = filtered.filter((d) => (d.status ?? "").toLowerCase() === "revisado").length;
+  const countDevueltos = filtered.filter((d) => (d.status ?? "").toLowerCase() === "devuelto").length;
 
   const statusInfo = (status: string) =>
     STATUS_LABELS[status.toLowerCase()] ?? { label: status, className: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" };
 
+  const tabCls =
+    "inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm";
+  const countBadgeCls =
+    "ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200";
+  const sectionCardCls = "overflow-hidden rounded-[22px] border border-border bg-card shadow-sm";
+
+  const renderDocumentCard = (doc: DocRecord) => {
+    const st = statusInfo(doc.status ?? "pendiente");
+    const rawTitle = doc.title ?? "";
+    const lastSep = rawTitle.lastIndexOf(" - ");
+    const fileName = lastSep !== -1 && rawTitle.substring(lastSep + 3).trim()
+      ? rawTitle.substring(lastSep + 3).trim()
+      : rawTitle;
+    const apartadoLabel = lastSep !== -1 ? rawTitle.substring(0, lastSep).trim() : "";
+    const grupo = doc.grupo ?? doc.group_code;
+    const parcialNum = getParcialNum(doc.parcial);
+
+    return (
+      <div key={doc.id} className="relative flex flex-col gap-4 rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted/50 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-3 flex-1">
+          <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <FileText className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold tracking-wide text-foreground">
+              {apartadoLabel ? `${apartadoLabel} - ${fileName}` : fileName}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {doc.uploaded_by_name ?? "Docente"}
+              {doc.carrera_label ? ` • ${doc.carrera_label}` : ""}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {grupo && grupo !== "-" && (
+                <Badge variant="outline" className="text-xs">{`Grupo ${grupo}`}</Badge>
+              )}
+              {parcialNum && (
+                <Badge variant="outline" className="text-xs">{`Parcial ${parcialNum}`}</Badge>
+              )}
+              {doc.materia && (
+                <Badge variant="outline" className="text-xs">{doc.materia}</Badge>
+              )}
+            </div>
+            {(doc.submitted_at ?? doc.created_at) && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Enviado: {formatSentFecha(doc.submitted_at ?? doc.created_at)}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${st.className}`}>
+            {st.label}
+          </span>
+          <Button size="sm" variant="outline" className="gap-1.5 rounded-full" onClick={() => setPreviewDoc(doc)}>
+            <Eye className="h-4 w-4" />
+            Ver
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFilters = () => (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <SearchableSelect
+        value={currentFilter.carrera}
+        onValueChange={(v) => setFilter(activeInstrumento, { carrera: v })}
+        options={carrerasUnicas.map((c) => ({ value: c, label: c }))}
+        placeholder="Buscar carrera..."
+        allLabel="Todas las carreras"
+      />
+      <SearchableSelect
+        value={currentFilter.docente}
+        onValueChange={(v) => setFilter(activeInstrumento, { docente: v })}
+        options={docentesUnicos.map((d) => ({ value: d, label: d }))}
+        placeholder="Buscar docente..."
+        allLabel="Todos los docentes"
+      />
+      <SearchableSelect
+        value={currentFilter.grupo}
+        onValueChange={(v) => setFilter(activeInstrumento, { grupo: v })}
+        options={gruposUnicos.map((g) => ({ value: g, label: g }))}
+        placeholder="Buscar grupo..."
+        allLabel="Todos los grupos"
+      />
+      <SearchableSelect
+        value={currentFilter.parcial}
+        onValueChange={(v) => setFilter(activeInstrumento, { parcial: v })}
+        options={[
+          { value: "1", label: "Parcial 1" },
+          { value: "2", label: "Parcial 2" },
+          { value: "3", label: "Parcial 3" },
+        ]}
+        allLabel="Todos los parciales"
+      />
+    </div>
+  );
+
+  const renderDocList = (docList: DocRecord[]) => {
+    if (isCurrentLoading) {
+      return (
+        <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
+          <p>Cargando...</p>
+        </div>
+      );
+    }
+    if (docList.length === 0) {
+      return (
+        <div className="rounded-2xl border border-border bg-muted/40 p-8 text-center text-muted-foreground shadow-sm">
+          <div className="flex flex-col items-center gap-3">
+            <FileText className="h-8 w-8 opacity-40" />
+            <p className="text-sm">No hay documentos en esta sección.</p>
+          </div>
+        </div>
+      );
+    }
+    return <div className="space-y-3">{docList.map(renderDocumentCard)}</div>;
+  };
+
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 bg-transparent text-slate-900 dark:text-slate-100">
-      {/* Título */}
-      <div className="shrink-0 rounded-2xl sm:rounded-3xl border border-emerald-200/30 p-4 sm:p-6 dark:border-emerald-900/25">
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100">Instrumentos</h1>
-        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-          Instrumentos de evaluación enviados por todos los docentes
-        </p>
+    <div className="relative space-y-6 overflow-hidden">
+      {/* Encabezado */}
+      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+        <div className="relative flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Instrumentos de Evaluación</h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Instrumentos enviados por todos los docentes
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const inst = currentInstrumento;
+              void loadDocs(inst.key, inst.form_code);
+            }}
+            disabled={isCurrentLoading}
+            className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-400"
+          >
+            <RefreshCw className={`h-4 w-4 ${isCurrentLoading ? "animate-spin" : ""}`} />
+            <span>Actualizar</span>
+          </button>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2">
+      {/* Selector de instrumento */}
+      <div className="flex flex-wrap justify-center gap-2">
         {INSTRUMENTOS.filter((inst) => allowedTabs.includes(inst.key)).map((inst) => (
           <button
             key={inst.key}
             type="button"
-            onClick={() => setActiveTab(inst.key as TabKey)}
+            onClick={() => { setActiveInstrumento(inst.key); setActiveSection("all"); }}
             className={`flex flex-col items-start rounded-xl border px-4 py-2.5 text-left transition-all text-sm font-medium ${
-              activeTab === inst.key
-                ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400 dark:text-emerald-300"
-                : "border-emerald-200/50 bg-white/40 text-slate-600 hover:bg-emerald-50/50 dark:border-emerald-900/30 dark:bg-slate-950/30 dark:text-slate-400 dark:hover:bg-emerald-950/20"
+              activeInstrumento === inst.key
+                ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm dark:border-emerald-400 dark:bg-emerald-950/40 dark:text-emerald-300"
+                : "border-border bg-card text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/20"
             }`}
           >
             <span>{inst.label}</span>
@@ -221,156 +366,56 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
         ))}
       </div>
 
-      <Card className={cardCls}>
-        <CardHeader className={headerCls}>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-base sm:text-lg">{currentInstrumento.label}</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
-                  {isCurrentLoading ? "Cargando..." : `${filtered.length} de ${currentDocs.length} documento${currentDocs.length !== 1 ? "s" : ""}`}
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={() => clearFilters(activeTab)} className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground">
-                    <X className="h-3.5 w-3.5" />
-                    Limpiar
-                  </Button>
-                )}
-                <Button variant="outline" size="icon" onClick={() => loadDocs(activeTab, currentInstrumento.form_id)} disabled={isCurrentLoading} title="Actualizar">
-                  <RefreshCw className={`h-4 w-4 ${isCurrentLoading ? "animate-spin" : ""}`} />
-                </Button>
-              </div>
-            </div>
+      {/* Pestañas de estado */}
+      <Tabs value={activeSection} onValueChange={(v) => setActiveSection(v as SectionKey)}>
+        <div className="sm:hidden mb-3">
+          <Select value={activeSection} onValueChange={(v) => setActiveSection(v as SectionKey)}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Sección" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="pendientes">Pendientes</SelectItem>
+              <SelectItem value="revisados">Revisados</SelectItem>
+              <SelectItem value="devueltos">Devueltos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
+          <TabsTrigger value="all" className={tabCls}>
+            Todos <Badge variant="outline" className={countBadgeCls}>{countAll}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="pendientes" className={tabCls}>
+            Pendientes <Badge variant="outline" className={countBadgeCls}>{countPendientes}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="revisados" className={tabCls}>
+            Revisados <Badge variant="outline" className={countBadgeCls}>{countRevisados}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="devueltos" className={tabCls}>
+            Devueltos <Badge variant="outline" className={countBadgeCls}>{countDevueltos}</Badge>
+          </TabsTrigger>
+        </TabsList>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="relative flex-1 min-w-[180px]">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por docente, materia..."
-                  value={currentFilter.search}
-                  onChange={(e) => setFilter(activeTab, { search: e.target.value })}
-                  className="pl-9 pr-8 text-sm h-9"
-                />
-                {currentFilter.search && (
-                  <button onClick={() => setFilter(activeTab, { search: "" })} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+        {(["all", "pendientes", "revisados", "devueltos"] as SectionKey[]).map((section) => (
+          <TabsContent key={section} value={section} className="space-y-4 mt-6">
+            <Card className={sectionCardCls}>
+              <CardHeader className="pb-4">{renderFilters()}</CardHeader>
+              <CardContent>{renderDocList(activeDocuments)}</CardContent>
+            </Card>
+          </TabsContent>
+        ))}
+      </Tabs>
 
-              <div className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/75 px-2.5 py-1.5 dark:bg-slate-900/65">
-                <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Carrera:</span>
-                <Select value={currentFilter.carrera} onValueChange={(v) => setFilter(activeTab, { carrera: v })}>
-                  <SelectTrigger className="h-7 w-[160px] border-0 bg-transparent px-1 text-xs shadow-none focus:ring-0">
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {carrerasUnicas.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/75 px-2.5 py-1.5 dark:bg-slate-900/65">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Parcial:</span>
-                <Select value={currentFilter.parcial} onValueChange={(v) => setFilter(activeTab, { parcial: v })}>
-                  <SelectTrigger className="h-7 w-[100px] border-0 bg-transparent px-1 text-xs shadow-none focus:ring-0">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="1">Parcial 1</SelectItem>
-                    <SelectItem value="2">Parcial 2</SelectItem>
-                    <SelectItem value="3">Parcial 3</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/75 px-2.5 py-1.5 dark:bg-slate-900/65">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Estado:</span>
-                <Select value={currentFilter.status} onValueChange={(v) => setFilter(activeTab, { status: v })}>
-                  <SelectTrigger className="h-7 w-[110px] border-0 bg-transparent px-1 text-xs shadow-none focus:ring-0">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="pendiente">Pendiente</SelectItem>
-                    <SelectItem value="revisado">Revisado</SelectItem>
-                    <SelectItem value="devuelto">Devuelto</SelectItem>
-                    <SelectItem value="reenviado">Reenviado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-0">
-          {isCurrentLoading ? (
-            <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">Cargando documentos...</div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
-              <FileText className="h-8 w-8 opacity-40" />
-              <p className="text-sm">{hasActiveFilters ? "Sin resultados para los filtros aplicados" : `No hay documentos de ${currentInstrumento.label}`}</p>
-              {hasActiveFilters && <Button variant="ghost" size="sm" onClick={() => clearFilters(activeTab)} className="text-xs mt-1">Limpiar filtros</Button>}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-emerald-200/30 dark:border-emerald-900/25 bg-emerald-50/40 dark:bg-emerald-950/10">
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">Docente</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">Materia</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300 hidden lg:table-cell">Carrera</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300 hidden sm:table-cell">Grupo</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300 hidden md:table-cell">Parcial</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300 hidden md:table-cell">Fecha</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">Estado</th>
-                    <th className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((doc, idx) => {
-                    const st = statusInfo(doc.status ?? "pendiente");
-                    return (
-                      <tr key={doc.id} className={`border-b border-emerald-200/20 dark:border-emerald-900/15 transition-colors hover:bg-emerald-50/30 dark:hover:bg-emerald-950/10 ${idx % 2 === 0 ? "" : "bg-slate-50/20 dark:bg-slate-900/10"}`}>
-                        <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">{doc.uploaded_by_name ?? "—"}</td>
-                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[160px] truncate" title={doc.materia ?? undefined}>{doc.materia ?? "—"}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 hidden lg:table-cell max-w-[180px] truncate text-xs" title={doc.carrera_label ?? undefined}>{doc.carrera_label ?? "—"}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 hidden sm:table-cell text-xs">{doc.grupo ?? doc.group_code ?? "—"}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 hidden md:table-cell text-xs">{doc.parcial ?? "—"}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 hidden md:table-cell text-xs">{formatDate(doc.submitted_at ?? doc.created_at)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${st.className}`}>{st.label}</span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <Button size="sm" variant="outline" className="gap-1 text-xs h-7" onClick={() => setPreviewDoc(doc)}>
-                            <Eye className="h-3.5 w-3.5" />
-                            Ver
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Preview dialog — mismo estilo que el admin */}
+      {/* Diálogo de vista previa */}
       <Dialog open={previewDoc !== null} onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}>
         <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>{previewDoc?.materia ?? "Documento"}</DialogTitle>
+            <DialogTitle>{previewDoc?.title ?? "Documento"}</DialogTitle>
             {previewDoc && (
               <DialogDescription>
-                {previewDoc.uploaded_by_name ?? "Docente"}{previewDoc.carrera_label ? ` · ${previewDoc.carrera_label}` : ""}
-                {previewDoc.parcial ? ` · ${previewDoc.parcial}` : ""}
+                {[previewDoc.uploaded_by_name, previewDoc.carrera_label, previewDoc.parcial]
+                  .filter(Boolean)
+                  .join(" · ")}
               </DialogDescription>
             )}
           </DialogHeader>

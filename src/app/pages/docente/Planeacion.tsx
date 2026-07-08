@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../componen
 import { planNuevoModelo, planNormal, carrieras, cuatrimestres, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
+import { useFormAccess } from "../../hooks/useFormAccess";
 import { fetchDocumentBlob, getDocumentDisplayFileName } from "../../lib/documents";
 import { formatGroupCode } from "../../../lib/utils";
 
@@ -46,6 +47,7 @@ const initialFormData: PlaneacionFormData = {
 export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null }) {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const formAccess = useFormAccess(1);
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
   const [formData, setFormData] = useState<PlaneacionFormData>(initialFormData);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -348,7 +350,7 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const cleanFileName = file.name.replace(/\.pdf$/i, '').substring(0, 50);
-      const title = `${basePayload.materia || "Planeación"} - ${basePayload.parcial || ""} - ${cleanFileName}`.trim();
+      const title = cleanFileName;
 
       const fd = new FormData();
       fd.append('file', file, file.name);
@@ -459,28 +461,31 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
               Historial
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="sm:max-w-xl overflow-y-auto dark:border-slate-700 dark:bg-slate-950">
-            <SheetHeader>
+<SheetContent
+  side="right"
+  className="sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
+  overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
+>         <SheetHeader>
               <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
               <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
             </SheetHeader>
             <div className="mt-4 space-y-4">
               {history.length > 0 ? (
-                <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-700 dark:bg-slate-900/30">
-                  <div className="grid gap-3 p-1">
+<ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">              <div className="grid gap-3 p-1">
                     {history.map((h) => (
-                      <DocumentHistoryCard
-                        key={h.id}
-                        title=""
-                        fileName={getUploadedFileName(h)}
-                        carrera={h.carrera_label}
-                        subject={h.materia}
-                        submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                        status={h.status}
-                        returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
-                        onView={() => openPreview(h)}
-                        onEdit={() => populateFormForEdit(h)}
-                      />
+                     <DocumentHistoryCard
+  key={h.id}
+  title=""
+  fileName={getUploadedFileName(h)}
+  carrera={h.carrera_label}
+  subject={h.materia}
+  grupo={h.group_code ? formatGroupCode(h.group_code) : undefined}
+  submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+  status={h.status}
+  returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
+  onView={() => openPreview(h)}
+  onEdit={() => populateFormForEdit(h)}
+/>
                     ))}
                   </div>
                 </ScrollArea>
@@ -502,12 +507,14 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
       </div>
 
       {/* Título y subtítulo */}
-      <div className="space-y-1 pt-1">
-        <h1 className="text-3xl font-bold text-white drop-shadow-sm dark:text-white">Planeación</h1>
-        <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
-          Recordatorio: se sube 3 días después de la aplicación de cada parcial.
-        </p>
-      </div>
+<div className="space-y-1.5 pt-1">
+  <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
+    Planeación
+  </h1>
+  <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
+    Recordatorio: se sube 3 días después de la aplicación de cada parcial.
+  </p>
+</div>
 
       <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
         <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
@@ -758,14 +765,18 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
           </div>
 
           {/* Footer con acciones */}
-          <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
+                    {formAccess.isExpired && (
+            <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 mb-2 text-sm font-medium text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+              <span>Formulario cerrado &mdash; el plazo de env&iacute;o ha vencido. Solo puedes consultar tu historial.</span>
+            </div>
+          )}          <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
             <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
               Limpiar
             </Button>
             <Button 
               variant="success" 
               onClick={handleSubmit} 
-              disabled={!isValid || isSubmitting} 
+              disabled={!isValid || isSubmitting || !formAccess.canSubmit} 
               className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white"
             >
               {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar planeación" : "Enviar planeación"}

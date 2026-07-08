@@ -55,7 +55,7 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
   const { formId, title, children } = props;
   const { user } = useAuth();
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [history, setHistory] = useState<Array<{ id: number; title?: string; file_path?: string; submitted_at?: string; status?: string; materia?: string }>>([]);
+  const [history, setHistory] = useState<Array<{ id: number; title?: string; file_path?: string; submitted_at?: string; status?: string; materia?: string; has_file?: boolean }>>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: number; nombre: string } | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
@@ -297,32 +297,44 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
               ) : history.length > 0 ? (
                 <ScrollArea className="h-[min(78vh,44rem)] pr-2">
                   <div className="space-y-3">
-                    {history.map((item) => (
-                      <div
-                        key={item.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => openPreview(item)}
-                        onKeyDown={(e) => e.key === 'Enter' && openPreview(item)}
-                        className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/20"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 shrink-0">
-                            <FileText className="h-4 w-4" />
+                    {history.map((item) => {
+                      const fileAvailable = item.has_file !== false;
+                      return (
+                        <div
+                          key={item.id}
+                          role={fileAvailable ? "button" : undefined}
+                          tabIndex={fileAvailable ? 0 : undefined}
+                          onClick={() => fileAvailable && openPreview(item)}
+                          onKeyDown={(e) => fileAvailable && e.key === 'Enter' && openPreview(item)}
+                          className={fileAvailable
+                            ? "cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/20"
+                            : "rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 opacity-60 dark:border-slate-800 dark:bg-slate-900/40"}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`rounded-xl p-2 shrink-0 ${fileAvailable ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"}`}>
+                              <FileText className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <p className="break-words text-sm font-semibold text-slate-900 dark:text-slate-50">
+                                {getFileName(item)}
+                              </p>
+                              {item.materia && <p className="text-xs text-muted-foreground">{item.materia}</p>}
+                              <p className="text-xs text-muted-foreground">
+                                {item.submitted_at ? new Date(item.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Fecha no disponible"}
+                              </p>
+                              {!fileAvailable && (
+                                <p className="text-xs font-medium text-amber-600 dark:text-amber-500">
+                                  Archivo no disponible en el servidor
+                                </p>
+                              )}
+                            </div>
+                            {fileAvailable
+                              ? <Eye className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-emerald-600" />
+                              : <span className="text-xs text-slate-400">—</span>}
                           </div>
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <p className="break-words text-sm font-semibold text-slate-900 dark:text-slate-50">
-                              {getFileName(item)}
-                            </p>
-                            {item.materia && <p className="text-xs text-muted-foreground">{item.materia}</p>}
-                            <p className="text-xs text-muted-foreground">
-                              {item.submitted_at ? new Date(item.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Fecha no disponible"}
-                            </p>
-                          </div>
-                          <Eye className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-emerald-600" />
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               ) : (

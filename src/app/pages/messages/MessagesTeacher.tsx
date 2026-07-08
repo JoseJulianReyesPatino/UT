@@ -116,12 +116,20 @@ const formatMessageTimestamp = (raw: string): string => {
   const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return raw;
   return date.toLocaleString('es-MX', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
+  });
+};
+
+const formatDateSeparator = (raw: string): string => {
+  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return raw;
+  return date.toLocaleDateString('es-MX', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
   });
 };
 
@@ -133,9 +141,6 @@ const formatSize = (size: number) => {
 
 const getTimeLabel = () =>
   new Date().toLocaleString("es-MX", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
@@ -195,6 +200,17 @@ function StatusDot({ status }: Readonly<{ status: Conversation["status"] }>) {
   if (status === "online") statusClassName = "bg-emerald-500";
   else if (status === "away") statusClassName = "bg-amber-500";
   return <span className={cn("h-2 w-2 rounded-full", statusClassName)} />;
+}
+
+// Componente para mostrar separador de fecha (como en Messenger)
+function DateSeparator({ date }: { date: string }) {
+  return (
+    <div className="flex items-center justify-center my-4">
+      <span className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/60 rounded-full dark:bg-slate-800/60 dark:text-slate-400">
+        {date}
+      </span>
+    </div>
+  );
 }
 
 const ConversationRow = React.memo(({
@@ -346,130 +362,131 @@ const MessageBubble = React.memo(({
   }, [editOpen, message.content]);
 
   return (
-    <div className={cn("flex w-full min-w-0 items-end", message.isOwn ? "justify-end" : "justify-start")}>
-      {!message.isOwn && (
-        <div className="mr-2 mt-0.5 shrink-0">
-          <Avatar className="h-8 w-8 ring-1 ring-white/80 dark:ring-slate-900/50">
-            {showImage && imageUrl ? (
-              <AvatarImage src={imageUrl} alt={message.sender} className="h-full w-full object-cover" />
-            ) : (
-              <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-medium">
-                {senderInitials}
-              </AvatarFallback>
-            )}
-          </Avatar>
-        </div>
-      )}
-
-      <div
-        className={cn(
-          "max-w-[78%] min-w-0 overflow-hidden rounded-2xl px-4 py-3 shadow-sm relative",
-          message.isOwn
-            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white"
-            : cn("bg-white/95 border border-border/70 text-foreground", isDark && "bg-slate-800/95 border-slate-700 text-slate-200")
+    <>
+      <div className={cn("flex w-full min-w-0 items-end mb-1", message.isOwn ? "justify-end" : "justify-start")}>
+        {!message.isOwn && (
+          <div className="mr-2 mt-0.5 shrink-0">
+            <Avatar className="h-8 w-8 ring-1 ring-white/80 dark:ring-slate-900/50">
+              {showImage && imageUrl ? (
+                <AvatarImage src={imageUrl} alt={message.sender} className="h-full w-full object-cover" />
+              ) : (
+                <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-medium">
+                  {senderInitials}
+                </AvatarFallback>
+              )}
+            </Avatar>
+          </div>
         )}
-        title={message.timestamp}
-      >
-        <div className={cn("text-xs font-medium mb-1", message.isOwn ? "text-white/80" : "text-muted-foreground dark:text-slate-400")}>
-          {!message.isOwn && message.sender}
-        </div>
 
-        {message.replyTo && (
-          <div className={cn(
-            "mb-2 rounded-lg border-l-4 px-3 py-1.5 text-xs cursor-default select-none",
+        <div
+          className={cn(
+            "max-w-[78%] min-w-0 overflow-hidden rounded-2xl px-4 py-2.5 shadow-sm relative",
             message.isOwn
-              ? "border-white/50 bg-white/10"
-              : "border-emerald-400 bg-emerald-50/80 dark:border-emerald-600 dark:bg-emerald-950/40"
-          )}>
-            <p className={cn("font-semibold mb-0.5 truncate", message.isOwn ? "text-white/90" : "text-emerald-700 dark:text-emerald-400")}>
-              {message.replyTo.sender}
-            </p>
-            <p className={cn("line-clamp-2 leading-snug", message.isOwn ? "text-white/70" : "text-muted-foreground dark:text-slate-400")}>
-              {message.replyTo.content}
-            </p>
+              ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white"
+              : cn("bg-white/95 border border-border/70 text-foreground", isDark && "bg-slate-800/95 border-slate-700 text-slate-200")
+          )}
+        >
+          <div className={cn("text-xs font-medium mb-0.5", message.isOwn ? "text-white/80" : "text-muted-foreground dark:text-slate-400")}>
+            {!message.isOwn && message.sender}
           </div>
-        )}
 
-        <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
+          {message.replyTo && (
+            <div className={cn(
+              "mb-2 rounded-lg border-l-4 px-3 py-1.5 text-xs cursor-default select-none",
+              message.isOwn
+                ? "border-white/50 bg-white/10"
+                : "border-emerald-400 bg-emerald-50/80 dark:border-emerald-600 dark:bg-emerald-950/40"
+            )}>
+              <p className={cn("font-semibold mb-0.5 truncate", message.isOwn ? "text-white/90" : "text-emerald-700 dark:text-emerald-400")}>
+                {message.replyTo.sender}
+              </p>
+              <p className={cn("line-clamp-2 leading-snug", message.isOwn ? "text-white/70" : "text-muted-foreground dark:text-slate-400")}>
+                {message.replyTo.content}
+              </p>
+            </div>
+          )}
 
-        {message.attachments && message.attachments.length > 0 && (
-          <div className="mt-3 space-y-2">
-            {message.attachments.map((attachment) => (
-              <div key={`${message.id}-${attachment.name}`} className="flex items-center gap-2 rounded-lg border p-2 text-sm bg-muted/40 dark:bg-slate-700/40 dark:border-slate-700 min-w-0 overflow-hidden">
-                <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground dark:text-slate-400" />
-                <div className="min-w-0 flex-1 flex items-center justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium dark:text-slate-200">
-                      {attachment.url ? (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const resolved = resolveApiAssetUrl(attachment.url!);
-                            const ok = await tryFetchAndOpen(resolved!);
-                            if (!ok) window.open(resolved, '_blank', 'noopener');
-                          }}
-                          className="underline hover:text-emerald-700 dark:hover:text-emerald-300"
-                        >
-                          {attachment.name}
-                        </button>
-                      ) : (
-                        attachment.name
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground dark:text-slate-400">{attachment.typeLabel} • {attachment.sizeLabel}</p>
+          <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
+
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {message.attachments.map((attachment) => (
+                <div key={`${message.id}-${attachment.name}`} className="flex items-center gap-2 rounded-lg border p-2 text-sm bg-muted/40 dark:bg-slate-700/40 dark:border-slate-700 min-w-0 overflow-hidden">
+                  <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground dark:text-slate-400" />
+                  <div className="min-w-0 flex-1 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium dark:text-slate-200">
+                        {attachment.url ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const resolved = resolveApiAssetUrl(attachment.url!);
+                              const ok = await tryFetchAndOpen(resolved!);
+                              if (!ok) window.open(resolved, '_blank', 'noopener');
+                            }}
+                            className="underline hover:text-emerald-700 dark:hover:text-emerald-300"
+                          >
+                            {attachment.name}
+                          </button>
+                        ) : (
+                          attachment.name
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground dark:text-slate-400">{attachment.typeLabel} • {attachment.sizeLabel}</p>
+                    </div>
+
+                    {attachment.url && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const resolved = resolveApiAssetUrl(attachment.url!);
+                          const ok = await tryFetchAndDownload(resolved!, attachment.name);
+                          if (!ok) window.open(resolved, '_blank', 'noopener');
+                        }}
+                        className="ml-3 text-muted-foreground hover:text-emerald-700 dark:hover:text-emerald-300"
+                        title={`Descargar ${attachment.name}`}
+                      >
+                        <img src={downloadIcon} alt="Descargar" className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
-
-                  {attachment.url && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const resolved = resolveApiAssetUrl(attachment.url!);
-                        const ok = await tryFetchAndDownload(resolved!, attachment.name);
-                        if (!ok) window.open(resolved, '_blank', 'noopener');
-                      }}
-                      className="ml-3 text-muted-foreground hover:text-emerald-700 dark:hover:text-emerald-300"
-                      title={`Descargar ${attachment.name}`}
-                    >
-                      <img src={downloadIcon} alt="Descargar" className="h-4 w-4" />
-                    </button>
-                  )}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
 
-        <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-          <span className={cn("opacity-90", message.isOwn ? "text-white/80" : "text-muted-foreground dark:text-slate-400")}>
-            {message.timestamp}
-          </span>
-          <div className="inline-flex items-center gap-2">
-            <button type="button" onClick={() => onReply(message)} className={cn("inline-flex items-center gap-1", message.isOwn ? "text-white/80 hover:text-white" : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-200")}>
-              <CornerUpLeft className="h-3.5 w-3.5" />
-              Responder
-            </button>
-            {editable && onEdit && (
-              <button type="button" onClick={() => setEditOpen(true)} className={cn("inline-flex items-center gap-1", message.isOwn ? "text-white/80 hover:text-white" : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-200")}>
-                <PencilLine className="h-3.5 w-3.5" />
+          <div className="mt-1.5 flex items-center justify-between gap-3 text-xs">
+            <span className={cn("opacity-80", message.isOwn ? "text-white/70" : "text-muted-foreground dark:text-slate-400")}>
+              {formatMessageTimestamp(message.rawTimestamp || message.timestamp)}
+            </span>
+            <div className="inline-flex items-center gap-2">
+              <button type="button" onClick={() => onReply(message)} className={cn("inline-flex items-center gap-1", message.isOwn ? "text-white/70 hover:text-white" : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-200")}>
+                <CornerUpLeft className="h-3.5 w-3.5" />
+                Responder
               </button>
-            )}
-            {message.isOwn && onDelete && (
-              <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
-                <button type="button" onClick={() => setRemoveOpen(true)} className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
-                  <Trash className="h-3.5 w-3.5" />
+              {editable && onEdit && (
+                <button type="button" onClick={() => setEditOpen(true)} className={cn("inline-flex items-center gap-1", message.isOwn ? "text-white/70 hover:text-white" : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-200")}>
+                  <PencilLine className="h-3.5 w-3.5" />
                 </button>
-                <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
-                  <DialogHeader>
-                    <DialogTitle className="dark:text-white">Eliminar mensaje</DialogTitle>
-                    <DialogDescription className="dark:text-slate-400">¿Seguro que deseas eliminar este mensaje? Esta acción no se puede deshacer.</DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setRemoveOpen(false)} className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Cancelar</Button>
-                    <Button variant="destructive" onClick={() => { setRemoveOpen(false); onDelete(message.id); }}>Eliminar</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
+              )}
+              {message.isOwn && onDelete && (
+                <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
+                  <button type="button" onClick={() => setRemoveOpen(true)} className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
+                    <Trash className="h-3.5 w-3.5" />
+                  </button>
+                  <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
+                    <DialogHeader>
+                      <DialogTitle className="dark:text-white">Eliminar mensaje</DialogTitle>
+                      <DialogDescription className="dark:text-slate-400">¿Seguro que deseas eliminar este mensaje? Esta acción no se puede deshacer.</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setRemoveOpen(false)} className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Cancelar</Button>
+                      <Button variant="destructive" onClick={() => { setRemoveOpen(false); onDelete(message.id); }}>Eliminar</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -491,7 +508,7 @@ const MessageBubble = React.memo(({
           </DialogContent>
         </Dialog>
       )}
-    </div>
+    </>
   );
 });
 
@@ -562,6 +579,24 @@ function MessageListSkeleton() {
   );
 }
 
+// Función para agrupar mensajes por fecha (solo la fecha, sin hora)
+const groupMessagesByDate = (messages: ChatMessage[]) => {
+  const groups: { date: string; messages: ChatMessage[] }[] = [];
+  let currentDate = '';
+  
+  messages.forEach((msg) => {
+    const date = formatDateSeparator(msg.rawTimestamp || msg.timestamp);
+    if (date !== currentDate) {
+      currentDate = date;
+      groups.push({ date, messages: [msg] });
+    } else {
+      groups[groups.length - 1].messages.push(msg);
+    }
+  });
+  
+  return groups;
+};
+
 export function MessagesTeacher(props: Readonly<{
   initialOpen?: { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string; filePath?: string } } | null;
   onConsume?: () => void;
@@ -589,6 +624,7 @@ export function MessagesTeacher(props: Readonly<{
   const [draftRecipient, setDraftRecipient] = useState<DraftRecipient | null>(null);
   const [suppressedChatIds, setSuppressedChatIds] = useState<number[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [confirmedLoadedChatId, setConfirmedLoadedChatId] = useState<number | null>(null);
   const deniedConversationIdsRef = useRef<Set<number>>(new Set());
 
   const peerRoleLabel = "Administrador";
@@ -906,6 +942,8 @@ export function MessagesTeacher(props: Readonly<{
       }
       console.error('loadMessages error', err);
       return [];
+    } finally {
+      setConfirmedLoadedChatId(conversationId);
     }
   }, [isReady, normalizeMessage, user?.id]);
 
@@ -914,7 +952,11 @@ export function MessagesTeacher(props: Readonly<{
     try {
       await apiFetch(`/conversations/${conversationId}/read`, { method: 'PATCH' });
       setConversations((current) => current.map((c) => (c.id === conversationId ? { ...c, unread: 0 } : c)));
-      await updateUnreadCount();
+      const newTotal = conversationsRef.current.reduce(
+        (sum, c) => sum + (c.id === conversationId ? 0 : (c.unread || 0)),
+        0
+      );
+      window.dispatchEvent(new CustomEvent('ut-messages-count-updated', { detail: { unread: newTotal } }));
       window.dispatchEvent(new Event('ut-messages-updated'));
     } catch (err) {
       if (isUnauthenticatedError(err)) return;
@@ -925,7 +967,7 @@ export function MessagesTeacher(props: Readonly<{
       }
       console.error('Error marking conversation as read:', err);
     }
-  }, [isReady, updateUnreadCount, user?.id]);
+  }, [isReady, user?.id]);
 
   const resolveTeacherAdminDraft = useCallback(async () => {
     if (!isTeacher) return;
@@ -969,9 +1011,13 @@ export function MessagesTeacher(props: Readonly<{
 
   const loadMessagesRef = useRef(loadMessages);
   const loadConversationsRef = useRef(loadConversations);
+  const conversationsRef = useRef(conversations);
+  const markConversationAsReadRef = useRef(markConversationAsRead);
 
   useEffect(() => { loadMessagesRef.current = loadMessages; }, [loadMessages]);
   useEffect(() => { loadConversationsRef.current = loadConversations; }, [loadConversations]);
+  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
+  useEffect(() => { markConversationAsReadRef.current = markConversationAsRead; }, [markConversationAsRead]);
 
   useEffect(() => {
     if (!isReady || !user?.id || !selectedChat) return;
@@ -982,22 +1028,19 @@ export function MessagesTeacher(props: Readonly<{
     return () => clearInterval(interval);
   }, [isReady, selectedChat, user?.id]);
 
-  // Cuando la carga inicial termina y hay una conversación seleccionada sin mensajes,
-  // cargar sus mensajes de inmediato en lugar de esperar el intervalo de 8 segundos.
   const initialMessageLoadedRef = useRef(false);
   useEffect(() => {
     if (isInitialLoad || initialMessageLoadedRef.current || !selectedChat) return;
     initialMessageLoadedRef.current = true;
+    void markConversationAsReadRef.current(selectedChat);
     const conv = conversations.find(c => c.id === selectedChat);
     if (conv?.messages.length) return;
     setIsLoadingMessages(true);
     void loadMessagesRef.current(selectedChat)
       .then(() => setIsLoadingMessages(false))
       .catch(() => setIsLoadingMessages(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialLoad, selectedChat]);
 
-  // Carga inicial: obtener conversaciones. Si docente no tiene chat con admin, solo preparar borrador.
   useEffect(() => {
     if (!isReady) return;
     void (async () => {
@@ -1053,23 +1096,6 @@ export function MessagesTeacher(props: Readonly<{
         console.error('addDocumentAsPending error', err);
         toast.error('No fue posible adjuntar el documento automáticamente; se añadió como enlace.');
       });
-    };
-
-    const appendDocumentToConversation = (conv: Conversation, doc: { id: number; title: string }): Conversation => {
-      const documentMessage: ChatMessage = {
-        id: Date.now(),
-        sender: "Tú",
-        content: `Te comparto el documento: ${doc.title}`,
-        timestamp: getTimeLabel(),
-        isOwn: true,
-        attachments: [buildDocumentAttachment(doc)],
-      };
-      return {
-        ...conv,
-        messages: [...conv.messages, documentMessage],
-        lastMessage: documentMessage.content,
-        timestamp: "Ahora",
-      };
     };
 
     if (conversationId) {
@@ -1402,7 +1428,6 @@ export function MessagesTeacher(props: Readonly<{
     const convId = selectedChat;
     const prevMessages = conversations.find((c) => c.id === convId)?.messages ?? [];
 
-    // Optimistic: eliminar de inmediato
     setConversations((prev) => prev.map((c) =>
       c.id === convId ? { ...c, messages: c.messages.filter((m) => m.id !== messageId) } : c
     ));
@@ -1414,7 +1439,6 @@ export function MessagesTeacher(props: Readonly<{
       void Promise.all([loadMessages(convId), loadConversations()]);
       void updateUnreadCount();
     } catch (err: any) {
-      // Revertir si falla
       setConversations((prev) => prev.map((c) =>
         c.id === convId ? { ...c, messages: prevMessages } : c
       ));
@@ -1428,7 +1452,6 @@ export function MessagesTeacher(props: Readonly<{
     const convId = selectedChat;
     const prevMessages = conversations.find((c) => c.id === convId)?.messages ?? [];
 
-    // Optimistic: actualizar contenido de inmediato
     setConversations((prev) => prev.map((c) =>
       c.id === convId
         ? { ...c, messages: c.messages.map((m) => (m.id === messageId ? { ...m, content: body } : m)) }
@@ -1445,7 +1468,6 @@ export function MessagesTeacher(props: Readonly<{
       window.dispatchEvent(new Event('ut-messages-updated'));
       void loadMessages(convId);
     } catch (err: any) {
-      // Revertir si falla
       setConversations((prev) => prev.map((c) =>
         c.id === convId ? { ...c, messages: prevMessages } : c
       ));
@@ -1472,20 +1494,21 @@ export function MessagesTeacher(props: Readonly<{
   // ─────────────────────────────────────────────────────────────────────────────
   if (isTeacher) {
     const adminConversation = targetConversation;
+    const messageGroups = adminConversation ? groupMessagesByDate(adminConversation.messages) : [];
 
     return (
       <div className="flex h-[calc(100dvh-64px)] min-h-0 flex-col gap-5 overflow-hidden">
-        <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
-          <div className="relative">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Mensajes</h1>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Mensajería interna con el Administrador.</p>
-          </div>
+        {/* Header como Planeación - solo texto sin fondo */}
+        <div className="space-y-1.5 pt-1">
+          <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
+            Mensajes
+          </h1>
+          <p className="text-white/90 drop-shadow-sm dark:text-slate-400">Mensajería interna con el Administrador.</p>
         </div>
 
         <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-1">
-          <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
-            <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
+            <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3 dark:border-slate-700">
               {adminConversation ? (
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10 shrink-0 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
@@ -1503,38 +1526,45 @@ export function MessagesTeacher(props: Readonly<{
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-foreground leading-tight">{adminConversation.name}</p>
+                      <p className="text-sm font-semibold text-foreground leading-tight dark:text-white">{adminConversation.name}</p>
                       {adminConversation.unread > 0 && (
                         <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[11px]">
                           {adminConversation.unread}
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{adminConversation.role}</p>
+                    <p className="text-xs text-muted-foreground dark:text-slate-400">{adminConversation.role}</p>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Chat con Administrador</p>
-                  <p className="text-xs text-muted-foreground">Escribe el primer mensaje para iniciar el chat con administración.</p>
+                  <p className="text-sm font-semibold text-foreground dark:text-white">Chat con Administrador</p>
+                  <p className="text-xs text-muted-foreground dark:text-slate-400">Escribe el primer mensaje para iniciar el chat con administración.</p>
                 </div>
               )}
             </div>
 
             <div className="min-h-0 flex-1 overflow-hidden">
               {adminConversation ? (
-                <ScrollArea className="h-full bg-muted/20">
-                  <div className="w-full min-w-0 overflow-x-hidden space-y-4 px-4 pb-2 pt-3">
+                <ScrollArea className="h-full bg-muted/20 dark:bg-slate-900/30">
+                  <div className="w-full min-w-0 overflow-x-hidden pb-2 pt-3">
                     {adminConversation.messages.length > 0 ? (
-                      adminConversation.messages.map((messageItem) => (
-                        <MessageBubble
-                          key={messageItem.id}
-                          message={messageItem}
-                          onReply={setReplyingTo}
-                          onDelete={handleDeleteMessage}
-                          onEdit={handleEditMessage}
-                        />
-                      ))
+                      <div className="space-y-1 px-4">
+                        {messageGroups.map((group, groupIndex) => (
+                          <div key={groupIndex}>
+                            <DateSeparator date={group.date} />
+                            {group.messages.map((messageItem) => (
+                              <MessageBubble
+                                key={messageItem.id}
+                                message={messageItem}
+                                onReply={setReplyingTo}
+                                onDelete={handleDeleteMessage}
+                                onEdit={handleEditMessage}
+                              />
+                            ))}
+                          </div>
+                        ))}
+                      </div>
                     ) : (
                       <EmptyConversationState
                         title="Sin mensajes aún"
@@ -1552,7 +1582,7 @@ export function MessagesTeacher(props: Readonly<{
               )}
             </div>
 
-            <div className="shrink-0 border-t border-border/60 bg-card p-4">
+            <div className="shrink-0 border-t border-border/60 bg-card p-4 dark:border-slate-700 dark:bg-slate-950/60">
               {replyingTo && (
                 <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
                   <div className="min-w-0">
@@ -1571,7 +1601,7 @@ export function MessagesTeacher(props: Readonly<{
                   placeholder="Escribe un mensaje..."
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background px-4 py-3"
+                  className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -1586,7 +1616,7 @@ export function MessagesTeacher(props: Readonly<{
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="rounded-full px-4"
+                      className="rounded-full px-4 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Paperclip className="h-4 w-4 mr-1" />
@@ -1595,7 +1625,7 @@ export function MessagesTeacher(props: Readonly<{
                     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
                   </div>
 
-                  <Button variant="success" className="rounded-full px-5 shadow-md shadow-emerald-500/20" onClick={handleSend}>
+                  <Button variant="success" className="rounded-full px-5 shadow-md shadow-emerald-500/20 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white" onClick={handleSend}>
                     <Send className="h-4 w-4 mr-2" />
                     Enviar mensaje
                   </Button>
@@ -1611,22 +1641,24 @@ export function MessagesTeacher(props: Readonly<{
   // ─────────────────────────────────────────────────────────────────────────────
   // VISTA ADMINISTRADOR
   // ─────────────────────────────────────────────────────────────────────────────
+  const adminMessageGroups = targetConversation ? groupMessagesByDate(targetConversation.messages) : [];
+
   return (
     <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-5 overflow-hidden">
-      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
-        <div className="relative">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Mensajes</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Mensajería interna: mensajes, archivos y seguimiento.</p>
-        </div>
+      {/* Header como Planeación - solo texto sin fondo */}
+      <div className="space-y-1.5 pt-1">
+        <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
+          Mensajes
+        </h1>
+        <p className="text-white/90 drop-shadow-sm dark:text-slate-400">Mensajería interna: mensajes, archivos y seguimiento.</p>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <div className="hidden sm:flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
-          <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3 space-y-3">
+        <div className="hidden sm:flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
+          <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3 space-y-3 dark:border-slate-700">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <p className="text-base font-semibold text-foreground">Chats</p>
+                <p className="text-base font-semibold text-foreground dark:text-white">Chats</p>
                 {filteredConversations.filter((c) => c.unread > 0).length > 0 && (
                   <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1.5 text-[11px]">
                     {filteredConversations.filter((c) => c.unread > 0).length}
@@ -1665,7 +1697,7 @@ export function MessagesTeacher(props: Readonly<{
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por nombre o mensaje..."
-                className="pl-9 rounded-xl border-border/70 bg-background/80 text-sm"
+                className="pl-9 rounded-xl border-border/70 bg-background/80 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -1787,8 +1819,8 @@ export function MessagesTeacher(props: Readonly<{
           </DialogContent>
         </Dialog>
 
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
-          <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
+          <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3 dark:border-slate-700">
             {targetConversation ? (
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10 shrink-0 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
@@ -1806,40 +1838,45 @@ export function MessagesTeacher(props: Readonly<{
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-foreground leading-tight">{targetConversation.name}</p>
+                    <p className="text-sm font-semibold text-foreground leading-tight dark:text-white">{targetConversation.name}</p>
                     {targetConversation.unread > 0 && (
                       <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[11px]">
                         {targetConversation.unread}
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">{targetConversation.role}</p>
+                  <p className="text-xs text-muted-foreground dark:text-slate-400">{targetConversation.role}</p>
                 </div>
               </div>
             ) : (
               <div>
-                <p className="text-sm font-semibold text-foreground">Selecciona un chat</p>
-                <p className="text-xs text-muted-foreground">Elige una conversación para ver el historial y responder.</p>
+                <p className="text-sm font-semibold text-foreground dark:text-white">Selecciona un chat</p>
+                <p className="text-xs text-muted-foreground dark:text-slate-400">Elige una conversación para ver el historial y responder.</p>
               </div>
             )}
           </div>
 
           <div className="min-h-0 flex-1 overflow-hidden">
             {targetConversation ? (
-              <ScrollArea className="h-full bg-muted/20">
+              <ScrollArea className="h-full bg-muted/20 dark:bg-slate-900/30">
                 <div className="w-full min-w-0 overflow-x-hidden">
-                  {isLoadingMessages && !targetConversation.messages.length ? (
+                  {(isLoadingMessages || confirmedLoadedChatId !== selectedChat) && !targetConversation.messages.length ? (
                     <MessageListSkeleton />
                   ) : targetConversation.messages.length > 0 ? (
-                    <div className="space-y-4 px-4 pb-2 pt-3">
-                      {targetConversation.messages.map((messageItem) => (
-                        <MessageBubble
-                          key={messageItem.id}
-                          message={messageItem}
-                          onReply={setReplyingTo}
-                          onDelete={handleDeleteMessage}
-                          onEdit={handleEditMessage}
-                        />
+                    <div className="space-y-1 px-4 pb-2 pt-3">
+                      {adminMessageGroups.map((group, groupIndex) => (
+                        <div key={groupIndex}>
+                          <DateSeparator date={group.date} />
+                          {group.messages.map((messageItem) => (
+                            <MessageBubble
+                              key={messageItem.id}
+                              message={messageItem}
+                              onReply={setReplyingTo}
+                              onDelete={handleDeleteMessage}
+                              onEdit={handleEditMessage}
+                            />
+                          ))}
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -1859,7 +1896,7 @@ export function MessagesTeacher(props: Readonly<{
             )}
           </div>
 
-          <div className="shrink-0 border-t border-border/60 bg-card p-4">
+          <div className="shrink-0 border-t border-border/60 bg-card p-4 dark:border-slate-700 dark:bg-slate-950/60">
             {replyingTo && (
               <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
                 <div className="min-w-0">
@@ -1878,7 +1915,7 @@ export function MessagesTeacher(props: Readonly<{
                 placeholder="Escribe un mensaje..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background px-4 py-3"
+                className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -1893,7 +1930,7 @@ export function MessagesTeacher(props: Readonly<{
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="rounded-full px-4"
+                    className="rounded-full px-4 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Paperclip className="h-4 w-4 mr-1" />
@@ -1902,7 +1939,7 @@ export function MessagesTeacher(props: Readonly<{
                   <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
                 </div>
 
-                <Button variant="success" className="rounded-full px-5 shadow-md shadow-emerald-500/20" onClick={handleSend}>
+                <Button variant="success" className="rounded-full px-5 shadow-md shadow-emerald-500/20 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white" onClick={handleSend}>
                   <Send className="h-4 w-4 mr-2" />
                   Enviar mensaje
                 </Button>

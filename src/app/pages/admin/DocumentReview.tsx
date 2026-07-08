@@ -34,6 +34,7 @@ type PendingDocument = {
 	parcial?: string;
 	fecha: string;
 	file_path?: string | null;
+	has_file?: boolean;
 	returned?: boolean;
 	returnedAt?: string;
 	resubmittedAt?: string;
@@ -53,6 +54,7 @@ type ReviewedDocument = {
 	grupo?: string;
 	parcial?: string;
 	file_path?: string | null;
+	has_file?: boolean;
 	reviewedAt: string;
 	fecha?: string;
 	returned?: boolean;
@@ -384,6 +386,7 @@ const mapApiDocument = (doc: ApiDocument, kind: "pending" | "reviewed"): Pending
 		grupo: formatGroupCode(doc.group?.group_code ?? doc.group_code ?? "-"),
 		parcial: doc.parcial ?? "-",
 		file_path: doc.file_path ?? null,
+		has_file: doc.has_file ?? (doc.file_path != null ? undefined : false),
 		fecha: doc.submitted_at ?? "",
 		returned: doc.status === "devuelto",
 		returnedAt: doc.returned_at ?? undefined,
@@ -834,7 +837,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		const lastSep = doc.documento.lastIndexOf(" - ");
 		const rawName = lastSep !== -1 && doc.documento.substring(lastSep + 3).trim()
 			? doc.documento.substring(lastSep + 3).trim()
-			: (forcedApartado ? doc.documento : getDocumentFileName(doc as ApiDocument));
+			: (doc.documento || getDocumentFileName(doc as ApiDocument));
 		const fileName = rawName.toUpperCase().endsWith(".PDF") ? rawName : `${rawName}.pdf`;
 		const apartadoTitle = canonicalApartado(doc.apartado);
 		const cuatrimestreLabel = `Cuatrimestre ${getDocumentCuatrimestre(doc as ApiDocument)}`;
@@ -853,6 +856,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 							{doc.cuatrimestre !== "-" && <Badge variant="outline" className="text-xs">{cuatrimestreLabel}</Badge>}
 							{doc.grupo && doc.grupo !== "-" && <Badge variant="outline" className="text-xs">{`Grupo ${doc.grupo}`}</Badge>}
 							{parcialLabel !== "-" && <Badge variant="outline" className="text-xs">{parcialLabel}</Badge>}
+							{doc.materia && normalizeText(doc.materia) !== "sin materia" && doc.materia !== "-" && <Badge variant="outline" className="text-xs">{doc.materia}</Badge>}
 						</div>
 						{fecha && <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(fecha)}</p>}
 						{"returnedAt" in doc && doc.returnedAt && <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>}
@@ -861,7 +865,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					</div>
 				</div>
 				<div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
-					<ResponsiveActionButton variant="outline" size="sm" label="Ver" title="Ver PDF" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} icon={<Eye className="h-4 w-4" />} />
+					<ResponsiveActionButton variant="outline" size="sm" label="Ver" title={doc.has_file === false ? "El archivo no está disponible en el servidor" : "Ver PDF"} onClick={(e) => { e.stopPropagation(); if (doc.has_file !== false) setPreviewDocument(doc); }} disabled={doc.has_file === false} icon={<Eye className="h-4 w-4" />} />
 
 					{isReviewed ? null : <ResponsiveActionButton variant="outline" size="sm" label="Revisar" title="Revisar documento" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "review", document: doc }); }} icon={<Check className="h-4 w-4" />} />}
 
