@@ -1,4 +1,5 @@
 ﻿import React, { useMemo, useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Card, CardContent } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
@@ -59,6 +60,9 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  
+  const superiorFormImage = new URL("../../../assets/superior_form.png", import.meta.url).href;
+  const disenoNuevoImage = new URL("../../../assets/diseño-nuevo.webp", import.meta.url).href;
 
   useEffect(() => {
     if (user && !formData.docente) {
@@ -433,383 +437,405 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-1" ref={formRef}>
-      {/* Fila superior: fecha límite + acciones */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        {deadlineInfo && (
-          <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
-            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-            <span>
-              Cierra el <strong>{deadlineInfo.formattedDeadline}</strong>
-              {deadlineInfo.isUrgent && " · Tiempo limitado"}
-            </span>
-          </div>
-        )}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.open(getCalendarFileUrl(), "_blank")}
-          className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
-        >
-          <Calendar className="mr-2 h-4 w-4" />
-          Calendario
-        </Button>
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
-              <History className="mr-2 h-4 w-4" />
-              Historial
-            </Button>
-          </SheetTrigger>
-<SheetContent
-  side="right"
-  className="sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
-  overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
->         <SheetHeader>
-              <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
-              <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
-            </SheetHeader>
-            <div className="mt-4 space-y-4">
-              {history.length > 0 ? (
-<ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">              <div className="grid gap-3 p-1">
-                    {history.map((h) => (
-                     <DocumentHistoryCard
-  key={h.id}
-  title=""
-  fileName={getUploadedFileName(h)}
-  carrera={h.carrera_label}
-  subject={h.materia}
-  grupo={h.group_code ? formatGroupCode(h.group_code) : undefined}
-  submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-  status={h.status}
-  returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
-  onView={() => openPreview(h)}
-  onEdit={() => populateFormForEdit(h)}
-/>
-                    ))}
-                  </div>
-                </ScrollArea>
-              ) : formData.archivos.length === 0 ? (
-                <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
-              ) : (
-                <div>
-                  <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
-                  <ul className="space-y-2">
-                    {formData.archivos.map((f, i) => (
-                      <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-       </SheetContent>
-      </Sheet>
-      </div>
+    <>
+      {/* Imágenes decorativas: portal a document.body para que `fixed` funcione de verdad, sin importar animaciones ancestras. No se mueven con ningún scroll. */}
+      {createPortal(
+        <>
+          <img
+            src={superiorFormImage}
+            alt="Decoración superior"
+            className="pointer-events-none select-none fixed top-0 right-0 z-0 w-20 sm:w-28 lg:w-36 opacity-90"
+          />
+          <img
+            src={disenoNuevoImage}
+            alt="Decoración puntos"
+            className="pointer-events-none select-none fixed top-14 right-6 z-0 w-14 sm:w-16 lg:w-20 opacity-90 sm:top-16 sm:right-10 lg:top-20 lg:right-16"
+          />
+        </>,
+        document.body
+      )}
 
-      {/* Título y subtítulo */}
-<div className="space-y-1.5 pt-1">
-  <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
-    Planeación
-  </h1>
-  <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
-    Recordatorio: se sube 3 días después de la aplicación de cada parcial.
-  </p>
-</div>
-
-      <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
-        <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
-          <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Los campos marcados con * son obligatorios.</p>
-          {editingDocumentId && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-              Estás editando la planeación existente. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+      <div className="max-w-4xl mx-auto space-y-1" ref={formRef}>
+        {/* Fila superior: fecha límite + acciones */}
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {deadlineInfo && (
+            <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+              <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                Cierra el <strong>{deadlineInfo.formattedDeadline}</strong>
+                {deadlineInfo.isUrgent && " · Tiempo limitado"}
+              </span>
             </div>
           )}
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Selector de Plan */}
-            <div className="space-y-2 md:col-span-2">
-              <Label className="text-sm font-medium dark:text-white">Plan *</Label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
-                  className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
-                    formData.plan === "nuevo-modelo"
-                      ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
-                      : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  <div className="flex-1">
-                    <span className="block text-base font-semibold dark:text-white">Plan Nuevo Modelo</span>
-                    <span className="block text-xs text-muted-foreground dark:text-slate-400">TSU e Ingeniería</span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
-                  className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
-                    formData.plan === "plan-normal"
-                      ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
-                      : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  <div className="flex-1">
-                    <span className="block text-base font-semibold dark:text-white">Plan Normal</span>
-                    <span className="block text-xs text-muted-foreground dark:text-slate-400">Ingenierías</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* Información académica */}
-            <div className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4 dark:border-slate-800/70 dark:bg-slate-900/30 md:col-span-2 md:p-5">
-               <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label className="dark:text-white">Carrera *</Label>
-                  <Select 
-                    value={formData.carrera} 
-                    onValueChange={(value) => setFormData((current) => ({ ...current, carrera: value, cuatrimestre: "", materia: "", parcial: "", grupo: "" }))} 
-                    disabled={!formData.plan}
-                  >
-                    <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                      <SelectValue placeholder="Selecciona la carrera" />
-                    </SelectTrigger>
-                   <SelectContent className="dark:border-slate-700 dark:bg-slate-900" position="popper" avoidCollisions={false}>
-                      {carrerasDisponibles.map((carrera) => (
-                        <SelectItem key={carrera.codigo} value={carrera.codigo} className="dark:text-white dark:hover:bg-slate-800">{carrera.nombre}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="dark:text-white">Cuatrimestre *</Label>
-                  <Select 
-                    value={formData.cuatrimestre} 
-                    onValueChange={(value) => setFormData((current) => ({ ...current, cuatrimestre: value as Cuatrimestre, materia: "", parcial: "", grupo: "" }))} 
-                    disabled={!formData.carrera}
-                  >
-                    <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                      <SelectValue placeholder="Selecciona el cuatrimestre" />
-                    </SelectTrigger>
-                    <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
-                      {cuatrimestresDisponibles.map((cuatri) => (
-                        <SelectItem key={cuatri} value={cuatri} className="dark:text-white dark:hover:bg-slate-800">{cuatrimestresLabels[cuatri as keyof typeof cuatrimestresLabels]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label className="dark:text-white">Materia *</Label>
-                  <Select 
-                    value={formData.materia} 
-                    onValueChange={(value) => setFormData((current) => ({ ...current, materia: value }))} 
-                    disabled={!formData.cuatrimestre}
-                  >
-                    <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                      <SelectValue placeholder="Selecciona la materia" />
-                    </SelectTrigger>
-                    <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
-                      {materiasDisponibles.map((materia, index) => (
-                        <SelectItem key={`${materia.nombre}-${index}`} value={materia.nombre} className="dark:text-white dark:hover:bg-slate-800">{materia.nombre}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="dark:text-white">Parcial *</Label>
-                  <Select 
-                    value={formData.parcial} 
-                    onValueChange={(value) => setFormData((current) => ({ ...current, parcial: value }))}
-                    disabled={!formData.materia}
-                  >
-                    <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                      <SelectValue placeholder="Selecciona el parcial" />
-                    </SelectTrigger>
-                    <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
-                      {parciales.map((parcial) => (
-                        <SelectItem key={parcial} value={parcial} className="dark:text-white dark:hover:bg-slate-800">{parcial}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="dark:text-white">Grupo *</Label>
-                  <Select 
-                    value={formData.grupo} 
-                    onValueChange={(value) => setFormData((c) => ({ ...c, grupo: value }))}
-                    disabled={!formData.parcial}
-                  >
-                    <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                      <SelectValue placeholder="Selecciona el grupo" />
-                    </SelectTrigger>
-                    <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
-                      {groupsOptions.length > 0 ? (
-                        groupsOptions.map((g) => (
-                          <SelectItem key={g.id} value={formatGroupCode(g.group_code)} className="dark:text-white dark:hover:bg-slate-800">
-                            {formatGroupCode(g.group_code)}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <div className="px-3 py-4 text-center text-sm text-amber-700 dark:text-amber-300">
-                          No hay grupos disponibles.
-                        </div>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            {/* Documentos */}
-            <div className="space-y-2 md:col-span-2">
-              <Label className="dark:text-white">Documentos (PDF) *</Label>
-              <p className="text-sm text-muted-foreground dark:text-slate-400">Adjunta documentos PDF de hasta 5 MB por archivo. Puedes cargar hasta tres archivos en total.</p>
-
-              <input 
-                type="file" 
-                accept=".pdf" 
-                multiple 
-                className="hidden" 
-                id="planeacion-pdf-upload" 
-                onChange={handleFileChange} 
-                disabled={formData.archivos.length >= 3} 
-              />
-
-              <div
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                className={`rounded-3xl border-2 border-dashed transition-all ${
-                  formData.archivos.length === 0 ? "p-6 text-center" : "p-4"
-                } ${
-                  isDragging
-                    ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30"
-                    : "border-border bg-background/60 hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40"
-                }`}
-              >
-                {formData.archivos.length === 0 ? (
-                  <label htmlFor="planeacion-pdf-upload" className="block cursor-pointer space-y-3">
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors dark:bg-emerald-500/10 dark:text-emerald-400">
-                      <Upload className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium dark:text-white">{getArchivosLabel()}</p>
-                      <p className="text-xs text-muted-foreground dark:text-slate-400">
-                        {isDragging ? "Suelta aquí para cargar" : `${getEspaciosLabel()} · arrastra o haz clic`}
-                      </p>
-                    </div>
-                  </label>
-                ) : (
-                  <div className="space-y-3">
-                    <div className={`grid gap-3 ${formData.archivos.length > 1 ? "sm:grid-cols-2" : ""} ${formData.archivos.length > 2 ? "lg:grid-cols-3" : ""}`}>
-                      {formData.archivos.map((archivo, index) => (
-                        <PdfPreview 
-                          key={`${archivo.name}-${archivo.size}-${index}`} 
-                          file={archivo} 
-                          title="Documento cargado" 
-                          onRemove={() => removeFile(index)} 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(getCalendarFileUrl(), "_blank")}
+            className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
+          >
+            <Calendar className="mr-2 h-4 w-4" />
+            Calendario
+          </Button>
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+                <History className="mr-2 h-4 w-4" />
+                Historial
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className="sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
+              overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
+            >
+              <SheetHeader>
+                <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
+                <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
+              </SheetHeader>
+              <div className="mt-4 space-y-4">
+                {history.length > 0 ? (
+                  <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
+                    <div className="grid gap-3 p-1">
+                      {history.map((h) => (
+                        <DocumentHistoryCard
+                          key={h.id}
+                          title=""
+                          fileName={getUploadedFileName(h)}
+                          carrera={h.carrera_label}
+                          subject={h.materia}
+                          grupo={h.group_code ? formatGroupCode(h.group_code) : undefined}
+                          submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          status={h.status}
+                          returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
+                          onView={() => openPreview(h)}
+                          onEdit={() => populateFormForEdit(h)}
                         />
                       ))}
                     </div>
-
-                    {formData.archivos.length < 3 && (
-                      <label
-                        htmlFor="planeacion-pdf-upload"
-                        className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-background/60 py-3 text-sm text-muted-foreground transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:hover:border-emerald-500/40"
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                        Agregar otro archivo · {getEspaciosLabel()}
-                      </label>
-                    )}
+                  </ScrollArea>
+                ) : formData.archivos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
+                ) : (
+                  <div>
+                    <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
+                    <ul className="space-y-2">
+                      {formData.archivos.map((f, i) => (
+                        <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
-            </div>
+            </SheetContent>
+          </Sheet>
+        </div>
 
-            {/* Docente */}
-            <div className="space-y-2 md:col-span-2">
-              <Label className="dark:text-white">Nombre del docente</Label>
-              <div className="relative">
-                <Input
-                  value={formData.docente}
-                  readOnly
-                  placeholder="Nombre del docente"
-                  className="rounded-2xl bg-muted/50 cursor-default select-none pr-10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+        {/* Título y subtítulo */}
+        <div className="space-y-1.5 pt-1">
+          <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
+            Planeación
+          </h1>
+          <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
+            Recordatorio: se sube 3 días después de la aplicación de cada parcial.
+          </p>
+        </div>
+
+        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+          <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
+            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Los campos marcados con * son obligatorios.</p>
+            {editingDocumentId && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                Estás editando la planeación existente. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+              </div>
+            )}
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Selector de Plan */}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="text-sm font-medium dark:text-white">Plan *</Label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
+                    className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
+                      formData.plan === "nuevo-modelo"
+                        ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
+                        : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <span className="block text-base font-semibold dark:text-white">Plan Nuevo Modelo</span>
+                      <span className="block text-xs text-muted-foreground dark:text-slate-400">TSU e Ingeniería</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
+                    className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
+                      formData.plan === "plan-normal"
+                        ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
+                        : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <span className="block text-base font-semibold dark:text-white">Plan Normal</span>
+                      <span className="block text-xs text-muted-foreground dark:text-slate-400">Ingenierías</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Información académica */}
+              <div className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4 dark:border-slate-800/70 dark:bg-slate-900/30 md:col-span-2 md:p-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label className="dark:text-white">Carrera *</Label>
+                    <Select 
+                      value={formData.carrera} 
+                      onValueChange={(value) => setFormData((current) => ({ ...current, carrera: value, cuatrimestre: "", materia: "", parcial: "", grupo: "" }))} 
+                      disabled={!formData.plan}
+                    >
+                      <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                        <SelectValue placeholder="Selecciona la carrera" />
+                      </SelectTrigger>
+                      <SelectContent className="dark:border-slate-700 dark:bg-slate-900" position="popper" avoidCollisions={false}>
+                        {carrerasDisponibles.map((carrera) => (
+                          <SelectItem key={carrera.codigo} value={carrera.codigo} className="dark:text-white dark:hover:bg-slate-800">{carrera.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="dark:text-white">Cuatrimestre *</Label>
+                    <Select 
+                      value={formData.cuatrimestre} 
+                      onValueChange={(value) => setFormData((current) => ({ ...current, cuatrimestre: value as Cuatrimestre, materia: "", parcial: "", grupo: "" }))} 
+                      disabled={!formData.carrera}
+                    >
+                      <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                        <SelectValue placeholder="Selecciona el cuatrimestre" />
+                      </SelectTrigger>
+                      <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
+                        {cuatrimestresDisponibles.map((cuatri) => (
+                          <SelectItem key={cuatri} value={cuatri} className="dark:text-white dark:hover:bg-slate-800">{cuatrimestresLabels[cuatri as keyof typeof cuatrimestresLabels]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label className="dark:text-white">Materia *</Label>
+                    <Select 
+                      value={formData.materia} 
+                      onValueChange={(value) => setFormData((current) => ({ ...current, materia: value }))} 
+                      disabled={!formData.cuatrimestre}
+                    >
+                      <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                        <SelectValue placeholder="Selecciona la materia" />
+                      </SelectTrigger>
+                      <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
+                        {materiasDisponibles.map((materia, index) => (
+                          <SelectItem key={`${materia.nombre}-${index}`} value={materia.nombre} className="dark:text-white dark:hover:bg-slate-800">{materia.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="dark:text-white">Parcial *</Label>
+                    <Select 
+                      value={formData.parcial} 
+                      onValueChange={(value) => setFormData((current) => ({ ...current, parcial: value }))}
+                      disabled={!formData.materia}
+                    >
+                      <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                        <SelectValue placeholder="Selecciona el parcial" />
+                      </SelectTrigger>
+                      <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
+                        {parciales.map((parcial) => (
+                          <SelectItem key={parcial} value={parcial} className="dark:text-white dark:hover:bg-slate-800">{parcial}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="dark:text-white">Grupo *</Label>
+                    <Select 
+                      value={formData.grupo} 
+                      onValueChange={(value) => setFormData((c) => ({ ...c, grupo: value }))}
+                      disabled={!formData.parcial}
+                    >
+                      <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                        <SelectValue placeholder="Selecciona el grupo" />
+                      </SelectTrigger>
+                      <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
+                        {groupsOptions.length > 0 ? (
+                          groupsOptions.map((g) => (
+                            <SelectItem key={g.id} value={formatGroupCode(g.group_code)} className="dark:text-white dark:hover:bg-slate-800">
+                              {formatGroupCode(g.group_code)}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="px-3 py-4 text-center text-sm text-amber-700 dark:text-amber-300">
+                            No hay grupos disponibles.
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Documentos */}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="dark:text-white">Documentos (PDF) *</Label>
+                <p className="text-sm text-muted-foreground dark:text-slate-400">Adjunta documentos PDF de hasta 5 MB por archivo. Puedes cargar hasta tres archivos en total.</p>
+
+                <input 
+                  type="file" 
+                  accept=".pdf" 
+                  multiple 
+                  className="hidden" 
+                  id="planeacion-pdf-upload" 
+                  onChange={handleFileChange} 
+                  disabled={formData.archivos.length >= 3} 
                 />
-                <Ban className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground dark:text-slate-500" />
+
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={`rounded-3xl border-2 border-dashed transition-all ${
+                    formData.archivos.length === 0 ? "p-6 text-center" : "p-4"
+                  } ${
+                    isDragging
+                      ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30"
+                      : "border-border bg-background/60 hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40"
+                  }`}
+                >
+                  {formData.archivos.length === 0 ? (
+                    <label htmlFor="planeacion-pdf-upload" className="block cursor-pointer space-y-3">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors dark:bg-emerald-500/10 dark:text-emerald-400">
+                        <Upload className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium dark:text-white">{getArchivosLabel()}</p>
+                        <p className="text-xs text-muted-foreground dark:text-slate-400">
+                          {isDragging ? "Suelta aquí para cargar" : `${getEspaciosLabel()} · arrastra o haz clic`}
+                        </p>
+                      </div>
+                    </label>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className={`grid gap-3 ${formData.archivos.length > 1 ? "sm:grid-cols-2" : ""} ${formData.archivos.length > 2 ? "lg:grid-cols-3" : ""}`}>
+                        {formData.archivos.map((archivo, index) => (
+                          <PdfPreview 
+                            key={`${archivo.name}-${archivo.size}-${index}`} 
+                            file={archivo} 
+                            title="Documento cargado" 
+                            onRemove={() => removeFile(index)} 
+                          />
+                        ))}
+                      </div>
+
+                      {formData.archivos.length < 3 && (
+                        <label
+                          htmlFor="planeacion-pdf-upload"
+                          className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-background/60 py-3 text-sm text-muted-foreground transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:hover:border-emerald-500/40"
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                          Agregar otro archivo · {getEspaciosLabel()}
+                        </label>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Docente */}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="dark:text-white">Nombre del docente</Label>
+                <div className="relative">
+                  <Input
+                    value={formData.docente}
+                    readOnly
+                    placeholder="Nombre del docente"
+                    className="rounded-2xl bg-muted/50 cursor-default select-none pr-10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  />
+                  <Ban className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground dark:text-slate-500" />
+                </div>
+              </div>
+
+              {/* Autorización */}
+              <div className="space-y-2 md:col-span-2">
+                <p className="text-sm font-medium dark:text-white">Declaración de autorización</p>
+                <p className="text-sm text-muted-foreground dark:text-slate-400">
+                  Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares 
+                  y confirmo la veracidad de la información proporcionada.
+                </p>
+              </div>
+
+              {/* Nota */}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="dark:text-white">Nota para administración (opcional)</Label>
+                <Textarea 
+                  value={formData.nota} 
+                  onChange={(e) => setFormData((current) => ({ ...current, nota: e.target.value }))} 
+                  placeholder="Agrega una nota para revisión" 
+                  className="min-h-[9rem] rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500" 
+                />
               </div>
             </div>
 
-            {/* Autorización */}
-            <div className="space-y-2 md:col-span-2">
-              <p className="text-sm font-medium dark:text-white">Declaración de autorización</p>
-              <p className="text-sm text-muted-foreground dark:text-slate-400">
-                Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares 
-                y confirmo la veracidad de la información proporcionada.
-              </p>
-            </div>
-
-            {/* Nota */}
-            <div className="space-y-2 md:col-span-2">
-              <Label className="dark:text-white">Nota para administración (opcional)</Label>
-              <Textarea 
-                value={formData.nota} 
-                onChange={(e) => setFormData((current) => ({ ...current, nota: e.target.value }))} 
-                placeholder="Agrega una nota para revisión" 
-                className="min-h-[9rem] rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500" 
-              />
-            </div>
-          </div>
-
-          {/* Footer con acciones */}
-                    {formAccess.isExpired && (
-            <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 mb-2 text-sm font-medium text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-              <span>Formulario cerrado &mdash; el plazo de env&iacute;o ha vencido. Solo puedes consultar tu historial.</span>
-            </div>
-          )}          <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
-            <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
-              Limpiar
-            </Button>
-            <Button 
-              variant="success" 
-              onClick={handleSubmit} 
-              disabled={!isValid || isSubmitting || !formAccess.canSubmit} 
-              className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white"
-            >
-              {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar planeación" : "Enviar planeación"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Diálogo de vista previa */}
-      <Dialog open={previewItem !== null} onOpenChange={(open) => { if (!open) closePreview(); }}>
-        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{previewItem?.nombre ?? "Documento"}</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 min-h-0">
-            {previewLoading ? (
-              <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
-                <p>Cargando...</p>
+            {/* Footer con acciones */}
+            {formAccess.isExpired && (
+              <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 mb-2 text-sm font-medium text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+                <span>Formulario cerrado &mdash; el plazo de env&iacute;o ha vencido. Solo puedes consultar tu historial.</span>
               </div>
-            ) : previewError ? (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-                {previewError}
-              </div>
-            ) : previewBlobUrl ? (
-              <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border">
-                <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
-                  Abrir documento en nueva pestaña
-                </a>
-              </object>
-            ) : null}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+            )}
+            <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
+              <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+                Limpiar
+              </Button>
+              <Button 
+                variant="success" 
+                onClick={handleSubmit} 
+                disabled={!isValid || isSubmitting || !formAccess.canSubmit} 
+                className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white"
+              >
+                {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar planeación" : "Enviar planeación"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Diálogo de vista previa */}
+        <Dialog open={previewItem !== null} onOpenChange={(open) => { if (!open) closePreview(); }}>
+          <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>{previewItem?.nombre ?? "Documento"}</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 min-h-0">
+              {previewLoading ? (
+                <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                  <p>Cargando...</p>
+                </div>
+              ) : previewError ? (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                  {previewError}
+                </div>
+              ) : previewBlobUrl ? (
+                <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border">
+                  <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
+                    Abrir documento en nueva pestaña
+                  </a>
+                </object>
+              ) : null}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </>
   );
 }

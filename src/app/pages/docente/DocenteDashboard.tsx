@@ -22,6 +22,12 @@ import {
   Undo2,
 } from "lucide-react";
 
+// --- Importar las imágenes desde assets ---
+import banner1 from "../../../assets/123.png";
+import banner2 from "../../../assets/1234.png";
+import banner3 from "../../../assets/ut_imagen3.webp";
+import banner4 from "../../../assets/ut_imagen4.webp";
+
 function formatTiempoRestante(fecha: string): { valor: string; unidad: string } {
   const diff = new Date(fecha).getTime() - Date.now();
   if (diff <= 0) return { valor: '0', unidad: 'minutos' };
@@ -64,15 +70,15 @@ type FormItem = {
   access_roles?: string[];
 };
 
-// --- Arreglo de banners para el carrusel ---
+// --- Arreglo de banners para el carrusel con las imágenes importadas ---
 const introBanners = [
-  "/images/intro-banner-1.jpg",
-  "/images/intro-banner-2.jpg",
-  "/images/intro-banner-3.jpg",
-  "/images/intro-banner-4.jpg",
+  banner1,
+  banner2,
+  banner3,
+  banner4,
 ];
 
-// --- Componente del carrusel (ocupa todo el cuadro) ---
+// --- Componente del carrusel (solo las imágenes, sin ningún cuadro) ---
 function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: string[]; href: string; intervalMs?: number }) {
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -95,7 +101,7 @@ function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: s
         <img
           key={src}
           src={src}
-          alt="Antes de comenzar - Manual Docente"
+          alt="Manual Docente"
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out ${
             index === activeIndex ? "opacity-100" : "opacity-0"
           }`}
@@ -108,7 +114,6 @@ function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: s
 export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const { onNavigate } = props;
   const manualDocenteUrl = new URL("../../../assets/Manual de Usuario del Docente.pdf", import.meta.url).href;
-  const [isIntroOpen, setIsIntroOpen] = useState(true);
 
   const { isReady, user } = useAuth();
 
@@ -370,45 +375,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
       </div>
 
       <div className="relative z-10">
-        {/* Card de bienvenida con carrusel */}
-        <Card className="overflow-hidden rounded-3xl border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
-          <CardContent className="space-y-5 p-5 sm:p-7">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-2">
-                <h2 className="text-2xl font-semibold tracking-tight text-slate-800 dark:text-white">Antes de comenzar</h2>
-                {!isIntroOpen && (
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Haz clic en el caret para ver los banners informativos.
-                  </p>
-                )}
-              </div>
-
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsIntroOpen((current) => !current)}
-                aria-label={isIntroOpen ? "Contraer información" : "Expandir información"}
-                title={isIntroOpen ? "Contraer información" : "Expandir información"}
-                className="h-11 w-11 rounded-2xl border-0 bg-emerald-600 text-white shadow-md transition-transform duration-200 hover:scale-105 hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 dark:bg-emerald-700 dark:hover:bg-emerald-800"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className={`h-5 w-5 transform-gpu transition-transform duration-200 ${isIntroOpen ? "rotate-180" : "rotate-0"}`}
-                  aria-hidden
-                >
-                  <polyline points="6 9 12 15 18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </Button>
-            </div>
-
-            {isIntroOpen && (
-              <AutoFadeBannerCarousel images={introBanners} href={manualDocenteUrl} />
-            )}
-          </CardContent>
-        </Card>
+        {/* Solo el carrusel de imágenes, sin ningún cuadro ni título */}
+        <AutoFadeBannerCarousel images={introBanners} href={manualDocenteUrl} />
 
         {/* Stats cards */}
         <div className="relative z-10 mt-3 grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
