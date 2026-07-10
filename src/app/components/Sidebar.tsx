@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { cn } from "../../lib/utils";
 import { Button } from "./ui/button";
+import { usePWAInstall } from "../hooks/usePWAInstall";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import apiFetch from "../lib/api";
@@ -26,6 +27,7 @@ import {
   ChevronDown,
   ChevronRight,
   Shield,
+  Download,
 } from "lucide-react";
 
 const defaultProfileAvatar = "/src/assets/perfil2.png";
@@ -385,6 +387,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   }, [instrumento6070Open, onNavigate]);
 
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const { canInstall, install } = usePWAInstall();
 
   const handleLogoutClick = React.useCallback(() => {
     setLogoutDialogOpen(true);
@@ -625,6 +628,19 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                 </p>
               </div>
             </button>
+          )}
+          {canInstall && (
+            <Button
+              variant="ghost"
+              size={isCollapsedLocal ? "icon" : "default"}
+              onClick={install}
+              aria-label="Abrir en la app"
+              title="Abrir en la app"
+              className="w-full shrink-0 justify-start rounded-xl border border-emerald-300/70 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+            >
+              <Download className="h-5 w-5" />
+              {!isCollapsedLocal && <span className="ml-3">Abrir en la app</span>}
+            </Button>
           )}
           <Button
             variant="ghost"

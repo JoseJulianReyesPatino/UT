@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { CycleCardSkeleton, CycleDocumentCardSkeleton } from "./skeletons";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -313,6 +314,8 @@ export function CiclosEscolares() {
   });
 
   const [ciclos, setCiclos] = useState<AcademicCycle[]>(initialCycles);
+  const [isLoadingCycles, setIsLoadingCycles] = useState(true);
+  const [cyclesLoadError, setCyclesLoadError] = useState<string | null>(null);
   const [documents, setDocuments] = useState<DocumentRecord[]>(initialDocuments);
   const [estadiasDocuments, setEstadiasDocuments] = useState<EstadiasDocumentRecord[]>([]);
   const [tutorDocuments, setTutorDocuments] = useState<TutorDocumentRecord[]>(initialTutorDocuments);
@@ -731,14 +734,21 @@ export function CiclosEscolares() {
     let cancelled = false;
 
     const loadCycles = async () => {
+      setIsLoadingCycles(true);
+      setCyclesLoadError(null);
       try {
         const response = await apiFetch("/cycles", { method: "GET" });
         if (cancelled) return;
-        const mappedCycles = response.data.map(mapApiCycle);
+        const mappedCycles = (response.data ?? []).map(mapApiCycle);
         setCiclos(mappedCycles);
         void loadCycleDocumentCounts(mappedCycles);
       } catch (error) {
-        toast.error("No fue posible cargar los ciclos escolares");
+        if (!cancelled) {
+          setCyclesLoadError("No fue posible cargar los ciclos escolares. Intenta actualizar la página.");
+          toast.error("No fue posible cargar los ciclos escolares");
+        }
+      } finally {
+        if (!cancelled) setIsLoadingCycles(false);
       }
     };
 
@@ -1470,8 +1480,21 @@ export function CiclosEscolares() {
         </div>
       </div>
 
+      {isLoadingCycles ? (
+        <CycleCardSkeleton />
+      ) : cyclesLoadError ? (
+        <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-8 text-center text-sm text-destructive">
+          {cyclesLoadError}
+        </div>
+      ) : ciclos.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-muted/40 p-10 text-center text-muted-foreground">
+          <p className="font-medium">No hay ciclos escolares registrados</p>
+          <p className="mt-1 text-sm">Crea el primer ciclo con el botón "Nuevo Ciclo".</p>
+        </div>
+      ) : null}
+
       <div className="grid gap-4">
-        {ciclos.map((ciclo) => {
+        {!isLoadingCycles && !cyclesLoadError && ciclos.map((ciclo) => {
           const documentsCount = cycleDocumentCount(ciclo);
 
           return (
@@ -1876,9 +1899,7 @@ export function CiclosEscolares() {
 
           <ScrollArea className="flex-1 pr-4">
             {isLoadingDocuments ? (
-              <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-                Cargando documentos del ciclo...
-              </div>
+              <CycleDocumentCardSkeleton />
             ) : selectedDocumentType === "docentes" ? (
               <>
                 <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 py-4 border-b">

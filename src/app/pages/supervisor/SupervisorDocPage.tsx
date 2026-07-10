@@ -3,55 +3,14 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { SearchableSelect } from "../../components/SearchableSelect";
 import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
+import { type DocRecord, getParcialNum, formatSentFecha } from "./supervisorShared";
 import { Eye, FileText, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { DocumentCardSkeleton } from "../admin/skeletons";
 
-type DocRecord = {
-  id: number;
-  title: string;
-  status: string;
-  submitted_at?: string | null;
-  created_at?: string | null;
-  materia?: string | null;
-  grupo?: string | null;
-  group_code?: string | null;
-  parcial?: string | null;
-  uploaded_by_name?: string | null;
-  form_title?: string | null;
-  carrera_label?: string | null;
-};
-
-type SectionKey = "all" | "pendientes" | "revisados" | "devueltos";
-
-const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  pendiente: { label: "Pendiente", className: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" },
-  revisado:  { label: "Revisado",  className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" },
-  devuelto:  { label: "Devuelto",  className: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300" },
-  reenviado: { label: "Reenviado", className: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300" },
-};
-
-const getParcialNum = (parcial?: string | null): string => {
-  if (!parcial) return "";
-  const m = parcial.match(/\b([123])\b/);
-  return m ? m[1] : "";
-};
-
-const formatSentFecha = (fecha?: string | null) => {
-  if (!fecha) return "";
-  try {
-    const normalized = fecha.includes(" ") && !fecha.includes("T") ? fecha.replace(" ", "T") : fecha;
-    const date = new Date(normalized);
-    if (Number.isNaN(date.getTime())) return fecha;
-    const datePart = date.toLocaleDateString("es-MX", { year: "numeric", month: "2-digit", day: "2-digit" });
-    const timePart = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
-    return `${datePart} ${timePart}`;
-  } catch { return fecha; }
-};
 
 export interface FormCodeEntry {
   code: string;
@@ -84,7 +43,6 @@ export default function SupervisorDocPage({
   const [docenteFilter, setDocenteFilter] = useState("all");
   const [grupoFilter, setGrupoFilter] = useState("all");
   const [apartadoFilter, setApartadoFilter] = useState("all");
-  const [activeSection, setActiveSection] = useState<SectionKey>("all");
   const [previewDoc, setPreviewDoc] = useState<DocRecord | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -137,7 +95,7 @@ export default function SupervisorDocPage({
       try {
         const blob = await fetchDocumentBlob(previewDoc.id);
         if (!isMounted) return;
-        setPreviewBlobUrl(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+        setPreviewBlobUrl(URL.createObjectURL(blob));
       } catch (error) {
         if (!isMounted) return;
         setPreviewError(error instanceof Error ? error.message : "No fue posible abrir el PDF");
@@ -185,29 +143,9 @@ export default function SupervisorDocPage({
     });
   }, [docs, parcialFilter, carreraFilter, docenteFilter, grupoFilter, apartadoFilter, isMultiForm]);
 
-  const activeDocuments = useMemo(() => {
-    if (activeSection === "pendientes") return filtered.filter((d) => ["pendiente", "reenviado"].includes((d.status ?? "").toLowerCase()));
-    if (activeSection === "revisados") return filtered.filter((d) => (d.status ?? "").toLowerCase() === "revisado");
-    if (activeSection === "devueltos") return filtered.filter((d) => (d.status ?? "").toLowerCase() === "devuelto");
-    return filtered;
-  }, [filtered, activeSection]);
-
-  const countAll = filtered.length;
-  const countPendientes = filtered.filter((d) => ["pendiente", "reenviado"].includes((d.status ?? "").toLowerCase())).length;
-  const countRevisados = filtered.filter((d) => (d.status ?? "").toLowerCase() === "revisado").length;
-  const countDevueltos = filtered.filter((d) => (d.status ?? "").toLowerCase() === "devuelto").length;
-
-  const statusInfo = (status: string) =>
-    STATUS_LABELS[status.toLowerCase()] ?? { label: status, className: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" };
-
-  const tabCls =
-    "inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm";
-  const countBadgeCls =
-    "ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200";
   const sectionCardCls = "overflow-hidden rounded-[22px] border border-border bg-card shadow-sm";
 
   const renderDocumentCard = (doc: DocRecord) => {
-    const st = statusInfo(doc.status ?? "pendiente");
     const rawTitle = doc.title ?? "";
     const lastSep = rawTitle.lastIndexOf(" - ");
     const fileName = lastSep !== -1 && rawTitle.substring(lastSep + 3).trim()
@@ -225,21 +163,27 @@ export default function SupervisorDocPage({
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold tracking-wide text-foreground">
-              {apartadoLabel ? `${apartadoLabel} - ${fileName}` : fileName}
+              {fileName.toLowerCase().endsWith(".pdf") ? fileName : `${fileName}.pdf`}
             </p>
             <p className="text-xs text-muted-foreground">
               {doc.uploaded_by_name ?? "Docente"}
               {!hideColumns.includes("carrera") && doc.carrera_label ? ` • ${doc.carrera_label}` : ""}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
+              {apartadoLabel && (
+                <Badge variant="outline" className="text-xs">{apartadoLabel}</Badge>
+              )}
+              {doc.cuatrimestre != null && String(doc.cuatrimestre) !== "" && String(doc.cuatrimestre) !== "-" && (
+                <Badge variant="outline" className="text-xs">{`Cuatrimestre ${doc.cuatrimestre}`}</Badge>
+              )}
               {!hideColumns.includes("grupo") && grupo && grupo !== "-" && (
                 <Badge variant="outline" className="text-xs">{`Grupo ${grupo}`}</Badge>
               )}
               {!hideColumns.includes("parcial") && parcialNum && (
                 <Badge variant="outline" className="text-xs">{`Parcial ${parcialNum}`}</Badge>
               )}
-              {isMultiForm && doc.form_title && (
-                <Badge variant="outline" className="text-xs">{doc.form_title}</Badge>
+              {doc.materia && doc.materia !== "-" && doc.materia.toLowerCase() !== "sin materia" && (
+                <Badge variant="outline" className="text-xs">{doc.materia}</Badge>
               )}
             </div>
             {(doc.submitted_at ?? doc.created_at) && (
@@ -250,9 +194,6 @@ export default function SupervisorDocPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${st.className}`}>
-            {st.label}
-          </span>
           <Button size="sm" variant="outline" className="gap-1.5 rounded-full" onClick={() => setPreviewDoc(doc)}>
             <Eye className="h-4 w-4" />
             Ver
@@ -315,11 +256,7 @@ export default function SupervisorDocPage({
 
   const renderDocList = (docList: DocRecord[]) => {
     if (isLoading) {
-      return (
-        <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
-          <p>Cargando...</p>
-        </div>
-      );
+      return <DocumentCardSkeleton />;
     }
     if (docList.length === 0) {
       return (
@@ -357,45 +294,10 @@ export default function SupervisorDocPage({
         </div>
       </div>
 
-      {/* Pestañas de estado */}
-      <Tabs value={activeSection} onValueChange={(v) => setActiveSection(v as SectionKey)}>
-        <div className="sm:hidden mb-3">
-          <Select value={activeSection} onValueChange={(v) => setActiveSection(v as SectionKey)}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Sección" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="pendientes">Pendientes</SelectItem>
-              <SelectItem value="revisados">Revisados</SelectItem>
-              <SelectItem value="devueltos">Devueltos</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
-          <TabsTrigger value="all" className={tabCls}>
-            Todos <Badge variant="outline" className={countBadgeCls}>{countAll}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="pendientes" className={tabCls}>
-            Pendientes <Badge variant="outline" className={countBadgeCls}>{countPendientes}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="revisados" className={tabCls}>
-            Revisados <Badge variant="outline" className={countBadgeCls}>{countRevisados}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="devueltos" className={tabCls}>
-            Devueltos <Badge variant="outline" className={countBadgeCls}>{countDevueltos}</Badge>
-          </TabsTrigger>
-        </TabsList>
-
-        {(["all", "pendientes", "revisados", "devueltos"] as SectionKey[]).map((section) => (
-          <TabsContent key={section} value={section} className="space-y-4 mt-6">
-            <Card className={sectionCardCls}>
-              <CardHeader className="pb-4">{renderFilters()}</CardHeader>
-              <CardContent>{renderDocList(activeDocuments)}</CardContent>
-            </Card>
-          </TabsContent>
-        ))}
-      </Tabs>
+      <Card className={sectionCardCls}>
+        <CardHeader className="pb-4">{renderFilters()}</CardHeader>
+        <CardContent>{renderDocList(filtered)}</CardContent>
+      </Card>
 
       {/* Diálogo de vista previa */}
       <Dialog open={previewDoc !== null} onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}>
@@ -405,7 +307,7 @@ export default function SupervisorDocPage({
             {previewDoc && (
               <DialogDescription>
                 {[previewDoc.uploaded_by_name, previewDoc.form_title, previewDoc.carrera_label, previewDoc.parcial]
-                  .filter(Boolean)
+                  .filter((v) => v && v !== "-")
                   .join(" · ")}
               </DialogDescription>
             )}

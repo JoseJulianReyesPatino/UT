@@ -15,7 +15,6 @@ import Configuration from "./pages/admin/Configuration";
 import EstadiasAdmin from "./pages/admin/Estadias";
 import CalendarioAdmin from "./pages/admin/Calendario";
 import { Profile } from "./pages/docente/Profile";
-import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import SupervisorPlaneacion from "./pages/supervisor/SupervisorPlaneacion";
 import SupervisorInstrumentos from "./pages/supervisor/SupervisorInstrumentos";
 import SupervisorDocPage from "./pages/supervisor/SupervisorDocPage";
@@ -49,10 +48,14 @@ import {
   Moon,
 } from "lucide-react";
 
+// IMPORTAR LAS IMÁGENES AQUÍ
+import PlaneacionSuperiorImg from "../assets/superior_form.png";
+import PlaneacionDisenoImg from "../assets/diseño-nuevo.webp";
+
 function AppContent() {
   const { isAuthenticated, isReady, user, notice, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const logoSrc = theme === "dark" ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
+  const logoSrc = theme === "dark" ? LogoUTSLRCWhite : LogoUTSLRC;
   const splashLogoSrc = theme === "dark" ? LogoUTSLRCWhite : LogoUTSLRC;
   const currentViewStorageKey = "utslrc-current-view";
   const [currentView, setCurrentView] = useState(() => sessionStorage.getItem(currentViewStorageKey) ?? "dashboard");
@@ -195,7 +198,7 @@ function AppContent() {
       sessionStorage.setItem(currentViewStorageKey, currentView);
     }
     setIsLoggingOut(false);
-  }, [currentView, isAuthenticated, isReady, user?.role, user?.supervisorSections]);
+  }, [currentView, isAuthenticated, isReady, user?.role, user?.roles, user?.supervisorSections]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -416,11 +419,6 @@ function AppContent() {
 
     if (isSupervisor) {
       const sections = user?.supervisorSections ?? [];
-      const defaultView = sections.includes("planeacion")
-        ? "supervisor-planeacion"
-        : sections.some((s) => ["instrumento-30","instrumento-40","instrumento-60","instrumento-70"].includes(s))
-        ? "supervisor-instrumentos"
-        : null;
 
       switch (currentView) {
         case "supervisor-planeacion":
@@ -455,9 +453,6 @@ function AppContent() {
         case "perfil":
           return <Profile />;
         default:
-          if (defaultView) {
-            return defaultView === "supervisor-planeacion" ? <SupervisorPlaneacion /> : <SupervisorInstrumentos allowedSections={sections} />;
-          }
           return <Profile />;
       }
     }
@@ -578,6 +573,25 @@ function AppContent() {
             />
             <main className="relative flex-1 overflow-y-auto bg-transparent">
               <div className="pointer-events-none absolute inset-0 overflow-hidden" />
+
+              {/* IMÁGENES DECORATIVAS - HIJAS DIRECTAS DE <main> */}
+              {currentView === "planeacion" && (
+                <>
+<img
+  src={PlaneacionSuperiorImg}
+  alt="Decoración superior"
+  className="hidden md:block pointer-events-none select-none absolute w-20 sm:w-28 lg:w-36 opacity-90 z-0"
+  style={{ top: '-0.5rem', right: '0.1rem' }}
+/>
+<img
+  src={PlaneacionDisenoImg}
+  alt="Decoración puntos"
+  className="hidden md:block pointer-events-none select-none absolute w-14 sm:w-16 lg:w-20 opacity-90 z-0"
+  style={{ top: '7rem', right: '2.5rem' }}
+/>
+                </>
+              )}
+
               <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur md:hidden">
                 <div className="flex items-center justify-between px-4 py-3">
                   <Button

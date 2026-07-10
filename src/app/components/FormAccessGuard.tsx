@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import { CalendarClock, Eye, FileText, History, Calendar } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -83,15 +83,23 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
 
   const hasRole = (role: "docente" | "tutor" | "administrador") => user?.role === role || user?.roles?.includes(role);
 
-  // Cargar reglas de acceso desde la API, usando y refrescando la caché compartida
-  useEffect(() => {
-    let cancelled = false;
-
+  // Actualiza accessRule desde caché de forma SÍNCRONA antes de que el navegador pinte.
+  // Esto evita el flash donde el título ya cambió al nuevo formulario pero el estado
+  // "cerrado" del formulario anterior aún se muestra porque useEffect corre post-paint.
+  useLayoutEffect(() => {
     const freshNow = Boolean(formsCache && Date.now() - formsCache.timestamp < FORMS_CACHE_TTL);
     if (freshNow) {
       setAccessRule(resolveAccessRule(formsCache!.data, formId));
       setAccessLoading(false);
-    } else {
+    }
+  }, [formId]);
+
+  // Carga asíncrona desde la API y refresca si el caché expiró
+  useEffect(() => {
+    let cancelled = false;
+
+    const freshNow = Boolean(formsCache && Date.now() - formsCache.timestamp < FORMS_CACHE_TTL);
+    if (!freshNow) {
       setAccessLoading(!formsCache);
     }
 
@@ -129,6 +137,33 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
     return () => {
       window.removeEventListener('ut-forms-loaded', handleFormsLoaded as EventListener);
     };
+  }, [formId]);
+
+  // Actualización en tiempo real cuando el admin guarda la configuración de formularios.
+  // El mensaje incluye los datos actualizados directamente, sin necesidad de llamada a la red.
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const bc = new BroadcastChannel("form_config_changed");
+    bc.onmessage = (event: MessageEvent) => {
+      const msg = event.data ?? {};
+      if (msg.formId !== formId) return;
+      const newDueAt: string | null = msg.dueAt ?? null;
+      const newRoles: FormRole[] = msg.roles ?? [];
+      // Actualiza el caché compartido para que navegaciones futuras sean consistentes
+      if (formsCache) {
+        const backendCode = getBackendFormCode(formId);
+        formsCache = {
+          ...formsCache,
+          data: formsCache.data.map((f: any) =>
+            String(f.form_code).replace(/_/g, "-") === backendCode
+              ? { ...f, due_at: newDueAt, access_roles: newRoles }
+              : f
+          ),
+        };
+      }
+      setAccessRule({ roles: newRoles, dueAt: newDueAt });
+    };
+    return () => bc.close();
   }, [formId]);
 
   const roleAllowed = Boolean(

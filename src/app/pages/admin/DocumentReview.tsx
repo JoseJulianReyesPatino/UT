@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+import FormNotFoundImg from "../../../assets/Form_Not_Found.png";
+import { DocumentCardSkeleton } from "./skeletons";
 import { Check, Eye, FileText, MessageCircleMore, MessageSquare, RefreshCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -795,19 +797,16 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const EmptyState = ({ text }: { text: string }) => (
 		<div className="rounded-2xl border border-border bg-muted/40 p-8 text-center text-muted-foreground shadow-sm">
 			<div className="flex flex-col items-center gap-4">
+				<img src={FormNotFoundImg} alt="Sin documentos" className="h-36 w-36 object-contain opacity-60 dark:opacity-40" />
 				<p>{text}</p>
 			</div>
 		</div>
 	);
 
 	const renderListState = (content: React.ReactNode) => {
-			if (isLoading) {
-					return (
-						<div className="rounded-lg border border-dashed border-border p-4 text-center text-muted-foreground">
-							<p>Cargando...</p>
-						</div>
-					);
-			}
+		if (isLoading) {
+			return <DocumentCardSkeleton />;
+		}
 
 		if (loadError) {
 			return <p className="text-sm text-destructive">{loadError}</p>;

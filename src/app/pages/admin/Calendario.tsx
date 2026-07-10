@@ -17,12 +17,14 @@ type CalendarMeta = {
 
 export function CalendarioAdmin() {
   const [calendar, setCalendar] = useState<CalendarMeta | null>(null);
+  const [isLoadingCalendar, setIsLoadingCalendar] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void (async () => {
+      setIsLoadingCalendar(true);
       try {
         const response = await apiFetch("/calendar");
         const data = response?.data;
@@ -39,6 +41,8 @@ export function CalendarioAdmin() {
           uploadedAt: null,
           isActive: false,
         });
+      } finally {
+        setIsLoadingCalendar(false);
       }
     })();
   }, []);
@@ -100,49 +104,69 @@ export function CalendarioAdmin() {
           <CardTitle>Calendario vigente</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" variant="success" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
-              {isLoading ? "Subiendo..." : "Subir calendario"}
-            </Button>
-            <Input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileSelect} disabled={isLoading} />
-            <Button type="button" variant="outline" disabled={isLoading || !calendar} onClick={() => window.open(calendarSrc, "_blank", "noopener,noreferrer")}>
-              <Eye className="mr-2 h-4 w-4" />Abrir PDF
-            </Button>
-            <Button type="button" variant="outline" disabled={isLoading || !calendar} onClick={() => window.open(getCalendarDownloadUrl(), "_blank", "noopener,noreferrer")}>
-              <Download className="mr-2 h-4 w-4" />Descargar
-            </Button>
-          </div>
+          {isLoadingCalendar ? (
+            <div className="space-y-4" aria-busy="true" aria-label="Cargando calendario">
+              {/* Fila de botones */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="animate-pulse h-9 w-40 rounded-lg bg-muted" />
+                <div className="animate-pulse h-9 w-28 rounded-lg bg-muted" />
+                <div className="animate-pulse h-9 w-28 rounded-lg bg-muted" />
+              </div>
+              {/* Caja "Archivo actual" */}
+              <div className="animate-pulse rounded-2xl border border-border bg-muted/40 p-4 space-y-2">
+                <div className="h-3.5 w-24 rounded-full bg-muted" />
+                <div className="h-3 w-48 rounded-full bg-muted" />
+              </div>
+              {/* Área del PDF */}
+              <div className="animate-pulse overflow-hidden rounded-2xl border border-border bg-muted/30 h-[72vh] w-full" />
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" variant="success" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+                  {isLoading ? "Subiendo..." : "Subir calendario"}
+                </Button>
+                <Input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileSelect} disabled={isLoading} />
+                <Button type="button" variant="outline" disabled={isLoading || !calendar} onClick={() => window.open(calendarSrc, "_blank", "noopener,noreferrer")}>
+                  <Eye className="mr-2 h-4 w-4" />Abrir PDF
+                </Button>
+                <Button type="button" variant="outline" disabled={isLoading || !calendar} onClick={() => window.open(getCalendarDownloadUrl(), "_blank", "noopener,noreferrer")}>
+                  <Download className="mr-2 h-4 w-4" />Descargar
+                </Button>
+              </div>
 
-          <Dialog open={!!pendingFile} onOpenChange={(open) => { if (!open) setPendingFile(null); }}>
-            <DialogContent className="max-w-sm">
-              <DialogHeader>
-                <DialogTitle>¿Reemplazar calendario vigente?</DialogTitle>
-                <DialogDescription>
-                  Se sobreescribirá el archivo actual con <span className="font-medium text-foreground">{pendingFile?.name}</span>. Esta acción no se puede deshacer.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button variant="outline" onClick={() => setPendingFile(null)}>Cancelar</Button>
-                <Button variant="destructive" onClick={() => void handleUploadConfirm()}>Reemplazar</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              <div className="rounded-2xl border border-border bg-background/80 p-4 shadow-sm">
+                <p className="text-sm font-medium text-foreground">Archivo actual</p>
+                <p className="text-sm text-muted-foreground">{calendar?.name ?? "Calendario25-26.pdf"}</p>
+              </div>
 
-          <div className="rounded-2xl border border-border bg-background/80 p-4 shadow-sm">
-            <p className="text-sm font-medium text-foreground">Archivo actual</p>
-            <p className="text-sm text-muted-foreground">{calendar?.name ?? "Calendario25-26.pdf"}</p>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-border bg-background">
-            <iframe
-              src={`${calendarSrc}#toolbar=1&navpanes=0`}
-              className="h-[72vh] w-full"
-              title="Calendario institucional"
-            />
-          </div>
+              <div className="overflow-hidden rounded-2xl border border-border bg-background">
+                <iframe
+                  src={`${calendarSrc}#toolbar=1&navpanes=0`}
+                  className="h-[72vh] w-full"
+                  title="Calendario institucional"
+                />
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!pendingFile} onOpenChange={(open) => { if (!open) setPendingFile(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>¿Reemplazar calendario vigente?</DialogTitle>
+            <DialogDescription>
+              Se sobreescribirá el archivo actual con <span className="font-medium text-foreground">{pendingFile?.name}</span>. Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setPendingFile(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => void handleUploadConfirm()}>Reemplazar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { UserCardSkeleton } from "./skeletons";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -240,6 +241,7 @@ function StatusConfirmationDialog({
   );
 }
 
+
 const initialDocentes: Docente[] = [
 ];
 
@@ -337,11 +339,7 @@ export function DocenteManagement() {
   let usersListContent: React.ReactNode;
 
   if (isLoadingUsers) {
-    usersListContent = (
-      <div className="rounded-xl border border-dashed border-border bg-background/80 p-8 text-center text-sm text-muted-foreground">
-        Cargando...
-      </div>
-    );
+    usersListContent = <UserCardSkeleton />;
   } else if (usersError) {
     usersListContent = (
       <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-sm text-destructive">

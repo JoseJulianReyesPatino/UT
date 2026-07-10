@@ -23,10 +23,30 @@ import {
 } from "lucide-react";
 
 // --- Importar las imágenes desde assets ---
-import banner1 from "../../../assets/123.png";
-import banner2 from "../../../assets/1234.png";
-import banner3 from "../../../assets/ut_imagen3.webp";
-import banner4 from "../../../assets/ut_imagen4.webp";
+import banner1 from "../../../assets/carrusel1.png";
+import banner2 from "../../../assets/carrusel2.png";
+import banner3 from "../../../assets/carrusel3.png";
+import banner4 from "../../../assets/carrusel4.png";
+import banner5 from "../../../assets/carrusel5.png";
+
+// --- Caché en memoria compartida para evitar el "flash" de vacío al reentrar al dashboard ---
+let dashboardCache: {
+  stats: {
+    title: string;
+    value: string;
+    description: string;
+    icon: any;
+    trend?: string;
+    color?: string;
+    bgColor?: string;
+    cardClass?: string;
+    accentClass?: string;
+    action?: string;
+  }[];
+  recentDocuments: DocumentItem[];
+  proximasEntregas: any[];
+  timestamp: number;
+} | null = null;
 
 function formatTiempoRestante(fecha: string): { valor: string; unidad: string } {
   const diff = new Date(fecha).getTime() - Date.now();
@@ -78,9 +98,14 @@ const introBanners = [
   banner4,
 ];
 
-// --- Componente del carrusel (solo las imágenes, sin ningún cuadro) ---
+// --- Componente del carrusel con flechas ---
+// --- Componente del carrusel (solo las imágenes, sin fondo oscuro) ---
+// --- Componente del carrusel (con fondo sutil pero sin el cuadro oscuro) ---
+// --- Componente del carrusel con botón para minimizar ---
+// --- Componente del carrusel con botón para minimizar (UI/UX mejorada) ---
 function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: string[]; href: string; intervalMs?: number }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   useEffect(() => {
     if (images.length <= 1) return;
@@ -90,24 +115,142 @@ function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: s
     return () => clearInterval(timer);
   }, [images.length, intervalMs]);
 
+  const goPrev = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setActiveIndex((current) => (current - 1 + images.length) % images.length);
+  };
+
+  const goNext = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setActiveIndex((current) => (current + 1) % images.length);
+  };
+
+  const toggleMinimize = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsMinimized(!isMinimized);
+  };
+
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="relative block h-48 w-full overflow-hidden rounded-2xl transition-transform duration-200 hover:scale-[1.01] sm:h-56"
-    >
-      {images.map((src, index) => (
-        <img
-          key={src}
-          src={src}
-          alt="Manual Docente"
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out ${
-            index === activeIndex ? "opacity-100" : "opacity-0"
+    <div className="relative w-full overflow-hidden rounded-2xl transition-all duration-300 ease-in-out">
+      <div 
+        className={`relative w-full overflow-hidden rounded-2xl transition-all duration-300 ease-in-out ${
+          isMinimized ? 'h-14 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200/50 dark:border-emerald-800/50' : ''
+        }`}
+        style={!isMinimized ? { aspectRatio: '1852/849' } : {}}
+      >
+        {/* Imágenes del carrusel */}
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className={`relative block h-full w-full transition-transform duration-200 ${
+            !isMinimized ? 'hover:scale-[1.01]' : ''
           }`}
-        />
-      ))}
-    </a>
+        >
+          {images.map((src, index) => (
+            <img
+              key={src}
+              src={src}
+              alt="Manual Docente"
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out ${
+                index === activeIndex ? "opacity-100" : "opacity-0"
+              } ${isMinimized ? 'opacity-0' : ''}`}
+            />
+          ))}
+        </a>
+
+        {/* Botón de minimizar/expandir - Mejorado */}
+        <button
+          type="button"
+          onClick={toggleMinimize}
+          aria-label={isMinimized ? "Expandir carrusel" : "Minimizar carrusel"}
+          className={`absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-105 ${
+            isMinimized 
+              ? 'bg-emerald-600/90 hover:bg-emerald-700/90 dark:bg-emerald-500/90 dark:hover:bg-emerald-600/90' 
+              : 'bg-black/50 hover:bg-black/70'
+          }`}
+        >
+          {isMinimized ? (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                <path d="M19 9l-7 7-7-7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="hidden sm:inline">Expandir</span>
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                <path d="M5 15l7-7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="hidden sm:inline">Minimizar</span>
+            </>
+          )}
+        </button>
+
+        {/* Flechas de navegación - solo visibles cuando NO está minimizado */}
+        {images.length > 1 && !isMinimized && (
+          <>
+            <button
+              type="button"
+              onClick={goPrev}
+              aria-label="Imagen anterior"
+              className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/60 sm:left-4 sm:h-10 sm:w-10"
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+                <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={goNext}
+              aria-label="Imagen siguiente"
+              className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/60 sm:right-4 sm:h-10 sm:w-10"
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+                <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </>
+        )}
+
+        {/* Estado minimizado - UI mejorada */}
+        {isMinimized && (
+          <div className="absolute inset-0 flex items-center justify-between px-4">
+            <div className="flex items-center gap-3">
+              {/* Icono decorativo */}
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
+                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true">
+                  <rect x="2" y="2" width="20" height="20" rx="2" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                  <path d="M8 8h8M8 12h6M8 16h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              
+              {/* Texto informativo */}
+              <div>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Carrusel minimizado
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Haz clic en <span className="font-medium text-emerald-600 dark:text-emerald-400">Expandir</span> para ver las imágenes
+                </p>
+              </div>
+            </div>
+
+            {/* Indicador de cantidad de imágenes */}
+            <div className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-xs font-medium text-slate-600 backdrop-blur-sm dark:bg-slate-800/70 dark:text-slate-300">
+              <span>{images.length}</span>
+              <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
+                <rect x="2" y="2" width="20" height="20" rx="2" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M8 8h8M8 12h6M8 16h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -135,14 +278,14 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     cardClass?: string;
     accentClass?: string;
     action?: string;
-  }[]>([]);
+  }[]>(dashboardCache?.stats ?? []);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
 
-  const [recentDocuments, setRecentDocuments] = useState<DocumentItem[]>([]);
+  const [recentDocuments, setRecentDocuments] = useState<DocumentItem[]>(dashboardCache?.recentDocuments ?? []);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
 
-  const [proximasEntregas, setProximasEntregas] = useState<any[]>([]);
-  const [isLoadingProximas, setIsLoadingProximas] = useState(false);
+  const [proximasEntregas, setProximasEntregas] = useState<any[]>(dashboardCache?.proximasEntregas ?? []);
+  const [isLoadingProximas, setIsLoadingProximas] = useState(!dashboardCache);
 
   // --- Función para formatear fecha ---
   const formatDate = useCallback((dateStr?: string | null) => {
@@ -187,96 +330,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     }
   }, []);
 
-  // --- Función para recargar los datos manualmente ---
-  const refreshData = useCallback(async () => {
-    if (!isReady || !user) return;
-    
-    setIsLoadingStats(true);
-    setIsLoadingDocuments(true);
-    setIsLoadingProximas(true);
-    
-    try {
-      // 1. Recargar estadísticas
-      const dashboard = (await apiFetch('/dashboard/stats', { method: 'GET' })) as any;
-      
-      const statsArr = [
-        {
-          title: 'Documentos Pendientes',
-          value: String(dashboard.documents_pending ?? 0),
-          description: 'Pendientes de revisión',
-          icon: Clock,
-          action: 'historial',
-          cardClass: 'bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70',
-          accentClass: 'from-slate-400/35 via-slate-300/20 to-transparent',
-        },
-        {
-          title: 'Documentos Aprobados',
-          value: String(dashboard.documents_reviewed ?? 0),
-          description: 'Este cuatrimestre',
-          icon: CheckCircle2,
-          action: 'historial',
-          cardClass: 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50/80 border-emerald-200/70 dark:from-emerald-950/20 dark:via-slate-950 dark:to-emerald-950/25 dark:border-emerald-800/60',
-          accentClass: 'from-emerald-400/35 via-emerald-300/20 to-transparent',
-        },
-        {
-          title: 'En Revisión',
-          value: String((dashboard.documents_total ?? 0) - (dashboard.documents_reviewed ?? 0) - (dashboard.documents_pending ?? 0)),
-          description: 'En revisión',
-          icon: AlertCircle,
-          action: 'historial',
-          cardClass: 'bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70',
-          accentClass: 'from-slate-400/35 via-slate-300/20 to-transparent',
-        },
-      ];
-      setStats(statsArr);
-
-      // 2. Recargar documentos recientes con corrección de "undefined"
-      const docsPayload = (await apiFetch('/documents?per_page=6', { method: 'GET' })) as any;
-      const docs = (docsPayload?.data?.data ?? docsPayload?.data ?? []) as any[];
-      
-      setRecentDocuments(docs.map((d) => {
-        const formTitle = (d?.form_title ?? d?.tipoLabel ?? d?.apartado_label ?? '').toString().trim();
-
-        // Nombre de archivo tal cual lo subió el docente (último segmento del title, sin modificar)
-        const titleStr = decodeURIComponent((d?.title ?? '').toString().trim());
-        const lastSegment = titleStr.split(' - ').pop()?.trim() ?? titleStr;
-        const fileName = lastSegment || 'Documento';
-        const nombre = formTitle ? `${formTitle} - ${fileName}` : fileName;
-
-        const rawMateria = (d?.materia ?? '').toString().trim();
-        const materia = rawMateria && rawMateria !== 'Sin materia' ? rawMateria : '';
-
-        const rawGrupo = (d?.grupo ?? d?.group_code ?? '').toString().trim();
-        const grupo = rawGrupo && rawGrupo !== '-' ? rawGrupo : '';
-
-        const fechaEnvio = d?.submitted_at ?? d?.fecha ?? d?.created_at ?? null;
-
-        return {
-          id: d.id,
-          nombre,
-          materia,
-          grupo,
-          tipo: formTitle || 'Documento',
-          fecha: fechaEnvio,
-          submittedAt: fechaEnvio,
-          status: d.status ?? 'pendiente',
-          resubmittedAt: d.resubmitted_at ?? null,
-          filePath: d.file_path ?? d.filePath ?? null,
-        };
-      }));
-
-      // 3. Recargar próximas entregas
-      await loadProximasEntregas(docs);
-      
-    } catch (err) {
-      console.error("Error al cargar el dashboard:", err);
-    } finally {
-      setIsLoadingStats(false);
-      setIsLoadingDocuments(false);
-      setIsLoadingProximas(false);
-    }
-  }, [isReady, user]);
-
   // --- Función separada para cargar próximas entregas ---
   const loadProximasEntregas = async (docs?: DocumentItem[]) => {
     try {
@@ -316,32 +369,132 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         : [];
 
       if (upcomingFromForms.length === 0) {
-        setProximasEntregas([
-          {
-            titulo: "No hay formularios próximos",
-            fecha: "Sin fechas límite próximas",
-            dias: 0,
-            isPlaceholder: true,
-          }
-        ]);
+        const placeholder = [{ 
+          titulo: "No hay formularios próximos", 
+          fecha: "Sin fechas límite próximas", 
+          dias: 0, 
+          isPlaceholder: true 
+        }];
+        setProximasEntregas(placeholder);
+        return placeholder;
       } else {
         setProximasEntregas(upcomingFromForms);
+        return upcomingFromForms;
       }
       
     } catch (error) {
       console.error("❌ Error en loadProximasEntregas:", error);
-      setProximasEntregas([
-        {
-          titulo: "No fue posible cargar los formularios",
-          fecha: "Intenta de nuevo más tarde",
-          dias: 0,
-          isPlaceholder: true,
-        }
-      ]);
+      const errorPlaceholder = [{ 
+        titulo: "No fue posible cargar los formularios", 
+        fecha: "Intenta de nuevo más tarde", 
+        dias: 0, 
+        isPlaceholder: true 
+      }];
+      setProximasEntregas(errorPlaceholder);
+      return errorPlaceholder;
     } finally {
       setIsLoadingProximas(false);
     }
   };
+
+  // --- Función para recargar los datos manualmente ---
+  const refreshData = useCallback(async () => {
+    if (!isReady || !user) return;
+    
+    setIsLoadingStats(true);
+    setIsLoadingDocuments(true);
+    setIsLoadingProximas(true);
+    
+    try {
+      // 1. Recargar estadísticas
+      const dashboard = (await apiFetch('/dashboard/stats', { method: 'GET' })) as any;
+      
+      const statsArr = [
+        {
+          title: 'Documentos Pendientes',
+          value: String(dashboard.documents_pending ?? 0),
+          description: 'Pendientes de revisión',
+          icon: Clock,
+          action: 'historial',
+          cardClass: 'bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70',
+          accentClass: 'from-slate-400/35 via-slate-300/20 to-transparent',
+        },
+        {
+          title: 'Documentos Aprobados',
+          value: String(dashboard.documents_reviewed ?? 0),
+          description: 'Este cuatrimestre',
+          icon: CheckCircle2,
+          action: 'historial',
+          cardClass: 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50/80 border-emerald-200/70 dark:from-emerald-950/20 dark:via-slate-950 dark:to-emerald-950/25 dark:border-emerald-800/60',
+          accentClass: 'from-emerald-400/35 via-emerald-300/20 to-transparent',
+        },
+        {
+          title: 'En Revisión',
+          value: String((dashboard.documents_total ?? 0) - (dashboard.documents_reviewed ?? 0) - (dashboard.documents_pending ?? 0)),
+          description: 'Actualmente en proceso',
+          icon: AlertCircle,
+          action: 'historial',
+          cardClass: 'bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70',
+          accentClass: 'from-slate-400/35 via-slate-300/20 to-transparent',
+        },
+      ];
+      setStats(statsArr);
+
+      // 2. Recargar documentos recientes con corrección de "undefined"
+      const docsPayload = (await apiFetch('/documents?per_page=6', { method: 'GET' })) as any;
+      const docs = (docsPayload?.data?.data ?? docsPayload?.data ?? []) as any[];
+      
+      const mappedDocs = docs.map((d) => {
+        const formTitle = (d?.form_title ?? d?.tipoLabel ?? d?.apartado_label ?? '').toString().trim();
+
+        // Nombre de archivo tal cual lo subió el docente (último segmento del title, sin modificar)
+        const titleStr = decodeURIComponent((d?.title ?? '').toString().trim());
+        const lastSegment = titleStr.split(' - ').pop()?.trim() ?? titleStr;
+        const fileName = lastSegment || 'Documento';
+        const nombre = formTitle ? `${formTitle} - ${fileName}` : fileName;
+
+        const rawMateria = (d?.materia ?? '').toString().trim();
+        const materia = rawMateria && rawMateria !== 'Sin materia' ? rawMateria : '';
+
+        const rawGrupo = (d?.grupo ?? d?.group_code ?? '').toString().trim();
+        const grupo = rawGrupo && rawGrupo !== '-' ? rawGrupo : '';
+
+        const fechaEnvio = d?.submitted_at ?? d?.fecha ?? d?.created_at ?? null;
+
+        return {
+          id: d.id,
+          nombre,
+          materia,
+          grupo,
+          tipo: formTitle || 'Documento',
+          fecha: fechaEnvio,
+          submittedAt: fechaEnvio,
+          status: d.status ?? 'pendiente',
+          resubmittedAt: d.resubmitted_at ?? null,
+          filePath: d.file_path ?? d.filePath ?? null,
+        };
+      });
+      setRecentDocuments(mappedDocs);
+
+      // 3. Recargar próximas entregas
+      const nextProximas = await loadProximasEntregas(docs);
+
+      // Guardar en caché para la próxima vez que se visite este dashboard
+      dashboardCache = {
+        stats: statsArr,
+        recentDocuments: mappedDocs,
+        proximasEntregas: nextProximas ?? [],
+        timestamp: Date.now(),
+      };
+      
+    } catch (err) {
+      console.error("Error al cargar el dashboard:", err);
+    } finally {
+      setIsLoadingStats(false);
+      setIsLoadingDocuments(false);
+      setIsLoadingProximas(false);
+    }
+  }, [isReady, user]);
 
   // --- Función para abrir el documento en el diálogo ---
   const openDocument = useCallback((doc: DocumentItem) => {
@@ -427,7 +580,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="max-h-[24rem] space-y-3 overflow-x-hidden overflow-y-auto pr-2">
+              <div className="max-h-[60vh] space-y-3 overflow-x-hidden overflow-y-auto pr-2 sm:max-h-[24rem]">
                 {recentDocuments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600" />
@@ -458,28 +611,35 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                       DocStatusIcon = Clock2;
                     }
 
+                    // Separar nombre del formulario (tipo) del nombre real del PDF
+                    const fileNameOnly = doc.nombre.includes(' - ')
+                      ? doc.nombre.split(' - ').slice(1).join(' - ')
+                      : doc.nombre;
+
                     return (
                       <div
                         key={doc.id}
-                        className="flex min-w-0 items-center gap-3 rounded-2xl border border-border/70 bg-card/70 p-3 transition-colors hover:bg-accent/50 dark:border-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-900"
+                        className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-card/70 p-3 transition-colors hover:bg-accent/50 dark:border-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:gap-3"
                       >
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                          <FileText className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-slate-800 dark:text-white">{doc.nombre}</p>
-                          {(doc.materia || doc.grupo) && (
-                            <p className="truncate text-xs text-slate-600 dark:text-slate-400">
-                              {[doc.materia, doc.grupo].filter(Boolean).join(' · ')}
+                        <div className="flex items-start gap-3 sm:min-w-0 sm:flex-1">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            <FileText className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                              {doc.tipo}
                             </p>
-                          )}
-                          {doc.fecha && (
-                            <p className="truncate text-[11px] text-slate-500 dark:text-slate-500">
-                              {formatDate(doc.fecha)}
+                            <p className="break-words text-sm font-semibold text-slate-800 dark:text-white sm:truncate">
+                              {fileNameOnly}
                             </p>
-                          )}
+                            {doc.fecha && (
+                              <p className="text-[11px] text-slate-500 dark:text-slate-500">
+                                {formatDate(doc.fecha)}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
                           <Badge variant={docStatusVariant} className="inline-flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-xs rounded-full dark:border-slate-700">
                             <DocStatusIcon className="h-3.5 w-3.5" />
                             {docStatusLabel}
@@ -516,7 +676,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="max-h-[24rem] space-y-3 overflow-x-hidden overflow-y-auto pr-2">
+              <div className="max-h-[60vh] space-y-3 overflow-x-hidden overflow-y-auto pr-2 sm:max-h-[24rem]">
                 {isLoadingProximas ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="text-center">
@@ -567,11 +727,11 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                         <div>
                           {tituloVisible && (
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-bold text-slate-900 dark:text-white">{tituloVisible}</p>
+                              <p className="text-sm font-semibold capitalize text-emerald-700 dark:text-emerald-400">{tituloVisible}</p>
                             </div>
                           )}
                           {detalle !== tituloVisible && (
-                            <p className="text-xs text-slate-600 dark:text-slate-400">{detalle}</p>
+                            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{detalle}</p>
                           )}
                           <p className="text-xs text-slate-600 dark:text-slate-400">
                             {new Date(entrega.fecha).toLocaleDateString("es-MX", {

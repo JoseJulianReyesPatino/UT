@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
+import FormNotFoundImg from "../../../assets/Form_Not_Found.png";
+import { DocumentCardSkeleton } from "./skeletons";
 import { SearchableSelect } from "../../components/SearchableSelect";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { FileText, Eye, Loader2, MessageCircleMore, MessageSquare, Check, RefreshCw, Undo2 } from "lucide-react";
+import { FileText, Eye, MessageCircleMore, MessageSquare, Check, RefreshCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
@@ -121,10 +123,12 @@ const emptyStateLegend = "Aún no hay documentos de tutores para mostrar en esta
 const EmptyState = ({ text }: { text: string }) => (
   <div className="rounded-2xl border border-border bg-muted/40 p-8 text-center text-muted-foreground shadow-sm">
     <div className="flex flex-col items-center gap-4">
+      <img src={FormNotFoundImg} alt="Sin documentos" className="h-36 w-36 object-contain opacity-60 dark:opacity-40" />
       <p>{text}</p>
     </div>
   </div>
 );
+
 
 const careerOptions: CareerOption[] = Array.from(
   new Map(
@@ -153,7 +157,7 @@ export default function Tutores() {
   const [returnConfirmation, setReturnConfirmation] = useState<ReturnConfirmation | null>(null);
   const [isConfirmingReturn, setIsConfirmingReturn] = useState(false);
   const [returnComment, setReturnComment] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [noteDialog, setNoteDialog] = useState<{ nota: string; tutor: string } | null>(null);
   const [reviewConfirmation, setReviewConfirmation] = useState<TutorDocument | null>(null);
   // Conteos estables por sección — no se mezclan con los documentos activos del tab
@@ -563,11 +567,7 @@ export default function Tutores() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Cargando documentos...</span>
-                  </div>
-                ) : filteredAll.length === 0 ? (
+                {isLoading ? <DocumentCardSkeleton /> : filteredAll.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : filteredAll.map((doc) => {
                   const isReviewed = Boolean(doc.reviewedAt);
@@ -585,8 +585,13 @@ export default function Tutores() {
                           <FileText className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                          <p className="font-medium break-words text-sm sm:text-base">{ensurePdfExtension(doc.documento)}</p>
+                          <p className="font-medium break-words text-sm sm:text-base">{extractPreviewFileName(doc.documento)}</p>
                           <p className="text-sm text-muted-foreground">{"tutor" in doc ? doc.tutor : (doc as any).tutor}</p>
+                          {doc.apartado && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Badge variant="outline" className="text-xs">{getTutoriasApartadoLabel(doc.apartado)}</Badge>
+                            </div>
+                          )}
                             {('fecha' in doc && doc.fecha) && (
                               <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(('fecha' in doc ? doc.fecha : ''))} {('fecha' in doc && doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' '))) ? <span className="ml-2 text-xs text-muted-foreground">{formatTime12(doc.fecha)}</span> : null}</p>
                             )}
@@ -679,11 +684,7 @@ export default function Tutores() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Cargando documentos...</span>
-                  </div>
-                ) : filteredPending.length === 0 ? (
+                {isLoading ? <DocumentCardSkeleton /> : filteredPending.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : filteredPending.map((doc) => {
                   const isReturned = Boolean(doc.returned);
@@ -700,8 +701,13 @@ export default function Tutores() {
                         <FileText className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                        <p className="break-words text-sm font-medium leading-snug sm:text-base">{ensurePdfExtension(doc.documento)}</p>
+                        <p className="break-words text-sm font-medium leading-snug sm:text-base">{extractPreviewFileName(doc.documento)}</p>
                         <p className="mt-1 text-xs leading-snug text-muted-foreground sm:text-sm">{doc.tutor}</p>
+                        {doc.apartado && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge variant="outline" className="text-xs">{getTutoriasApartadoLabel(doc.apartado)}</Badge>
+                          </div>
+                        )}
                         {doc.fecha && (
                           <p className="mt-2 text-[11px] leading-snug text-muted-foreground sm:text-xs">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-[11px] text-muted-foreground sm:text-xs">{formatTime12(doc.fecha)}</span> : null}</p>
                         )}
@@ -790,11 +796,7 @@ export default function Tutores() {
               {filtersBar}
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Cargando documentos...</span>
-                </div>
-              ) : Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
+              {isLoading ? <DocumentCardSkeleton /> : Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
                 <EmptyState text={emptyStateLegend} />
               ) : (
                 <div className="space-y-6">
@@ -820,8 +822,13 @@ export default function Tutores() {
                                 <FileText className="h-6 w-6 text-muted-foreground" />
                               </div>
                               <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                                <p className="font-medium break-words text-sm sm:text-base">{ensurePdfExtension(doc.documento)}</p>
+                                <p className="font-medium break-words text-sm sm:text-base">{extractPreviewFileName(doc.documento)}</p>
                                 <p className="text-sm text-muted-foreground">{doc.tutor}</p>
+                                {doc.apartado && (
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    <Badge variant="outline" className="text-xs">{getTutoriasApartadoLabel(doc.apartado)}</Badge>
+                                  </div>
+                                )}
                                 {'reviewedAt' in doc && doc.reviewedAt && (
                                   <p className="mt-1 text-xs text-muted-foreground">Revisado: {formatDateTimeFromIso(doc.reviewedAt)}</p>
                                 )}
@@ -880,11 +887,7 @@ export default function Tutores() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Cargando documentos...</span>
-                  </div>
-                ) : reviewedToday.length === 0 ? (
+                {isLoading ? <DocumentCardSkeleton /> : reviewedToday.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : (
                   reviewedToday.map((doc) => {
@@ -902,8 +905,13 @@ export default function Tutores() {
                           <FileText className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                          <p className="font-medium break-words text-sm sm:text-base">{ensurePdfExtension(doc.documento)}</p>
+                          <p className="font-medium break-words text-sm sm:text-base">{extractPreviewFileName(doc.documento)}</p>
                           <p className="text-sm text-muted-foreground">{doc.tutor}</p>
+                          {doc.apartado && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Badge variant="outline" className="text-xs">{getTutoriasApartadoLabel(doc.apartado)}</Badge>
+                            </div>
+                          )}
                             {doc.fecha && (
                               <p className="mt-1 text-xs text-muted-foreground">Enviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-xs text-muted-foreground">{formatTime12(doc.fecha)}</span> : null}</p>
                             )}

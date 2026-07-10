@@ -111,26 +111,35 @@ type DraftRecipient = {
 
 const initialConversations: Conversation[] = [];
 
-const formatMessageTimestamp = (raw: string): string => {
+// Sonora / Hermosillo = UTC-7, sin horario de verano
+const MST_OFFSET_MS = -7 * 60 * 60 * 1000;
+
+const toMSTDate = (utcDate: Date): Date => new Date(utcDate.getTime() + MST_OFFSET_MS);
+
+const parseUTC = (raw: string): Date | null => {
   const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return raw;
-  return date.toLocaleString('es-MX', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const withZ = /Z$|[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : normalized + 'Z';
+  const d = new Date(withZ);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const fmt12h = (local: Date): string => {
+  const h = local.getUTCHours();
+  const m = local.getUTCMinutes();
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${h < 12 ? 'a.m.' : 'p.m.'}`;
+};
+
+const formatMessageTimestamp = (raw: string): string => {
+  const utc = parseUTC(raw);
+  return utc ? fmt12h(toMSTDate(utc)) : raw;
 };
 
 const formatDateSeparator = (raw: string): string => {
-  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return raw;
-  return date.toLocaleDateString('es-MX', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  const utc = parseUTC(raw);
+  if (!utc) return raw;
+  const local = toMSTDate(utc);
+  return `${String(local.getUTCDate()).padStart(2, '0')}/${String(local.getUTCMonth() + 1).padStart(2, '0')}/${local.getUTCFullYear()}`;
 };
 
 const formatSize = (size: number) => {
@@ -139,12 +148,7 @@ const formatSize = (size: number) => {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 };
 
-const getTimeLabel = () =>
-  new Date().toLocaleString("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+const getTimeLabel = () => fmt12h(toMSTDate(new Date()));
 
 const parseMessageDate = (timestamp: string) => {
   const normalized = timestamp.includes("T") ? timestamp : timestamp.replace(" ", "T");
@@ -833,7 +837,7 @@ export function MessagesTeacher(props: Readonly<{
     const avatarUrl = raw.avatar_url ?? raw.avatar;
     const avatarFallback = raw.avatar_fallback || getInitials(raw.sender);
     const avatarValue = avatarUrl && isImageUrl(avatarUrl) ? avatarUrl : DEFAULT_AVATAR_PATH;
-    const rawTs = raw.timestamp ?? raw.created_at ?? new Date().toISOString();
+    const rawTs = raw.rawTimestamp ?? raw.created_at ?? raw.timestamp ?? new Date().toISOString();
 
     return {
       id: raw.id,
@@ -1545,14 +1549,18 @@ export function MessagesTeacher(props: Readonly<{
             </div>
 
             <div className="min-h-0 flex-1 overflow-hidden">
-              {adminConversation ? (
-                <ScrollArea className="h-full bg-muted/20 dark:bg-slate-900/30">
-                  <div className="w-full min-w-0 overflow-x-hidden pb-2 pt-3">
-                    {adminConversation.messages.length > 0 ? (
-                      <div className="space-y-1 px-4">
-                        {messageGroups.map((group, groupIndex) => (
-                          <div key={groupIndex}>
-                            <DateSeparator date={group.date} />
+              <ScrollArea className="h-full bg-muted/20 dark:bg-slate-900/30">
+                <div className="w-full min-w-0 overflow-x-hidden">
+                  {isInitialLoad && !adminConversation ? (
+                    <MessageListSkeleton />
+                  ) : adminConversation && (isLoadingMessages || confirmedLoadedChatId !== selectedChat) && !adminConversation.messages.length ? (
+                    <MessageListSkeleton />
+                  ) : adminConversation && adminConversation.messages.length > 0 ? (
+                    <div className="pb-2 pt-3 px-4">
+                      {messageGroups.map((group, groupIndex) => (
+                        <div key={groupIndex}>
+                          <DateSeparator date={group.date} />
+                          <div className="space-y-3">
                             {group.messages.map((messageItem) => (
                               <MessageBubble
                                 key={messageItem.id}
@@ -1563,23 +1571,23 @@ export function MessagesTeacher(props: Readonly<{
                               />
                             ))}
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <EmptyConversationState
-                        title="Sin mensajes aún"
-                        description="Escribe el primer mensaje para iniciar la conversación con el administrador."
-                      />
-                    )}
-                    <div ref={messagesEndRef} />
-                  </div>
-                </ScrollArea>
-              ) : (
-                <EmptyConversationState
-                  title="Preparando tu chat..."
-                  description="Estamos conectando tu chat con el administrador, un momento por favor."
-                />
-              )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : adminConversation ? (
+                    <EmptyConversationState
+                      title="Sin mensajes aún"
+                      description="Escribe el primer mensaje para iniciar la conversación con el administrador."
+                    />
+                  ) : (
+                    <EmptyConversationState
+                      title="Preparando tu chat..."
+                      description="Estamos conectando tu chat con el administrador, un momento por favor."
+                    />
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              </ScrollArea>
             </div>
 
             <div className="shrink-0 border-t border-border/60 bg-card p-4 dark:border-slate-700 dark:bg-slate-950/60">

@@ -1,5 +1,4 @@
 ﻿import React, { useMemo, useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import { Card, CardContent } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
@@ -60,9 +59,6 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  
-  const superiorFormImage = new URL("../../../assets/superior_form.png", import.meta.url).href;
-  const disenoNuevoImage = new URL("../../../assets/diseño-nuevo.webp", import.meta.url).href;
 
   useEffect(() => {
     if (user && !formData.docente) {
@@ -437,107 +433,95 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
   };
 
   return (
-    <>
-      {/* Imágenes decorativas: portal a document.body para que `fixed` funcione de verdad, sin importar animaciones ancestras. No se mueven con ningún scroll. */}
-      {createPortal(
-        <>
-          <img
-            src={superiorFormImage}
-            alt="Decoración superior"
-            className="pointer-events-none select-none fixed top-0 right-0 z-0 w-20 sm:w-28 lg:w-36 opacity-90"
-          />
-          <img
-            src={disenoNuevoImage}
-            alt="Decoración puntos"
-            className="pointer-events-none select-none fixed top-14 right-6 z-0 w-14 sm:w-16 lg:w-20 opacity-90 sm:top-16 sm:right-10 lg:top-20 lg:right-16"
-          />
-        </>,
-        document.body
-      )}
-
-      <div className="max-w-4xl mx-auto space-y-1" ref={formRef}>
-        {/* Fila superior: fecha límite + acciones */}
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          {deadlineInfo && (
-            <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
-              <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-              <span>
-                Cierra el <strong>{deadlineInfo.formattedDeadline}</strong>
-                {deadlineInfo.isUrgent && " · Tiempo limitado"}
-              </span>
-            </div>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.open(getCalendarFileUrl(), "_blank")}
-            className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
-          >
-            <Calendar className="mr-2 h-4 w-4" />
-            Calendario
-          </Button>
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm" className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
-                <History className="mr-2 h-4 w-4" />
-                Historial
-              </Button>
-            </SheetTrigger>
-            <SheetContent
-              side="right"
-              className="sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
-              overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
-            >
-              <SheetHeader>
-                <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
-                <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
-              </SheetHeader>
-              <div className="mt-4 space-y-4">
-                {history.length > 0 ? (
-                  <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
-                    <div className="grid gap-3 p-1">
-                      {history.map((h) => (
-                        <DocumentHistoryCard
-                          key={h.id}
-                          title=""
-                          fileName={getUploadedFileName(h)}
-                          carrera={h.carrera_label}
-                          subject={h.materia}
-                          grupo={h.group_code ? formatGroupCode(h.group_code) : undefined}
-                          submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          status={h.status}
-                          returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
-                          onView={() => openPreview(h)}
-                          onEdit={() => populateFormForEdit(h)}
-                        />
-                      ))}
-                    </div>
-                  </ScrollArea>
-                ) : formData.archivos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
-                ) : (
-                  <div>
-                    <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
-                    <ul className="space-y-2">
-                      {formData.archivos.map((f, i) => (
-                        <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+    <div className="relative w-full" ref={formRef}>
+      {/* NOTA: Las imágenes decorativas se movieron a App.tsx como hijas directas de <main> */}
+      
+      <div className="max-w-4xl mx-auto space-y-1">
+        {/* HEADER - título, subtítulo y botones */}
+        <div className="planeacion-header relative">
+          {/* Fila superior: fecha límite + acciones */}
+          <div className="flex flex-wrap items-center justify-end gap-3 relative z-10">
+            {deadlineInfo && (
+              <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+                <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Cierra el <strong>{deadlineInfo.formattedDeadline}</strong>
+                  {deadlineInfo.isUrgent && " · Tiempo limitado"}
+                </span>
               </div>
-            </SheetContent>
-          </Sheet>
-        </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(getCalendarFileUrl(), "_blank")}
+              className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
+            >
+              <Calendar className="mr-2 h-4 w-4" />
+              Calendario
+            </Button>
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+                  <History className="mr-2 h-4 w-4" />
+                  Historial
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="right"
+                className="sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
+                overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
+              >
+                <SheetHeader>
+                  <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
+                  <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-4">
+                  {history.length > 0 ? (
+                    <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
+                      <div className="grid gap-3 p-1">
+                        {history.map((h) => (
+                          <DocumentHistoryCard
+                            key={h.id}
+                            title=""
+                            fileName={getUploadedFileName(h)}
+                            carrera={h.carrera_label}
+                            subject={h.materia}
+                            grupo={h.group_code ? formatGroupCode(h.group_code) : undefined}
+                            submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            status={h.status}
+                            returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
+                            onView={() => openPreview(h)}
+                            onEdit={() => populateFormForEdit(h)}
+                          />
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : formData.archivos.length === 0 ? (
+                    <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
+                  ) : (
+                    <div>
+                      <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
+                      <ul className="space-y-2">
+                        {formData.archivos.map((f, i) => (
+                          <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
 
-        {/* Título y subtítulo */}
-        <div className="space-y-1.5 pt-1">
-          <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
-            Planeación
-          </h1>
-          <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
-            Recordatorio: se sube 3 días después de la aplicación de cada parcial.
-          </p>
+          {/* Título y subtítulo */}
+          <div className="space-y-1.5 pt-1 relative z-10">
+            <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
+              Planeación
+            </h1>
+            <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
+              Recordatorio: se sube 3 días después de la aplicación de cada parcial.
+            </p>
+          </div>
         </div>
 
         <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
@@ -836,6 +820,6 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
           </DialogContent>
         </Dialog>
       </div>
-    </>
+    </div>
   );
 }

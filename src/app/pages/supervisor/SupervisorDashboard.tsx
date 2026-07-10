@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React from "react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { useAuth } from "../../context/AuthContext";
-import { apiFetch } from "../../lib/api";
 import { CheckCircle2, ClipboardList, FileStack, FileText, Users } from "lucide-react";
 
 interface SupervisorDashboardProps {
@@ -11,29 +10,6 @@ interface SupervisorDashboardProps {
 
 export default function SupervisorDashboard({ onNavigate }: Readonly<SupervisorDashboardProps>) {
   const { user } = useAuth();
-  const [stats, setStats] = useState({ total: 0, revisados: 0, pendientes: 0, docentes: 0 });
-  const [isLoading, setIsLoading] = useState(true);
-
-  const loadStats = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [planeacionRes, instRes] = await Promise.all([
-        apiFetch("/documents", { query: { form_id: 1, per_page: 1 } }) as Promise<any>,
-        apiFetch("/documents", { query: { per_page: 1 } }) as Promise<any>,
-      ]);
-      const total = instRes?.total ?? instRes?.meta?.total ?? 0;
-      const revisados = instRes?.revisados ?? 0;
-      const pendientes = instRes?.pendientes ?? 0;
-      setStats({ total, revisados, pendientes, docentes: planeacionRes?.docentes_count ?? 0 });
-    } catch {
-      // stats opcionales
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void loadStats(); }, [loadStats]);
-
   const firstName = user?.firstNames?.split(" ")[0] ?? user?.name?.split(" ")[0] ?? "Supervisor";
 
   const statCardCls = "overflow-hidden rounded-[22px] border border-border bg-card shadow-sm";

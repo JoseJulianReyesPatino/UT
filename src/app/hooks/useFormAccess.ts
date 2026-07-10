@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { apiFetch } from "../lib/api";
 
 export interface FormAccess {
@@ -8,6 +8,8 @@ export interface FormAccess {
   canSubmit: boolean;
 }
 
+const BC_CHANNEL = "form_config_changed";
+
 export function useFormAccess(formId: number): FormAccess {
   const [state, setState] = useState<FormAccess>({
     isLoading: true,
@@ -15,6 +17,11 @@ export function useFormAccess(formId: number): FormAccess {
     isExpired: false,
     canSubmit: true,
   });
+
+  // Reset synchronously before paint so no stale "closed" state flashes when formId changes
+  useLayoutEffect(() => {
+    setState({ isLoading: true, dueAt: null, isExpired: false, canSubmit: true });
+  }, [formId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,11 +42,21 @@ export function useFormAccess(formId: number): FormAccess {
     };
 
     check();
-    const intervalId = window.setInterval(check, 30_000);
+    const intervalId = window.setInterval(check, 10_000);
+
+    // Instantly sync when admin saves form config in another tab
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      bc = new BroadcastChannel(BC_CHANNEL);
+      bc.onmessage = (event: MessageEvent) => {
+        if (event.data?.formId === formId) check();
+      };
+    }
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
+      bc?.close();
     };
   }, [formId]);
 

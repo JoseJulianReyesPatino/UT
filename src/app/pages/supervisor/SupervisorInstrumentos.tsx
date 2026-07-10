@@ -3,31 +3,16 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { SearchableSelect } from "../../components/SearchableSelect";
 import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
+import { type DocRecord, getParcialNum, formatSentFecha } from "./supervisorShared";
 import { Eye, FileText, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-
-type DocRecord = {
-  id: number;
-  title: string;
-  status: string;
-  submitted_at?: string | null;
-  created_at?: string | null;
-  materia?: string | null;
-  grupo?: string | null;
-  group_code?: string | null;
-  parcial?: string | null;
-  uploaded_by_name?: string | null;
-  form_title?: string | null;
-  carrera_label?: string | null;
-};
+import { DocumentCardSkeleton } from "../admin/skeletons";
 
 type InstrumentoKey = "30" | "40" | "60" | "70";
-type SectionKey = "all" | "pendientes" | "revisados" | "devueltos";
+type InstrumentoFilter = InstrumentoKey | "all";
 
 const INSTRUMENTOS = [
   { key: "30" as InstrumentoKey, label: "Instrumento 30%", sublabel: "Plan Normal",      form_code: "instrumento-30-normal" },
@@ -36,33 +21,10 @@ const INSTRUMENTOS = [
   { key: "70" as InstrumentoKey, label: "Instrumento 70%", sublabel: "Plan Normal",      form_code: "instrumento-70-normal" },
 ] as const;
 
-const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  pendiente: { label: "Pendiente", className: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" },
-  revisado:  { label: "Revisado",  className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" },
-  devuelto:  { label: "Devuelto",  className: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300" },
-  reenviado: { label: "Reenviado", className: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300" },
-};
-
-const getParcialNum = (parcial?: string | null): string => {
-  if (!parcial) return "";
-  const m = parcial.match(/\b([123])\b/);
-  return m ? m[1] : "";
-};
-
-const formatSentFecha = (fecha?: string | null) => {
-  if (!fecha) return "";
-  try {
-    const normalized = fecha.includes(" ") && !fecha.includes("T") ? fecha.replace(" ", "T") : fecha;
-    const date = new Date(normalized);
-    if (Number.isNaN(date.getTime())) return fecha;
-    const datePart = date.toLocaleDateString("es-MX", { year: "numeric", month: "2-digit", day: "2-digit" });
-    const timePart = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
-    return `${datePart} ${timePart}`;
-  } catch { return fecha; }
-};
 
 type FilterState = { carrera: string; docente: string; grupo: string; parcial: string };
 const defaultFilter = (): FilterState => ({ carrera: "all", docente: "all", grupo: "all", parcial: "all" });
+const ALL_INSTRUMENTO_KEYS: InstrumentoKey[] = INSTRUMENTOS.map((i) => i.key);
 
 interface SupervisorInstrumentosProps {
   allowedSections?: string[];
@@ -83,12 +45,11 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
     });
   }, [allowedSections]);
 
-  const [activeInstrumento, setActiveInstrumento] = useState<InstrumentoKey>(() => allowedTabs[0] ?? "30");
-  const [activeSection, setActiveSection] = useState<SectionKey>("all");
+  const [activeInstrumento, setActiveInstrumento] = useState<InstrumentoFilter>("all");
   const [docs, setDocs] = useState<Record<InstrumentoKey, DocRecord[]>>({ "30": [], "40": [], "60": [], "70": [] });
   const [loading, setLoading] = useState<Record<InstrumentoKey, boolean>>({ "30": true, "40": true, "60": true, "70": true });
-  const [filters, setFilters] = useState<Record<InstrumentoKey, FilterState>>({
-    "30": defaultFilter(), "40": defaultFilter(), "60": defaultFilter(), "70": defaultFilter(),
+  const [filters, setFilters] = useState<Record<InstrumentoFilter, FilterState>>({
+    "all": defaultFilter(), "30": defaultFilter(), "40": defaultFilter(), "60": defaultFilter(), "70": defaultFilter(),
   });
   const [previewDoc, setPreviewDoc] = useState<DocRecord | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
@@ -119,6 +80,12 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
     );
   }, [loadDocs, allowedTabs]);
 
+  // Resetea los filtros de la vista "todos" cuando cambian los instrumentos permitidos
+  // para evitar que filtros de carrera/docente previos produzcan una lista vacía
+  useEffect(() => {
+    setFilters((prev) => ({ ...prev, all: defaultFilter() }));
+  }, [allowedTabs]);
+
   useEffect(() => {
     return () => { if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl); };
   }, [previewBlobUrl]);
@@ -138,7 +105,7 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
       try {
         const blob = await fetchDocumentBlob(previewDoc.id);
         if (!isMounted) return;
-        setPreviewBlobUrl(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+        setPreviewBlobUrl(URL.createObjectURL(blob));
       } catch (error) {
         if (!isMounted) return;
         setPreviewError(error instanceof Error ? error.message : "No fue posible abrir el PDF");
@@ -150,12 +117,19 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
     return () => { isMounted = false; };
   }, [previewDoc]);
 
-  const setFilter = (key: InstrumentoKey, partial: Partial<FilterState>) =>
+  const setFilter = (key: InstrumentoFilter, partial: Partial<FilterState>) =>
     setFilters((prev) => ({ ...prev, [key]: { ...prev[key], ...partial } }));
 
-  const currentInstrumento = INSTRUMENTOS.find((i) => i.key === activeInstrumento)!;
-  const currentDocs = docs[activeInstrumento] ?? [];
-  const isCurrentLoading = loading[activeInstrumento] ?? false;
+  const currentInstrumento = INSTRUMENTOS.find((i) => i.key === activeInstrumento) ?? null;
+  const currentDocs = useMemo(() => {
+    if (activeInstrumento === "all") {
+      return ALL_INSTRUMENTO_KEYS.filter((k) => allowedTabs.includes(k)).flatMap((k) => docs[k] ?? []);
+    }
+    return docs[activeInstrumento] ?? [];
+  }, [activeInstrumento, docs, allowedTabs]);
+  const isCurrentLoading = activeInstrumento === "all"
+    ? ALL_INSTRUMENTO_KEYS.filter((k) => allowedTabs.includes(k)).some((k) => loading[k])
+    : (loading[activeInstrumento] ?? false);
   const currentFilter = filters[activeInstrumento];
 
   const carrerasUnicas = useMemo(() => {
@@ -187,29 +161,9 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
     });
   }, [currentDocs, currentFilter]);
 
-  const activeDocuments = useMemo(() => {
-    if (activeSection === "pendientes") return filtered.filter((d) => ["pendiente", "reenviado"].includes((d.status ?? "").toLowerCase()));
-    if (activeSection === "revisados") return filtered.filter((d) => (d.status ?? "").toLowerCase() === "revisado");
-    if (activeSection === "devueltos") return filtered.filter((d) => (d.status ?? "").toLowerCase() === "devuelto");
-    return filtered;
-  }, [filtered, activeSection]);
-
-  const countAll = filtered.length;
-  const countPendientes = filtered.filter((d) => ["pendiente", "reenviado"].includes((d.status ?? "").toLowerCase())).length;
-  const countRevisados = filtered.filter((d) => (d.status ?? "").toLowerCase() === "revisado").length;
-  const countDevueltos = filtered.filter((d) => (d.status ?? "").toLowerCase() === "devuelto").length;
-
-  const statusInfo = (status: string) =>
-    STATUS_LABELS[status.toLowerCase()] ?? { label: status, className: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" };
-
-  const tabCls =
-    "inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm";
-  const countBadgeCls =
-    "ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200";
   const sectionCardCls = "overflow-hidden rounded-[22px] border border-border bg-card shadow-sm";
 
   const renderDocumentCard = (doc: DocRecord) => {
-    const st = statusInfo(doc.status ?? "pendiente");
     const rawTitle = doc.title ?? "";
     const lastSep = rawTitle.lastIndexOf(" - ");
     const fileName = lastSep !== -1 && rawTitle.substring(lastSep + 3).trim()
@@ -227,13 +181,19 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold tracking-wide text-foreground">
-              {apartadoLabel ? `${apartadoLabel} - ${fileName}` : fileName}
+              {fileName.toLowerCase().endsWith(".pdf") ? fileName : `${fileName}.pdf`}
             </p>
             <p className="text-xs text-muted-foreground">
               {doc.uploaded_by_name ?? "Docente"}
               {doc.carrera_label ? ` • ${doc.carrera_label}` : ""}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
+              {(apartadoLabel || doc.form_title) && (
+                <Badge variant="outline" className="text-xs">{apartadoLabel || doc.form_title}</Badge>
+              )}
+              {doc.cuatrimestre != null && String(doc.cuatrimestre) !== "" && String(doc.cuatrimestre) !== "-" && (
+                <Badge variant="outline" className="text-xs">{`Cuatrimestre ${doc.cuatrimestre}`}</Badge>
+              )}
               {grupo && grupo !== "-" && (
                 <Badge variant="outline" className="text-xs">{`Grupo ${grupo}`}</Badge>
               )}
@@ -252,9 +212,6 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${st.className}`}>
-            {st.label}
-          </span>
           <Button size="sm" variant="outline" className="gap-1.5 rounded-full" onClick={() => setPreviewDoc(doc)}>
             <Eye className="h-4 w-4" />
             Ver
@@ -266,6 +223,15 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
 
   const renderFilters = () => (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {allowedTabs.length > 1 && (
+        <SearchableSelect
+          value={activeInstrumento}
+          onValueChange={(v) => { setActiveInstrumento(v as InstrumentoFilter); }}
+          options={INSTRUMENTOS.filter((i) => allowedTabs.includes(i.key)).map((i) => ({ value: i.key, label: `${i.label} — ${i.sublabel}` }))}
+          placeholder="Buscar instrumento..."
+          allLabel="Todos los instrumentos"
+        />
+      )}
       <SearchableSelect
         value={currentFilter.carrera}
         onValueChange={(v) => setFilter(activeInstrumento, { carrera: v })}
@@ -297,16 +263,13 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
         ]}
         allLabel="Todos los parciales"
       />
+
     </div>
   );
 
   const renderDocList = (docList: DocRecord[]) => {
     if (isCurrentLoading) {
-      return (
-        <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
-          <p>Cargando...</p>
-        </div>
-      );
+      return <DocumentCardSkeleton />;
     }
     if (docList.length === 0) {
       return (
@@ -335,8 +298,11 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
           </div>
           <button
             onClick={() => {
-              const inst = currentInstrumento;
-              void loadDocs(inst.key, inst.form_code);
+              if (currentInstrumento) {
+                void loadDocs(currentInstrumento.key, currentInstrumento.form_code);
+              } else {
+                INSTRUMENTOS.filter((i) => allowedTabs.includes(i.key)).forEach((i) => void loadDocs(i.key, i.form_code));
+              }
             }}
             disabled={isCurrentLoading}
             className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-400"
@@ -347,64 +313,10 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
         </div>
       </div>
 
-      {/* Selector de instrumento */}
-      <div className="flex flex-wrap justify-center gap-2">
-        {INSTRUMENTOS.filter((inst) => allowedTabs.includes(inst.key)).map((inst) => (
-          <button
-            key={inst.key}
-            type="button"
-            onClick={() => { setActiveInstrumento(inst.key); setActiveSection("all"); }}
-            className={`flex flex-col items-start rounded-xl border px-4 py-2.5 text-left transition-all text-sm font-medium ${
-              activeInstrumento === inst.key
-                ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm dark:border-emerald-400 dark:bg-emerald-950/40 dark:text-emerald-300"
-                : "border-border bg-card text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/20"
-            }`}
-          >
-            <span>{inst.label}</span>
-            <span className="text-xs font-normal opacity-70">{inst.sublabel}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Pestañas de estado */}
-      <Tabs value={activeSection} onValueChange={(v) => setActiveSection(v as SectionKey)}>
-        <div className="sm:hidden mb-3">
-          <Select value={activeSection} onValueChange={(v) => setActiveSection(v as SectionKey)}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Sección" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="pendientes">Pendientes</SelectItem>
-              <SelectItem value="revisados">Revisados</SelectItem>
-              <SelectItem value="devueltos">Devueltos</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
-          <TabsTrigger value="all" className={tabCls}>
-            Todos <Badge variant="outline" className={countBadgeCls}>{countAll}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="pendientes" className={tabCls}>
-            Pendientes <Badge variant="outline" className={countBadgeCls}>{countPendientes}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="revisados" className={tabCls}>
-            Revisados <Badge variant="outline" className={countBadgeCls}>{countRevisados}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="devueltos" className={tabCls}>
-            Devueltos <Badge variant="outline" className={countBadgeCls}>{countDevueltos}</Badge>
-          </TabsTrigger>
-        </TabsList>
-
-        {(["all", "pendientes", "revisados", "devueltos"] as SectionKey[]).map((section) => (
-          <TabsContent key={section} value={section} className="space-y-4 mt-6">
-            <Card className={sectionCardCls}>
-              <CardHeader className="pb-4">{renderFilters()}</CardHeader>
-              <CardContent>{renderDocList(activeDocuments)}</CardContent>
-            </Card>
-          </TabsContent>
-        ))}
-      </Tabs>
+      <Card className={sectionCardCls}>
+        <CardHeader className="pb-4">{renderFilters()}</CardHeader>
+        <CardContent>{renderDocList(filtered)}</CardContent>
+      </Card>
 
       {/* Diálogo de vista previa */}
       <Dialog open={previewDoc !== null} onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}>
@@ -414,7 +326,7 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
             {previewDoc && (
               <DialogDescription>
                 {[previewDoc.uploaded_by_name, previewDoc.carrera_label, previewDoc.parcial]
-                  .filter(Boolean)
+                  .filter((v) => v && v !== "-")
                   .join(" · ")}
               </DialogDescription>
             )}

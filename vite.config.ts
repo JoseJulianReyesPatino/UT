@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 
 function toFsPath(url: URL) {
   return decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, "$1");
@@ -43,6 +44,42 @@ export default defineConfig({
     // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
+    VitePWA({
+      registerType: "autoUpdate",
+      // Usa el manifest ya existente en public/favicon_io/
+      manifest: false,
+      workbox: {
+        // Solo cachea archivos estáticos del build
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Excluye TODAS las rutas de la API para evitar errores de conexión
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          {
+            // Archivos estáticos propios (JS, CSS, imágenes del build)
+            urlPattern: /^https?:\/\/[^/]+\/assets\//,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "static-assets",
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+          {
+            // Imágenes y favicons
+            urlPattern: /^https?:\/\/[^/]+\/favicon_io\//,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "favicon-cache",
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+        ],
+        // No cachear rutas de API ni devtunnels/ngrok
+        navigateFallback: "index.html",
+      },
+      devOptions: {
+        enabled: false, // No activar SW en desarrollo para evitar conflictos
+      },
+    }),
   ],
   resolve: {
     alias: {

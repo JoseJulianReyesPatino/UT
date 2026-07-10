@@ -1,4 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
+import { PendingDocumentSkeleton, ActivitySkeleton, StatsGridSkeleton } from "./skeletons";
+import FormNotFoundImg from "../../../assets/Form_Not_Found.png";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -191,6 +193,16 @@ const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocum
     .map(({ sortAt, ...item }) => item);
 };
 
+function DashboardEmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 py-8 text-center text-muted-foreground">
+      <img src={FormNotFoundImg} alt="Sin datos" className="h-36 w-36 object-contain opacity-60 dark:opacity-40" />
+      <p className="text-sm">{text}</p>
+    </div>
+  );
+}
+
+
 const StatsGrid = React.memo(function StatsGrid({ stats, onNavigate }: { stats: any[]; onNavigate: (view: AdminView) => void }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -307,12 +319,6 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   const [isLoading, setIsLoading] = useState(true);
   const [isReviewing, setIsReviewing] = useState(false);
   const [, setTimeTick] = useState(0);
-  const showReloadLoader = useMemo(() => {
-    if (typeof window === "undefined") return false;
-
-    const navigationEntry = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-    return navigationEntry?.type === "reload";
-  }, []);
 
   const [selectedDocument, setSelectedDocument] = useState<null | {
     id: number;
@@ -563,7 +569,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         </div>
       </div>
 
-      <StatsGrid stats={stats} onNavigate={onNavigate} />
+      {isLoading ? <StatsGridSkeleton /> : <StatsGrid stats={stats} onNavigate={onNavigate} />}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
@@ -575,14 +581,10 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
             <CardDescription>Requieren tu aprobación</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading && showReloadLoader ? (
-              <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                Cargando...
-              </div>
-            ) : isLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando...</p>
+            {isLoading ? (
+              <PendingDocumentSkeleton />
             ) : pendingDocuments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No hay documentos pendientes por revisar.</p>
+              <DashboardEmptyState text="No hay documentos pendientes por revisar." />
             ) : (
               <PendingList items={pendingDocuments} onOpen={openDocument} />
             )}
@@ -595,14 +597,10 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
             <CardDescription>Últimas acciones en el sistema</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading && showReloadLoader ? (
-              <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                Cargando...
-              </div>
-            ) : isLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando...</p>
+            {isLoading ? (
+              <ActivitySkeleton />
             ) : recentActivity.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sin actividad reciente.</p>
+              <DashboardEmptyState text="Sin actividad reciente en el sistema." />
             ) : (
               <ActivityList items={recentActivity} onOpen={openActivity} />
             )}

@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
+import FormNotFoundImg from "../../../assets/Form_Not_Found.png";
+import { DocumentCardSkeleton } from "./skeletons";
 import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
-import { Eye, FileText, Check, Loader2, MessageCircleMore, MessageSquare, RefreshCw, Undo2 } from "lucide-react";
+import { Eye, FileText, Check, MessageCircleMore, MessageSquare, RefreshCw, Undo2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
@@ -274,6 +276,7 @@ export default function Estadias() {
   const EmptyState = ({ text }: { text: string }) => (
     <div className="rounded-2xl border border-border bg-muted/40 p-8 text-center text-muted-foreground shadow-sm">
       <div className="flex flex-col items-center gap-4">
+        <img src={FormNotFoundImg} alt="Sin documentos" className="h-36 w-36 object-contain opacity-60 dark:opacity-40" />
         <p>{text}</p>
       </div>
     </div>
@@ -690,11 +693,7 @@ export default function Estadias() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading && (
-                  <div className="rounded-lg border border-dashed border-border p-4 text-center text-muted-foreground">
-                    <p>Cargando...</p>
-                  </div>
-                )}
+                {isLoading ? <DocumentCardSkeleton /> : null}
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
                 {!isLoading && !loadError && filteredAll.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
@@ -709,9 +708,12 @@ export default function Estadias() {
                           <FileText className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium">{ensurePdfExtension(doc.documento)}</p>
+                          <p className="font-medium">{extractPreviewFileName(doc.documento)}</p>
                           <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                           <div className="flex flex-wrap gap-2 mt-2">
+                            {doc.apartado && doc.apartado !== "Documento" && (
+                              <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
+                            )}
                             <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
                             {doc.grupo && doc.grupo !== "-" && (
                               <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
@@ -790,11 +792,7 @@ export default function Estadias() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading && (
-                  <div className="rounded-lg border border-dashed border-border p-4 text-center text-muted-foreground">
-                    <p>Cargando...</p>
-                  </div>
-                )}
+                {isLoading ? <DocumentCardSkeleton /> : null}
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
                 {!isLoading && !loadError && filteredPending.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
@@ -808,9 +806,12 @@ export default function Estadias() {
                         <FileText className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium">{ensurePdfExtension(doc.documento)}</p>
+                        <p className="font-medium">{extractPreviewFileName(doc.documento)}</p>
                         <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                         <div className="flex flex-wrap gap-2 mt-2">
+                          {doc.apartado && doc.apartado !== "Documento" && (
+                            <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
+                          )}
                           <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
                           {doc.grupo && doc.grupo !== "-" && (
                             <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
@@ -907,9 +908,12 @@ export default function Estadias() {
                               <FileText className="h-6 w-6 text-muted-foreground" />
                             </div>
                             <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                              <p className="font-medium">{ensurePdfExtension(doc.documento)}</p>
+                              <p className="font-medium">{extractPreviewFileName(doc.documento)}</p>
                               <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                               <div className="mt-2 flex flex-wrap gap-2">
+                                {doc.apartado && doc.apartado !== "Documento" && (
+                                  <Badge variant="outline" className="text-xs pointer-events-none">{doc.apartado}</Badge>
+                                )}
                                 <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
                                   {doc.plan}
                                 </Button>
@@ -995,11 +999,7 @@ export default function Estadias() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Cargando documentos...</span>
-                  </div>
-                ) : reviewedToday.length === 0 ? (
+                {isLoading ? <DocumentCardSkeleton /> : reviewedToday.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : (
                   reviewedToday.map((doc) => {
@@ -1012,9 +1012,12 @@ export default function Estadias() {
                           <FileText className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
-                          <p className="font-medium">{ensurePdfExtension(doc.documento)}</p>
+                          <p className="font-medium">{extractPreviewFileName(doc.documento)}</p>
                           <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                           <div className="mt-2 flex flex-wrap gap-2">
+                            {doc.apartado && doc.apartado !== "Documento" && (
+                              <Badge variant="outline" className="text-xs pointer-events-none">{doc.apartado}</Badge>
+                            )}
                             <Button type="button" variant="outline" className={`${previewChipClassName} pointer-events-auto`} onClick={() => setPreviewDocument(doc)}>
                               {doc.plan}
                             </Button>

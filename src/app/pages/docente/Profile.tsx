@@ -317,25 +317,37 @@ export function Profile() {
     }).format(date);
   }, [user?.createdAt]);
 
-  const roleLabel = user?.roles?.length && user.roles.length > 1
-    ? user.roles.map((role) => (role === "administrador" ? "Administrador" : role === "tutor" ? "Tutor" : "Docente")).join(" y ")
-    : user?.role === "administrador"
-    ? "Administrador"
-    : user?.role === "tutor"
-    ? "Tutor"
+  const mapRole = (role: string) =>
+    role === "administrador" ? "Administrador"
+    : role === "supervisor" ? "Supervisor"
+    : role === "tutor" ? "Tutor"
     : "Docente";
+
+  const roleLabel = user?.roles?.length && user.roles.length > 1
+    ? user.roles.map(mapRole).join(" y ")
+    : mapRole(user?.role ?? "");
 
   return (
     <div className="relative min-h-[calc(100vh-2rem)] overflow-hidden">
       <div className="relative z-10 space-y-6">
-        <div>
-          <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
-            Mi Perfil
-          </h1>
-          <p className="mt-2 text-white/90 drop-shadow-sm dark:text-slate-400">
-            Gestiona tu información personal y preferencias
-          </p>
-        </div>
+        {user?.role === "supervisor" ? (
+          <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+            <div className="relative">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Mi Perfil</h1>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Gestiona tu información personal y preferencias</p>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
+              Mi Perfil
+            </h1>
+            <p className="mt-2 text-white/90 drop-shadow-sm dark:text-slate-400">
+              Gestiona tu información personal y preferencias
+            </p>
+          </div>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2 overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
@@ -592,8 +604,8 @@ export function Profile() {
           </div>
         </div>
 
-        {user?.role !== "administrador" && (
-          <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+        {user?.role !== "administrador" && user?.role !== "supervisor" && (
+          <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader>
               <CardTitle className="dark:text-white">Estadísticas</CardTitle>
               <CardDescription className="dark:text-slate-400">Resumen de tu actividad</CardDescription>

@@ -6,7 +6,7 @@ export default function SupervisorPlaneacion() {
     <SupervisorDocPage
       title="Planeación"
       description="Documentos de planeación enviados por todos los docentes"
-      formId={1}
+      formCode="planeacion"
     />
   );
 }

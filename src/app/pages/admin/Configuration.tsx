@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SupervisorRowSkeleton } from "./skeletons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -122,6 +123,7 @@ function getPasswordStrength(password: string): PasswordStrength {
   if (score === 4) return { score, label: "Fuerte", color: "bg-emerald-500" };
   return { score, label: "Muy fuerte", color: "bg-emerald-600" };
 }
+
 
 export function Configuration(props: Readonly<ConfigurationProps>) {
   const { initialTab = "formularios" } = props;
@@ -403,7 +405,28 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   };
 
   const saveFormAccessRule = async (formId: FormId, nextRule: { roles: FormRole[]; dueAt: string | null }) => {
-    const formIdNumber = formCodeToId[formId];
+    let formIdNumber = formCodeToId[formId];
+
+    // Si el mapa de IDs está vacío (p.ej. por re-mount en desarrollo), recargarlo antes de guardar
+    if (!formIdNumber) {
+      try {
+        const res = await apiFetch('/forms');
+        const forms = res?.data ?? [];
+        const newIdMap = {} as Record<FormId, number>;
+        const formByCode = forms.reduce((acc: Record<string, any>, item: any) => {
+          acc[String(item.form_code).replace(/_/g, '-')] = item;
+          return acc;
+        }, {} as Record<string, any>);
+        for (const fId of Object.keys(formByCode) as FormId[]) {
+          if (formByCode[fId]) newIdMap[fId] = formByCode[fId].id;
+        }
+        setFormCodeToId((prev) => ({ ...prev, ...newIdMap }));
+        formIdNumber = newIdMap[formId];
+      } catch {
+        // silencio — el toast de abajo lo cubre
+      }
+    }
+
     if (!formIdNumber) {
       toast.error('No se encontró el identificador del formulario. Actualiza la página e intenta de nuevo.');
       return false;
@@ -450,6 +473,11 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
         },
       }));
       toast.success('Configuración guardada');
+      if (typeof BroadcastChannel !== "undefined") {
+        const bc = new BroadcastChannel("form_config_changed");
+        bc.postMessage({ formId, roles: currentDraft.roles, dueAt: currentDraft.dueAt });
+        bc.close();
+      }
     }
     setSavingFormIds((current) => ({ ...current, [formId]: false }));
   };
@@ -479,24 +507,6 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       ...current,
       dueAt: value || null,
     }));
-  };
-
-  const handleCloseForm = async (formId: FormId) => {
-    const past = new Date(Date.now() - 60_000);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const pastLocal = `${past.getFullYear()}-${pad(past.getMonth() + 1)}-${pad(past.getDate())}T${pad(past.getHours())}:${pad(past.getMinutes())}`;
-    const nextRule = { ...(formDrafts[formId] ?? formConfig.formAccess[formId]), dueAt: pastLocal };
-    setSavingFormIds((current) => ({ ...current, [formId]: true }));
-    const success = await saveFormAccessRule(formId, nextRule);
-    if (success) {
-      setFormConfig((current) => ({
-        ...current,
-        formAccess: { ...current.formAccess, [formId]: nextRule },
-      }));
-      setFormDrafts((current) => ({ ...current, [formId]: nextRule }));
-      toast.success("Formulario cerrado");
-    }
-    setSavingFormIds((current) => ({ ...current, [formId]: false }));
   };
 
   const handleAddGroup = async () => {
@@ -1237,8 +1247,6 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
                                   const isOpenItem = Boolean(openFormItems[form.id]);
                                   const isDraftChanged = JSON.stringify(draftConfig) !== JSON.stringify(savedConfig);
-                                  const isFormOpen = savedConfig.dueAt === null || new Date(savedConfig.dueAt) > new Date();
-
                                   return (
                                     <div key={form.id} className="rounded-[14px] border border-border bg-card">
                                       <button
@@ -1269,25 +1277,50 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                             <div className="space-y-2 sm:col-span-2">
                                               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                                 <Label htmlFor={`deadline-${form.id}`} className="text-sm">Fecha y hora de vencimiento</Label>
-                                                <label className="flex items-center gap-2 text-sm">
-                                                  <Checkbox
-                                                    checked={draftConfig.dueAt === null}
-                                                    onCheckedChange={(val) => {
-                                                      setFormDraftValue(form.id, (current) => ({ ...current, dueAt: val ? null : "" }));
-                                                    }}
-                                                  />
-                                                  <span>Sin límite</span>
-                                                </label>
+                                                <div className="flex items-center gap-4">
+                                                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                    <Checkbox
+                                                      checked={draftConfig.dueAt === null}
+                                                      onCheckedChange={(val) => {
+                                                        setFormDraftValue(form.id, (current) => ({ ...current, dueAt: val ? null : "" }));
+                                                      }}
+                                                    />
+                                                    <span>Sin límite</span>
+                                                  </label>
+                                                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                    <Checkbox
+                                                      checked={draftConfig.dueAt !== null && draftConfig.dueAt !== "" && new Date(draftConfig.dueAt) <= new Date()}
+                                                      onCheckedChange={(val) => {
+                                                        if (val) {
+                                                          const d = new Date(Date.now() - 60_000);
+                                                          const pad = (n: number) => String(n).padStart(2, "0");
+                                                          const localStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                                                          setFormDraftValue(form.id, (current) => ({ ...current, dueAt: localStr }));
+                                                        } else {
+                                                          setFormDraftValue(form.id, (current) => ({ ...current, dueAt: null }));
+                                                        }
+                                                      }}
+                                                      disabled={Boolean(savingFormIds[form.id])}
+                                                    />
+                                                    <span>Cerrar formulario</span>
+                                                  </label>
+                                                </div>
                                               </div>
                                               <Input
                                                 id={`deadline-${form.id}`}
                                                 type="datetime-local"
+                                                lang="es"
                                                 value={draftConfig.dueAt ?? ""}
                                                 min={new Date().toISOString().slice(0, 16)}
                                                 onChange={(event) => handleDeadlineChange(form.id, event.target.value)}
                                                 disabled={draftConfig.dueAt === null}
-                                                className="text-sm"
+                                                className="text-sm dark:[&::-webkit-calendar-picker-indicator]:invert"
                                               />
+                                              {draftConfig.dueAt && (
+                                                <p className="text-xs text-muted-foreground">
+                                                  Fecha límite: {new Date(draftConfig.dueAt).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                                </p>
+                                              )}
                                             </div>
 
                                             <div className="space-y-2 sm:col-span-2">
@@ -1318,20 +1351,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                               {!isTutoriasForm && <p className="text-xs text-muted-foreground">Selecciona si el formulario aplica para Docente, Tutor o ambos.</p>}
                                             </div>
                                           </div>
-                                          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-between">
-                                            <div>
-                                              {isFormOpen && (
-                                                <Button
-                                                  type="button"
-                                                  variant="destructive"
-                                                  onClick={() => handleCloseForm(form.id)}
-                                                  disabled={Boolean(savingFormIds[form.id])}
-                                                  className="w-full sm:w-auto text-sm"
-                                                >
-                                                  Cerrar formulario
-                                                </Button>
-                                              )}
-                                            </div>
+                                          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
                                             <div className="flex flex-col gap-2 sm:flex-row">
                                               <Button
                                                 type="button"
@@ -1566,11 +1586,9 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                     />
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 pt-0 sm:pt-0 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
+                <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 pt-3 sm:pt-4 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
                   {supervisorsLoading ? (
-                    <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-                      Cargando supervisores...
-                    </div>
+                    <SupervisorRowSkeleton />
                   ) : supervisors.length === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
                       <Shield className="h-10 w-10 opacity-30" />
@@ -1578,7 +1596,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                       <p className="text-xs">Crea un usuario con rol de supervisor para asignarle permisos.</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-border">
+                    <div className="space-y-3">
                       {supervisors
                         .filter((sup) => {
                           const q = supervisorSearch.toLowerCase().trim();
@@ -1596,10 +1614,10 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                             return next;
                           });
                           return (
-                            <div key={sup.user_id}>
+                            <div key={sup.user_id} className="overflow-hidden rounded-xl border border-border/70 bg-background/80 dark:bg-slate-950/60">
                               <button
                                 type="button"
-                                className="w-full flex items-center justify-between gap-3 py-3 text-left hover:bg-muted/40 rounded-lg px-2 transition-colors"
+                                className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60 dark:hover:bg-slate-900/70"
                                 onClick={toggle}
                               >
                                 <div className="min-w-0">
@@ -1615,8 +1633,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                               </button>
 
                               {isExpanded && (
-                                <div className="pb-4 px-2 space-y-4">
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+                                <div className="border-t border-border/60 px-4 pb-4 space-y-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
                                     {SUPERVISOR_SECTIONS.map((section) => {
                                       const isChecked = draft.includes(section.id);
                                       return (

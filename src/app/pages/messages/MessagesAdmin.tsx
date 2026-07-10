@@ -111,18 +111,35 @@ type DraftRecipient = {
 
 const initialConversations: Conversation[] = [];
 
-const formatMessageTimestamp = (raw: string): string => {
+// Sonora / Hermosillo = UTC-7, sin horario de verano
+const MST_OFFSET_MS = -7 * 60 * 60 * 1000;
+
+const toMSTDate = (utcDate: Date): Date => new Date(utcDate.getTime() + MST_OFFSET_MS);
+
+const parseUTC = (raw: string): Date | null => {
   const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return raw;
-  return date.toLocaleString('es-MX', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const withZ = /Z$|[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : normalized + 'Z';
+  const d = new Date(withZ);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const fmt12h = (local: Date): string => {
+  const h = local.getUTCHours();
+  const m = local.getUTCMinutes();
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${h < 12 ? 'a.m.' : 'p.m.'}`;
+};
+
+const formatMessageTimestamp = (raw: string): string => {
+  const utc = parseUTC(raw);
+  return utc ? fmt12h(toMSTDate(utc)) : raw;
+};
+
+const formatDateSeparator = (raw: string): string => {
+  const utc = parseUTC(raw);
+  if (!utc) return raw;
+  const local = toMSTDate(utc);
+  return `${String(local.getUTCDate()).padStart(2, '0')}/${String(local.getUTCMonth() + 1).padStart(2, '0')}/${local.getUTCFullYear()}`;
 };
 
 const formatSize = (size: number) => {
@@ -131,15 +148,7 @@ const formatSize = (size: number) => {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 };
 
-const getTimeLabel = () =>
-  new Date().toLocaleString("es-MX", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+const getTimeLabel = () => fmt12h(toMSTDate(new Date()));
 
 const parseMessageDate = (timestamp: string) => {
   const normalized = timestamp.includes("T") ? timestamp : timestamp.replace(" ", "T");
@@ -195,6 +204,16 @@ function StatusDot({ status }: Readonly<{ status: Conversation["status"] }>) {
   if (status === "online") statusClassName = "bg-emerald-500";
   else if (status === "away") statusClassName = "bg-amber-500";
   return <span className={cn("h-2 w-2 rounded-full", statusClassName)} />;
+}
+
+function DateSeparator({ date }: { date: string }) {
+  return (
+    <div className="flex items-center justify-center my-4">
+      <span className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/60 rounded-full dark:bg-slate-800/60 dark:text-slate-400">
+        {date}
+      </span>
+    </div>
+  );
 }
 
 const ConversationRow = React.memo(({
@@ -259,8 +278,8 @@ const ConversationRow = React.memo(({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="truncate text-sm font-semibold text-foreground">{conversation.name}</p>
-              <p className="text-[11px] text-muted-foreground">{conversation.role}</p>
+              <p className="truncate text-sm font-semibold text-foreground dark:text-white">{conversation.name}</p>
+              <p className="text-[11px] text-muted-foreground dark:text-slate-400">{conversation.role}</p>
             </div>
             {conversation.unread > 0 && (
               <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1.5 text-[11px]">
@@ -268,8 +287,8 @@ const ConversationRow = React.memo(({
               </Badge>
             )}
           </div>
-          <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{conversation.lastMessage}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground/90">{conversation.timestamp}</p>
+          <p className="mt-1 line-clamp-1 text-sm text-muted-foreground dark:text-slate-400">{conversation.lastMessage}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground/90 dark:text-slate-500">{conversation.timestamp}</p>
         </div>
       </div>
     </div>
@@ -295,7 +314,7 @@ const RecipientRow = React.memo(({
       key={recipient.id}
       type="button"
       onClick={onClick}
-      className="w-full rounded-xl border border-border/60 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/80"
+      className="w-full rounded-xl border border-border/60 px-4 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/80 dark:border-slate-700/60 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
     >
       <div className="flex items-center gap-3">
         <Avatar className="h-10 w-10 ring-1 ring-white/80 dark:ring-slate-900/60">
@@ -307,8 +326,8 @@ const RecipientRow = React.memo(({
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <p className="truncate font-semibold">{recipientName}</p>
-          <p className="text-sm text-muted-foreground">{peerRoleLabel}</p>
+          <p className="truncate font-semibold dark:text-white">{recipientName}</p>
+          <p className="text-sm text-muted-foreground dark:text-slate-400">{peerRoleLabel}</p>
         </div>
       </div>
     </button>
@@ -327,7 +346,7 @@ const SuppressedConversationRow = React.memo(({
   const initials = conversation.avatarFallback || getInitials(conversation.name);
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 py-2 dark:border-slate-700">
       <div className="min-w-0 flex items-center gap-3">
         <Avatar className="h-9 w-9 ring-1 ring-white/80 dark:ring-slate-900/60">
           {showImage && imageUrl ? (
@@ -339,14 +358,15 @@ const SuppressedConversationRow = React.memo(({
           )}
         </Avatar>
         <div className="min-w-0">
-          <p className="truncate font-semibold">{conversation.name}</p>
-          <p className="text-xs text-muted-foreground truncate">{conversation.role}</p>
+          <p className="truncate font-semibold dark:text-white">{conversation.name}</p>
+          <p className="text-xs text-muted-foreground dark:text-slate-400 truncate">{conversation.role}</p>
         </div>
       </div>
       <Button
         type="button"
         size="sm"
         variant="outline"
+        className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
         onClick={() => {
           onRestore(conversation.id);
         }}
@@ -433,7 +453,7 @@ const MessageBubble = React.memo(({
         {message.attachments && message.attachments.length > 0 && (
           <div className="mt-3 space-y-2">
             {message.attachments.map((attachment) => (
-              <div key={`${message.id}-${attachment.name}`} className="flex items-center gap-2 rounded-lg border p-2 text-sm bg-muted/40 dark:bg-slate-700/40 min-w-0 overflow-hidden">
+              <div key={`${message.id}-${attachment.name}`} className="flex items-center gap-2 rounded-lg border p-2 text-sm bg-muted/40 dark:bg-slate-700/40 dark:border-slate-700 min-w-0 overflow-hidden">
                 <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground dark:text-slate-400" />
                 <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1 overflow-hidden">
@@ -496,13 +516,13 @@ const MessageBubble = React.memo(({
                 <button type="button" onClick={() => setRemoveOpen(true)} className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
                   <Trash className="h-3.5 w-3.5" />
                 </button>
-                <DialogContent>
+                <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
                   <DialogHeader>
-                    <DialogTitle>Eliminar mensaje</DialogTitle>
-                    <DialogDescription>¿Seguro que deseas eliminar este mensaje? Esta acción no se puede deshacer.</DialogDescription>
+                    <DialogTitle className="dark:text-white">Eliminar mensaje</DialogTitle>
+                    <DialogDescription className="dark:text-slate-400">¿Seguro que deseas eliminar este mensaje? Esta acción no se puede deshacer.</DialogDescription>
                   </DialogHeader>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setRemoveOpen(false)}>Cancelar</Button>
+                    <Button variant="outline" className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800" onClick={() => setRemoveOpen(false)}>Cancelar</Button>
                     <Button variant="destructive" onClick={() => { setRemoveOpen(false); onDelete(message.id); }}>Eliminar</Button>
                   </DialogFooter>
                 </DialogContent>
@@ -514,14 +534,14 @@ const MessageBubble = React.memo(({
 
       {editable && onEdit && (
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent>
+          <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
             <DialogHeader>
-              <DialogTitle>Editar mensaje</DialogTitle>
-              <DialogDescription>Modifica el contenido del mensaje y guarda los cambios.</DialogDescription>
+              <DialogTitle className="dark:text-white">Editar mensaje</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">Modifica el contenido del mensaje y guarda los cambios.</DialogDescription>
             </DialogHeader>
-            <Textarea value={editBody} onChange={(event) => setEditBody(event.target.value)} className="min-h-[120px]" />
+            <Textarea value={editBody} onChange={(event) => setEditBody(event.target.value)} className="min-h-[120px] dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-500" />
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+              <Button variant="outline" className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800" onClick={() => setEditOpen(false)}>Cancelar</Button>
               <Button variant="success" onClick={() => { const nextBody = editBody.trim(); if (!nextBody) return; setEditOpen(false); onEdit(message.id, nextBody); }}>
                 Guardar cambios
               </Button>
@@ -599,6 +619,21 @@ function MessageListSkeleton() {
     </div>
   );
 }
+
+const groupMessagesByDate = (messages: ChatMessage[]) => {
+  const groups: { date: string; messages: ChatMessage[] }[] = [];
+  let currentDate = '';
+  messages.forEach((msg) => {
+    const date = formatDateSeparator(msg.rawTimestamp || msg.timestamp);
+    if (date !== currentDate) {
+      currentDate = date;
+      groups.push({ date, messages: [msg] });
+    } else {
+      groups[groups.length - 1].messages.push(msg);
+    }
+  });
+  return groups;
+};
 
 export function MessagesAdmin(props: Readonly<{
   initialOpen?: { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string; filePath?: string } } | null;
@@ -849,7 +884,7 @@ export function MessagesAdmin(props: Readonly<{
     const avatarFallback = raw.avatar_fallback || getInitials(raw.sender);
     const toPath = (u: string) => { try { return u.startsWith("http") ? new URL(u).pathname : u; } catch { return u; } };
     const avatarValue = avatarUrl && isImageUrl(avatarUrl) ? toPath(avatarUrl) : DEFAULT_AVATAR_PATH;
-    const rawTs = raw.timestamp ?? raw.created_at ?? new Date().toISOString();
+    const rawTs = raw.rawTimestamp ?? raw.created_at ?? raw.timestamp ?? new Date().toISOString();
 
     return {
       id: raw.id,
@@ -1588,34 +1623,45 @@ export function MessagesAdmin(props: Readonly<{
 
             {/* Área de mensajes */}
             <div className="min-h-0 flex-1 overflow-hidden">
-              {adminConversation ? (
-                <ScrollArea className="h-full bg-muted/20">
-                  <div className="w-full min-w-0 overflow-x-hidden space-y-4 px-4 pb-2 pt-3">
-                    {adminConversation.messages.length > 0 ? (
-                      adminConversation.messages.map((messageItem) => (
-                        <MessageBubble
-                          key={messageItem.id}
-                          message={messageItem}
-                          onReply={setReplyingTo}
-                          onDelete={handleDeleteMessage}
-                          onEdit={handleEditMessage}
-                        />
-                      ))
-                    ) : (
-                      <EmptyConversationState
-                        title="Sin mensajes aún"
-                        description="Escribe el primer mensaje para iniciar la conversación con el administrador."
-                      />
-                    )}
-                    <div ref={messagesEndRef} />
-                  </div>
-                </ScrollArea>
-              ) : (
-                <EmptyConversationState
-                  title="Preparando tu chat..."
-                  description="Estamos conectando tu chat con el administrador, un momento por favor."
-                />
-              )}
+              <ScrollArea className="h-full bg-muted/20">
+                <div className="w-full min-w-0 overflow-x-hidden">
+                  {isInitialLoad && !adminConversation ? (
+                    <MessageListSkeleton />
+                  ) : adminConversation && (isLoadingMessages || confirmedLoadedChatId !== selectedChat) && !adminConversation.messages.length ? (
+                    <MessageListSkeleton />
+                  ) : adminConversation && adminConversation.messages.length > 0 ? (
+                    <div className="pb-2 pt-3 px-4">
+                      {groupMessagesByDate(adminConversation.messages).map((group, groupIndex) => (
+                        <div key={groupIndex}>
+                          <DateSeparator date={group.date} />
+                          <div className="space-y-3">
+                            {group.messages.map((messageItem) => (
+                              <MessageBubble
+                                key={messageItem.id}
+                                message={messageItem}
+                                onReply={setReplyingTo}
+                                onDelete={handleDeleteMessage}
+                                onEdit={handleEditMessage}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : adminConversation ? (
+                    <EmptyConversationState
+                      title="Sin mensajes aún"
+                      description="Escribe el primer mensaje para iniciar la conversación con el administrador."
+                    />
+                  ) : (
+                    <EmptyConversationState
+                      title="Preparando tu chat..."
+                      description="Estamos conectando tu chat con el administrador, un momento por favor."
+                    />
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              </ScrollArea>
             </div>
 
             {/* Pie: redacción */}
@@ -1690,12 +1736,12 @@ export function MessagesAdmin(props: Readonly<{
 
       <div className="grid min-h-0 flex-1 gap-4 sm:grid-cols-[300px_minmax(0,1fr)]">
         {/* ── Panel izquierdo: lista de conversaciones ── */}
-        <div className={cn("overflow-hidden rounded-[22px] border border-border bg-card shadow-sm min-h-0 flex-col", mobileView === 'list' ? "flex" : "hidden sm:flex")}>
+        <div className={cn("overflow-hidden rounded-[22px] border border-border bg-card shadow-sm min-h-0 flex-col dark:border-slate-800/70 dark:bg-slate-950/60", mobileView === 'list' ? "flex" : "hidden sm:flex")}>
           {/* Cabecera */}
-          <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3 space-y-3">
+          <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3 space-y-3 dark:border-slate-700 dark:bg-slate-950/60">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <p className="text-base font-semibold text-foreground">Chats</p>
+                <p className="text-base font-semibold text-foreground dark:text-white">Chats</p>
                 {filteredConversations.filter((c) => c.unread > 0).length > 0 && (
                   <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1.5 text-[11px]">
                     {filteredConversations.filter((c) => c.unread > 0).length}
@@ -1734,7 +1780,7 @@ export function MessagesAdmin(props: Readonly<{
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por nombre o mensaje..."
-                className="pl-9 rounded-xl border-border/70 bg-background/80 text-sm"
+                className="pl-9 rounded-xl border-border/70 bg-background/80 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -1767,17 +1813,17 @@ export function MessagesAdmin(props: Readonly<{
         </div>
 
         <Dialog open={newConversationOpen} onOpenChange={setNewConversationOpen}>
-          <DialogContent>
+          <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
             <DialogHeader>
               <div className="flex items-center justify-between gap-3">
-                <DialogTitle>Iniciar nuevo chat</DialogTitle>
+                <DialogTitle className="dark:text-white">Iniciar nuevo chat</DialogTitle>
                 {!isLoadingRecipients && recipientUsersWithoutConversation.length > 0 && (
-                  <span className="text-sm text-muted-foreground font-normal">
+                  <span className="text-sm text-muted-foreground dark:text-slate-400 font-normal">
                     {filteredRecipientUsers.length} sin chat
                   </span>
                 )}
               </div>
-              <DialogDescription>Selecciona un {peerRoleLabel.toLowerCase()}. El chat se creará cuando se envíe el primer mensaje.</DialogDescription>
+              <DialogDescription className="dark:text-slate-400">Selecciona un {peerRoleLabel.toLowerCase()}. El chat se creará cuando se envíe el primer mensaje.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="relative">
@@ -1786,17 +1832,17 @@ export function MessagesAdmin(props: Readonly<{
                   value={recipientQuery}
                   onChange={(e) => setRecipientQuery(e.target.value)}
                   placeholder={`Buscar ${peerRoleLabel.toLowerCase()} por nombre...`}
-                  className="pl-9"
+                  className="pl-9 dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                 />
               </div>
               {isLoadingRecipients ? (
-                <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground dark:border-slate-700 dark:text-slate-400">
                   Cargando...
                 </div>
               ) : recipientFetchError ? (
                 <p className="text-sm text-destructive">{recipientFetchError}</p>
               ) : (
-                <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-background/80 p-3">
+                <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-background/80 p-3 dark:border-slate-700/70 dark:bg-slate-900/80">
                   {filteredRecipientUsers.length > 0 ? (
                     filteredRecipientUsers.map((recipient) => (
                       <RecipientRow
@@ -1807,7 +1853,7 @@ export function MessagesAdmin(props: Readonly<{
                       />
                     ))
                   ) : (
-                    <p className="text-sm text-muted-foreground">No se encontraron usuarios.</p>
+                    <p className="text-sm text-muted-foreground dark:text-slate-400">No se encontraron usuarios.</p>
                   )}
                 </div>
               )}
@@ -1816,15 +1862,15 @@ export function MessagesAdmin(props: Readonly<{
         </Dialog>
 
         <Dialog open={restoreDialogOpen} onOpenChange={setRestoreDialogOpen}>
-          <DialogContent>
+          <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
             <DialogHeader>
-              <DialogTitle>Restaurar chats suprimidos</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="dark:text-white">Restaurar chats suprimidos</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">
                 Selecciona qué chat deseas restaurar. No se restauran todos automáticamente.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-background/80 p-3">
+            <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-background/80 p-3 dark:border-slate-700/70 dark:bg-slate-900/80">
               {suppressedConversations.length > 0 ? (
                 suppressedConversations.map((conversation) => (
                   <SuppressedConversationRow
@@ -1834,20 +1880,20 @@ export function MessagesAdmin(props: Readonly<{
                   />
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground">No hay chats suprimidos para restaurar.</p>
+                <p className="text-sm text-muted-foreground dark:text-slate-400">No hay chats suprimidos para restaurar.</p>
               )}
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setRestoreDialogOpen(false)}>Cerrar</Button>
+              <Button variant="outline" className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800" onClick={() => setRestoreDialogOpen(false)}>Cerrar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* ── Panel derecho: vista del chat ── */}
-        <div className={cn("overflow-hidden rounded-[22px] border border-border bg-card shadow-sm min-h-0 flex-col", mobileView === 'chat' ? "flex" : "hidden sm:flex")}>
+        <div className={cn("overflow-hidden rounded-[22px] border border-border bg-card shadow-sm min-h-0 flex-col dark:border-slate-800/70 dark:bg-slate-950/60", mobileView === 'chat' ? "flex" : "hidden sm:flex")}>
           {/* Cabecera del chat */}
-          <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3">
+          <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3 dark:border-slate-700 dark:bg-slate-950/60">
             <button
               type="button"
               onClick={() => setMobileView('list')}
@@ -1873,7 +1919,7 @@ export function MessagesAdmin(props: Readonly<{
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-foreground leading-tight">{targetConversation.name}</p>
+                    <p className="text-sm font-semibold text-foreground leading-tight dark:text-white">{targetConversation.name}</p>
                     {targetConversation.unread > 0 && (
                       <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[11px]">
                         {targetConversation.unread}
@@ -1894,20 +1940,27 @@ export function MessagesAdmin(props: Readonly<{
           {/* Área de mensajes */}
           <div className="min-h-0 flex-1 overflow-hidden">
             {targetConversation ? (
-              <ScrollArea className="h-full bg-muted/20">
+              <ScrollArea className="h-full bg-muted/20 dark:bg-slate-900/30">
                 <div className="w-full min-w-0 overflow-x-hidden">
                   {(isLoadingMessages || confirmedLoadedChatId !== selectedChat) && !targetConversation.messages.length ? (
                     <MessageListSkeleton />
                   ) : targetConversation.messages.length > 0 ? (
-                    <div className="space-y-4 px-4 pb-2 pt-3">
-                      {targetConversation.messages.map((messageItem) => (
-                        <MessageBubble
-                          key={messageItem.id}
-                          message={messageItem}
-                          onReply={setReplyingTo}
-                          onDelete={handleDeleteMessage}
-                          onEdit={handleEditMessage}
-                        />
+                    <div className="pb-2 pt-3 px-4">
+                      {groupMessagesByDate(targetConversation.messages).map((group, groupIndex) => (
+                        <div key={groupIndex}>
+                          <DateSeparator date={group.date} />
+                          <div className="space-y-3">
+                            {group.messages.map((messageItem) => (
+                              <MessageBubble
+                                key={messageItem.id}
+                                message={messageItem}
+                                onReply={setReplyingTo}
+                                onDelete={handleDeleteMessage}
+                                onEdit={handleEditMessage}
+                              />
+                            ))}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -1928,7 +1981,7 @@ export function MessagesAdmin(props: Readonly<{
           </div>
 
           {/* Pie: redacción de mensaje */}
-          <div className="shrink-0 border-t border-border/60 bg-card p-4">
+          <div className="shrink-0 border-t border-border/60 bg-card p-4 dark:border-slate-700 dark:bg-slate-950/60">
             {replyingTo && (
               <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
                 <div className="min-w-0">
@@ -1947,7 +2000,7 @@ export function MessagesAdmin(props: Readonly<{
                 placeholder="Escribe un mensaje..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background px-4 py-3"
+                className="min-h-[48px] resize-none rounded-[1.35rem] border-border/70 bg-background px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -1962,7 +2015,7 @@ export function MessagesAdmin(props: Readonly<{
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="rounded-full px-4"
+                    className="rounded-full px-4 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Paperclip className="h-4 w-4 mr-1" />
@@ -1971,7 +2024,7 @@ export function MessagesAdmin(props: Readonly<{
                   <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
                 </div>
 
-                <Button variant="success" className="rounded-full px-5 shadow-md shadow-emerald-500/20" onClick={handleSend}>
+                <Button variant="success" className="rounded-full px-5 shadow-md shadow-emerald-500/20 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white" onClick={handleSend}>
                   <Send className="h-4 w-4 mr-2" />
                   Enviar mensaje
                 </Button>
