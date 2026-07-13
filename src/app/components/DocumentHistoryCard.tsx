@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { CheckCircle2, Clock2, Undo2, Eye, PencilLine, Trash2, GraduationCap, Layers, BookOpen, Users, User, StickyNote } from "lucide-react";
+import { CheckCircle2, Clock2, Undo2, Eye, PencilLine, Trash2, StickyNote } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +34,8 @@ interface DocumentHistoryCardProps {
   returnedComment?: string;
   onViewDocument: (documentId: number) => void;
   onEdit: () => void;
-  onDelete: (documentIds: number[]) => void;
+  onDelete: (documentIds: number[]) => Promise<void>;
+  isDeleting?: boolean;
 }
 
 function getStatusInfo(status?: string) {
@@ -89,10 +90,11 @@ export function DocumentHistoryCard({
   onViewDocument,
   onEdit,
   onDelete,
+  isDeleting = false,
 }: DocumentHistoryCardProps) {
   const [openMotivo, setOpenMotivo] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeletingLocal, setIsDeletingLocal] = useState(false);
   const { text, variant, Icon } = getStatusInfo(status);
   const isDevuelto = String(status ?? "").trim().toLowerCase() === "devuelto";
 
@@ -101,7 +103,9 @@ export function DocumentHistoryCard({
     : undefined;
 
   const handleDelete = async () => {
-    setIsDeleting(true);
+    if (isDeletingLocal || isDeleting) return;
+    
+    setIsDeletingLocal(true);
     try {
       const documentIds = documents.map(d => d.id);
       await onDelete(documentIds);
@@ -109,9 +113,11 @@ export function DocumentHistoryCard({
     } catch (error) {
       console.error("Error al eliminar documentos", error);
     } finally {
-      setIsDeleting(false);
+      setIsDeletingLocal(false);
     }
   };
+
+  const isLoading = isDeletingLocal || isDeleting;
 
   return (
     <>
@@ -174,7 +180,13 @@ export function DocumentHistoryCard({
 
           {/* Botones */}
           <div className="grid grid-cols-1 gap-2 pt-1 sm:flex sm:flex-wrap">
-            <Button size="sm" variant="secondary" className="w-full text-xs sm:w-auto sm:min-w-[5.5rem] sm:text-sm" onClick={onEdit}>
+            <Button 
+              size="sm" 
+              variant="secondary" 
+              className="w-full text-xs sm:w-auto sm:min-w-[5.5rem] sm:text-sm" 
+              onClick={onEdit}
+              disabled={isLoading}
+            >
               <PencilLine className="mr-1.5 h-3.5 w-3.5" />
               Editar
             </Button>
@@ -183,9 +195,10 @@ export function DocumentHistoryCard({
               variant="destructive" 
               className="w-full text-xs sm:w-auto sm:min-w-[5.5rem] sm:text-sm"
               onClick={() => setOpenDeleteDialog(true)}
+              disabled={isLoading}
             >
               <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-              Eliminar
+              {isLoading ? "Eliminando..." : "Eliminar"}
             </Button>
             {isDevuelto && returnedComment ? (
               <Button
@@ -193,6 +206,7 @@ export function DocumentHistoryCard({
                 variant="outline"
                 className="w-full text-xs sm:w-auto sm:min-w-[5.5rem] sm:text-sm"
                 onClick={() => setOpenMotivo(true)}
+                disabled={isLoading}
               >
                 Motivo
               </Button>
@@ -216,15 +230,18 @@ export function DocumentHistoryCard({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+            <AlertDialogCancel 
+              className="dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+              disabled={isLoading}
+            >
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              disabled={isDeleting}
+              disabled={isLoading}
               className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
             >
-              {isDeleting ? "Eliminando..." : "Eliminar"}
+              {isLoading ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -5,7 +5,7 @@ import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Button } from "../../components/ui/button";
-import { Ban, History, Upload, FolderOpen, Calendar, CalendarClock } from "lucide-react";
+import { Ban, History, Upload, FolderOpen, Calendar, CalendarClock, Loader2 } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
 import { getCalendarFileUrl } from "../../lib/calendar";
@@ -59,6 +59,8 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoadingPdf, setIsLoadingPdf] = useState(false);
 
   // Agrupar documentos por batch_id
   const groupedHistory = useMemo(() => {
@@ -225,6 +227,7 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
   const resetForm = () => {
     setFormData({ ...initialFormData, docente: user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "" : "" });
     setEditingDocumentId(null);
+    setIsLoadingPdf(false);
   };
 
   const getArchivosLabel = () => {
@@ -272,7 +275,7 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
     return 'Documento.pdf';
   };
 
-  // Función para cargar el PDF real al editar
+  // Función optimizada para cargar el PDF al editar con feedback visual
   const populateFormForEdit = async (document: any) => {
     const normalizePlanKey = (p: any) => {
       if (!p) return "plan-normal";
@@ -298,8 +301,9 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
     };
 
     setEditingDocumentId(document.id);
+    setIsLoadingPdf(true);
 
-    // Primero llenamos los campos de texto de inmediato
+    // 1. PRIMERO: Llenamos los campos de texto de inmediato (sensación de respuesta rápida)
     setFormData({
       plan: planKey as Plan,
       carrera: careerCode,
@@ -312,25 +316,81 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
       nota: document.note ?? document.nota ?? "",
     });
     setSheetOpen(false);
-    formRef.current?.scrollIntoView({ behavior: "smooth" });
+    
+    // Scroll suave al formulario
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
 
-    // Luego descargamos el PDF real
+    // 2. SEGUNDO: Descargamos el PDF en background
     try {
       const blob = await fetchDocumentBlob(document.id);
       const fileName = getUploadedFileName(document);
       const file = new File([blob], fileName, { type: "application/pdf" });
       setFormData((current) => ({ ...current, archivos: [file] }));
+      
+      // Mostrar toast de éxito (opcional, para dar feedback)
+      toast.success("Documento cargado correctamente", {
+        duration: 2000,
+      });
     } catch (error) {
       console.error("No se pudo cargar el PDF original para edición", error);
       toast.error("No fue posible cargar el PDF original. Selecciona el archivo manualmente.");
+    } finally {
+      setIsLoadingPdf(false);
     }
   };
 
-  // Función para editar un lote completo (múltiples archivos)
+  // Función para editar un lote completo (múltiples archivos) optimizada
   const populateFormForEditBatch = async (documents: any[]) => {
     const main = documents[0];
-    await populateFormForEdit(main);
+    
+    // Primero llenamos el formulario con el primer documento
+    const normalizePlanKey = (p: any) => {
+      if (!p) return "plan-normal";
+      const s = String(p).toLowerCase();
+      if (s.includes("nuevo")) return "nuevo-modelo";
+      return "plan-normal";
+    };
 
+    const planKey = normalizePlanKey(main.plan ?? "");
+    const careerCode = findCareerCodeByLabel(main.carrera_label ?? "", planKey as any);
+    const allowedCuatrimestres = new Set(Object.keys(cuatrimestresLabels));
+    const rawCuatrimestre = String(main.cuatrimestre ?? "").trim();
+    const normalizedCuatrimestre = rawCuatrimestre === "0" ? "propedeutico" : rawCuatrimestre;
+    const fallbackParcial = String(main.parcial ?? "").trim();
+    const resolvedCuatrimestre = allowedCuatrimestres.has(normalizedCuatrimestre)
+      ? normalizedCuatrimestre
+      : (allowedCuatrimestres.has(fallbackParcial) ? fallbackParcial : "");
+
+    const normalizeParcialForForm = (value: unknown): string => {
+      const raw = String(value ?? "").trim();
+      const match = raw.match(/\b([123])\b/);
+      return match ? `Parcial ${match[1]}` : "";
+    };
+
+    setEditingDocumentId(main.id);
+    setIsLoadingPdf(true);
+
+    // Llenar campos de texto inmediatamente
+    setFormData({
+      plan: planKey as Plan,
+      carrera: careerCode,
+      cuatrimestre: resolvedCuatrimestre as Cuatrimestre,
+      materia: main.materia ?? "",
+      parcial: normalizeParcialForForm(main.parcial),
+      grupo: main.group_code ? formatGroupCode(main.group_code) : "",
+      archivos: [],
+      docente: main.docente ?? (user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() : ""),
+      nota: main.note ?? main.nota ?? "",
+    });
+    setSheetOpen(false);
+    
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+
+    // Cargar todos los PDFs del lote en paralelo
     try {
       const files = await Promise.all(
         documents.slice(0, 3).map(async (doc) => {
@@ -339,14 +399,22 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
         })
       );
       setFormData((current) => ({ ...current, archivos: files }));
+      toast.success(`${files.length} documentos cargados correctamente`, {
+        duration: 2000,
+      });
     } catch (error) {
       console.error("No se pudieron cargar todos los PDFs del lote", error);
       toast.error("Algunos PDFs no se pudieron cargar. Verifica los archivos manualmente.");
+    } finally {
+      setIsLoadingPdf(false);
     }
   };
 
-  // Función para eliminar documentos (por lote)
+  // Función para eliminar documentos (por lote) con manejo de errores mejorado
   const handleDeleteDocuments = async (documentIds: number[]) => {
+    if (isDeleting) return;
+    
+    setIsDeleting(true);
     try {
       // Eliminar cada documento
       for (const id of documentIds) {
@@ -358,14 +426,20 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
         : "Documento eliminado correctamente"
       );
       
+      // Pequeña pausa para evitar conflictos de estado
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Recargar el historial
       if (user) {
         const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 1, per_page: 50 } });
-        setHistory(Array.isArray(res?.data) ? res.data : []);
+        const newHistory = Array.isArray(res?.data) ? res.data : [];
+        setHistory(newHistory);
       }
     } catch (error) {
       toast.error("No fue posible eliminar el documento");
       console.error("Error al eliminar documentos", error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -575,6 +649,7 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
                               }}
                               onEdit={() => void populateFormForEditBatch(group)}
                               onDelete={handleDeleteDocuments}
+                              isDeleting={isDeleting}
                             />
                           );
                         })}
@@ -614,6 +689,12 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
             {editingDocumentId && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
                 Estás editando la planeación existente. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+                {isLoadingPdf && (
+                  <span className="ml-2 inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando documentos...
+                  </span>
+                )}
               </div>
             )}
             <div className="grid gap-4 md:grid-cols-2">
@@ -767,7 +848,7 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
                   className="hidden" 
                   id="planeacion-pdf-upload" 
                   onChange={handleFileChange} 
-                  disabled={formData.archivos.length >= 3} 
+                  disabled={formData.archivos.length >= 3 || isLoadingPdf} 
                 />
 
                 <div
@@ -780,9 +861,16 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
                     isDragging
                       ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30"
                       : "border-border bg-background/60 hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40"
-                  }`}
+                  } ${isLoadingPdf ? "opacity-60 pointer-events-none" : ""}`}
                 >
-                  {formData.archivos.length === 0 ? (
+                  {isLoadingPdf ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                        <p className="text-sm text-muted-foreground dark:text-slate-400">Cargando documento...</p>
+                      </div>
+                    </div>
+                  ) : formData.archivos.length === 0 ? (
                     <label htmlFor="planeacion-pdf-upload" className="block cursor-pointer space-y-3">
                       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors dark:bg-emerald-500/10 dark:text-emerald-400">
                         <Upload className="h-6 w-6" />
@@ -863,13 +951,13 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
               </div>
             )}
             <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
-              <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+              <Button variant="outline" onClick={resetForm} disabled={isSubmitting || isLoadingPdf} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
                 Limpiar
               </Button>
               <Button 
                 variant="success" 
                 onClick={handleSubmit} 
-                disabled={!isValid || isSubmitting || !formAccess.canSubmit} 
+                disabled={!isValid || isSubmitting || !formAccess.canSubmit || isLoadingPdf} 
                 className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white"
               >
                 {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar planeación" : "Enviar planeación"}
@@ -887,7 +975,8 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
             <div className="flex-1 min-h-0">
               {previewLoading ? (
                 <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
-                  <p>Cargando...</p>
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                  <p className="ml-2">Cargando...</p>
                 </div>
               ) : previewError ? (
                 <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
