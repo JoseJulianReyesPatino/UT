@@ -60,6 +60,19 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
+  // Agrupar documentos por batch_id
+  const groupedHistory = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    for (const doc of history) {
+      const key = doc.batch_id ?? `single-${doc.id}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(doc);
+    }
+    return Array.from(groups.values()).sort(
+      (a, b) => new Date(b[0].submitted_at).getTime() - new Date(a[0].submitted_at).getTime()
+    );
+  }, [history]);
+
   useEffect(() => {
     if (user && !formData.docente) {
       const nombreCompleto = `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "";
@@ -242,7 +255,25 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
     return found?.codigo ?? "";
   };
 
-  const populateFormForEdit = (document: any) => {
+  const getUploadedFileName = (doc: any): string => {
+    const t = (doc?.title ?? '').toString().trim();
+    if (t && !/^undefined\b/i.test(t)) {
+      const parts = t.split(' - ');
+      const last = (parts.length > 1 ? parts[parts.length - 1] : t).trim();
+      return /\.pdf$/i.test(last) ? last : last + '.pdf';
+    }
+    const p = (doc?.file_path ?? doc?.fileUrl ?? '').toString();
+    if (p) {
+      const raw = decodeURIComponent(p.split('?')[0].split('/').pop() ?? '');
+      const cleaned = raw.replace(/^doc_[^_]+_/, '');
+      if (!cleaned) return 'Documento.pdf';
+      return /\.pdf$/i.test(cleaned) ? cleaned : cleaned + '.pdf';
+    }
+    return 'Documento.pdf';
+  };
+
+  // Función para cargar el PDF real al editar
+  const populateFormForEdit = async (document: any) => {
     const normalizePlanKey = (p: any) => {
       if (!p) return "plan-normal";
       const s = String(p).toLowerCase();
@@ -267,6 +298,8 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
     };
 
     setEditingDocumentId(document.id);
+
+    // Primero llenamos los campos de texto de inmediato
     setFormData({
       plan: planKey as Plan,
       carrera: careerCode,
@@ -280,23 +313,60 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
     });
     setSheetOpen(false);
     formRef.current?.scrollIntoView({ behavior: "smooth" });
+
+    // Luego descargamos el PDF real
+    try {
+      const blob = await fetchDocumentBlob(document.id);
+      const fileName = getUploadedFileName(document);
+      const file = new File([blob], fileName, { type: "application/pdf" });
+      setFormData((current) => ({ ...current, archivos: [file] }));
+    } catch (error) {
+      console.error("No se pudo cargar el PDF original para edición", error);
+      toast.error("No fue posible cargar el PDF original. Selecciona el archivo manualmente.");
+    }
   };
 
-  const getUploadedFileName = (doc: any): string => {
-    const t = (doc?.title ?? '').toString().trim();
-    if (t && !/^undefined\b/i.test(t)) {
-      const parts = t.split(' - ');
-      const last = (parts.length > 1 ? parts[parts.length - 1] : t).trim();
-      return /\.pdf$/i.test(last) ? last : last + '.pdf';
+  // Función para editar un lote completo (múltiples archivos)
+  const populateFormForEditBatch = async (documents: any[]) => {
+    const main = documents[0];
+    await populateFormForEdit(main);
+
+    try {
+      const files = await Promise.all(
+        documents.slice(0, 3).map(async (doc) => {
+          const blob = await fetchDocumentBlob(doc.id);
+          return new File([blob], getUploadedFileName(doc), { type: "application/pdf" });
+        })
+      );
+      setFormData((current) => ({ ...current, archivos: files }));
+    } catch (error) {
+      console.error("No se pudieron cargar todos los PDFs del lote", error);
+      toast.error("Algunos PDFs no se pudieron cargar. Verifica los archivos manualmente.");
     }
-    const p = (doc?.file_path ?? doc?.fileUrl ?? '').toString();
-    if (p) {
-      const raw = decodeURIComponent(p.split('?')[0].split('/').pop() ?? '');
-      const cleaned = raw.replace(/^doc_[^_]+_/, '');
-      if (!cleaned) return 'Documento.pdf';
-      return /\.pdf$/i.test(cleaned) ? cleaned : cleaned + '.pdf';
+  };
+
+  // Función para eliminar documentos (por lote)
+  const handleDeleteDocuments = async (documentIds: number[]) => {
+    try {
+      // Eliminar cada documento
+      for (const id of documentIds) {
+        await apiFetch(`/documents/${id}`, { method: "DELETE" });
+      }
+      
+      toast.success(documentIds.length > 1 
+        ? `${documentIds.length} documentos eliminados correctamente` 
+        : "Documento eliminado correctamente"
+      );
+      
+      // Recargar el historial
+      if (user) {
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 1, per_page: 50 } });
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      }
+    } catch (error) {
+      toast.error("No fue posible eliminar el documento");
+      console.error("Error al eliminar documentos", error);
     }
-    return 'Documento.pdf';
   };
 
   const openDocument = async (id: number, action: "view" | "download") => {
@@ -364,6 +434,7 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
       if (basePayload.group_id) fd.append('group_id', String(basePayload.group_id));
       if (basePayload.original_document_id) fd.append('original_document_id', String(basePayload.original_document_id));
       if (basePayload.nota) fd.append('nota', basePayload.nota);
+      if (basePayload.batch_id) fd.append('batch_id', basePayload.batch_id);
 
       try {
         const result = await apiFetch("/documents", { method: "POST", body: fd });
@@ -394,6 +465,9 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
         selectedGroup = groupsOptions.find(g => formatGroupCode(g.group_code) === formData.grupo);
       }
       
+      // Generar batch_id único para este envío
+      const batchId = crypto.randomUUID();
+
       const basePayload: any = {
         form_id: 1,
         apartado_label: "Planeacion",
@@ -403,6 +477,7 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
         parcial: formData.parcial,
         docente: formData.docente,
         nota: formData.nota,
+        batch_id: batchId,
       };
 
       if (selectedGroup) {
@@ -434,8 +509,6 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
 
   return (
     <div className="relative w-full" ref={formRef}>
-      {/* NOTA: Las imágenes decorativas se movieron a App.tsx como hijas directas de <main> */}
-      
       <div className="max-w-4xl mx-auto space-y-1">
         {/* HEADER - título, subtítulo y botones */}
         <div className="planeacion-header relative">
@@ -476,24 +549,35 @@ export default function PlaneacionPage({ deadlineInfo }: { deadlineInfo?: { form
                   <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
                 </SheetHeader>
                 <div className="mt-4 space-y-4">
-                  {history.length > 0 ? (
+                  {groupedHistory.length > 0 ? (
                     <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
                       <div className="grid gap-3 p-1">
-                        {history.map((h) => (
-                          <DocumentHistoryCard
-                            key={h.id}
-                            title=""
-                            fileName={getUploadedFileName(h)}
-                            carrera={h.carrera_label}
-                            subject={h.materia}
-                            grupo={h.group_code ? formatGroupCode(h.group_code) : undefined}
-                            submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                            status={h.status}
-                            returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
-                            onView={() => openPreview(h)}
-                            onEdit={() => populateFormForEdit(h)}
-                          />
-                        ))}
+                        {groupedHistory.map((group) => {
+                          const main = group[0];
+                          return (
+                            <DocumentHistoryCard
+                              key={main.batch_id ?? main.id}
+                              documents={group.map((d) => ({ id: d.id, fileName: getUploadedFileName(d) }))}
+                              plan={main.plan}
+                              carrera={main.carrera_label}
+                              cuatrimestre={main.cuatrimestre}
+                              subject={main.materia}
+                              parcial={main.parcial}
+                              grupo={main.group_code ? formatGroupCode(main.group_code) : undefined}
+                              docente={main.docente}
+                              nota={main.nota}
+                              submittedAt={new Date(main.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                              status={main.status}
+                              returnedComment={String(main.status ?? "").toLowerCase() === "devuelto" ? main.returned_comment : undefined}
+                              onViewDocument={(docId) => {
+                                const doc = group.find((d) => d.id === docId);
+                                if (doc) openPreview(doc);
+                              }}
+                              onEdit={() => void populateFormForEditBatch(group)}
+                              onDelete={handleDeleteDocuments}
+                            />
+                          );
+                        })}
                       </div>
                     </ScrollArea>
                   ) : formData.archivos.length === 0 ? (

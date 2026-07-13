@@ -9,8 +9,6 @@ import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon } from "lucide-react";
 
 export function Login() {
   const THEME_TOGGLE_COOLDOWN_MS = 700;
-  const topDots = Array.from({ length: 16 }, (_, index) => `login-dot-top-${index}`);
-  const bottomDots = Array.from({ length: 15 }, (_, index) => `login-dot-bottom-${index}`);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -71,29 +69,14 @@ export function Login() {
         />
 
         {/* Manchas de gradiente principales */}
-        <div className="absolute top-0 left-0 w-[700px] h-[700px] bg-[#3BBF82]/5 blur-3xl rounded-full -translate-x-1/3 -translate-y-1/3 dark:bg-[#3BBF82]/10" />
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-[#3BBF82]/5 blur-3xl rounded-full translate-x-1/4 translate-y-1/4 dark:bg-[#3BBF82]/10" />
-        <div className="hidden lg:block absolute bottom-8 right-8 w-48 h-48 bg-[#3BBF82]/12 blur-2xl rounded-full pointer-events-none dark:bg-[#3BBF82]/18" />
+        <div className="absolute top-0 left-0 w-[700px] h-[700px] bg-slate-700/10 blur-3xl rounded-full -translate-x-1/3 -translate-y-1/3 dark:bg-slate-600/20" />
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-slate-700/10 blur-3xl rounded-full translate-x-1/4 translate-y-1/4 dark:bg-slate-600/20" />
+        <div className="hidden lg:block absolute bottom-8 right-8 w-48 h-48 bg-slate-700/10 blur-2xl rounded-full pointer-events-none dark:bg-slate-600/20" />
         
         {/* Manchas adicionales de color sutil */}
         <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-blue-300/3 blur-3xl rounded-full pointer-events-none dark:bg-blue-400/10" />
-        <div className="absolute top-2/3 right-1/3 w-80 h-80 bg-emerald-200/3 blur-3xl rounded-full pointer-events-none dark:bg-emerald-400/10" />
+        <div className="absolute top-2/3 right-1/3 w-80 h-80 bg-slate-700/8 blur-3xl rounded-full pointer-events-none dark:bg-slate-600/15" />
         
-        {/* Líneas decorativas sutiles */}
-        <div className="absolute top-1/4 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#3BBF82]/20 to-transparent opacity-50 dark:via-[#3BBF82]/30" />
-        <div className="hidden lg:block absolute top-3/4 right-0 w-1/2 h-px bg-gradient-to-r from-transparent via-[#3BBF82]/15 to-transparent opacity-40 dark:via-[#3BBF82]/25" />
-
-        {/* Textura distribuida por toda la página */}
-        <div className="absolute top-8 left-6 w-2 h-2 rounded-full bg-[#3BBF82]/30 dark:bg-[#3BBF82]/45" />
-        <div className="absolute top-16 right-[14%] w-1.5 h-1.5 rounded-full bg-[#3BBF82]/35 dark:bg-[#3BBF82]/50" />
-        <div className="absolute top-[22%] left-[10%] w-2 h-2 rounded-full border border-[#3BBF82]/25 opacity-50 dark:border-[#3BBF82]/40" />
-        <div className="absolute top-[34%] right-[30%] w-1.5 h-1.5 rounded-full bg-[#3BBF82]/25 dark:bg-[#3BBF82]/40" />
-        <div className="absolute bottom-[22%] left-[18%] w-3 h-3 rounded-full border-2 border-[#3BBF82]/15 opacity-40 dark:border-[#3BBF82]/30" />
-        <div className="absolute bottom-[14%] right-[22%] w-2 h-2 rounded-full bg-[#3BBF82]/25 dark:bg-[#3BBF82]/40" />
-        <div className="absolute top-[12%] left-[48%] w-32 h-px bg-gradient-to-r from-transparent via-[#3BBF82]/18 to-transparent rotate-12 dark:via-[#3BBF82]/28" />
-        <div className="absolute top-[30%] right-[6%] w-24 h-px bg-gradient-to-r from-transparent via-[#3BBF82]/15 to-transparent -rotate-45 dark:via-[#3BBF82]/25" />
-        <div className="absolute bottom-[26%] left-[7%] w-28 h-px bg-gradient-to-r from-transparent via-[#3BBF82]/18 to-transparent -rotate-12 dark:via-[#3BBF82]/28" />
-        <div className="absolute bottom-[8%] right-[46%] w-20 h-20 rounded-full border border-[#3BBF82]/10 opacity-40 dark:border-[#3BBF82]/25" />
       </div>
 
       <div className="relative z-10 min-h-screen grid lg:grid-cols-2">
@@ -101,31 +84,6 @@ export function Login() {
         {/* COLUMNA IZQUIERDA - CONTENIDO VISUAL */}
         {/* ===================================================== */}
         <div className="hidden lg:flex items-center justify-center px-8 xl:px-12 relative">
-          {/* DECORACIONES SUPERIORES - Cuadrícula de puntos */}
-          <div className="absolute top-10 right-8 h-1.5 w-1.5 rounded-full bg-[#3BBF82]/35 dark:bg-[#3BBF82]/50" />
-          <div className="absolute top-18 right-20 h-1 w-1 rounded-full bg-[#3BBF82]/30 dark:bg-[#3BBF82]/45" />
-          <div className="absolute top-28 right-12 h-2 w-2 rounded-full border border-[#3BBF82]/25 opacity-50 dark:border-[#3BBF82]/40" />
-          <div className="absolute top-6 right-[22%] h-px w-16 bg-gradient-to-r from-transparent via-[#3BBF82]/20 to-transparent rotate-12 dark:via-[#3BBF82]/30" />
-          <div className="absolute top-24 right-[28%] h-px w-20 bg-gradient-to-r from-transparent via-[#3BBF82]/15 to-transparent -rotate-45 dark:via-[#3BBF82]/25" />
-          <div className="absolute top-36 right-[18%] h-1.5 w-1.5 rounded-full bg-[#3BBF82]/30 dark:bg-[#3BBF82]/45" />
-
-          {/* DECORACIONES LATERALES - Líneas verticales sutil */}
-          <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-gradient-to-b from-transparent via-[#3BBF82]/20 to-transparent opacity-50 dark:via-[#3BBF82]/30" />
-          <div className="absolute left-6 top-[18%] h-24 w-px bg-gradient-to-b from-transparent via-[#3BBF82]/18 to-transparent rotate-12 dark:via-[#3BBF82]/28" />
-          <div className="absolute left-12 bottom-[18%] h-20 w-px bg-gradient-to-b from-transparent via-[#3BBF82]/14 to-transparent -rotate-12 dark:via-[#3BBF82]/24" />
-          
-          {/* PUNTOS DECORATIVOS ADICIONALES - Esquina inferior izquierda */}
-          <div className="absolute bottom-20 left-8 h-1 w-1 rounded-full bg-[#3BBF82]/40 dark:bg-[#3BBF82]/55" />
-          <div className="absolute bottom-28 left-20 h-1.5 w-1.5 rounded-full bg-[#3BBF82]/30 dark:bg-[#3BBF82]/45" />
-          <div className="absolute bottom-36 left-12 h-px w-12 bg-gradient-to-r from-transparent via-[#3BBF82]/18 to-transparent rotate-45 dark:via-[#3BBF82]/28" />
-          <div className="absolute bottom-14 left-28 h-2 w-2 rounded-full border border-[#3BBF82]/20 opacity-50 dark:border-[#3BBF82]/35" />
-
-          {/* CÍRCULOS DECORATIVOS - Diferentes tamaños */}
-          <div className="absolute top-16 left-12 w-2 h-2 rounded-full border border-[#3BBF82]/30 opacity-60" />
-          <div className="absolute top-32 left-6 w-3 h-3 rounded-full border border-[#3BBF82]/20 opacity-40" />
-          <div className="absolute bottom-40 left-16 w-4 h-4 rounded-full border-2 border-[#3BBF82]/25 opacity-50" />
-          <div className="absolute bottom-1/3 right-1/4 w-2 h-2 rounded-full bg-[#3BBF82]/30 opacity-60" />
-
           {/* CONTENIDO PRINCIPAL */}
           <div className="max-w-2xl relative z-10 min-h-[560px] w-full">
             {/* LOGO - Bloque independiente */}
@@ -170,23 +128,7 @@ export function Login() {
                   className="relative z-10 h-full w-full object-contain drop-shadow-2xl transition-transform duration-300 hover:scale-110 origin-center -translate-y-12"
                 />
                 
-                {/* Puntos decorativos alrededor */}
-                <div className="absolute top-0 right-0 w-3 h-3 rounded-full bg-[#3BBF82]/40" />
-                <div className="absolute bottom-0 left-0 w-2 h-2 rounded-full bg-[#3BBF82]/30" />
               </div>
-            </div>
-
-            {/* Puntos decorativos extra - INDEPENDIENTES */}
-            <div className="absolute top-[336px] right-[128px] grid grid-cols-4 gap-2 opacity-30 z-10">
-              {topDots.map((id) => (
-                <div key={id} className="h-1.5 w-1.5 rounded-full bg-[#3BBF82]" />
-              ))}
-            </div>
-
-            <div className="absolute top-[520px] right-[-150px] grid grid-cols-5 gap-2 opacity-25 z-10">
-              {bottomDots.map((id) => (
-                <div key={id} className="h-1 w-1 rounded-full bg-[#3BBF82]" />
-              ))}
             </div>
 
             {/* Elementos visuales (círculo + tarjetas) eliminados según solicitud */}
@@ -199,38 +141,16 @@ export function Login() {
         <div className="flex items-center justify-center p-6 lg:p-10 relative">
           {/* DECORACIONES DE FONDO - Círculos, líneas y textura */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute -top-20 -right-20 w-64 h-64 border border-[#3BBF82]/10 rounded-full opacity-50" />
-            <div className="absolute -bottom-32 -left-32 w-80 h-80 border border-[#3BBF82]/8 rounded-full opacity-40" />
-            <div className="absolute top-0 right-1/3 w-px h-32 bg-gradient-to-b from-[#3BBF82]/30 to-transparent opacity-50" />
-            <div className="absolute bottom-0 left-1/4 w-px h-40 bg-gradient-to-t from-[#3BBF82]/20 to-transparent opacity-40" />
-            <div className="absolute top-12 left-10 w-24 h-px bg-gradient-to-r from-transparent via-[#3BBF82]/20 to-transparent rotate-45 dark:via-[#3BBF82]/30" />
-            <div className="absolute bottom-20 right-8 w-28 h-px bg-gradient-to-r from-transparent via-[#3BBF82]/18 to-transparent -rotate-45 dark:via-[#3BBF82]/28" />
-            <div className="absolute top-20 right-28 w-16 h-px bg-gradient-to-r from-transparent via-[#3BBF82]/16 to-transparent rotate-12 dark:via-[#3BBF82]/24" />
-            <div className="absolute bottom-32 left-16 w-20 h-px bg-gradient-to-r from-transparent via-[#3BBF82]/16 to-transparent -rotate-12 dark:via-[#3BBF82]/24" />
-            <div className="absolute top-8 right-8 w-2 h-2 rounded-full bg-[#3BBF82]/40 dark:bg-[#3BBF82]/55" />
-            <div className="absolute bottom-12 right-16 w-1.5 h-1.5 rounded-full bg-[#3BBF82]/30 dark:bg-[#3BBF82]/45" />
-            <div className="absolute top-1/3 left-4 w-1.5 h-1.5 rounded-full bg-[#3BBF82]/25 dark:bg-[#3BBF82]/40" />
-            <div className="absolute top-1/4 right-24 w-16 h-16 rounded-full border border-[#3BBF82]/10 opacity-50 dark:border-[#3BBF82]/25" />
-            <div className="absolute bottom-1/4 left-10 w-12 h-12 rounded-full bg-[#3BBF82]/5 blur-2xl dark:bg-[#3BBF82]/10" />
-            <div className="absolute top-14 left-8 h-1.5 w-1.5 rounded-full bg-[#3BBF82]/35 dark:bg-[#3BBF82]/50" />
-            <div className="absolute top-24 left-20 h-1 w-1 rounded-full bg-[#3BBF82]/28 dark:bg-[#3BBF82]/42" />
-            <div className="absolute top-10 right-14 h-1 w-1 rounded-full bg-[#3BBF82]/30 dark:bg-[#3BBF82]/45" />
-            <div className="absolute top-28 right-10 h-px w-14 bg-gradient-to-r from-transparent via-[#3BBF82]/16 to-transparent rotate-45 dark:via-[#3BBF82]/24" />
-            <div className="absolute bottom-20 right-8 h-1.5 w-1.5 rounded-full bg-[#3BBF82]/30 dark:bg-[#3BBF82]/45" />
-            <div className="absolute bottom-28 right-20 h-px w-16 bg-gradient-to-r from-transparent via-[#3BBF82]/16 to-transparent -rotate-12 dark:via-[#3BBF82]/24" />
-            <div className="absolute bottom-1/4 left-8 w-32 h-32 rounded-full bg-sky-300/5 blur-3xl dark:bg-sky-400/10" />
+            <div className="absolute -top-14 -right-16 w-64 h-64 rounded-full bg-slate-700/10 blur-3xl opacity-60" />
+            <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-slate-700/8 blur-3xl opacity-55" />
           </div>
 
           {/* TARJETA DE LOGIN CON DECORACIONES */}
           <Card className={`w-full max-w-md rounded-3xl backdrop-blur-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(59,191,130,0.18)] hover:border-[#3BBF82]/20 group will-change-transform animate-in fade-in slide-in-from-bottom-1 ${cardSurface}`}>
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3BBF82]/40 to-transparent opacity-60" />
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3BBF82]/20 to-transparent opacity-40" />
-            <div className="absolute -top-20 -right-12 w-56 h-56 rounded-full bg-[#3BBF82]/5 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-emerald-200/20 blur-3xl pointer-events-none" />
+            <div className="absolute -top-20 -right-12 w-56 h-56 rounded-full bg-slate-700/10 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-slate-700/10 blur-3xl pointer-events-none" />
 
             <CardContent className="p-8 lg:p-10 relative">
-              <div className="absolute inset-x-8 top-6 h-px bg-gradient-to-r from-transparent via-[#3BBF82]/15 to-transparent" />
-              <div className="absolute inset-y-16 right-4 w-px bg-gradient-to-b from-transparent via-[#3BBF82]/10 to-transparent" />
 
               {/* Versión Mobile */}
               <div className="lg:hidden text-center mb-8">

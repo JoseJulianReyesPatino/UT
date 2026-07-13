@@ -1,26 +1,40 @@
 import React, { useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { CheckCircle2, Clock2, Undo2, Eye, PencilLine, X } from "lucide-react";
+import { CheckCircle2, Clock2, Undo2, Eye, PencilLine, Trash2, GraduationCap, Layers, BookOpen, Users, User, StickyNote } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 interface DocumentHistoryCardProps {
-  title: string;
-  fileName: string;
+  documents: Array<{ id: number; fileName: string }>;
+  plan?: string;
   carrera?: string;
+  cuatrimestre?: string;
   subject?: string;
+  parcial?: string;
   grupo?: string;
+  docente?: string;
+  nota?: string;
   submittedAt: string;
   status?: string;
   returnedComment?: string;
-  onView: () => void;
+  onViewDocument: (documentId: number) => void;
   onEdit: () => void;
+  onDelete: (documentIds: number[]) => void;
 }
 
 function getStatusInfo(status?: string) {
@@ -37,81 +51,147 @@ function getStatusInfo(status?: string) {
   return { text: "Pendiente", variant: "warning", Icon: Clock2 };
 }
 
+function InfoChip({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string;
+}) {
+  if (!value) return null;
+  return (
+    <div className="flex items-start gap-1.5 rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 dark:border-slate-800/60 dark:bg-slate-900/40 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2">
+      <div className="min-w-0 w-full">
+        <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400 sm:text-[11px]">
+          {label}
+        </p>
+        <p className="text-xs font-medium leading-snug text-foreground break-words dark:text-slate-100 sm:text-sm">
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function DocumentHistoryCard({
-  title,
-  fileName,
+  documents,
+  plan,
   carrera,
+  cuatrimestre,
   subject,
+  parcial,
   grupo,
+  docente,
+  nota,
   submittedAt,
   status,
   returnedComment,
-  onView,
+  onViewDocument,
   onEdit,
+  onDelete,
 }: DocumentHistoryCardProps) {
   const [openMotivo, setOpenMotivo] = useState(false);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { text, variant, Icon } = getStatusInfo(status);
   const isDevuelto = String(status ?? "").trim().toLowerCase() === "devuelto";
 
+  const planLabel = plan
+    ? (String(plan).toLowerCase().includes("nuevo") ? "Plan Nuevo Modelo" : "Plan Normal")
+    : undefined;
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const documentIds = documents.map(d => d.id);
+      await onDelete(documentIds);
+      setOpenDeleteDialog(false);
+    } catch (error) {
+      console.error("Error al eliminar documentos", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <>
-<div className="group rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary dark:border-slate-800/70 dark:bg-slate-900/30 dark:hover:border-emerald-500/40 sm:p-5">      <div className="flex flex-col gap-4">
-          {/* Fila 1: Fecha y Badge */}
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground">{submittedAt}</span>
-            <Badge variant={variant} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs">
-              <Icon className="h-3.5 w-3.5" />
+      <div className="group rounded-xl border border-border bg-card p-3 shadow-sm transition hover:border-primary dark:border-slate-800/70 dark:bg-slate-900/30 dark:hover:border-emerald-500/40 sm:rounded-2xl sm:p-5">
+        <div className="flex flex-col gap-2.5 sm:gap-4">
+          {/* Fila 1: Fecha y Badge de estado */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] text-muted-foreground dark:text-slate-500 sm:text-xs">{submittedAt}</span>
+            <Badge variant={variant} className="inline-flex shrink-0 items-center gap-1 px-2 py-1 text-[10px] sm:px-3 sm:py-1.5 sm:text-xs">
+              <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               {text}
             </Badge>
           </div>
 
-          {/* Fila 2: Título principal (nombre del PDF) */}
-          <div>
-            <p className="text-base font-semibold text-foreground break-words">
-              {fileName}
+          {/* Fila 2: Lista de archivos del envío */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground dark:text-slate-500 sm:text-[11px]">
+              {documents.length > 1 ? `${documents.length} documentos enviados` : "Documento"}
             </p>
+            <div className="space-y-1">
+              {documents.map((doc) => (
+                <button
+                  key={doc.id}
+                  type="button"
+                  onClick={() => onViewDocument(doc.id)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/20 px-2.5 py-1.5 text-left transition hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-800/50 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800/40"
+                >
+                  <span className="truncate text-xs font-semibold text-foreground dark:text-white sm:text-sm">{doc.fileName}</span>
+                  <Eye className="h-3.5 w-3.5 shrink-0 text-muted-foreground dark:text-slate-500" />
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Fila 3: Carrera y Grupo */}
-          {(carrera || grupo) ? (
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {carrera ? (
-                <p className="text-sm text-foreground break-words">
-                  Carrera: {carrera}
-                </p>
-              ) : null}
-              {grupo ? (
-                <p className="text-sm text-foreground break-words">
-                  Grupo: {grupo}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+          {/* Fila 3: Grid de información en chips - SIN ICONOS */}
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2">
+            <InfoChip label="Plan" value={planLabel} />
+            <InfoChip label="Carrera" value={carrera} />
+            <InfoChip label="Materia" value={subject} />
+            <InfoChip label="Grupo" value={grupo} />
+            <InfoChip label="Cuatrimestre" value={cuatrimestre} />
+            <InfoChip label="Parcial" value={parcial} />
+            <InfoChip label="Docente" value={docente} />
+          </div>
 
-          {/* Fila 4: Materia */}
-          {subject ? (
-            <div>
-              <p className="text-sm text-muted-foreground break-words">
-                Materia: {subject}
-              </p>
+          {/* Fila 4: Nota, si existe */}
+          {nota ? (
+            <div className="flex items-start gap-1.5 rounded-lg border border-amber-200/70 bg-amber-50/60 px-2.5 py-1.5 dark:border-amber-900/40 dark:bg-amber-950/20 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2">
+              <StickyNote className="mt-0.5 h-3 w-3 shrink-0 text-amber-700 dark:text-amber-400 sm:h-3.5 sm:w-3.5" />
+              <div className="min-w-0">
+                <p className="text-[9px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400 sm:text-[11px]">
+                  Nota para administración
+                </p>
+                <p className="text-xs text-amber-900 break-words whitespace-pre-wrap dark:text-amber-100 sm:text-sm">
+                  {nota}
+                </p>
+              </div>
             </div>
           ) : null}
 
           {/* Botones */}
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" className="min-w-[5.5rem]" onClick={onView}>
-              <Eye className="mr-1.5 h-3.5 w-3.5" />
-              Ver
-            </Button>
-            <Button size="sm" variant="secondary" className="min-w-[5.5rem]" onClick={onEdit}>
+          <div className="grid grid-cols-1 gap-2 pt-1 sm:flex sm:flex-wrap">
+            <Button size="sm" variant="secondary" className="w-full text-xs sm:w-auto sm:min-w-[5.5rem] sm:text-sm" onClick={onEdit}>
               <PencilLine className="mr-1.5 h-3.5 w-3.5" />
               Editar
+            </Button>
+            <Button 
+              size="sm" 
+              variant="destructive" 
+              className="w-full text-xs sm:w-auto sm:min-w-[5.5rem] sm:text-sm"
+              onClick={() => setOpenDeleteDialog(true)}
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              Eliminar
             </Button>
             {isDevuelto && returnedComment ? (
               <Button
                 size="sm"
                 variant="outline"
-                className="min-w-[5.5rem]"
+                className="w-full text-xs sm:w-auto sm:min-w-[5.5rem] sm:text-sm"
                 onClick={() => setOpenMotivo(true)}
               >
                 Motivo
@@ -121,19 +201,48 @@ export function DocumentHistoryCard({
         </div>
       </div>
 
+      {/* Diálogo de confirmación para eliminar */}
+      <AlertDialog open={openDeleteDialog} onOpenChange={setOpenDeleteDialog}>
+        <AlertDialogContent className="dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="dark:text-white">
+              ¿Eliminar {documents.length > 1 ? `${documents.length} documentos` : "documento"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="dark:text-slate-400">
+              {documents.length > 1 
+                ? `Se eliminarán ${documents.length} documentos de la base de datos. Esta acción no se puede deshacer.`
+                : `Se eliminará "${documents[0]?.fileName}" de la base de datos. Esta acción no se puede deshacer.`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+            >
+              {isDeleting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Diálogo de Motivo */}
       <Dialog open={openMotivo} onOpenChange={setOpenMotivo}>
-  <DialogContent className="max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
-    <DialogHeader>
-      <DialogTitle className="dark:text-white">Motivo de devolución</DialogTitle>
-    </DialogHeader>
-    <div className="rounded-lg border border-border bg-muted/50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
-      <p className="text-sm text-foreground whitespace-pre-wrap break-words dark:text-slate-200">
-        {returnedComment}
-      </p>
-    </div>
-  </DialogContent>
-</Dialog>
+        <DialogContent className="max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
+          <DialogHeader>
+            <DialogTitle className="dark:text-white">Motivo de devolución</DialogTitle>
+          </DialogHeader>
+          <div className="rounded-lg border border-border bg-muted/50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
+            <p className="text-sm text-foreground whitespace-pre-wrap break-words dark:text-slate-200">
+              {returnedComment}
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

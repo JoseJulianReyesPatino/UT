@@ -50,7 +50,6 @@ import {
 
 // IMPORTAR LAS IMÁGENES AQUÍ
 import PlaneacionSuperiorImg from "../assets/superior_form.png";
-import PlaneacionDisenoImg from "../assets/diseño-nuevo.webp";
 
 function AppContent() {
   const { isAuthenticated, isReady, user, notice, logout } = useAuth();
@@ -580,15 +579,10 @@ function AppContent() {
 <img
   src={PlaneacionSuperiorImg}
   alt="Decoración superior"
-  className="hidden md:block pointer-events-none select-none absolute w-20 sm:w-28 lg:w-36 opacity-90 z-0"
+  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
   style={{ top: '-0.5rem', right: '0.1rem' }}
 />
-<img
-  src={PlaneacionDisenoImg}
-  alt="Decoración puntos"
-  className="hidden md:block pointer-events-none select-none absolute w-14 sm:w-16 lg:w-20 opacity-90 z-0"
-  style={{ top: '7rem', right: '2.5rem' }}
-/>
+
                 </>
               )}
 

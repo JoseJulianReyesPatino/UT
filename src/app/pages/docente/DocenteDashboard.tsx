@@ -4,11 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { StatsCard } from "../../components/StatsCard";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
-import { AUTH_TOKEN_STORAGE_KEY } from "../../lib/env";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { getDocumentDisplayFileName, fetchDocumentBlob, getDocumentFileUrl } from "../../lib/documents";
 import {
   FileText,
@@ -23,13 +19,22 @@ import {
 } from "lucide-react";
 
 // --- Importar las imágenes desde assets ---
-import banner1 from "../../../assets/carrusel1.png";
-import banner2 from "../../../assets/carrusel2.png";
+// Imágenes para desktop
+import banner1 from "../../../assets/123.png";
+import banner2 from "../../../assets/prueba.png";
 import banner3 from "../../../assets/carrusel3.png";
 import banner4 from "../../../assets/carrusel4.png";
 import banner5 from "../../../assets/carrusel5.png";
 
-// --- Caché en memoria compartida para evitar el "flash" de vacío al reentrar al dashboard ---
+// Imágenes para móvil (versiones optimizadas)
+// Si no tienes versiones específicas para móvil, usa las mismas
+import banner1Mobile from "../../../assets/carrusel1.png";
+import banner2Mobile from "../../../assets/carrusel2.png";
+import banner3Mobile from "../../../assets/carrusel3.png";
+import banner4Mobile from "../../../assets/carrusel4.png";
+import banner5Mobile from "../../../assets/carrusel5.png";
+
+// --- Caché en memoria compartida ---
 let dashboardCache: {
   stats: {
     title: string;
@@ -90,22 +95,33 @@ type FormItem = {
   access_roles?: string[];
 };
 
-// --- Arreglo de banners para el carrusel con las imágenes importadas ---
-const introBanners = [
-  banner1,
-  banner2,
-  banner3,
-  banner4,
-];
+// --- Arreglo de banners ---
+const introBanners = [banner1, banner2, banner3, banner4, banner5];
+const introBannersMobile = [banner1Mobile, banner2Mobile, banner3Mobile, banner4Mobile, banner5Mobile];
 
-// --- Componente del carrusel con flechas ---
-// --- Componente del carrusel (solo las imágenes, sin fondo oscuro) ---
-// --- Componente del carrusel (con fondo sutil pero sin el cuadro oscuro) ---
-// --- Componente del carrusel con botón para minimizar ---
-// --- Componente del carrusel con botón para minimizar (UI/UX mejorada) ---
-function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: string[]; href: string; intervalMs?: number }) {
+// --- Componente del carrusel con imágenes responsive ---
+function AutoFadeBannerCarousel({ 
+  images, 
+  mobileImages, 
+  href, 
+  intervalMs = 4500 
+}: { 
+  images: string[]; 
+  mobileImages?: string[];
+  href: string; 
+  intervalMs?: number 
+}) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (images.length <= 1) return;
@@ -133,15 +149,17 @@ function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: s
     setIsMinimized(!isMinimized);
   };
 
+  const currentImages = (isMobile && mobileImages && mobileImages.length > 0) ? mobileImages : images;
+
   return (
     <div className="relative w-full overflow-hidden rounded-2xl transition-all duration-300 ease-in-out">
       <div 
         className={`relative w-full overflow-hidden rounded-2xl transition-all duration-300 ease-in-out ${
-          isMinimized ? 'h-14 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200/50 dark:border-emerald-800/50' : ''
+          isMinimized
+            ? 'h-14 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 dark:from-emerald-950/40 dark:to-teal-950/40 border border-emerald-200/40 dark:border-emerald-800/40'
+            : 'aspect-[1852/849] sm:aspect-[5375/934]'
         }`}
-        style={!isMinimized ? { aspectRatio: '1852/849' } : {}}
       >
-        {/* Imágenes del carrusel */}
         <a
           href={href}
           target="_blank"
@@ -150,7 +168,7 @@ function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: s
             !isMinimized ? 'hover:scale-[1.01]' : ''
           }`}
         >
-          {images.map((src, index) => (
+          {currentImages.map((src, index) => (
             <img
               key={src}
               src={src}
@@ -162,7 +180,7 @@ function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: s
           ))}
         </a>
 
-        {/* Botón de minimizar/expandir - Mejorado */}
+        {/* Botón de minimizar/expandir */}
         <button
           type="button"
           onClick={toggleMinimize}
@@ -190,8 +208,8 @@ function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: s
           )}
         </button>
 
-        {/* Flechas de navegación - solo visibles cuando NO está minimizado */}
-        {images.length > 1 && !isMinimized && (
+        {/* Flechas de navegación */}
+        {currentImages.length > 1 && !isMinimized && (
           <>
             <button
               type="button"
@@ -216,36 +234,27 @@ function AutoFadeBannerCarousel({ images, href, intervalMs = 4500 }: { images: s
           </>
         )}
 
-        {/* Estado minimizado - UI mejorada */}
+        {/* Estado minimizado - Diseño mejorado con texto semitransparente */}
         {isMinimized && (
-          <div className="absolute inset-0 flex items-center justify-between px-4">
-            <div className="flex items-center gap-3">
+          <div className="absolute inset-0 flex items-center justify-center px-4">
+            <div className="flex flex-col items-center gap-1">
               {/* Icono decorativo */}
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
-                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100/70 dark:bg-emerald-900/50">
+                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-emerald-600/70 dark:text-emerald-400/70" aria-hidden="true">
                   <rect x="2" y="2" width="20" height="20" rx="2" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
                   <path d="M8 8h8M8 12h6M8 16h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
               
-              {/* Texto informativo */}
-              <div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              {/* Texto semitransparente con mensaje institucional */}
+              <div className="text-center">
+                <p className="text-sm font-medium text-slate-600/80 dark:text-slate-300/80">
                   Carrusel minimizado
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Haz clic en <span className="font-medium text-emerald-600 dark:text-emerald-400">Expandir</span> para ver las imágenes
+                <p className="text-xs text-slate-500/60 dark:text-slate-400/60">
+                  Haz clic en <span className="font-medium text-emerald-600/80 dark:text-emerald-400/80">Expandir</span> para ver las imágenes
                 </p>
               </div>
-            </div>
-
-            {/* Indicador de cantidad de imágenes */}
-            <div className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-xs font-medium text-slate-600 backdrop-blur-sm dark:bg-slate-800/70 dark:text-slate-300">
-              <span>{images.length}</span>
-              <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
-                <rect x="2" y="2" width="20" height="20" rx="2" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-                <path d="M8 8h8M8 12h6M8 16h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
             </div>
           </div>
         )}
@@ -265,7 +274,9 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState<boolean>(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  // --------------------------------------------
+
+  // --- Estado para errores de carga ---
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [stats, setStats] = useState<{
     title: string;
@@ -305,11 +316,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     }
   }, []);
 
-  // --- Función para obtener la URL de previsualización ---
-  const getPreviewUrl = useCallback((documentId: number) => {
-    return getDocumentFileUrl(documentId);
-  }, []);
-
   // --- Función para cargar la vista previa del documento ---
   const loadDocumentPreview = useCallback(async (doc: DocumentItem) => {
     if (!doc) return;
@@ -330,73 +336,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     }
   }, []);
 
-  // --- Función separada para cargar próximas entregas ---
-  const loadProximasEntregas = async (docs?: DocumentItem[]) => {
-    try {
-      setIsLoadingProximas(true);
-
-      const userRoles = new Set((user?.roles ?? []).map(String));
-      
-      let allForms: FormItem[] = [];
-      let formsLoaded = false;
-      
-      try {
-        const formsPayload = await apiFetch('/forms', { method: 'GET' });
-        allForms = (formsPayload?.data ?? []) as FormItem[];
-        formsLoaded = true;
-      } catch (formError) {
-        console.error("❌ Error al cargar formularios:", formError);
-      }
-
-      const upcomingFromForms = formsLoaded && allForms.length > 0
-        ? allForms
-          .filter((form) => {
-            const isActive = form.is_active === true;
-            const hasDueDate = Boolean(form.due_at && form.due_at !== '');
-            const isFuture = hasDueDate && new Date(form.due_at!) > new Date();
-            const hasAccess = form.access_roles?.length ? form.access_roles.some((role) => userRoles.has(role)) : true;
-
-            return isActive && hasDueDate && isFuture && hasAccess;
-          })
-          .map((form) => ({
-            titulo: form.section?.trim() || form.title,
-            detalle: form.title,
-            fecha: form.due_at!,
-            dias: Math.max(0, Math.ceil((new Date(form.due_at!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))),
-          }))
-          .sort((a, b) => a.dias - b.dias)
-          .slice(0, 5)
-        : [];
-
-      if (upcomingFromForms.length === 0) {
-        const placeholder = [{ 
-          titulo: "No hay formularios próximos", 
-          fecha: "Sin fechas límite próximas", 
-          dias: 0, 
-          isPlaceholder: true 
-        }];
-        setProximasEntregas(placeholder);
-        return placeholder;
-      } else {
-        setProximasEntregas(upcomingFromForms);
-        return upcomingFromForms;
-      }
-      
-    } catch (error) {
-      console.error("❌ Error en loadProximasEntregas:", error);
-      const errorPlaceholder = [{ 
-        titulo: "No fue posible cargar los formularios", 
-        fecha: "Intenta de nuevo más tarde", 
-        dias: 0, 
-        isPlaceholder: true 
-      }];
-      setProximasEntregas(errorPlaceholder);
-      return errorPlaceholder;
-    } finally {
-      setIsLoadingProximas(false);
-    }
-  };
-
   // --- Función para recargar los datos manualmente ---
   const refreshData = useCallback(async () => {
     if (!isReady || !user) return;
@@ -404,11 +343,16 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     setIsLoadingStats(true);
     setIsLoadingDocuments(true);
     setIsLoadingProximas(true);
+    setLoadError(null);
     
     try {
-      // 1. Recargar estadísticas
-      const dashboard = (await apiFetch('/dashboard/stats', { method: 'GET' })) as any;
-      
+      const [dashboardResult, docsPayloadResult, formsResult] = await Promise.allSettled([
+        apiFetch('/dashboard/stats', { method: 'GET' }) as Promise<any>,
+        apiFetch('/documents?per_page=6', { method: 'GET' }) as Promise<any>,
+        apiFetch('/forms', { method: 'GET' }) as Promise<any>,
+      ]);
+
+      const dashboard = dashboardResult.status === 'fulfilled' ? dashboardResult.value : {};
       const statsArr = [
         {
           title: 'Documentos Pendientes',
@@ -439,26 +383,21 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         },
       ];
       setStats(statsArr);
+      setIsLoadingStats(false);
 
-      // 2. Recargar documentos recientes con corrección de "undefined"
-      const docsPayload = (await apiFetch('/documents?per_page=6', { method: 'GET' })) as any;
+      const docsPayload = docsPayloadResult.status === 'fulfilled' ? docsPayloadResult.value : null;
       const docs = (docsPayload?.data?.data ?? docsPayload?.data ?? []) as any[];
-      
+
       const mappedDocs = docs.map((d) => {
         const formTitle = (d?.form_title ?? d?.tipoLabel ?? d?.apartado_label ?? '').toString().trim();
-
-        // Nombre de archivo tal cual lo subió el docente (último segmento del title, sin modificar)
         const titleStr = decodeURIComponent((d?.title ?? '').toString().trim());
         const lastSegment = titleStr.split(' - ').pop()?.trim() ?? titleStr;
         const fileName = lastSegment || 'Documento';
         const nombre = formTitle ? `${formTitle} - ${fileName}` : fileName;
-
         const rawMateria = (d?.materia ?? '').toString().trim();
         const materia = rawMateria && rawMateria !== 'Sin materia' ? rawMateria : '';
-
         const rawGrupo = (d?.grupo ?? d?.group_code ?? '').toString().trim();
         const grupo = rawGrupo && rawGrupo !== '-' ? rawGrupo : '';
-
         const fechaEnvio = d?.submitted_at ?? d?.fecha ?? d?.created_at ?? null;
 
         return {
@@ -475,34 +414,62 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         };
       });
       setRecentDocuments(mappedDocs);
+      setIsLoadingDocuments(false);
 
-      // 3. Recargar próximas entregas
-      const nextProximas = await loadProximasEntregas(docs);
+      const userRoles = new Set((user?.roles ?? []).map(String));
+      const allForms = (formsResult.status === 'fulfilled' ? formsResult.value?.data : []) as FormItem[] ?? [];
 
-      // Guardar en caché para la próxima vez que se visite este dashboard
+      const upcomingFromForms = allForms.length > 0
+        ? allForms
+          .filter((form) => {
+            const isActive = form.is_active === true;
+            const hasDueDate = Boolean(form.due_at && form.due_at !== '');
+            const isFuture = hasDueDate && new Date(form.due_at!) > new Date();
+            const hasAccess = form.access_roles?.length ? form.access_roles.some((role) => userRoles.has(role)) : true;
+            return isActive && hasDueDate && isFuture && hasAccess;
+          })
+          .map((form) => ({
+            titulo: form.section?.trim() || form.title,
+            detalle: form.title,
+            fecha: form.due_at!,
+            dias: Math.max(0, Math.ceil((new Date(form.due_at!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))),
+          }))
+          .sort((a, b) => a.dias - b.dias)
+          .slice(0, 5)
+        : [];
+
+      const nextProximas = upcomingFromForms.length > 0
+        ? upcomingFromForms
+        : [{ titulo: "No hay formularios próximos", fecha: "Sin fechas límite próximas", dias: 0, isPlaceholder: true }];
+
+      setProximasEntregas(nextProximas);
+      setIsLoadingProximas(false);
+
+      const anyFailed = [dashboardResult, docsPayloadResult, formsResult].some((r) => r.status === 'rejected');
+      if (anyFailed) {
+        setLoadError('Algunos datos no se pudieron actualizar. Mostrando la última información disponible.');
+      }
+
       dashboardCache = {
         stats: statsArr,
         recentDocuments: mappedDocs,
-        proximasEntregas: nextProximas ?? [],
+        proximasEntregas: nextProximas,
         timestamp: Date.now(),
       };
-      
+
     } catch (err) {
-      console.error("Error al cargar el dashboard:", err);
-    } finally {
+      setLoadError('No fue posible actualizar la información del panel. Intenta de nuevo en unos momentos.');
       setIsLoadingStats(false);
       setIsLoadingDocuments(false);
       setIsLoadingProximas(false);
     }
   }, [isReady, user]);
 
-  // --- Función para abrir el documento en el diálogo ---
   const openDocument = useCallback((doc: DocumentItem) => {
     setSelectedDocument(doc);
     loadDocumentPreview(doc);
   }, [loadDocumentPreview]);
 
-  // --- Limpiar URL del blob al cerrar el diálogo ---
   const closePreview = useCallback(() => {
     if (previewBlobUrl) {
       URL.revokeObjectURL(previewBlobUrl);
@@ -510,15 +477,11 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     setPreviewBlobUrl(null);
     setSelectedDocument(null);
   }, [previewBlobUrl]);
-  // -----------------------------------------------------------
 
-  // --- Efecto para cargar los datos del dashboard ---
   useEffect(() => {
     if (!isReady || !user) return;
     refreshData();
   }, [isReady, user]);
-
-  // -----------------------------------------------------------
 
   return (
     <div className="relative z-0 space-y-6 overflow-hidden">
@@ -528,8 +491,20 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
       </div>
 
       <div className="relative z-10">
-        {/* Solo el carrusel de imágenes, sin ningún cuadro ni título */}
-        <AutoFadeBannerCarousel images={introBanners} href={manualDocenteUrl} />
+        {/* Carrusel con imágenes responsive */}
+        <AutoFadeBannerCarousel 
+          images={introBanners} 
+          mobileImages={introBannersMobile}
+          href={manualDocenteUrl} 
+        />
+
+        {/* Mensaje de error de carga */}
+        {loadError && (
+          <div className="mt-3 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p>{loadError}</p>
+          </div>
+        )}
 
         {/* Stats cards */}
         <div className="relative z-10 mt-3 grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -581,7 +556,14 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             </CardHeader>
             <CardContent>
               <div className="max-h-[60vh] space-y-3 overflow-x-hidden overflow-y-auto pr-2 sm:max-h-[24rem]">
-                {recentDocuments.length === 0 ? (
+                {isLoadingDocuments ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-center">
+                      <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent mx-auto"></div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Cargando documentos...</p>
+                    </div>
+                  </div>
+                ) : recentDocuments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600" />
                     <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">No tienes documentos enviados</p>
@@ -611,7 +593,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                       DocStatusIcon = Clock2;
                     }
 
-                    // Separar nombre del formulario (tipo) del nombre real del PDF
                     const fileNameOnly = doc.nombre.includes(' - ')
                       ? doc.nombre.split(' - ').slice(1).join(' - ')
                       : doc.nombre;
