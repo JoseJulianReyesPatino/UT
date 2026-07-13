@@ -16,7 +16,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar"
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, FileText, Grid2x2, Key, Moon, PencilLine, Plus, RefreshCw, Search, Shield, Sun, Trash2, Users, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { carrieras } from "../../data/curricula";
-import { clearAvatarCache, getAvatarUrlWithTimestamp, getInitials, useResolvedAvatarUrl } from "../../lib/avatar";
+import { clearAvatarCache, getAvatarUrlWithTimestamp, getInitials, isImageUrl, useResolvedAvatarUrl } from "../../lib/avatar";
+import defaultAvatar from "../../../assets/perfil2.png";
 
 // Función para resolver URLs de avatar
 const getAbsoluteUrl = (url?: string | null): string | undefined => {
@@ -35,7 +36,22 @@ interface ConfigurationProps {
   initialTab?: ConfigTab;
 }
 
-type SupervisorPermission = { user_id: number; user_name: string; email: string; sections: string[] };
+type SupervisorPermission = { user_id: number; user_name: string; email: string; sections: string[]; avatar?: string | null };
+
+function SupervisorAvatar({ avatarUrl, name }: { avatarUrl?: string | null; name: string }) {
+  const rawAvatar = avatarUrl && isImageUrl(avatarUrl) ? avatarUrl : null;
+  const resolved = useResolvedAvatarUrl(rawAvatar);
+  return (
+    <Avatar className="h-9 w-9 shrink-0 ring-1 ring-white/80 dark:ring-slate-900/60">
+      {resolved ? (
+        <AvatarImage src={resolved} alt={name} className="h-full w-full object-cover" />
+      ) : null}
+      <AvatarFallback className="bg-transparent p-0 overflow-hidden">
+        <img src={defaultAvatar} alt={name} className="h-full w-full object-cover" />
+      </AvatarFallback>
+    </Avatar>
+  );
+}
 
 const SUPERVISOR_SECTIONS = [
   { id: "planeacion", label: "Planeación" },
@@ -1620,9 +1636,12 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                 className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60 dark:hover:bg-slate-900/70"
                                 onClick={toggle}
                               >
-                                <div className="min-w-0">
-                                  <p className="font-medium text-sm truncate">{sup.user_name}</p>
-                                  <p className="text-xs text-muted-foreground truncate">{sup.email}</p>
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <SupervisorAvatar avatarUrl={sup.avatar} name={sup.user_name} />
+                                  <div className="min-w-0">
+                                    <p className="font-medium text-sm truncate">{sup.user_name}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{sup.email}</p>
+                                  </div>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                   <span className="text-xs text-muted-foreground">
