@@ -425,7 +425,7 @@ export default function PortafolioDigitalPage({ deadlineInfo }: { deadlineInfo?:
           </SheetTrigger>
           <SheetContent
             side="right"
-            className="sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
+            className="w-full sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
             overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
           >
             <SheetHeader>

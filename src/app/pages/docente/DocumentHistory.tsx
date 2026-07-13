@@ -117,6 +117,37 @@ const getTipoLabel = (tipo: string): string => {
   return tipoMap[tipo] || tipo;
 };
 
+function DocumentHistorySkeleton() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Cargando documentos">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="animate-pulse relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-2xl border border-border/70 dark:border-slate-700">
+          <div className="flex items-start gap-3 flex-1">
+            <div className="h-12 w-12 rounded-xl bg-muted shrink-0" />
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="h-4 w-2/3 rounded-full bg-muted" />
+              <div className="h-5 w-24 rounded-full bg-muted" />
+              <div className="flex flex-wrap gap-2 mt-1">
+                <div className="h-5 w-44 rounded-full bg-muted" />
+                <div className="h-5 w-24 rounded-full bg-muted" />
+                <div className="h-5 w-32 rounded-full bg-muted" />
+                <div className="h-5 w-20 rounded-full bg-muted" />
+                <div className="h-5 w-16 rounded-full bg-muted" />
+              </div>
+              <div className="h-3 w-40 rounded-full bg-muted" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="h-6 w-20 rounded-full bg-muted" />
+            <div className="h-8 w-8 rounded-xl bg-muted" />
+            <div className="h-8 w-8 rounded-xl bg-muted" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function DocumentHistory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -493,11 +524,7 @@ export function DocumentHistory() {
           </CardHeader>
           <CardContent>
             <div className="max-h-[34rem] space-y-3 overflow-y-auto pr-2">
-              {isLoading && (
-                <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground dark:border-slate-700 dark:text-slate-400">
-                  Cargando...
-                </div>
-              )}
+              {isLoading && <DocumentHistorySkeleton />}
 
               {!isLoading && loadError && (
                 <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive dark:border-red-900/30 dark:bg-red-950/10 dark:text-red-400">
@@ -652,9 +679,7 @@ export function DocumentHistory() {
           {previewDocument && (
             <div className="flex-1 min-h-0">
               {previewLoading ? (
-                <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground dark:border-slate-700 dark:text-slate-400">
-                  <p>Cargando...</p>
-                </div>
+                <div className="animate-pulse h-[82vh] rounded-lg border border-border bg-muted/40 dark:border-slate-700 dark:bg-slate-900/50" />
               ) : previewError ? (
                 <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
                   {previewError}

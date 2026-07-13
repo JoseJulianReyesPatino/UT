@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Eye, ExternalLink, FileText, X } from "lucide-react";
+import React, { useMemo, useRef, useState } from "react";
+import { Eye, ExternalLink, FileText, RefreshCw, X } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   AlertDialog,
@@ -24,12 +24,14 @@ interface PdfPreviewProps {
   readonly file: File | null;
   readonly title?: string;
   readonly onRemove?: () => void;
+  readonly onReplace?: (newFile: File) => void;
 }
 
-export function PdfPreview({ file, title = "Vista previa del PDF", onRemove }: PdfPreviewProps) {
+export function PdfPreview({ file, title = "Vista previa del PDF", onRemove, onReplace }: PdfPreviewProps) {
   const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : ""), [file]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     return () => {
@@ -77,6 +79,31 @@ export function PdfPreview({ file, title = "Vista previa del PDF", onRemove }: P
               <Eye className="mr-1.5 h-3.5 w-3.5" />
               Ampliar
             </Button>
+            {onReplace && (
+              <>
+                <input
+                  ref={replaceInputRef}
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onReplace(f);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
+                  onClick={() => replaceInputRef.current?.click()}
+                >
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                  Reemplazar
+                </Button>
+              </>
+            )}
             {onRemove ? (
               <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
                 <Button

@@ -62,6 +62,9 @@ function AppContent() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [deferredMessageOpen, setDeferredMessageOpen] = useState<null | { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string; filePath?: string } }>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [unsavedChangesOpen, setUnsavedChangesOpen] = useState(false);
+  const [pendingView, setPendingView] = useState<string | null>(null);
+  const formEditingRef = useRef(false);
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== "undefined" ? !navigator.onLine : false);
   const [minimumLoadingElapsed, setMinimumLoadingElapsed] = useState(false);
   const [isSplashExiting, setIsSplashExiting] = useState(false);
@@ -344,6 +347,31 @@ function AppContent() {
 
   const cancelLeave = () => setLeaveDialogOpen(false);
 
+  const safeNavigate = (view: string) => {
+    if (formEditingRef.current) {
+      setPendingView(view);
+      setUnsavedChangesOpen(true);
+    } else {
+      setCurrentView(view);
+      setMobileSidebarOpen(false);
+    }
+  };
+
+  const confirmDiscardChanges = () => {
+    formEditingRef.current = false;
+    setUnsavedChangesOpen(false);
+    if (pendingView) {
+      setCurrentView(pendingView);
+      setMobileSidebarOpen(false);
+      setPendingView(null);
+    }
+  };
+
+  const cancelDiscardChanges = () => {
+    setUnsavedChangesOpen(false);
+    setPendingView(null);
+  };
+
   // CAMBIO: el splash ahora es un overlay fixed con z-index alto, que se renderiza
   // ENCIMA del contenido real (Login o Dashboard), en vez de sustituirlo. Así, cuando
   // se desvanece (fade), revela el contenido que ya está montado debajo — nunca el
@@ -471,7 +499,7 @@ function AppContent() {
         case "dashboard":
           return <DocenteDashboard onNavigate={setCurrentView} />;
         case "planeacion":
-          return wrapForm("planeacion", "Planeación", <PlaneacionPage />);
+          return wrapForm("planeacion", "Planeación", <PlaneacionPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "instrumento-30-normal":
           return wrapForm("instrumento-30-normal", "Instrumento 30%", <Instrumento30Page />);
         case "instrumento-40-nuevo":
@@ -563,10 +591,7 @@ function AppContent() {
           <div className={`flex h-screen overflow-hidden ${isLoggingOut ? "animate-page-exit" : ""} motion-reduce:animate-none`}>
             <Sidebar
               currentView={currentView}
-              onNavigate={(view) => {
-                setCurrentView(view);
-                setMobileSidebarOpen(false);
-              }}
+              onNavigate={safeNavigate}
               mobileOpen={mobileSidebarOpen}
               onMobileOpenChange={setMobileSidebarOpen}
             />
@@ -635,6 +660,25 @@ function AppContent() {
                 <DialogFooter className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
                   <Button variant="outline" onClick={cancelLeave}>Cancelar</Button>
                   <Button onClick={confirmLeaveAndLogout}>Salir</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={unsavedChangesOpen} onOpenChange={cancelDiscardChanges}>
+              <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md rounded-2xl dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
+                <DialogHeader>
+                  <DialogTitle className="dark:text-white">¿Salir sin guardar?</DialogTitle>
+                  <DialogDescription className="dark:text-slate-400">
+                    Tienes cambios sin guardar en el formulario. Si te vas ahora, se perderá todo lo que hayas editado.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="flex-row justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={cancelDiscardChanges} className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">
+                    Seguir editando
+                  </Button>
+                  <Button variant="destructive" onClick={confirmDiscardChanges}>
+                    Descartar cambios
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

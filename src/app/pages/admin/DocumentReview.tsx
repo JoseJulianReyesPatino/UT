@@ -20,7 +20,7 @@ import { formatGroupCode } from "../../../lib/utils";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { useAuth } from "../../context/AuthContext";
 
-type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
+type ReviewSection = "all" | "pendientes" | "revisados" | "hoy" | "devueltos" | "reenviados";
 
 type PendingDocument = {
 	id: number;
@@ -41,6 +41,8 @@ type PendingDocument = {
 	returnedAt?: string;
 	resubmittedAt?: string;
 	nota?: string | null;
+	batch_id?: string | null;
+	status?: string | null;
 };
 
 type ReviewedDocument = {
@@ -107,6 +109,7 @@ type ApiDocument = {
 	resubmitted_at?: string | null;
 	fileUrl?: string | null;
 	nota?: string | null;
+	batch_id?: string | null;
 };
 
 const getCareerFilterOptions = (plan: string): CareerFilterOption[] => {
@@ -394,6 +397,8 @@ const mapApiDocument = (doc: ApiDocument, kind: "pending" | "reviewed"): Pending
 		returnedAt: doc.returned_at ?? undefined,
 		resubmittedAt: doc.resubmitted_at ?? undefined,
 		nota: doc.nota ?? null,
+		batch_id: doc.batch_id ?? null,
+		status: doc.status ?? null,
 	};
 
 	if (kind === "reviewed") {
@@ -462,7 +467,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			setLoadError(null);
 
 			try {
-				const statuses = ["pendiente", "revisado", "devuelto"] as const;
+				const statuses = ["pendiente", "revisado", "devuelto", "reenviado"] as const;
 				const responses = await Promise.allSettled(
 					statuses.map((status) => apiFetch("/documents", {
 						query: {
@@ -478,8 +483,12 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 				const pendingPayload = responses[0].status === "fulfilled" ? responses[0].value : null;
 				const reviewedPayload = responses[1].status === "fulfilled" ? responses[1].value : null;
 				const returnedPayload = responses[2].status === "fulfilled" ? responses[2].value : null;
+				const resubmittedPayload = responses[3].status === "fulfilled" ? responses[3].value : null;
 
-				const pendingItems = extractApiDocuments(pendingPayload).map((doc) => mapApiDocument(doc, "pending"));
+				const pendingItems = [
+					...extractApiDocuments(pendingPayload).map((doc) => mapApiDocument(doc, "pending")),
+					...extractApiDocuments(resubmittedPayload).map((doc) => mapApiDocument(doc, "pending")),
+				];
 				const reviewedItems = [
 					...extractApiDocuments(reviewedPayload).map((doc) => mapApiDocument(doc, "reviewed")),
 					...extractApiDocuments(returnedPayload).map((doc) => mapApiDocument(doc, "reviewed")),
@@ -681,15 +690,22 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const filteredPendingDocuments = useMemo(() => pendingDocuments.filter(matchesFilters), [pendingDocuments, matchesFilters]);
 	const filteredReviewedDocuments = useMemo(() => reviewedDocuments.filter(matchesFilters), [reviewedDocuments, matchesFilters]);
 	const filteredAllDocuments = useMemo(() => allDocuments.filter(matchesFilters), [allDocuments, matchesFilters]);
-	const reviewedTodayDocuments = useMemo(() => filteredReviewedDocuments.filter((doc) => toLocalDateKey(doc.reviewedAt) === todayKey), [filteredReviewedDocuments, todayKey]);
+
+	// Separar por estado para tabs dedicados
+	const filteredPendienteOnlyDocuments = useMemo(() => filteredPendingDocuments.filter((doc) => !("status" in doc && doc.status === "reenviado")), [filteredPendingDocuments]);
+	const filteredReenviadosDocuments = useMemo(() => filteredPendingDocuments.filter((doc) => "status" in doc && doc.status === "reenviado"), [filteredPendingDocuments]);
+	const filteredRevisadosDocuments = useMemo(() => filteredReviewedDocuments.filter((doc) => !doc.returned), [filteredReviewedDocuments]);
+	const filteredDevueltosDocuments = useMemo(() => filteredReviewedDocuments.filter((doc) => doc.returned === true), [filteredReviewedDocuments]);
+
+	const reviewedTodayDocuments = useMemo(() => filteredRevisadosDocuments.filter((doc) => toLocalDateKey(doc.reviewedAt) === todayKey), [filteredRevisadosDocuments, todayKey]);
 
 	const reviewedByDate = useMemo(() => {
-		return filteredReviewedDocuments.reduce<Record<string, ReviewedDocument[]>>((groups, doc) => {
+		return filteredRevisadosDocuments.reduce<Record<string, ReviewedDocument[]>>((groups, doc) => {
 			const date = toLocalDateKey(doc.reviewedAt);
 			groups[date] = [...(groups[date] || []), doc];
 			return groups;
 		}, {});
-	}, [filteredReviewedDocuments]);
+	}, [filteredRevisadosDocuments]);
 
 	const handleReviewDocument = async (documentId: number) => {
 		try {
@@ -770,12 +786,14 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	};
 
 	const getStatusVariant = (doc: DocumentItem) => {
-		if (doc.returned) return "destructive";
-		if ("reviewedAt" in doc) return "success";
-		return "warning";
+		if ("status" in doc && doc.status === "reenviado") return "outline" as const;
+		if (doc.returned) return "destructive" as const;
+		if ("reviewedAt" in doc) return "success" as const;
+		return "warning" as const;
 	};
 
 	const getStatusLabel = (doc: DocumentItem) => {
+		if ("status" in doc && doc.status === "reenviado") return "Reenviado";
 		if (doc.returned) return "Devuelto";
 		if ("reviewedAt" in doc) return "Revisado";
 		return "Pendiente";
@@ -828,7 +846,8 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		</div>
 	);
 
-	const renderDocumentRow = (doc: DocumentItem) => {
+	const renderDocumentRow = (doc: DocumentItem, opts: { allowReturn?: boolean } = {}) => {
+		const allowReturn = opts.allowReturn !== false;
 		const isReviewed = "reviewedAt" in doc;
 		const statusVariant = getStatusVariant(doc);
 		const statusLabel = getStatusLabel(doc);
@@ -868,11 +887,47 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 
 					{isReviewed ? null : <ResponsiveActionButton variant="outline" size="sm" label="Revisar" title="Revisar documento" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "review", document: doc }); }} icon={<Check className="h-4 w-4" />} />}
 
-					<Badge variant={statusVariant}>{statusLabel}</Badge>
+					<Badge
+						variant={statusVariant}
+						className={"status" in doc && doc.status === "reenviado" ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" : undefined}
+					>
+						{statusLabel}
+					</Badge>
 
 					{doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
 					<ResponsiveActionButton variant="ghost" size="sm" label="Enviar" title={`Enviar a mensajes ${doc.docente}`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} icon={<MessageSquare className="h-4 w-4" />} />
-					{doc.returned ? <Tooltip><TooltipTrigger asChild><ResponsiveActionButton variant="outline" size="sm" label="Cancelar" title="Cancelar devolución" className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} /></TooltipTrigger><TooltipContent>Cancelar devolución</TooltipContent></Tooltip> : <Tooltip><TooltipTrigger asChild><ResponsiveActionButton variant="destructive" size="sm" label="Devolver" title="Devolver documento" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} /></TooltipTrigger><TooltipContent>Devolver</TooltipContent></Tooltip>}
+					{allowReturn && (doc.returned ? <Tooltip><TooltipTrigger asChild><ResponsiveActionButton variant="outline" size="sm" label="Cancelar" title="Cancelar devolución" className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} /></TooltipTrigger><TooltipContent>Cancelar devolución</TooltipContent></Tooltip> : <Tooltip><TooltipTrigger asChild><ResponsiveActionButton variant="destructive" size="sm" label="Devolver" title="Devolver documento" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} /></TooltipTrigger><TooltipContent>Devolver</TooltipContent></Tooltip>)}
+				</div>
+			</div>
+		);
+	};
+
+	// Agrupar documentos por batch_id para mostrar envíos múltiples juntos
+	const groupDocsByBatch = (docs: PendingDocument[]): PendingDocument[][] => {
+		const groups = new Map<string, PendingDocument[]>();
+		for (const doc of docs) {
+			const key = doc.batch_id ?? `single-${doc.id}`;
+			if (!groups.has(key)) groups.set(key, []);
+			groups.get(key)!.push(doc);
+		}
+		return Array.from(groups.values());
+	};
+
+	const renderBatchGroup = (group: PendingDocument[]) => {
+		if (group.length === 1) return renderDocumentRow(group[0]);
+		return (
+			<div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+				<div className="flex items-center gap-2 border-b border-emerald-200/50 bg-emerald-50/80 px-4 py-2.5 dark:border-emerald-800/30 dark:bg-emerald-950/20">
+					<FileText className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+					<span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+						{group.length} archivos del mismo envío
+					</span>
+					<span className="text-xs text-muted-foreground">
+						· {group[0].docente} · {group[0].apartado}
+					</span>
+				</div>
+				<div className="divide-y divide-border/50 dark:divide-slate-800/50">
+					{group.map((doc) => renderDocumentRow(doc))}
 				</div>
 			</div>
 		);
@@ -909,16 +964,20 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 							<SelectContent>
 								<SelectItem value="all">Todos</SelectItem>
 								<SelectItem value="pendientes">Pendientes</SelectItem>
+								<SelectItem value="devueltos">Devueltos</SelectItem>
+								<SelectItem value="reenviados">Reenviados</SelectItem>
 								<SelectItem value="revisados">Revisados</SelectItem>
 								<SelectItem value="hoy">Revisados hoy</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
-					<TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
-						<TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Todos <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredAllDocuments.length}</Badge></TabsTrigger>
-						<TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Pendientes <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPendingDocuments.length}</Badge></TabsTrigger>
-						<TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredReviewedDocuments.length}</Badge></TabsTrigger>
-						<TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{reviewedTodayDocuments.length}</Badge></TabsTrigger>
+					<TabsList className="hidden sm:grid w-full grid-cols-6 gap-1.5 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
+						<TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Todos <Badge variant="outline" className="ml-1.5 rounded-full bg-white/95 px-1.5 py-0.5 text-[10px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredAllDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Pendientes <Badge variant="outline" className="ml-1.5 rounded-full bg-white/95 px-1.5 py-0.5 text-[10px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPendienteOnlyDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="devueltos" className="inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Devueltos <Badge variant="outline" className="ml-1.5 rounded-full bg-white/95 px-1.5 py-0.5 text-[10px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredDevueltosDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="reenviados" className="inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Reenviados <Badge variant="outline" className="ml-1.5 rounded-full bg-white/95 px-1.5 py-0.5 text-[10px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredReenviadosDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados <Badge variant="outline" className="ml-1.5 rounded-full bg-white/95 px-1.5 py-0.5 text-[10px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredRevisadosDocuments.length}</Badge></TabsTrigger>
+						<TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy <Badge variant="outline" className="ml-1.5 rounded-full bg-white/95 px-1.5 py-0.5 text-[10px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{reviewedTodayDocuments.length}</Badge></TabsTrigger>
 					</TabsList>
 
 					<TabsContent value="all" className="space-y-4 mt-6">
@@ -933,7 +992,21 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					<TabsContent value="pendientes" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
-							<CardContent>{renderListState(<div className="space-y-3">{filteredPendingDocuments.length === 0 ? <EmptyState text="No hay documentos pendientes." /> : filteredPendingDocuments.map(renderDocumentRow)}</div>)}</CardContent>
+							<CardContent>{renderListState(<div className="space-y-3">{filteredPendienteOnlyDocuments.length === 0 ? <EmptyState text="No hay documentos pendientes." /> : groupDocsByBatch(filteredPendienteOnlyDocuments).map((group) => renderBatchGroup(group))}</div>)}</CardContent>
+						</Card>
+					</TabsContent>
+
+					<TabsContent value="devueltos" className="space-y-4 mt-6">
+						<Card className={sectionCardClassName}>
+							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
+							<CardContent>{renderListState(<div className="space-y-3">{filteredDevueltosDocuments.length === 0 ? <EmptyState text="No hay documentos devueltos." /> : filteredDevueltosDocuments.map((doc) => renderDocumentRow(doc))}</div>)}</CardContent>
+						</Card>
+					</TabsContent>
+
+					<TabsContent value="reenviados" className="space-y-4 mt-6">
+						<Card className={sectionCardClassName}>
+							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
+							<CardContent>{renderListState(<div className="space-y-3">{filteredReenviadosDocuments.length === 0 ? <EmptyState text="No hay documentos reenviados." /> : groupDocsByBatch(filteredReenviadosDocuments as PendingDocument[]).map((group) => renderBatchGroup(group))}</div>)}</CardContent>
 						</Card>
 					</TabsContent>
 
@@ -951,7 +1024,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 														<p className="font-semibold text-sm text-foreground">{formatDateOnlyFromKey(date)}</p>
 														<p className="text-xs text-muted-foreground">{docs.length} documentos revisados</p>
 													</div>
-													<div className="space-y-3">{docs.map(renderDocumentRow)}</div>
+													<div className="space-y-3">{docs.map((doc) => renderDocumentRow(doc, { allowReturn: false }))}</div>
 												</div>
 											))}
 										</div>
@@ -963,7 +1036,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					<TabsContent value="hoy" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
-							<CardContent>{renderListState(<div className="space-y-3">{reviewedTodayDocuments.length === 0 ? <EmptyState text="No hay documentos revisados hoy." /> : reviewedTodayDocuments.map(renderDocumentRow)}</div>)}</CardContent>
+							<CardContent>{renderListState(<div className="space-y-3">{reviewedTodayDocuments.length === 0 ? <EmptyState text="No hay documentos revisados hoy." /> : reviewedTodayDocuments.map((doc) => renderDocumentRow(doc, { allowReturn: false }))}</div>)}</CardContent>
 						</Card>
 					</TabsContent>
 				</Tabs>

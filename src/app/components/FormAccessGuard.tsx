@@ -100,6 +100,12 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
 
     const freshNow = Boolean(formsCache && Date.now() - formsCache.timestamp < FORMS_CACHE_TTL);
     if (!freshNow) {
+      // Si hay caché stale, usarla optimísticamente para evitar el flash de "cerrado"
+      // mientras la red trae datos frescos. Sin esto: accessLoading=false + accessRule=null
+      // → roleAllowed=false → se muestra FormClosedState brevemente.
+      if (formsCache) {
+        setAccessRule(resolveAccessRule(formsCache.data, formId));
+      }
       setAccessLoading(!formsCache);
     }
 

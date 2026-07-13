@@ -78,6 +78,7 @@ export const fetchDocumentBlob = async (
         headers,
         credentials: "include",
         mode: "cors",
+        cache: "no-store",
       });
 
       if (!res.ok) {

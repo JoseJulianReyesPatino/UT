@@ -53,6 +53,50 @@ let dashboardCache: {
   timestamp: number;
 } | null = null;
 
+// --- Caché en sessionStorage (sobrevive recarga de página) ---
+const SESSION_KEY = 'docente-dashboard-cache';
+
+// Limpiar entradas corruptas de versiones anteriores (iconos serializados como {})
+try {
+  const existing = sessionStorage.getItem(SESSION_KEY);
+  if (existing) {
+    const parsed = JSON.parse(existing);
+    if (parsed?.stats?.[0]?.icon !== undefined) {
+      sessionStorage.removeItem(SESSION_KEY);
+    }
+  }
+} catch { sessionStorage.removeItem(SESSION_KEY); }
+
+// Los iconos de Lucide son objetos forwardRef y no son serializables a JSON.
+// Los guardamos por índice y los re-adjuntamos al leer de sessionStorage.
+const STAT_ICONS = [Clock, CheckCircle2, AlertCircle];
+
+const readSessionCache = (): typeof dashboardCache => {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.stats) {
+      parsed.stats = parsed.stats.map((s: any, i: number) => ({
+        ...s,
+        icon: STAT_ICONS[i] ?? Clock,
+      }));
+    }
+    return parsed;
+  } catch { return null; }
+};
+const writeSessionCache = (data: typeof dashboardCache) => {
+  try {
+    if (!data) return;
+    // Guardar sin los iconos (funciones/objetos no serializables)
+    const serializable = {
+      ...data,
+      stats: data.stats.map(({ icon: _icon, ...rest }) => rest),
+    };
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(serializable));
+  } catch {}
+};
+
 function formatTiempoRestante(fecha: string): { valor: string; unidad: string } {
   const diff = new Date(fecha).getTime() - Date.now();
   if (diff <= 0) return { valor: '0', unidad: 'minutos' };
@@ -98,6 +142,69 @@ type FormItem = {
 // --- Arreglo de banners ---
 const introBanners = [banner1, banner2, banner3, banner4, banner5];
 const introBannersMobile = [banner1Mobile, banner2Mobile, banner3Mobile, banner4Mobile, banner5Mobile];
+
+// --- Skeletons de carga ---
+function StatCardSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="animate-pulse overflow-hidden rounded-2xl border border-slate-200/70 bg-white/70 shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
+          <div className="h-1 bg-muted" />
+          <div className="flex flex-col items-start gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="h-4 w-36 rounded-full bg-muted" />
+            <div className="h-9 w-9 rounded-xl bg-muted sm:h-10 sm:w-10" />
+          </div>
+          <div className="space-y-2 px-4 pb-4 pt-0">
+            <div className="h-8 w-10 rounded-lg bg-muted" />
+            <div className="h-3 w-32 rounded-full bg-muted" />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function RecentDocsSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="animate-pulse flex flex-col gap-2 rounded-2xl border border-border/70 bg-card/70 p-3 dark:border-slate-700 dark:bg-slate-900/70 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex items-start gap-3 sm:min-w-0 sm:flex-1">
+            <div className="h-11 w-11 shrink-0 rounded-2xl bg-muted" />
+            <div className="min-w-0 flex-1 space-y-2 pt-1">
+              <div className="h-3 w-20 rounded-full bg-muted" />
+              <div className="h-4 w-2/3 rounded-full bg-muted" />
+              <div className="h-3 w-28 rounded-full bg-muted" />
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
+            <div className="h-6 w-24 rounded-full bg-muted" />
+            <div className="h-9 w-9 rounded-xl bg-muted" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProximasSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="animate-pulse flex items-center justify-between rounded-2xl border border-border/70 bg-card/70 p-3 dark:border-slate-700 dark:bg-slate-900/70">
+          <div className="space-y-2">
+            <div className="h-4 w-28 rounded-full bg-muted" />
+            <div className="h-3 w-44 rounded-full bg-muted" />
+          </div>
+          <div className="space-y-2">
+            <div className="h-4 w-14 rounded-full bg-muted ml-auto" />
+            <div className="h-3 w-12 rounded-full bg-muted ml-auto" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // --- Componente del carrusel con imágenes responsive ---
 function AutoFadeBannerCarousel({ 
@@ -278,6 +385,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   // --- Estado para errores de carga ---
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Combina caché de memoria (navegación) y sessionStorage (recarga de página)
   const [stats, setStats] = useState<{
     title: string;
     value: string;
@@ -289,14 +397,14 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     cardClass?: string;
     accentClass?: string;
     action?: string;
-  }[]>(dashboardCache?.stats ?? []);
-  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  }[]>(() => (dashboardCache ?? readSessionCache())?.stats ?? []);
+  const [isLoadingStats, setIsLoadingStats] = useState(() => !(dashboardCache ?? readSessionCache()));
 
-  const [recentDocuments, setRecentDocuments] = useState<DocumentItem[]>(dashboardCache?.recentDocuments ?? []);
-  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const [recentDocuments, setRecentDocuments] = useState<DocumentItem[]>(() => (dashboardCache ?? readSessionCache())?.recentDocuments ?? []);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(() => !(dashboardCache ?? readSessionCache()));
 
-  const [proximasEntregas, setProximasEntregas] = useState<any[]>(dashboardCache?.proximasEntregas ?? []);
-  const [isLoadingProximas, setIsLoadingProximas] = useState(!dashboardCache);
+  const [proximasEntregas, setProximasEntregas] = useState<any[]>(() => (dashboardCache ?? readSessionCache())?.proximasEntregas ?? []);
+  const [isLoadingProximas, setIsLoadingProximas] = useState(() => !(dashboardCache ?? readSessionCache()));
 
   // --- Función para formatear fecha ---
   const formatDate = useCallback((dateStr?: string | null) => {
@@ -337,12 +445,15 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   }, []);
 
   // --- Función para recargar los datos manualmente ---
-  const refreshData = useCallback(async () => {
+  // showLoading=false cuando ya hay datos en caché: refresca en silencio sin mostrar skeletons
+  const refreshData = useCallback(async (showLoading = true) => {
     if (!isReady || !user) return;
-    
-    setIsLoadingStats(true);
-    setIsLoadingDocuments(true);
-    setIsLoadingProximas(true);
+
+    if (showLoading) {
+      setIsLoadingStats(true);
+      setIsLoadingDocuments(true);
+      setIsLoadingProximas(true);
+    }
     setLoadError(null);
     
     try {
@@ -450,12 +561,14 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         setLoadError('Algunos datos no se pudieron actualizar. Mostrando la última información disponible.');
       }
 
-      dashboardCache = {
+      const newCache = {
         stats: statsArr,
         recentDocuments: mappedDocs,
         proximasEntregas: nextProximas,
         timestamp: Date.now(),
       };
+      dashboardCache = newCache;
+      writeSessionCache(newCache);
 
     } catch (err) {
       setLoadError('No fue posible actualizar la información del panel. Intenta de nuevo en unos momentos.');
@@ -480,7 +593,9 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
   useEffect(() => {
     if (!isReady || !user) return;
-    refreshData();
+    // Si ya hay datos (memoria o sessionStorage), refresca en silencio sin skeletons
+    const hasCache = Boolean(dashboardCache ?? readSessionCache());
+    refreshData(!hasCache);
   }, [isReady, user]);
 
   return (
@@ -508,35 +623,39 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
         {/* Stats cards */}
         <div className="relative z-10 mt-3 grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            const handleClick = () => {
-              if (onNavigate && stat.action) onNavigate(stat.action);
-            };
+          {isLoadingStats ? (
+            <StatCardSkeleton />
+          ) : (
+            stats.map((stat) => {
+              const Icon = stat.icon;
+              const handleClick = () => {
+                if (onNavigate && stat.action) onNavigate(stat.action);
+              };
 
-            return (
-              <button
-                key={stat.title}
-                type="button"
-                onClick={handleClick}
-                className="cursor-pointer text-left transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
-              >
-                <Card className={`h-full overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60 hover:shadow-md transition ${stat.cardClass}`}>
-                  <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
-                  <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm dark:text-white">{stat.title}</CardTitle>
-                    <div className="h-9 w-9 rounded-xl bg-emerald-100/80 dark:bg-emerald-950/40 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5 sm:h-10 sm:w-10">
-                      {Icon ? <Icon className="h-4 w-4 text-emerald-700 dark:text-emerald-300" aria-hidden /> : null}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="text-2xl leading-none font-bold text-foreground dark:text-white sm:text-2xl">{stat.value}</div>
-                    <p className="mt-1 text-[11px] leading-snug text-foreground/70 sm:text-xs dark:text-slate-400">{stat.description}</p>
-                  </CardContent>
-                </Card>
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={stat.title}
+                  type="button"
+                  onClick={handleClick}
+                  className="cursor-pointer text-left transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                >
+                  <Card className={`h-full overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60 hover:shadow-md transition ${stat.cardClass}`}>
+                    <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
+                    <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
+                      <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm dark:text-white">{stat.title}</CardTitle>
+                      <div className="h-9 w-9 rounded-xl bg-emerald-100/80 dark:bg-emerald-950/40 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5 sm:h-10 sm:w-10">
+                        {Icon ? <Icon className="h-4 w-4 text-emerald-700 dark:text-emerald-300" aria-hidden /> : null}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="text-2xl leading-none font-bold text-foreground dark:text-white sm:text-2xl">{stat.value}</div>
+                      <p className="mt-1 text-[11px] leading-snug text-foreground/70 sm:text-xs dark:text-slate-400">{stat.description}</p>
+                    </CardContent>
+                  </Card>
+                </button>
+              );
+            })
+          )}
         </div>
 
         {/* Documentos Recientes y Próximas Entregas */}
@@ -557,12 +676,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             <CardContent>
               <div className="max-h-[60vh] space-y-3 overflow-x-hidden overflow-y-auto pr-2 sm:max-h-[24rem]">
                 {isLoadingDocuments ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="text-center">
-                      <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent mx-auto"></div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Cargando documentos...</p>
-                    </div>
-                  </div>
+                  <RecentDocsSkeleton />
                 ) : recentDocuments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600" />
@@ -659,12 +773,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             <CardContent>
               <div className="max-h-[60vh] space-y-3 overflow-x-hidden overflow-y-auto pr-2 sm:max-h-[24rem]">
                 {isLoadingProximas ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="text-center">
-                      <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent mx-auto"></div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Cargando entregas...</p>
-                    </div>
-                  </div>
+                  <ProximasSkeleton />
                 ) : proximasEntregas.length === 0 || (proximasEntregas.length === 1 && proximasEntregas[0]?.isPlaceholder) ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <Calendar className="h-12 w-12 text-slate-300 dark:text-slate-600" />
