@@ -50,6 +50,8 @@ import {
 
 // IMPORTAR LAS IMÁGENES AQUÍ
 import PlaneacionSuperiorImg from "../assets/superior_form.png";
+import Instrumento30SuperiorImg from "../assets/superior_form.png";
+import Instrumento40SuperiorImg from "../assets/superior_form.png";
 
 function AppContent() {
   const { isAuthenticated, isReady, user, notice, logout } = useAuth();
@@ -307,9 +309,6 @@ function AppContent() {
       return;
     }
 
-    // Ambas actualizaciones en el mismo callback → React 18 las agrupa en un
-    // solo render, evitando el flash de un frame donde shouldShowSplash=false
-    // antes de que isSplashExiting sea true.
     const enterTimer = window.setTimeout(() => {
       setMinimumLoadingElapsed(true);
       setIsSplashExiting(true);
@@ -330,9 +329,6 @@ function AppContent() {
 
   const shouldShowSplash = !isReady || !minimumLoadingElapsed || isSplashExiting;
 
-  // CAMBIO: quitamos "splashing" del body en cuanto isReady es true (no esperamos
-  // a que termine la animación). El contenido real ya queda montado debajo del
-  // overlay opaco del splash, así que el cambio de fondo nunca se ve.
   useEffect(() => {
     if (isReady && typeof document !== "undefined") {
       document.body.classList.remove("splashing");
@@ -372,10 +368,6 @@ function AppContent() {
     setPendingView(null);
   };
 
-  // CAMBIO: el splash ahora es un overlay fixed con z-index alto, que se renderiza
-  // ENCIMA del contenido real (Login o Dashboard), en vez de sustituirlo. Así, cuando
-  // se desvanece (fade), revela el contenido que ya está montado debajo — nunca el
-  // fondo "pelón" de la página.
   const splashOverlay = shouldShowSplash
     ? createPortal(
         <div
@@ -546,7 +538,6 @@ function AppContent() {
 
   return (
     <>
-      {/* Splash siempre en posición 0 — fiber position estable, sin remount */}
       {splashOverlay}
       {noticeBanner}
       {isAuthenticated && isOffline && (
@@ -559,7 +550,6 @@ function AppContent() {
         </div>
       )}
 
-      {/* Login — iris se abre desde círculo pequeño hacia afuera */}
       {isReady && !isAuthenticated && (
         <div
           className={
@@ -572,7 +562,6 @@ function AppContent() {
         </div>
       )}
 
-      {/* Dashboard autenticado — iris se abre desde círculo pequeño hacia afuera */}
       {isReady && isAuthenticated && (
         <div
           className={`fixed inset-0 overflow-hidden${isSplashExiting ? " z-[9999] tv-iris-reveal" : " z-0"}`}
@@ -600,16 +589,31 @@ function AppContent() {
 
               {/* IMÁGENES DECORATIVAS - HIJAS DIRECTAS DE <main> */}
               {currentView === "planeacion" && (
-                <>
-<img
-  src={PlaneacionSuperiorImg}
-  alt="Decoración superior"
-  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-  style={{ top: '-0.5rem', right: '0.1rem' }}
-/>
-
-                </>
+                <img
+                  src={PlaneacionSuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
               )}
+
+              {currentView === "instrumento-30-normal" && (
+                <img
+                  src={Instrumento30SuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
+              )}
+
+              {currentView === "instrumento-40-nuevo" && (
+                <img
+                  src={Instrumento40SuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
+           )}
 
               <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur md:hidden">
                 <div className="flex items-center justify-between px-4 py-3">

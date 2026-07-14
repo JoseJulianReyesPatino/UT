@@ -294,7 +294,7 @@ export function DocumentHistoryCard({
             <AlertDialogDescription className="dark:text-slate-400">
               {documents.length > 1 
                 ? `Se eliminarán ${documents.length} documentos de la base de datos. Esta acción no se puede deshacer.`
-                : `Se eliminará "${documents[0]?.fileName}" de la base de datos. Esta acción no se puede deshacer.`
+                : `Se eliminará "${documents[0]?.fileName}". Esta acción no se puede deshacer.`
               }
             </AlertDialogDescription>
           </AlertDialogHeader>
