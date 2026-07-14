@@ -7,6 +7,11 @@ import { Label } from "../../components/ui/label";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Calendar } from "../../components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
+import { cn } from "../../components/ui/utils";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { getDefaultFormConfig, type FormId, type FormRole, type Group } from "../../../lib/formConfig";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
@@ -140,6 +145,45 @@ function getPasswordStrength(password: string): PasswordStrength {
   return { score, label: "Muy fuerte", color: "bg-emerald-600" };
 }
 
+function DeadlineDatePicker({ value, disabled, onChange }: { value: string; disabled: boolean; onChange: (date: string) => void }) {
+  const [open, setOpen] = React.useState(false);
+  const selected = value ? new Date(`${value}T00:00:00`) : undefined;
+
+  return (
+    <Popover open={open && !disabled} onOpenChange={(o) => { if (!disabled) setOpen(o); }}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          disabled={disabled}
+          className={cn(
+            "flex-1 justify-start text-left font-normal h-9 px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100",
+            !selected && "text-muted-foreground",
+          )}
+        >
+          <CalendarDays className="mr-2 h-4 w-4 shrink-0 opacity-70" />
+          {selected ? format(selected, "dd/MM/yyyy", { locale: es }) : "Selecciona una fecha"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selected}
+          onSelect={(date) => {
+            if (date) {
+              const pad = (n: number) => String(n).padStart(2, "0");
+              onChange(`${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`);
+            } else {
+              onChange("");
+            }
+            setOpen(false);
+          }}
+          locale={es}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export function Configuration(props: Readonly<ConfigurationProps>) {
   const { initialTab = "formularios" } = props;
@@ -1322,16 +1366,26 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                                   </label>
                                                 </div>
                                               </div>
-                                              <Input
-                                                id={`deadline-${form.id}`}
-                                                type="datetime-local"
-                                                lang="es"
-                                                value={draftConfig.dueAt ?? ""}
-                                                min={new Date().toISOString().slice(0, 16)}
-                                                onChange={(event) => handleDeadlineChange(form.id, event.target.value)}
-                                                disabled={draftConfig.dueAt === null}
-                                                className="text-sm dark:[&::-webkit-calendar-picker-indicator]:invert"
-                                              />
+                                              <div className="flex gap-2">
+                                                <DeadlineDatePicker
+                                                  value={draftConfig.dueAt ? draftConfig.dueAt.slice(0, 10) : ""}
+                                                  disabled={draftConfig.dueAt === null}
+                                                  onChange={(date) => {
+                                                    const timePart = draftConfig.dueAt?.slice(11, 16) ?? "00:00";
+                                                    handleDeadlineChange(form.id, date ? `${date}T${timePart}` : "");
+                                                  }}
+                                                />
+                                                <Input
+                                                  type="time"
+                                                  value={draftConfig.dueAt ? draftConfig.dueAt.slice(11, 16) : ""}
+                                                  onChange={(event) => {
+                                                    const datePart = draftConfig.dueAt?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
+                                                    handleDeadlineChange(form.id, `${datePart}T${event.target.value}`);
+                                                  }}
+                                                  disabled={draftConfig.dueAt === null}
+                                                  className="text-sm dark:[&::-webkit-calendar-picker-indicator]:invert w-28"
+                                                />
+                                              </div>
                                               {draftConfig.dueAt && (
                                                 <p className="text-xs text-muted-foreground">
                                                   Fecha límite: {new Date(draftConfig.dueAt).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}

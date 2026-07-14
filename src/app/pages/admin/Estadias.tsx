@@ -460,6 +460,7 @@ export default function Estadias() {
   }, [filterCuatrimestre, cuatrimestresDisponibles]);
 
   const handleReviewDocument = async (documentId: number) => {
+    const reviewedDoc = pendingDocuments.find((doc) => doc.id === documentId);
     try {
       await apiFetch(`/documents/${documentId}/review`, {
         method: "PATCH",
@@ -469,7 +470,6 @@ export default function Estadias() {
 
       setPendingDocuments((current) => current.filter((doc) => doc.id !== documentId));
       setReviewedDocuments((current) => {
-        const reviewedDoc = pendingDocuments.find((doc) => doc.id === documentId);
         if (!reviewedDoc) return current;
 
         return [

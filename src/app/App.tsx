@@ -501,25 +501,25 @@ function AppContent() {
         case "planeacion":
           return wrapForm("planeacion", "Planeación", <PlaneacionPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "instrumento-30-normal":
-          return wrapForm("instrumento-30-normal", "Instrumento 30%", <Instrumento30Page />);
+          return wrapForm("instrumento-30-normal", "Instrumento 30%", <Instrumento30Page onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "instrumento-40-nuevo":
-          return wrapForm("instrumento-40-nuevo", "Instrumento 40%", <Instrumento40Page />);
+          return wrapForm("instrumento-40-nuevo", "Instrumento 40%", <Instrumento40Page onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "instrumento-60-nuevo":
-          return wrapForm("instrumento-60-nuevo", "Instrumento 60%", <Instrumento60Page />);
+          return wrapForm("instrumento-60-nuevo", "Instrumento 60%", <Instrumento60Page onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "instrumento-70-normal":
-          return wrapForm("instrumento-70-normal", "Instrumento 70%", <Instrumento70Page />);
+          return wrapForm("instrumento-70-normal", "Instrumento 70%", <Instrumento70Page onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "remedial":
-          return wrapForm("remedial", "Remedial", <RemedialPage />);
+          return wrapForm("remedial", "Remedial", <RemedialPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "lista-concentrada":
-          return wrapForm("lista-concentrada", "Lista Concentrada", <ListaConcentradaPage />);
+          return wrapForm("lista-concentrada", "Lista Concentrada", <ListaConcentradaPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "asesoria":
-          return wrapForm("asesoria", "Asesoría", <AsesoriaPage />);
+          return wrapForm("asesoria", "Asesoría", <AsesoriaPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "portafolio":
-          return wrapForm("portafolio-digital", "Portafolio Digital", <PortafolioDigitalPage />);
+          return wrapForm("portafolio-digital", "Portafolio Digital", <PortafolioDigitalPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "acta-final":
-          return wrapForm("acta-final", "Acta Final", <ActaFinalPage />);
+          return wrapForm("acta-final", "Acta Final", <ActaFinalPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "estadias":
-          return wrapForm("estadias", "Estadías", <EstadiasPage />);
+          return wrapForm("estadias", "Estadías", <EstadiasPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "tutorias":
           return wrapForm("tutorias", "Tutorías", <TutoriasPage />);
         case "tutorias-carga-academica":

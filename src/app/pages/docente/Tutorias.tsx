@@ -179,8 +179,8 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
     }
 
     for (const file of newFiles) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error(`${file.name} excede el límite de 5 MB`);
+      if (file.size > 15 * 1024 * 1024) {
+        toast.error(`${file.name} excede el límite de 15 MB`);
         return;
       }
 
@@ -505,7 +505,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
               <div className="space-y-2 md:col-span-2">
                 <Label className="dark:text-white">Subir archivo *</Label>
                 <p className="text-sm text-muted-foreground dark:text-slate-400">
-                  Adjuntar el documento en formato PDF, con un límite de 5 MB por archivo. En caso de ser necesario, se permite la carga simultánea de hasta tres archivos.
+                  Adjuntar el documento en formato PDF, con un límite de 15 MB por archivo. En caso de ser necesario, se permite la carga simultánea de hasta tres archivos.
                 </p>
 
                 <input

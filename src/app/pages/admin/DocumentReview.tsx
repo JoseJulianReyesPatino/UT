@@ -65,6 +65,7 @@ type ReviewedDocument = {
 	returnedAt?: string;
 	resubmittedAt?: string;
 	nota?: string | null;
+	batch_id?: string | null;
 };
 
 type DocumentItem = PendingDocument | ReviewedDocument;
@@ -708,6 +709,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	}, [filteredRevisadosDocuments]);
 
 	const handleReviewDocument = async (documentId: number) => {
+		const reviewedDoc = pendingDocuments.find((doc) => doc.id === documentId);
 		try {
 			await apiFetch(`/documents/${documentId}/review`, {
 				method: "PATCH",
@@ -716,19 +718,12 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			});
 
 			setPendingDocuments((currentDocuments) => currentDocuments.filter((doc) => doc.id !== documentId));
-			setReviewedDocuments((currentDocuments) => {
-				const reviewedDoc = pendingDocuments.find((doc) => doc.id === documentId);
-				if (!reviewedDoc) return currentDocuments;
-
-				return [
-					{
-						...reviewedDoc,
-						reviewedAt: new Date().toISOString(),
-						returned: false,
-					},
+			if (reviewedDoc) {
+				setReviewedDocuments((currentDocuments) => [
+					{ ...reviewedDoc, reviewedAt: new Date().toISOString(), returned: false },
 					...currentDocuments,
-				];
-			});
+				]);
+			}
 			toast.success("Documento marcado como revisado");
 		} catch {
 			toast.error("No se pudo marcar el documento como revisado");
@@ -739,16 +734,15 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		const doc = [...pendingDocuments, ...reviewedDocuments].find((d) => d.id === documentId);
 		const fileName = doc ? extractPreviewFileName(doc.documento) : "Documento";
 		const docenteName = doc?.docente ?? "";
+		const wasReturned = doc?.returned ?? false;
 		try {
 			await apiFetch(`/documents/${documentId}/return`, {
 				method: "PATCH",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ notes: comment.trim() }),
 			});
-			const wasReturned = [...pendingDocuments, ...reviewedDocuments].find((d) => d.id === documentId)?.returned ?? false;
-			setPendingDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned: !wasReturned, returnedAt: new Date().toISOString(), resubmittedAt: undefined } : d)));
-			setReviewedDocuments((current) => current.map((d) => (d.id === documentId ? { ...d, returned: !wasReturned, returnedAt: new Date().toISOString(), resubmittedAt: undefined } : d)));
 			toast.success(wasReturned ? `Devolución de ${fileName} cancelada` : `${fileName} devuelto al docente ${docenteName}`);
+			setRefreshTrigger((n) => n + 1);
 		} catch {
 			toast.error("No se pudo devolver el documento");
 		}
@@ -903,8 +897,8 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	};
 
 	// Agrupar documentos por batch_id para mostrar envíos múltiples juntos
-	const groupDocsByBatch = (docs: PendingDocument[]): PendingDocument[][] => {
-		const groups = new Map<string, PendingDocument[]>();
+	const groupDocsByBatch = (docs: DocumentItem[]): DocumentItem[][] => {
+		const groups = new Map<string, DocumentItem[]>();
 		for (const doc of docs) {
 			const key = doc.batch_id ?? `single-${doc.id}`;
 			if (!groups.has(key)) groups.set(key, []);
@@ -913,8 +907,8 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		return Array.from(groups.values());
 	};
 
-	const renderBatchGroup = (group: PendingDocument[]) => {
-		if (group.length === 1) return renderDocumentRow(group[0]);
+	const renderBatchGroup = (group: DocumentItem[], opts: { allowReturn?: boolean } = {}) => {
+		if (group.length === 1) return renderDocumentRow(group[0], opts);
 		return (
 			<div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
 				<div className="flex items-center gap-2 border-b border-emerald-200/50 bg-emerald-50/80 px-4 py-2.5 dark:border-emerald-800/30 dark:bg-emerald-950/20">
@@ -927,7 +921,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					</span>
 				</div>
 				<div className="divide-y divide-border/50 dark:divide-slate-800/50">
-					{group.map((doc) => renderDocumentRow(doc))}
+					{group.map((doc) => renderDocumentRow(doc, opts))}
 				</div>
 			</div>
 		);
@@ -984,7 +978,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
 							<CardContent>
-								{renderListState(<div className="space-y-3">{filteredAllDocuments.length === 0 ? <EmptyState text="No hay documentos en esta sección." /> : filteredAllDocuments.map(renderDocumentRow)}</div>)}
+								{renderListState(<div className="space-y-3">{filteredAllDocuments.length === 0 ? <EmptyState text="No hay documentos en esta sección." /> : groupDocsByBatch(filteredAllDocuments).map((group) => renderBatchGroup(group))}</div>)}
 							</CardContent>
 						</Card>
 					</TabsContent>
@@ -999,14 +993,14 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					<TabsContent value="devueltos" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
-							<CardContent>{renderListState(<div className="space-y-3">{filteredDevueltosDocuments.length === 0 ? <EmptyState text="No hay documentos devueltos." /> : filteredDevueltosDocuments.map((doc) => renderDocumentRow(doc))}</div>)}</CardContent>
+							<CardContent>{renderListState(<div className="space-y-3">{filteredDevueltosDocuments.length === 0 ? <EmptyState text="No hay documentos devueltos." /> : groupDocsByBatch(filteredDevueltosDocuments).map((group) => renderBatchGroup(group))}</div>)}</CardContent>
 						</Card>
 					</TabsContent>
 
 					<TabsContent value="reenviados" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
-							<CardContent>{renderListState(<div className="space-y-3">{filteredReenviadosDocuments.length === 0 ? <EmptyState text="No hay documentos reenviados." /> : groupDocsByBatch(filteredReenviadosDocuments as PendingDocument[]).map((group) => renderBatchGroup(group))}</div>)}</CardContent>
+							<CardContent>{renderListState(<div className="space-y-3">{filteredReenviadosDocuments.length === 0 ? <EmptyState text="No hay documentos reenviados." /> : groupDocsByBatch(filteredReenviadosDocuments).map((group) => renderBatchGroup(group))}</div>)}</CardContent>
 						</Card>
 					</TabsContent>
 
@@ -1024,7 +1018,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 														<p className="font-semibold text-sm text-foreground">{formatDateOnlyFromKey(date)}</p>
 														<p className="text-xs text-muted-foreground">{docs.length} documentos revisados</p>
 													</div>
-													<div className="space-y-3">{docs.map((doc) => renderDocumentRow(doc, { allowReturn: false }))}</div>
+													<div className="space-y-3">{groupDocsByBatch(docs).map((group) => renderBatchGroup(group, { allowReturn: false }))}</div>
 												</div>
 											))}
 										</div>
@@ -1036,7 +1030,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					<TabsContent value="hoy" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
-							<CardContent>{renderListState(<div className="space-y-3">{reviewedTodayDocuments.length === 0 ? <EmptyState text="No hay documentos revisados hoy." /> : reviewedTodayDocuments.map((doc) => renderDocumentRow(doc, { allowReturn: false }))}</div>)}</CardContent>
+							<CardContent>{renderListState(<div className="space-y-3">{reviewedTodayDocuments.length === 0 ? <EmptyState text="No hay documentos revisados hoy." /> : groupDocsByBatch(reviewedTodayDocuments).map((group) => renderBatchGroup(group, { allowReturn: false }))}</div>)}</CardContent>
 						</Card>
 					</TabsContent>
 				</Tabs>

@@ -12,7 +12,7 @@ import { getCalendarFileUrl } from "../../lib/calendar";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { DocumentHistoryCard } from "../../components/DocumentHistoryCard";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { planNuevoModelo, planNormal, carrieras, cuatrimestres, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
@@ -69,6 +69,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
   const [resubmitPreviewUrl, setResubmitPreviewUrl] = useState<string | null>(null);
   const [showResubmitPreview, setShowResubmitPreview] = useState(false);
   const [isResubmitting, setIsResubmitting] = useState(false);
+  const [cancelEditDialogOpen, setCancelEditDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!onDirtyChange) return;
@@ -214,8 +215,8 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
     }
 
     for (const file of newFiles) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error(`${file.name} excede el límite de 5 MB`);
+      if (file.size > 15 * 1024 * 1024) {
+        toast.error(`${file.name} excede el límite de 15 MB`);
         return;
       }
       if (file.type !== "application/pdf") {
@@ -255,7 +256,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
   };
 
   const replaceFile = (index: number, newFile: File) => {
-    if (newFile.size > 5 * 1024 * 1024) { toast.error(`${newFile.name} excede el límite de 5 MB`); return; }
+    if (newFile.size > 15 * 1024 * 1024) { toast.error(`${newFile.name} excede el límite de 15 MB`); return; }
     if (newFile.type !== "application/pdf") { toast.error(`${newFile.name} debe ser un archivo PDF`); return; }
     setFormData((current) => ({
       ...current,
@@ -579,6 +580,13 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
 
       await uploadMultipleFiles(formData.archivos, basePayload);
 
+      // Eliminar documentos pendientes anteriores del lote (re-edición)
+      if (editingBatchDocIds.length > 0) {
+        await Promise.allSettled(
+          editingBatchDocIds.map((id) => apiFetch(`/documents/${id}`, { method: "DELETE" }))
+        );
+      }
+
       toast.success(editingDocumentId ? "Planeación actualizada correctamente" : "Planeación enviada correctamente", {
         description: editingDocumentId ? "Tus documentos han sido actualizados." : "Tus documentos fueron enviados para revisión administrativa.",
       });
@@ -868,7 +876,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
                 {isMetadataOnlyEdit ? (
                   <p className="text-sm text-muted-foreground dark:text-slate-400">Los archivos de este envío no se pueden cambiar desde aquí.</p>
                 ) : (
-                  <p className="text-sm text-muted-foreground dark:text-slate-400">Adjunta documentos PDF de hasta 5 MB por archivo. Puedes cargar hasta tres archivos en total.</p>
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">Adjunta documentos PDF de hasta 15 MB por archivo. Puedes cargar hasta tres archivos en total.</p>
                 )}
 
                 {isMetadataOnlyEdit ? (
@@ -994,13 +1002,24 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
               </div>
             )}
             <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
-              <Button variant="outline" onClick={resetForm} disabled={isSubmitting || isLoadingPdf} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
-                Limpiar
-              </Button>
-              <Button 
-                variant="success" 
-                onClick={handleSubmit} 
-                disabled={!isValid || isSubmitting || !formAccess.canSubmit || isLoadingPdf} 
+              {(editingDocumentId !== null || editingBatchDocIds.length > 0) ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setCancelEditDialogOpen(true)}
+                  disabled={isSubmitting || isLoadingPdf}
+                  className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white"
+                >
+                  Cancelar
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={resetForm} disabled={isSubmitting || isLoadingPdf} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+                  Limpiar
+                </Button>
+              )}
+              <Button
+                variant="success"
+                onClick={handleSubmit}
+                disabled={!isValid || isSubmitting || !formAccess.canSubmit || isLoadingPdf}
                 className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white"
               >
                 {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar planeación" : "Enviar planeación"}
@@ -1036,7 +1055,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    if (f.size > 5 * 1024 * 1024) { toast.error("El archivo excede el límite de 5 MB"); return; }
+                    if (f.size > 15 * 1024 * 1024) { toast.error("El archivo excede el límite de 15 MB"); return; }
                     if (f.type !== "application/pdf") { toast.error("Selecciona un archivo PDF válido"); return; }
                     setResubmitFile(f);
                     e.target.value = "";
@@ -1100,6 +1119,33 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
               </Button>
               <Button variant="success" onClick={() => void handleResubmit()} disabled={!resubmitFile || isResubmitting} className="dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
                 {isResubmitting ? "Reenviando..." : "Reenviar documento"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Diálogo de confirmación para cancelar edición */}
+        <Dialog open={cancelEditDialogOpen} onOpenChange={setCancelEditDialogOpen}>
+          <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
+            <DialogHeader>
+              <DialogTitle className="dark:text-white">¿Cancelar edición?</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">
+                Se perderán los cambios que hayas hecho en el formulario. El documento seguirá tal como estaba.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-row justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setCancelEditDialogOpen(false)}
+                className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
+              >
+                Seguir editando
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => { setCancelEditDialogOpen(false); resetForm(); }}
+              >
+                Sí, cancelar
               </Button>
             </DialogFooter>
           </DialogContent>

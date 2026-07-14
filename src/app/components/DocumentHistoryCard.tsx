@@ -84,7 +84,7 @@ const devueltoDocForCard = (documents: Array<{ id: number; fileName: string; sta
   documents.find((d) => String(d.status ?? "").toLowerCase() === "devuelto");
 
 export function DocumentHistoryCard({
-  documents,
+  documents = [],
   plan,
   carrera,
   cuatrimestre,

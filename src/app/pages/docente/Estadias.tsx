@@ -12,7 +12,7 @@ import { getCalendarFileUrl } from "../../lib/calendar";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { DocumentHistoryCard } from "../../components/DocumentHistoryCard";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { carrieras, Plan } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
@@ -90,7 +90,7 @@ const initialFormData: EstadiaFormData = {
   docente: "",
 };
 
-export default function EstadiasPage({ deadlineInfo }: { deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null }) {
+export default function EstadiasPage({ deadlineInfo, onDirtyChange }: { deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null; onDirtyChange?: (dirty: boolean) => void }) {
   const { user } = useAuth();
   const [selectedType, setSelectedType] = useState<DocumentoEstadia | null>(null);
   const [formData, setFormData] = useState<EstadiaFormData>(initialFormData);
@@ -105,6 +105,16 @@ export default function EstadiasPage({ deadlineInfo }: { deadlineInfo?: { format
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [cancelEditDialogOpen, setCancelEditDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!onDirtyChange) return;
+    const hasEditing = editingDocumentId !== null;
+    const hasFormData = formData.plan !== "" || formData.carrera !== "" || formData.materia !== "" ||
+      formData.grupo !== "" || formData.archivos.length > 0 || formData.nota !== "";
+    onDirtyChange(hasEditing || hasFormData);
+  }, [onDirtyChange, editingDocumentId, formData]);
 
   const selectedConfig = useMemo(() => documentTypes.find((d) => d.id === selectedType) ?? null, [selectedType]);
 
@@ -193,6 +203,38 @@ export default function EstadiasPage({ deadlineInfo }: { deadlineInfo?: { format
     );
   }, [formData, user, groupsOptions]);
 
+  const groupedHistory = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    for (const doc of history) {
+      const key = doc.batch_id ?? `single-${doc.id}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(doc);
+    }
+    return Array.from(groups.values()).sort(
+      (a, b) => new Date(b[0].submitted_at).getTime() - new Date(a[0].submitted_at).getTime()
+    );
+  }, [history]);
+
+  const getBatchStatus = (group: any[]) => {
+    if (group.some((d) => String(d.status ?? "").toLowerCase() === "devuelto")) return "devuelto";
+    if (group.some((d) => String(d.status ?? "").toLowerCase() === "reenviado")) return "reenviado";
+    if (group.every((d) => String(d.status ?? "").toLowerCase() === "revisado")) return "revisado";
+    return "pendiente";
+  };
+
+  const handleDeleteDocuments = async (documentIds: number[]) => {
+    setIsDeleting(true);
+    try {
+      await Promise.all(documentIds.map((id) => apiFetch(`/documents/${id}`, { method: "DELETE" })));
+      setHistory((prev) => prev.filter((h) => !documentIds.includes(h.id)));
+      toast.success(documentIds.length > 1 ? "Documentos eliminados correctamente" : "Documento eliminado correctamente");
+    } catch {
+      toast.error("No fue posible eliminar el documento");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const processFiles = (fileList: FileList | File[]) => {
     const newFiles = Array.from(fileList);
     const totalFiles = formData.archivos.length + newFiles.length;
@@ -203,8 +245,8 @@ export default function EstadiasPage({ deadlineInfo }: { deadlineInfo?: { format
     }
 
     for (const file of newFiles) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error(`${file.name} excede el límite de 5 MB`);
+      if (file.size > 15 * 1024 * 1024) {
+        toast.error(`${file.name} excede el límite de 15 MB`);
         return;
       }
       if (file.type !== "application/pdf") {
@@ -483,24 +525,29 @@ export default function EstadiasPage({ deadlineInfo }: { deadlineInfo?: { format
                 <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
               </SheetHeader>
               <div className="mt-4 space-y-4">
-                {history.length > 0 ? (
+                {groupedHistory.length > 0 ? (
                   <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
                     <div className="grid gap-3 p-1">
-                      {history.map((h) => (
-                        <DocumentHistoryCard
-                          key={h.id}
-                          title=""
-                          fileName={getUploadedFileName(h)}
-                          carrera={h.carrera_label}
-                          subject={h.materia}
-                          grupo={h.group_code ? formatGroupCode(h.group_code) : undefined}
-                          submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          status={h.status}
-                          returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
-                          onView={() => openPreview(h)}
-                          onEdit={() => populateFormForEdit(h)}
-                        />
-                      ))}
+                      {groupedHistory.map((group) => {
+                        const main = group[0];
+                        return (
+                          <DocumentHistoryCard
+                            key={main.batch_id ?? main.id}
+                            documents={group.map((d: any) => ({ id: d.id, fileName: getUploadedFileName(d), status: d.status, returnedComment: d.returned_comment ?? undefined }))}
+                            carrera={main.carrera_label}
+                            subject={main.materia}
+                            grupo={main.group_code ? formatGroupCode(main.group_code) : undefined}
+                            nota={main.nota}
+                            submittedAt={new Date(main.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            status={getBatchStatus(group)}
+                            returnedComment={getBatchStatus(group) === "devuelto" ? (group.find((d: any) => String(d.status ?? "").toLowerCase() === "devuelto")?.returned_comment ?? undefined) : undefined}
+                            onViewDocument={(docId) => { const doc = group.find((d: any) => d.id === docId); if (doc) openPreview(doc); }}
+                            onEdit={() => populateFormForEdit(main)}
+                            onDelete={handleDeleteDocuments}
+                            isDeleting={isDeleting}
+                          />
+                        );
+                      })}
                     </div>
                   </ScrollArea>
                 ) : formData.archivos.length === 0 ? (
@@ -659,7 +706,7 @@ export default function EstadiasPage({ deadlineInfo }: { deadlineInfo?: { format
               <div className="space-y-2 md:col-span-2">
                 <Label className="dark:text-white">{selectedConfig.etiquetaCarga} *</Label>
                 <p className="text-sm text-muted-foreground dark:text-slate-400">
-                  Adjuntar el documento en formato PDF, con un límite de 5 MB por archivo. Hasta 3 archivos.
+                  Adjuntar el documento en formato PDF, con un límite de 15 MB por archivo. Hasta 3 archivos.
                 </p>
 
                 <input
@@ -760,9 +807,15 @@ export default function EstadiasPage({ deadlineInfo }: { deadlineInfo?: { format
 
             {/* Footer con acciones */}
             <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
-              <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
-                Limpiar
-              </Button>
+              {editingDocumentId !== null ? (
+                <Button variant="outline" onClick={() => setCancelEditDialogOpen(true)} disabled={isSubmitting} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+                  Cancelar
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+                  Limpiar
+                </Button>
+              )}
               <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
                 {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar documento" : "Enviar"}
               </Button>
@@ -794,6 +847,32 @@ export default function EstadiasPage({ deadlineInfo }: { deadlineInfo?: { format
               </object>
             ) : null}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cancelEditDialogOpen} onOpenChange={setCancelEditDialogOpen}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
+          <DialogHeader>
+            <DialogTitle className="dark:text-white">¿Cancelar edición?</DialogTitle>
+            <DialogDescription className="dark:text-slate-400">
+              Se perderán los cambios que hayas hecho en el formulario. El documento seguirá tal como estaba.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setCancelEditDialogOpen(false)}
+              className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
+            >
+              Seguir editando
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => { setCancelEditDialogOpen(false); resetForm(); }}
+            >
+              Sí, cancelar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
