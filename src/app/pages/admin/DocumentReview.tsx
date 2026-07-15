@@ -432,7 +432,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState<string | null>(null);
-	const [pendingAction, setPendingAction] = useState<{ type: "review" | "send" | "return"; document: DocumentItem } | null>(null);
+	const [pendingAction, setPendingAction] = useState<{ type: "review" | "send" | "return" | "cancel-return"; document: DocumentItem } | null>(null);
 	const [returnComment, setReturnComment] = useState("");
 	const [noteDialog, setNoteDialog] = useState<{ nota: string; docente: string } | null>(null);
 
@@ -773,6 +773,12 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			return;
 		}
 
+		if (type === "cancel-return") {
+			setPendingAction(null);
+			void handleReturnDocument(document.id, "");
+			return;
+		}
+
 		const trimmedComment = returnComment.trim();
 		setPendingAction(null);
 		setReturnComment("");
@@ -803,6 +809,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 			const recipientName = tutorName ?? doc.docente ?? "";
 			return `Vas a compartirle el documento ${doc.documento} al ${recipientRole} ${recipientName}`;
 		}
+		if (pendingAction.type === "cancel-return") return `Vas a cancelar la devolución de: ${pendingAction.document.documento}`;
 		return `Vas a devolver: ${pendingAction.document.documento}`;
 	})();
 
@@ -890,7 +897,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 
 					{doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
 					<ResponsiveActionButton variant="ghost" size="sm" label="Enviar" title={`Enviar a mensajes ${doc.docente}`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} icon={<MessageSquare className="h-4 w-4" />} />
-					{allowReturn && (doc.returned ? <Tooltip><TooltipTrigger asChild><ResponsiveActionButton variant="outline" size="sm" label="Cancelar" title="Cancelar devolución" className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} /></TooltipTrigger><TooltipContent>Cancelar devolución</TooltipContent></Tooltip> : <Tooltip><TooltipTrigger asChild><ResponsiveActionButton variant="destructive" size="sm" label="Devolver" title="Devolver documento" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} /></TooltipTrigger><TooltipContent>Devolver</TooltipContent></Tooltip>)}
+					{allowReturn && (doc.returned || !isReviewed) && (doc.returned ? <Tooltip><TooltipTrigger asChild><ResponsiveActionButton variant="outline" size="sm" label="Cancelar" title="Cancelar devolución" className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "cancel-return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} /></TooltipTrigger><TooltipContent>Cancelar devolución</TooltipContent></Tooltip> : <Tooltip><TooltipTrigger asChild><ResponsiveActionButton variant="destructive" size="sm" label="Devolver" title="Devolver documento" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} /></TooltipTrigger><TooltipContent>Devolver</TooltipContent></Tooltip>)}
 				</div>
 			</div>
 		);

@@ -21,7 +21,7 @@ import {
 // --- Importar las imágenes desde assets ---
 // Imágenes para desktop
 import banner1 from "../../../assets/123.png";
-import banner2 from "../../../assets/calar.png";
+import banner2 from "../../../assets/Carrusel6.jpg";
 import banner3 from "../../../assets/carrusel3.png";
 import banner4 from "../../../assets/carrusel4.png";
 import banner5 from "../../../assets/carrusel5.png";

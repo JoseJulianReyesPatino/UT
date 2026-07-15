@@ -18,7 +18,7 @@ import { fetchDocumentBlob, getDocumentDisplayFileName } from "../../lib/documen
 import { carrieras } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
 
-type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
+type ReviewSection = "all" | "pendientes" | "devueltos" | "reenviados" | "revisados" | "hoy";
 
 type TutorDocument = {
   id: number;
@@ -297,6 +297,8 @@ export default function Tutores() {
   const filteredPending = pendingDocuments.filter(matchesFilters);
   const filteredReviewed = reviewedDocuments.filter((d) => d.status === 'revisado').filter(matchesFilters);
   const filteredAll = allDocuments.filter(matchesFilters);
+  const filteredDevueltos = allDocuments.filter((d) => d.status === 'devuelto').filter(matchesFilters);
+  const filteredReenviados = allDocuments.filter((d) => d.status === 'reenviado').filter(matchesFilters);
   const reviewedToday = filteredReviewed.filter((doc) => doc.reviewedAt ? toLocalDateKey(doc.reviewedAt) === todayKey : false);
 
   const getDocumentStatusLabel = (doc: TutorDocumentItem) => {
@@ -535,12 +537,14 @@ export default function Tutores() {
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="pendientes">Pendientes</SelectItem>
+                <SelectItem value="devueltos">Devueltos</SelectItem>
+                <SelectItem value="reenviados">Reenviados</SelectItem>
                 <SelectItem value="revisados">Revisados</SelectItem>
                 <SelectItem value="hoy">Revisados hoy</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
+          <TabsList className="hidden sm:grid w-full grid-cols-6 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
             <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
               Todos
               <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countAll}</Badge>
@@ -548,6 +552,14 @@ export default function Tutores() {
             <TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
               Pendientes
               <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countPending}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="devueltos" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+              Devueltos
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredDevueltos.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="reenviados" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+              Reenviados
+              <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredReenviados.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
               Revisados
@@ -785,6 +797,174 @@ export default function Tutores() {
                     </div>
                   </div>
                 )})}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="devueltos" className="space-y-4 mt-6">
+          <Card className={sectionCardClassName}>
+            <CardHeader className="pb-4">
+              {filtersBar}
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {isLoading ? <DocumentCardSkeleton /> : filteredDevueltos.length === 0 ? (
+                  <EmptyState text={emptyStateLegend} />
+                ) : filteredDevueltos.map((doc) => (
+                  <div key={doc.id} className={getDocumentRowClassName(true)}>
+                    <button
+                      type="button"
+                      aria-label={`Abrir vista previa de ${doc.documento}`}
+                      onClick={() => setPreviewDocument(doc)}
+                      className={previewCardOverlayClassName}
+                    />
+                    <div className="relative z-20 flex items-start gap-3 flex-1 min-w-0 pointer-events-none">
+                      <div className="relative z-20 h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 pointer-events-none">
+                        <FileText className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
+                        <p className="break-words text-sm font-medium leading-snug sm:text-base">{extractPreviewFileName(doc.documento)}</p>
+                        <p className="mt-1 text-xs leading-snug text-muted-foreground sm:text-sm">{doc.tutor}</p>
+                        {doc.apartado && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge variant="outline" className="text-xs">{getTutoriasApartadoLabel(doc.apartado)}</Badge>
+                          </div>
+                        )}
+                        {doc.returnedAt && (
+                          <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+                      <Badge variant="destructive" className="inline-flex items-center gap-1 rounded-full px-2.5 py-1">
+                        <Undo2 className="h-3 w-3" />Devuelto
+                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver PDF</TooltipContent>
+                      </Tooltip>
+                      {doc.nota && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del tutor">
+                              <MessageCircleMore className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Nota del tutor</TooltipContent>
+                        </Tooltip>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.tutor}`}>
+                            <MessageSquare className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Enviar</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="outline" size="icon" className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }} aria-label="Cancelar devolución">
+                            <Undo2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Cancelar devolución</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reenviados" className="space-y-4 mt-6">
+          <Card className={sectionCardClassName}>
+            <CardHeader className="pb-4">
+              {filtersBar}
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {isLoading ? <DocumentCardSkeleton /> : filteredReenviados.length === 0 ? (
+                  <EmptyState text={emptyStateLegend} />
+                ) : filteredReenviados.map((doc) => (
+                  <div key={doc.id} className={getDocumentRowClassName(false)}>
+                    <button
+                      type="button"
+                      aria-label={`Abrir vista previa de ${doc.documento}`}
+                      onClick={() => setPreviewDocument(doc)}
+                      className={previewCardOverlayClassName}
+                    />
+                    <div className="relative z-20 flex items-start gap-3 flex-1 min-w-0 pointer-events-none">
+                      <div className="relative z-20 h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 pointer-events-none">
+                        <FileText className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div className="relative z-20 flex-1 min-w-0 pointer-events-none">
+                        <p className="break-words text-sm font-medium leading-snug sm:text-base">{extractPreviewFileName(doc.documento)}</p>
+                        <p className="mt-1 text-xs leading-snug text-muted-foreground sm:text-sm">{doc.tutor}</p>
+                        {doc.apartado && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge variant="outline" className="text-xs">{getTutoriasApartadoLabel(doc.apartado)}</Badge>
+                          </div>
+                        )}
+                        {doc.fecha && (
+                          <p className="mt-2 text-[11px] leading-snug text-muted-foreground sm:text-xs">Reenviado: {formatSentFecha(doc.fecha)} {doc.fecha && (doc.fecha.includes('T') || doc.fecha.includes(' ')) ? <span className="ml-2 text-[11px] text-muted-foreground sm:text-xs">{formatTime12(doc.fecha)}</span> : null}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+                      <Badge variant="secondary" className="inline-flex items-center gap-1 rounded-full px-2.5 py-1">
+                        <RefreshCw className="h-3 w-3" />Reenviado
+                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver PDF</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setReviewConfirmation(doc); }} aria-label="Revisar documento">
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Revisar</TooltipContent>
+                      </Tooltip>
+                      {doc.nota && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota del tutor">
+                              <MessageCircleMore className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Nota del tutor</TooltipContent>
+                        </Tooltip>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }} aria-label={`Enviar a mensajes ${doc.tutor}`}>
+                            <MessageSquare className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Enviar</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="destructive" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }} aria-label="Devolver documento">
+                            <Undo2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Devolver</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

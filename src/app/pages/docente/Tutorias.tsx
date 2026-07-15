@@ -16,6 +16,8 @@ import { getCalendarFileUrl } from "../../lib/calendar";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
+import { FormClosedState } from "../../components/FormClosedState";
+import { preloadForms } from "../../components/FormAccessGuard";
 
 type DocumentoTutorias =
   | "carga-academica"
@@ -23,6 +25,14 @@ type DocumentoTutorias =
   | "concentrado-asesorias"
   | "acta-asistencia-grupal"
   | "ficha-tecnica";
+
+const TUTORIAS_FORM_ID_MAP: Record<DocumentoTutorias, string> = {
+  "carga-academica": "carga-academica",
+  "reporte-bajas": "reporte-bajas",
+  "concentrado-asesorias": "concentrado-asesorias",
+  "acta-asistencia-grupal": "acta-asistencia-grupal",
+  "ficha-tecnica": "ficha-tecnica",
+};
 
 interface DocumentoConfig {
   id: DocumentoTutorias;
@@ -104,6 +114,8 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
   const { initialType = null, onNavigateHome, deadlineInfo } = props;
   const { user } = useAuth();
   const [selectedType, setSelectedType] = useState<DocumentoTutorias | null>(initialType);
+  const [typeAccessClosed, setTypeAccessClosed] = useState(false);
+  const [typeDeadlineInfo, setTypeDeadlineInfo] = useState<{ formattedDeadline: string; isUrgent: boolean } | null>(null);
   const [formData, setFormData] = useState<TutoriasFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
@@ -119,6 +131,38 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
     () => documentTypes.find((type) => type.id === selectedType) ?? null,
     [selectedType]
   );
+
+  // Pre-cargar caché de formularios al montar para que la verificación por tipo sea instantánea
+  useEffect(() => { if (initialType === null) preloadForms().catch(() => {}); }, []);
+
+  // Verificación de acceso por tipo (solo cuando no hay initialType, es decir, selector de tipos)
+  useEffect(() => {
+    if (initialType !== null || !selectedType || !user) {
+      if (!initialType) { setTypeAccessClosed(false); setTypeDeadlineInfo(null); }
+      return;
+    }
+    const formIdStr = TUTORIAS_FORM_ID_MAP[selectedType];
+    preloadForms().then((forms) => {
+      const match = forms.find((f: any) => String(f.form_code).replace(/_/g, "-") === formIdStr);
+      if (!match) { setTypeAccessClosed(false); setTypeDeadlineInfo(null); return; }
+      const roles: string[] = match.access_roles ?? [];
+      const dueAt: string | null = match.due_at ?? null;
+      const roleOk = (roles.includes("docente") && (user.role === "docente" || user.roles?.includes("docente"))) ||
+                     (roles.includes("tutor") && (user.role === "tutor" || user.roles?.includes("tutor")));
+      const expired = Boolean(dueAt && new Date(dueAt).getTime() < Date.now());
+      setTypeAccessClosed(!roleOk || expired);
+      if (roleOk && !expired && dueAt) {
+        const deadline = new Date(dueAt);
+        const msLeft = deadline.getTime() - Date.now();
+        setTypeDeadlineInfo({
+          formattedDeadline: deadline.toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" }),
+          isUrgent: msLeft / (1000 * 60 * 60) < 24,
+        });
+      } else {
+        setTypeDeadlineInfo(null);
+      }
+    }).catch(() => { setTypeAccessClosed(false); setTypeDeadlineInfo(null); });
+  }, [selectedType, user, initialType]);
 
   // Setear docente automático al cargar el usuario
   useEffect(() => {
@@ -368,15 +412,18 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
     <div className="max-w-4xl mx-auto space-y-1">
       {/* Fila superior: fecha límite + acciones */}
       <div className="flex flex-wrap items-center justify-end gap-3">
-        {deadlineInfo && (
-          <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
-            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-            <span>
-              Cierra el <strong>{deadlineInfo.formattedDeadline}</strong>
-              {deadlineInfo.isUrgent && " · Tiempo limitado"}
-            </span>
-          </div>
-        )}
+        {(initialType ? deadlineInfo : typeDeadlineInfo) && (() => {
+          const di = initialType ? deadlineInfo : typeDeadlineInfo;
+          return (
+            <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+              <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                Cierra el <strong>{di!.formattedDeadline}</strong>
+                {di!.isUrgent && " · Tiempo limitado"}
+              </span>
+            </div>
+          );
+        })()}
         <Button
           variant="outline"
           size="sm"
@@ -457,7 +504,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
         <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
           <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
             <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Selecciona una opción para continuar</p>
-            
+
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
               {documentTypes.map((type) => (
                 <Button
@@ -476,6 +523,22 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
             </div>
           </CardContent>
         </Card>
+      ) : typeAccessClosed && initialType === null ? (
+        <div className="space-y-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setSelectedType(null); setEditingDocumentId(null); setTypeAccessClosed(false); }}
+            className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Cambiar tipo
+          </Button>
+          <FormClosedState
+            title={selectedConfig.boton}
+            message={`El formulario de ${selectedConfig.boton.toLowerCase()} está cerrado. Si necesitas acceso, solicita al administrador que actualice la fecha de vencimiento o los roles permitidos.`}
+          />
+        </div>
       ) : (
         <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
           <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">

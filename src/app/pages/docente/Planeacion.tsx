@@ -777,12 +777,12 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
                       onValueChange={(value) => setFormData((current) => ({ ...current, carrera: value, cuatrimestre: "", materia: "", parcial: "", grupo: "" }))} 
                       disabled={!formData.plan}
                     >
-                      <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                      <SelectTrigger className="w-full min-w-0 rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
                         <SelectValue placeholder="Selecciona la carrera" />
                       </SelectTrigger>
-                      <SelectContent className="dark:border-slate-700 dark:bg-slate-900" position="popper" avoidCollisions={false}>
+                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-1rem)] dark:border-slate-700 dark:bg-slate-900" position="popper" avoidCollisions={false}>
                         {carrerasDisponibles.map((carrera) => (
-                          <SelectItem key={carrera.codigo} value={carrera.codigo} className="dark:text-white dark:hover:bg-slate-800">{carrera.nombre}</SelectItem>
+                          <SelectItem key={carrera.codigo} value={carrera.codigo} className="max-w-full truncate dark:text-white dark:hover:bg-slate-800">{carrera.nombre}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

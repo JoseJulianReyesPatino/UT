@@ -671,8 +671,8 @@ export function DocenteManagement() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
+        <CardContent className="overflow-x-hidden">
+          <div className="min-w-0 space-y-3">
             {usersListContent}
           </div>
         </CardContent>
@@ -797,7 +797,7 @@ export function DocenteManagement() {
           <DialogHeader>
             <DialogTitle>Restablecer Contraseña</DialogTitle>
             <DialogDescription>
-              Se restablecerá la contraseña del usuario en la API.
+              Se restablecerá la contraseña del usuario.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">

@@ -52,6 +52,17 @@ import {
 import PlaneacionSuperiorImg from "../assets/superior_form.png";
 import Instrumento30SuperiorImg from "../assets/superior_form.png";
 import Instrumento40SuperiorImg from "../assets/superior_form.png";
+import Instrumento60SuperiorImg from "../assets/superior_form.png";
+import Instrumento70SuperiorImg from "../assets/superior_form.png";
+import RemedialSuperiorImg from "../assets/superior_form.png";
+import ListaConcentradaSuperiorImg from "../assets/superior_form.png";
+import PortafolioDigitalSuperiorImg from "../assets/superior_form.png";
+import AsesoriaSuperiorImg from "../assets/superior_form.png";
+import EstadiasSuperiorImg from "../assets/superior_form.png";
+import ActaFinalSuperiorImg from "../assets/superior_form.png";
+import TutoriasSuperiorImg from "../assets/superior_form.png";
+
+
 
 function AppContent() {
   const { isAuthenticated, isReady, user, notice, logout } = useAuth();
@@ -511,9 +522,9 @@ function AppContent() {
         case "acta-final":
           return wrapForm("acta-final", "Acta Final", <ActaFinalPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "estadias":
-          return wrapForm("estadias", "Estadías", <EstadiasPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
+          return <EstadiasPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
         case "tutorias":
-          return wrapForm("tutorias", "Tutorías", <TutoriasPage />);
+          return <TutoriasPage />;
         case "tutorias-carga-academica":
           return wrapForm("carga-academica", "Carga Académica", <TutoriasPage initialType="carga-academica" onNavigateHome={() => setCurrentView("tutorias")} />);
         case "tutorias-reporte-bajas":
@@ -614,6 +625,87 @@ function AppContent() {
                   style={{ top: '-0.5rem', right: '0.1rem' }}
                 />
            )}
+
+                {currentView === "instrumento-60-nuevo" && (
+                <img
+                  src={Instrumento60SuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
+           )}
+
+            {currentView === "instrumento-70-normal" && (
+                <img
+                  src={Instrumento70SuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
+           )}
+
+            {currentView === "remedial" && (
+                <img
+                  src={RemedialSuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
+              )}
+
+               {currentView === "lista-concentrada" && (
+                <img
+                  src={ListaConcentradaSuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
+              )}
+
+               {currentView === "asesoria" && (
+                <img
+                  src={AsesoriaSuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
+              )}
+
+               {currentView === "portafolio" && (
+                <img
+                  src={PortafolioDigitalSuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
+              )}
+
+              {currentView === "estadias" && (
+                <img
+                  src={EstadiasSuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
+              )}
+
+              {currentView === "acta-final" && (
+                <img
+                  src={ActaFinalSuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
+              )}
+
+               {currentView === "tutorias" && (
+                <img
+                  src={TutoriasSuperiorImg}
+                  alt="Decoración superior"
+                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
+                  style={{ top: '-0.5rem', right: '0.1rem' }}
+                />
+              )}
 
               <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur md:hidden">
                 <div className="flex items-center justify-between px-4 py-3">

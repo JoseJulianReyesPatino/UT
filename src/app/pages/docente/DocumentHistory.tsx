@@ -4,9 +4,10 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { FileText, Search, Download, Eye, Filter, Loader2 } from "lucide-react";
+import { FileText, Search, Download, Eye, Filter, Loader2, ChevronDown, Check, CheckCircle2, Clock2, Undo2, RefreshCw, StickyNote } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import apiFetch from "../../lib/api";
 import { fetchDocumentBlob, getDocumentDownloadUrl, getDocumentFileUrl, getDocumentDisplayFileName } from "../../lib/documents";
 
@@ -22,8 +23,9 @@ type ApiDocument = {
   plan: string;
   fecha: string | null;
   hora: string | null;
-  status: "pendiente" | "revisado" | "devuelto";
+  status: "pendiente" | "revisado" | "devuelto" | "reenviado";
   observaciones?: string | null;
+  batch_id?: string | null;
   fileUrl?: string | null;
   downloadUrl?: string | null;
   has_file?: boolean;
@@ -62,6 +64,7 @@ const normalizeStatusFilter = (value: string) => {
   if (value === "aprobado") return "revisado";
   if (value === "revision") return "pendiente";
   if (value === "rechazado") return "devuelto";
+  if (value === "resubmitted" || value === "resent") return "reenviado";
   return value;
 };
 
@@ -83,8 +86,10 @@ const formatParcialLabel = (value?: string | null): string => {
 
 const normalizeTipoFilter = (value: string) => {
   const legacyMap: Record<string, string> = {
-    instrumento3040: "instrumento-3040",
-    instrumento6070: "instrumento-6070",
+    instrumento3040: "instrumento-30-normal",
+    "instrumento-3040": "instrumento-30-normal",
+    instrumento6070: "instrumento-60-nuevo",
+    "instrumento-6070": "instrumento-60-nuevo",
     lista: "lista-concentrada",
     portafolio: "portafolio-digital",
     acta: "acta-final",
@@ -96,8 +101,10 @@ const normalizeTipoFilter = (value: string) => {
 const getTipoLabel = (tipo: string): string => {
   const tipoMap: Record<string, string> = {
     "planeacion": "Planeación",
-    "instrumento-3040": "Instrumento 30/40",
-    "instrumento-6070": "Instrumento 60/70",
+    "instrumento-30-normal": "Instrumento 30%",
+    "instrumento-40-nuevo": "Instrumento 40%",
+    "instrumento-60-nuevo": "Instrumento 60%",
+    "instrumento-70-normal": "Instrumento 70%",
     "lista-concentrada": "Lista Concentrada",
     "asesoria": "Asesoría",
     "portafolio-digital": "Portafolio Digital",
@@ -173,20 +180,27 @@ export function DocumentHistory() {
     { value: "revisado", label: "Revisados" },
     { value: "pendiente", label: "Pendientes" },
     { value: "devuelto", label: "Devueltos" },
+    { value: "reenviado", label: "Reenviados" },
   ];
   
+  const [filterTypeOpen, setFilterTypeOpen] = useState(false);
+  const [filterTypeSearch, setFilterTypeSearch] = useState("");
+
   const [previewDocument, setPreviewDocument] = useState<ApiDocument | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [loadingPdfId, setLoadingPdfId] = useState<number | null>(null);
+  const [motivoDialog, setMotivoDialog] = useState<{ nombre: string; obs: string } | null>(null);
 
   const typeOptions = useMemo(
     () => [
       { value: "all", label: "Todos los apartados" },
       { value: "planeacion", label: "Planeación" },
-      { value: "instrumento-3040", label: "Instrumento 30/40%" },
-      { value: "instrumento-6070", label: "Instrumento 60/70%" },
+      { value: "instrumento-30-normal", label: "Instrumento 30%" },
+      { value: "instrumento-40-nuevo", label: "Instrumento 40%" },
+      { value: "instrumento-60-nuevo", label: "Instrumento 60%" },
+      { value: "instrumento-70-normal", label: "Instrumento 70%" },
       { value: "lista-concentrada", label: "Lista Concentrada" },
       { value: "asesoria", label: "Asesoría" },
       { value: "portafolio-digital", label: "Portafolio Digital" },
@@ -249,12 +263,10 @@ export function DocumentHistory() {
 
     const normalizedTipo = (doc.tipo || "").toLowerCase();
 
-    if (normalizedTipo === "instrumento-30-normal" || normalizedTipo === "instrumento-40-nuevo") {
-      return "instrumento-3040";
-    }
-    if (normalizedTipo === "instrumento-60-nuevo" || normalizedTipo === "instrumento-70-normal") {
-      return "instrumento-6070";
-    }
+    if (normalizedTipo === "instrumento-30-normal") return "instrumento-30-normal";
+    if (normalizedTipo === "instrumento-40-nuevo") return "instrumento-40-nuevo";
+    if (normalizedTipo === "instrumento-60-nuevo") return "instrumento-60-nuevo";
+    if (normalizedTipo === "instrumento-70-normal") return "instrumento-70-normal";
 
     if (normalizedTipo && normalizedTipo !== "documento" && normalizedTipo !== "undefined") {
       return normalizedTipo;
@@ -262,8 +274,10 @@ export function DocumentHistory() {
 
     const nombre = doc.nombre.toLowerCase();
     if (nombre.includes("planeación") || nombre.includes("planeacion")) return "planeacion";
-    if (nombre.includes("instrumento 30") || nombre.includes("instrumento 40")) return "instrumento-3040";
-    if (nombre.includes("instrumento 60") || nombre.includes("instrumento 70")) return "instrumento-6070";
+    if (nombre.includes("instrumento 30")) return "instrumento-30-normal";
+    if (nombre.includes("instrumento 40")) return "instrumento-40-nuevo";
+    if (nombre.includes("instrumento 60")) return "instrumento-60-nuevo";
+    if (nombre.includes("instrumento 70")) return "instrumento-70-normal";
     if (nombre.includes("lista")) return "lista-concentrada";
     if (nombre.includes("asesoría")) return "asesoria";
     if (nombre.includes("portafolio")) return "portafolio-digital";
@@ -383,7 +397,8 @@ export function DocumentHistory() {
             fecha: doc.submitted_at,
             hora: doc.submitted_at ? new Date(doc.submitted_at).toLocaleTimeString() : null,
             status: doc.status,
-            observaciones: null,
+            observaciones: doc.returned_comment || doc.observations || doc.observaciones || doc.notes || doc.feedback || null,
+            batch_id: doc.batch_id || null,
             fileUrl: doc.file_path ? getDocumentFileUrl(doc.id) : null,
             downloadUrl: doc.file_path ? getDocumentDownloadUrl(doc.id) : null,
             form_id: doc.form_id,
@@ -445,6 +460,28 @@ export function DocumentHistory() {
     return matchesSearch && matchesStatus && matchesTipo;
   });
 
+  const getGroupStatus = (docs: ApiDocument[]): ApiDocument["status"] => {
+    const statuses = docs.map(d => d.status);
+    if (statuses.includes("devuelto")) return "devuelto";
+    if (statuses.includes("reenviado")) return "reenviado";
+    if (statuses.every(s => s === "revisado")) return "revisado";
+    return "pendiente";
+  };
+
+  const filteredGroups = useMemo(() => {
+    const groups = new Map<string, ApiDocument[]>();
+    for (const doc of filteredDocuments) {
+      const key = doc.batch_id ? String(doc.batch_id) : `single-${doc.id}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(doc);
+    }
+    return Array.from(groups.values()).sort((a, b) => {
+      const dateA = a[0]?.fecha ? new Date(a[0].fecha).getTime() : 0;
+      const dateB = b[0]?.fecha ? new Date(b[0].fecha).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [filteredDocuments]);
+
   useEffect(() => {
     try {
       localStorage.setItem("docs-filter-status", filterStatus);
@@ -479,7 +516,7 @@ export function DocumentHistory() {
               <div>
                 <CardTitle className="dark:text-white">Mis Documentos</CardTitle>
                 <CardDescription className="dark:text-slate-400">
-                  {filteredDocuments.length} documentos encontrados
+                  {filteredDocuments.length} documento{filteredDocuments.length !== 1 ? "s" : ""} en {filteredGroups.length} envío{filteredGroups.length !== 1 ? "s" : ""}
                 </CardDescription>
               </div>
               <div className="grid w-full gap-2 sm:w-auto sm:flex sm:flex-row sm:items-center sm:gap-3">
@@ -492,18 +529,46 @@ export function DocumentHistory() {
                     className="pl-9 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                   />
                 </div>
-                <Select value={filterTipo} onValueChange={setFilterTipo}>
-                  <SelectTrigger className="w-full min-w-[190px] sm:w-[190px] whitespace-nowrap rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white">
-                    <SelectValue placeholder="Tipo" className="whitespace-nowrap" />
-                  </SelectTrigger>
-                  <SelectContent className="dark:bg-slate-900 dark:border-slate-700">
-                    {typeOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value} className="dark:text-white dark:hover:bg-slate-800">
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={filterTypeOpen} onOpenChange={(o) => { setFilterTypeOpen(o); if (!o) setFilterTypeSearch(""); }}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full min-w-[190px] sm:w-[190px] rounded-2xl justify-between font-normal dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                    >
+                      <span className="truncate">{typeOptions.find(o => o.value === filterTipo)?.label ?? "Todos los apartados"}</span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-56 p-0 dark:bg-slate-900 dark:border-slate-700">
+                    <div className="flex items-center border-b px-3 dark:border-slate-700">
+                      <Search className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <input
+                        placeholder="Buscar apartado..."
+                        value={filterTypeSearch}
+                        onChange={(e) => setFilterTypeSearch(e.target.value)}
+                        className="flex h-9 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground dark:text-white dark:placeholder:text-slate-400"
+                      />
+                    </div>
+                    <div className="max-h-64 overflow-y-auto py-1">
+                      {typeOptions
+                        .filter(o => o.label.toLowerCase().includes(filterTypeSearch.toLowerCase()))
+                        .map(option => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => { setFilterTipo(option.value); setFilterTypeOpen(false); setFilterTypeSearch(""); }}
+                            className="relative flex w-full cursor-pointer select-none items-center gap-2 px-3 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground dark:hover:bg-slate-800 dark:text-white"
+                          >
+                            <Check className={`h-4 w-4 shrink-0 ${filterTipo === option.value ? "opacity-100 text-emerald-500" : "opacity-0"}`} />
+                            {option.label}
+                          </button>
+                        ))}
+                      {typeOptions.filter(o => o.label.toLowerCase().includes(filterTypeSearch.toLowerCase())).length === 0 && (
+                        <p className="py-4 text-center text-sm text-muted-foreground dark:text-slate-400">Sin resultados.</p>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
                   <SelectTrigger className="w-full min-w-[190px] sm:w-[190px] [&>svg:last-child]:hidden rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white">
                     <span className="flex min-w-0 items-center gap-2">
@@ -532,30 +597,224 @@ export function DocumentHistory() {
                 </div>
               )}
 
-              {!isLoading && !loadError && filteredDocuments.length === 0 && (
+              {!isLoading && !loadError && filteredGroups.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground dark:border-slate-700 dark:text-slate-400">
                   No hay documentos que coincidan con los filtros actuales.
                 </div>
               )}
 
-              {!isLoading && !loadError && filteredDocuments.map((doc) => {
-                const isTutoria = isTutoriaDocument(doc);
-                const isEstadias = isEstadiasDocument(doc);
-                const docTipo = getDocumentTipoForFilter(doc);
+              {!isLoading && !loadError && filteredGroups.map((groupDocs) => {
+                const rep = groupDocs[0];
+                const isMulti = groupDocs.length > 1;
+                const isTutoria = isTutoriaDocument(rep);
+                const isEstadias = isEstadiasDocument(rep);
+                const docTipo = getDocumentTipoForFilter(rep);
                 const tipoDisplayLabel = getTipoLabel(docTipo);
-                
-                const fileNameUpper = getFileNameOnly(doc.nombre).toUpperCase().endsWith(".PDF")
-                  ? getFileNameOnly(doc.nombre).toUpperCase()
-                  : `${getFileNameOnly(doc.nombre).toUpperCase()}.PDF`;
-                const hasMateria = doc.materia && doc.materia !== "Sin materia";
-                const hasGrupo = doc.grupo && doc.grupo !== "Grupo ?" && doc.grupo !== "?";
-                const hasCarrera = Boolean(doc.carrera && doc.carrera.trim());
-                const planLabel = formatPlanLabel(doc.plan);
-                const parcialLabel = formatParcialLabel(doc.parcial);
+                const hasMateria = rep.materia && rep.materia !== "Sin materia";
+                const hasGrupo = rep.grupo && rep.grupo !== "Grupo ?" && rep.grupo !== "?";
+                const hasCarrera = Boolean(rep.carrera && rep.carrera.trim());
+                const planLabel = formatPlanLabel(rep.plan);
+                const parcialLabel = formatParcialLabel(rep.parcial);
+                const groupStatus = getGroupStatus(groupDocs);
+                const groupObs = groupDocs.find(d => d.status === "devuelto" || d.status === "reenviado")?.observaciones || groupDocs[0]?.observaciones || null;
+                const batchKey = rep.batch_id ? String(rep.batch_id) : `single-${rep.id}`;
+                const dateStr = rep.fecha
+                  ? `${new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(rep.fecha))}${rep.hora ? ` ${rep.hora}` : ""}`
+                  : "Sin fecha";
+
+                const statusBadge = (
+                  <Badge
+                    variant={
+                      groupStatus === "revisado" ? "success"
+                      : groupStatus === "devuelto" ? "destructive"
+                      : groupStatus === "reenviado" ? "secondary"
+                      : "warning"
+                    }
+                    className="rounded-full inline-flex items-center gap-1 px-2.5 py-1 shrink-0"
+                  >
+                    {groupStatus === "revisado" ? (
+                      <><CheckCircle2 className="h-3 w-3" />Revisado</>
+                    ) : groupStatus === "devuelto" ? (
+                      <><Undo2 className="h-3 w-3" />Devuelto</>
+                    ) : groupStatus === "reenviado" ? (
+                      <><RefreshCw className="h-3 w-3" />Reenviado</>
+                    ) : (
+                      <><Clock2 className="h-3 w-3" />Pendiente</>
+                    )}
+                  </Badge>
+                );
+
+                const motivoBtn = groupObs && (groupStatus === "devuelto" || groupStatus === "reenviado") ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-xl dark:hover:bg-slate-800"
+                        onClick={() => setMotivoDialog({ nombre: rep.nombre, obs: groupObs })}
+                      >
+                        <StickyNote className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Ver motivo de devolución</TooltipContent>
+                  </Tooltip>
+                ) : null;
+
+                const metadataChips = (
+                  <div className="flex flex-wrap gap-2">
+                    {hasCarrera && (
+                      <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
+                        {rep.carrera}
+                      </Badge>
+                    )}
+                    {planLabel && (
+                      <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
+                        {planLabel}
+                      </Badge>
+                    )}
+                    {!isTutoria && !isEstadias && hasMateria && (
+                      <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
+                        {rep.materia}
+                      </Badge>
+                    )}
+                    {hasGrupo && (
+                      <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
+                        {`Grupo ${rep.grupo}`}
+                      </Badge>
+                    )}
+                    {!isTutoria && !isEstadias && parcialLabel && (
+                      <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
+                        {parcialLabel}
+                      </Badge>
+                    )}
+                  </div>
+                );
+
+                if (isMulti) {
+                  return (
+                    <div
+                      key={batchKey}
+                      className="rounded-2xl border border-border/70 p-4 transition-colors hover:bg-accent/50 dark:border-slate-700 dark:hover:bg-slate-900/50"
+                    >
+                      {/* Encabezado: ícono + info + status */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-start gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center shrink-0 dark:bg-slate-800">
+                            <FileText className="h-5 w-5 text-muted-foreground dark:text-slate-400" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground dark:text-slate-400">
+                              {groupDocs.length} documentos enviados
+                            </p>
+                            <Badge variant="secondary" className="mt-1 text-xs font-medium rounded-full dark:bg-slate-800 dark:text-slate-200">
+                              {tipoDisplayLabel}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Lista de archivos con status individual */}
+                      <div className="space-y-1 mb-3">
+                        {groupDocs.map((doc) => {
+                          const _base = getFileNameOnly(doc.nombre);
+                          const fileName = _base.toLowerCase().endsWith(".pdf") ? _base : `${_base}.pdf`;
+                          const docObs = doc.observaciones;
+                          const rowClass = doc.status === "devuelto"
+                            ? "border-rose-200/60 bg-rose-50/20 dark:border-rose-900/40 dark:bg-rose-950/10"
+                            : doc.status === "revisado"
+                            ? "border-emerald-200/50 bg-emerald-50/10 dark:border-emerald-900/30 dark:bg-emerald-950/10"
+                            : doc.status === "reenviado"
+                            ? "border-border/50 bg-muted/20 dark:border-slate-700/50 dark:bg-slate-800/20"
+                            : "border-border/50 bg-muted/20 dark:border-slate-700/50 dark:bg-slate-800/20";
+                          return (
+                            <div key={doc.id} className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${rowClass}`}>
+                              <span className="text-xs font-medium truncate text-foreground dark:text-slate-200 min-w-0 flex-1">{fileName}</span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Badge
+                                  variant={
+                                    doc.status === "revisado" ? "success"
+                                    : doc.status === "devuelto" ? "destructive"
+                                    : doc.status === "reenviado" ? "secondary"
+                                    : "warning"
+                                  }
+                                  className="rounded-full inline-flex items-center gap-1 px-2 py-0.5 text-[10px]"
+                                >
+                                  {doc.status === "revisado" ? (
+                                    <><CheckCircle2 className="h-2.5 w-2.5" />Revisado</>
+                                  ) : doc.status === "devuelto" ? (
+                                    <><Undo2 className="h-2.5 w-2.5" />Devuelto</>
+                                  ) : doc.status === "reenviado" ? (
+                                    <><RefreshCw className="h-2.5 w-2.5" />Reenviado</>
+                                  ) : (
+                                    <><Clock2 className="h-2.5 w-2.5" />Pendiente</>
+                                  )}
+                                </Badge>
+                                {docObs && (doc.status === "devuelto" || doc.status === "reenviado") && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 rounded-lg dark:hover:bg-slate-700"
+                                        onClick={() => setMotivoDialog({ nombre: doc.nombre, obs: docObs })}
+                                      >
+                                        <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Ver motivo de devolución</TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openDocumentWithAuth(doc, "view")}
+                                      disabled={doc.has_file === false || loadingPdfId === Number(doc.id)}
+                                      className="h-7 w-7 rounded-lg dark:hover:bg-slate-700"
+                                    >
+                                      {loadingPdfId === Number(doc.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{doc.has_file === false ? "No disponible" : "Ver documento"}</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openDocumentWithAuth(doc, "download")}
+                                      disabled={doc.has_file === false || loadingPdfId === Number(doc.id)}
+                                      className="h-7 w-7 rounded-lg dark:hover:bg-slate-700"
+                                    >
+                                      <Download className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{doc.has_file === false ? "No disponible" : "Descargar"}</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Metadatos y fecha */}
+                      {metadataChips}
+                      <p className="mt-2 text-xs text-muted-foreground dark:text-slate-400">
+                        Enviado: {dateStr}
+                      </p>
+                    </div>
+                  );
+                }
+
+                // Documento individual
+                const doc = rep;
+                const _baseSingle = getFileNameOnly(doc.nombre);
+                const fileNameUpper = _baseSingle.toLowerCase().endsWith(".pdf") ? _baseSingle : `${_baseSingle}.pdf`;
 
                 return (
                   <div
-                    key={doc.id}
+                    key={batchKey}
                     className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-2xl border border-border/70 transition-colors hover:bg-accent/50 dark:border-slate-700 dark:hover:bg-slate-900/50"
                   >
                     <div className="flex items-start gap-3 flex-1">
@@ -563,49 +822,17 @@ export function DocumentHistory() {
                         <FileText className="h-6 w-6 text-muted-foreground dark:text-slate-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold uppercase tracking-wide text-foreground dark:text-white">
+                        <p className="font-semibold text-foreground dark:text-white">
                           {fileNameUpper}
                         </p>
-
                         <Badge variant="secondary" className="mt-1 text-xs font-medium rounded-full dark:bg-slate-800 dark:text-slate-200">
                           {tipoDisplayLabel}
                         </Badge>
-
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {hasCarrera && (
-                            <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
-                              {doc.carrera}
-                            </Badge>
-                          )}
-                          {planLabel && (
-                            <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
-                              {planLabel}
-                            </Badge>
-                          )}
-                          {!isTutoria && !isEstadias && hasMateria && (
-                            <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
-                              {doc.materia}
-                            </Badge>
-                          )}
-                          {hasGrupo && (
-                            <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
-                              {`Grupo ${doc.grupo}`}
-                            </Badge>
-                          )}
-                          {!isTutoria && !isEstadias && parcialLabel && (
-                            <Badge variant="outline" className="text-xs font-medium rounded-full dark:border-slate-700 dark:text-slate-300">
-                              {parcialLabel}
-                            </Badge>
-                          )}
-                        </div>
-
+                        <div className="mt-2">{metadataChips}</div>
                         <p className="mt-1 text-xs text-muted-foreground dark:text-slate-400">
-                          Enviado: {doc.fecha
-                            ? `${new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(doc.fecha))}${doc.hora ? ` ${doc.hora}` : ""}`
-                            : "Sin fecha"}
+                          Enviado: {dateStr}
                         </p>
-
-                        {doc.observaciones && (
+                        {doc.observaciones && groupStatus !== "devuelto" && groupStatus !== "reenviado" && (
                           <p className="text-xs text-muted-foreground mt-2 bg-muted px-2 py-1 rounded inline-block dark:bg-slate-800 dark:text-slate-300">
                             {doc.observaciones}
                           </p>
@@ -613,22 +840,8 @@ export function DocumentHistory() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge
-                        variant={
-                          doc.status === "revisado"
-                            ? "success"
-                            : doc.status === "pendiente"
-                            ? "outline"
-                            : "destructive"
-                        }
-                        className="rounded-full dark:border-slate-700"
-                      >
-                        {doc.status === "revisado"
-                          ? "Revisado"
-                          : doc.status === "pendiente"
-                          ? "Pendiente"
-                          : "Devuelto"}
-                      </Badge>
+                      {statusBadge}
+                      {motivoBtn}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -665,6 +878,26 @@ export function DocumentHistory() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={motivoDialog !== null} onOpenChange={(open) => { if (!open) setMotivoDialog(null); }}>
+        <DialogContent className="max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
+          <DialogHeader>
+            <DialogTitle className="dark:text-white">Motivo de devolución</DialogTitle>
+            {motivoDialog && (
+              <DialogDescription className="dark:text-slate-400 truncate">
+                {motivoDialog.nombre}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          {motivoDialog && (
+            <div className="rounded-lg border border-border bg-muted/50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
+              <p className="text-sm text-foreground whitespace-pre-wrap break-words dark:text-slate-200">
+                {motivoDialog.obs}
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={previewDocument !== null} onOpenChange={(open) => { if (!open) setPreviewDocument(null); }}>
         <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col dark:bg-slate-950 dark:border-slate-800">

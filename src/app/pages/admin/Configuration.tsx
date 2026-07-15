@@ -10,9 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Calendar } from "../../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { cn } from "../../components/ui/utils";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { es } from "date-fns/locale";
-import { getDefaultFormConfig, type FormId, type FormRole, type Group } from "../../../lib/formConfig";
+import { getDefaultFormConfig, getBackendFormCode, type FormId, type FormRole, type Group } from "../../../lib/formConfig";
+import { updateFormsCache } from "../../components/FormAccessGuard";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { API_BASE_URL } from "../../lib/env";
@@ -147,7 +148,8 @@ function getPasswordStrength(password: string): PasswordStrength {
 
 function DeadlineDatePicker({ value, disabled, onChange }: { value: string; disabled: boolean; onChange: (date: string) => void }) {
   const [open, setOpen] = React.useState(false);
-  const selected = value ? new Date(`${value}T00:00:00`) : undefined;
+  const rawDate = value ? new Date(`${value}T00:00:00`) : undefined;
+  const selected = rawDate && isValid(rawDate) ? rawDate : undefined;
 
   return (
     <Popover open={open && !disabled} onOpenChange={(o) => { if (!disabled) setOpen(o); }}>
@@ -177,6 +179,7 @@ function DeadlineDatePicker({ value, disabled, onChange }: { value: string; disa
             }
             setOpen(false);
           }}
+          disabled={{ before: new Date() }}
           locale={es}
           initialFocus
         />
@@ -199,6 +202,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   // Estado inicial con getDefaultFormConfig - SIN localStorage
   const [formDrafts, setFormDrafts] = useState<Record<FormId, { roles: FormRole[]; dueAt: string | null }>>(() => getDefaultFormConfig().formAccess);
   const [savingFormIds, setSavingFormIds] = useState<Record<FormId, boolean>>({} as Record<FormId, boolean>);
+  type FormUIMode = "sinLimite" | "fechaLimite" | "cerrado";
+  const [formUIModes, setFormUIModes] = useState<Partial<Record<FormId, FormUIMode>>>({});
 
   const [plan, setPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
   const [careerCode, setCareerCode] = useState("");
@@ -464,6 +469,15 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     }));
   };
 
+  const getFormUIMode = (formId: FormId): FormUIMode => {
+    if (formUIModes[formId] !== undefined) return formUIModes[formId]!;
+    const dueAt = formConfig.formAccess[formId]?.dueAt ?? null;
+    if (!dueAt) return "sinLimite";
+    const d = new Date(dueAt);
+    if (!isValid(d)) return "sinLimite";
+    return d <= new Date() ? "cerrado" : "fechaLimite";
+  };
+
   const saveFormAccessRule = async (formId: FormId, nextRule: { roles: FormRole[]; dueAt: string | null }) => {
     let formIdNumber = formCodeToId[formId];
 
@@ -515,6 +529,19 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       return;
     }
 
+    if (currentDraft.dueAt !== null && !currentDraft.dueAt.slice(11, 16)) {
+      toast.error('Selecciona una fecha y hora límite antes de guardar.');
+      return;
+    }
+
+    if (formUIModes[formId] === "fechaLimite" && currentDraft.dueAt) {
+      const d = new Date(currentDraft.dueAt);
+      if (isValid(d) && d <= new Date()) {
+        toast.error('La fecha y hora límite ya han pasado. Selecciona una fecha futura.');
+        return;
+      }
+    }
+
     const isDifferent = JSON.stringify(currentDraft) !== JSON.stringify(formConfig.formAccess[formId]);
     if (!isDifferent) {
       toast('No hay cambios pendientes.');
@@ -533,6 +560,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
         },
       }));
       toast.success('Configuración guardada');
+      setFormUIModes((prev) => { const next = { ...prev }; delete next[formId]; return next; });
+      updateFormsCache(getBackendFormCode(formId), { roles: currentDraft.roles, dueAt: currentDraft.dueAt });
       if (typeof BroadcastChannel !== "undefined") {
         const bc = new BroadcastChannel("form_config_changed");
         bc.postMessage({ formId, roles: currentDraft.roles, dueAt: currentDraft.dueAt });
@@ -547,6 +576,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       ...current,
       [formId]: formConfig.formAccess[formId],
     }));
+    setFormUIModes((prev) => { const next = { ...prev }; delete next[formId]; return next; });
   };
 
   const toggleFormRole = (formId: FormId, role: FormRole) => {
@@ -565,7 +595,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const handleDeadlineChange = (formId: FormId, value: string) => {
     setFormDraftValue(formId, (current) => ({
       ...current,
-      dueAt: value || null,
+      dueAt: value,
     }));
   };
 
@@ -989,10 +1019,10 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           <button
             type="button"
             onClick={() => setMobileSectionOpen(false)}
-            className="mb-2 flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 lg:hidden"
+            className="mb-2 inline-flex items-center gap-1.5 self-start rounded-lg bg-white/90 px-2.5 py-1.5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200 transition hover:bg-white dark:bg-slate-900/85 dark:text-emerald-300 dark:ring-slate-700 lg:hidden"
           >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            Volver a secciones
+            <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">Volver a secciones</span>
           </button>
           {activeTab === "cuenta" && (
             <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
@@ -1298,11 +1328,9 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                   const draftConfig = formDrafts[form.id] ?? savedConfig;
                                   const allowedRoles = draftConfig.roles.map((role) => FORM_ROLE_LABELS[role]).join(" y ");
                                   const isTutoriasForm = form.section === "tutorias";
-                                  const dueAtLabel = draftConfig.dueAt
-                                    ? new Date(draftConfig.dueAt).toLocaleString("es-MX", {
-                                        dateStyle: "medium",
-                                        timeStyle: "short",
-                                      })
+                                  const dueAtDate = draftConfig.dueAt ? new Date(draftConfig.dueAt) : null;
+                                  const dueAtLabel = dueAtDate && isValid(dueAtDate)
+                                    ? dueAtDate.toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })
                                     : "Sin vencimiento";
 
                                   const isOpenItem = Boolean(openFormItems[form.id]);
@@ -1335,62 +1363,107 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                         <div className="border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20">
                                           <div className="grid gap-3 sm:grid-cols-2">
                                             <div className="space-y-2 sm:col-span-2">
-                                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                                <Label htmlFor={`deadline-${form.id}`} className="text-sm">Fecha y hora de vencimiento</Label>
-                                                <div className="flex items-center gap-4">
-                                                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                                    <Checkbox
-                                                      checked={draftConfig.dueAt === null}
-                                                      onCheckedChange={(val) => {
-                                                        setFormDraftValue(form.id, (current) => ({ ...current, dueAt: val ? null : "" }));
-                                                      }}
-                                                    />
-                                                    <span>Sin límite</span>
-                                                  </label>
-                                                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                                    <Checkbox
-                                                      checked={draftConfig.dueAt !== null && draftConfig.dueAt !== "" && new Date(draftConfig.dueAt) <= new Date()}
-                                                      onCheckedChange={(val) => {
-                                                        if (val) {
-                                                          const d = new Date(Date.now() - 60_000);
-                                                          const pad = (n: number) => String(n).padStart(2, "0");
-                                                          const localStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                                                          setFormDraftValue(form.id, (current) => ({ ...current, dueAt: localStr }));
-                                                        } else {
-                                                          setFormDraftValue(form.id, (current) => ({ ...current, dueAt: null }));
-                                                        }
-                                                      }}
-                                                      disabled={Boolean(savingFormIds[form.id])}
-                                                    />
-                                                    <span>Cerrar formulario</span>
-                                                  </label>
-                                                </div>
-                                              </div>
-                                              <div className="flex gap-2">
-                                                <DeadlineDatePicker
-                                                  value={draftConfig.dueAt ? draftConfig.dueAt.slice(0, 10) : ""}
-                                                  disabled={draftConfig.dueAt === null}
-                                                  onChange={(date) => {
-                                                    const timePart = draftConfig.dueAt?.slice(11, 16) ?? "00:00";
-                                                    handleDeadlineChange(form.id, date ? `${date}T${timePart}` : "");
-                                                  }}
-                                                />
-                                                <Input
-                                                  type="time"
-                                                  value={draftConfig.dueAt ? draftConfig.dueAt.slice(11, 16) : ""}
-                                                  onChange={(event) => {
-                                                    const datePart = draftConfig.dueAt?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
-                                                    handleDeadlineChange(form.id, `${datePart}T${event.target.value}`);
-                                                  }}
-                                                  disabled={draftConfig.dueAt === null}
-                                                  className="text-sm dark:[&::-webkit-calendar-picker-indicator]:invert w-28"
-                                                />
-                                              </div>
-                                              {draftConfig.dueAt && (
-                                                <p className="text-xs text-muted-foreground">
-                                                  Fecha límite: {new Date(draftConfig.dueAt).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                                                </p>
-                                              )}
+                                              {(() => {
+                                                const formUIMode = getFormUIMode(form.id);
+                                                const isCerrado = formUIMode === "cerrado";
+                                                const isFechaLimite = formUIMode === "fechaLimite";
+                                                const _dueDate = draftConfig.dueAt ? new Date(draftConfig.dueAt) : null;
+                                                const _dueDateValid = _dueDate !== null && isValid(_dueDate);
+                                                const _isPastDeadline = isFechaLimite && _dueDateValid && _dueDate! <= new Date();
+                                                return (
+                                                  <>
+                                                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                                                      <Label className="text-sm shrink-0">Fecha y hora de vencimiento</Label>
+                                                      <div className="flex flex-wrap items-center gap-4 ml-auto">
+                                                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                          <Checkbox
+                                                            checked={formUIMode === "sinLimite"}
+                                                            onCheckedChange={(val) => {
+                                                              if (val) {
+                                                                setFormUIModes((prev) => ({ ...prev, [form.id]: "sinLimite" }));
+                                                                setFormDraftValue(form.id, (current) => ({ ...current, dueAt: null }));
+                                                              }
+                                                            }}
+                                                          />
+                                                          <span>Sin límite</span>
+                                                        </label>
+                                                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                          <Checkbox
+                                                            checked={isFechaLimite}
+                                                            onCheckedChange={(val) => {
+                                                              if (val) {
+                                                                setFormUIModes((prev) => ({ ...prev, [form.id]: "fechaLimite" }));
+                                                                setFormDraftValue(form.id, (current) => {
+                                                                  const existingDate = current.dueAt && current.dueAt.slice(11, 16) ? new Date(current.dueAt) : null;
+                                                                  const keepExisting = existingDate && isValid(existingDate) && existingDate > new Date();
+                                                                  return { ...current, dueAt: keepExisting ? current.dueAt : "" };
+                                                                });
+                                                              }
+                                                            }}
+                                                          />
+                                                          <span>Con fecha límite</span>
+                                                        </label>
+                                                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                          <Checkbox
+                                                            checked={isCerrado}
+                                                            onCheckedChange={(val) => {
+                                                              if (val) {
+                                                                const d = new Date(Date.now() - 60_000);
+                                                                const pad = (n: number) => String(n).padStart(2, "0");
+                                                                setFormUIModes((prev) => ({ ...prev, [form.id]: "cerrado" }));
+                                                                setFormDraftValue(form.id, (current) => ({ ...current, dueAt: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}` }));
+                                                              } else {
+                                                                setFormUIModes((prev) => ({ ...prev, [form.id]: "sinLimite" }));
+                                                                setFormDraftValue(form.id, (current) => ({ ...current, dueAt: null }));
+                                                              }
+                                                            }}
+                                                            disabled={Boolean(savingFormIds[form.id])}
+                                                          />
+                                                          <span>Cerrar formulario</span>
+                                                        </label>
+                                                      </div>
+                                                    </div>
+                                                    {isFechaLimite && (
+                                                      <div className="flex gap-2">
+                                                        <DeadlineDatePicker
+                                                          value={draftConfig.dueAt ? draftConfig.dueAt.slice(0, 10) : ""}
+                                                          disabled={false}
+                                                          onChange={(date) => {
+                                                            const timePart = draftConfig.dueAt?.slice(11, 16) || "23:59";
+                                                            handleDeadlineChange(form.id, date ? `${date}T${timePart}` : "");
+                                                          }}
+                                                        />
+                                                        <Input
+                                                          type="time"
+                                                          value={draftConfig.dueAt ? draftConfig.dueAt.slice(11, 16) : ""}
+                                                          onChange={(event) => {
+                                                            const datePart = draftConfig.dueAt?.slice(0, 10) ?? "";
+                                                            if (!event.target.value || !datePart) return;
+                                                            handleDeadlineChange(form.id, `${datePart}T${event.target.value}`);
+                                                          }}
+                                                          className="text-sm dark:[&::-webkit-calendar-picker-indicator]:invert w-28"
+                                                        />
+                                                      </div>
+                                                    )}
+                                                    {_isPastDeadline && (
+                                                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                                                        ⚠ La fecha y hora seleccionadas ya han pasado. Cámbiala antes de guardar.
+                                                      </p>
+                                                    )}
+                                                    {isCerrado && (
+                                                      <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+                                                        <span className="shrink-0 font-bold">⊘</span>
+                                                        <span>Formulario cerrado manualmente</span>
+                                                      </div>
+                                                    )}
+                                                    {isFechaLimite && _dueDateValid && _dueDate! > new Date() && (
+                                                      <p className="text-xs text-muted-foreground">
+                                                        Fecha límite: {_dueDate!.toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                                      </p>
+                                                    )}
+                                                  </>
+                                                );
+                                              })()}
                                             </div>
 
                                             <div className="space-y-2 sm:col-span-2">
@@ -1435,7 +1508,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                               <Button
                                                 type="button"
                                                 onClick={() => handleSaveForm(form.id)}
-                                                disabled={!isDraftChanged || Boolean(savingFormIds[form.id])}
+                                                disabled={!isDraftChanged || Boolean(savingFormIds[form.id]) || (draftConfig.dueAt !== null && !draftConfig.dueAt.slice(11, 16)) || (formUIModes[form.id] === "fechaLimite" && Boolean(draftConfig.dueAt) && isValid(new Date(draftConfig.dueAt!)) && new Date(draftConfig.dueAt!) <= new Date())}
                                                 className="w-full sm:w-auto text-sm"
                                               >
                                                 {savingFormIds[form.id] ? 'Guardando...' : 'Guardar cambios'}

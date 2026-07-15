@@ -9,19 +9,19 @@ export function UserCardSkeleton() {
           <div className="flex min-w-0 flex-1 items-center gap-4">
             <div className="h-12 w-12 flex-shrink-0 rounded-full bg-muted" />
             <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-4 w-48 rounded-full bg-muted" />
-              <div className="h-3 w-64 rounded-full bg-muted" />
-              <div className="flex gap-4">
-                <div className="h-3 w-32 rounded-full bg-muted" />
-                <div className="h-3 w-24 rounded-full bg-muted" />
+              <div className="h-4 w-full max-w-[12rem] rounded-full bg-muted" />
+              <div className="h-3 w-full max-w-[16rem] rounded-full bg-muted" />
+              <div className="flex flex-wrap gap-4">
+                <div className="h-3 w-32 max-w-full rounded-full bg-muted" />
+                <div className="h-3 w-24 max-w-full rounded-full bg-muted" />
               </div>
             </div>
           </div>
-          <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-            <div className="h-5 w-14 rounded-full bg-muted" />
-            <div className="h-8 w-16 rounded-lg bg-muted" />
-            <div className="h-8 w-24 rounded-lg bg-muted" />
-            <div className="h-8 w-20 rounded-lg bg-muted" />
+          <div className="grid w-full max-w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:flex-shrink-0 sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
+            <div className="h-5 w-full rounded-full bg-muted sm:w-14" />
+            <div className="h-8 w-full rounded-lg bg-muted sm:w-16" />
+            <div className="h-8 w-full rounded-lg bg-muted sm:w-24" />
+            <div className="h-8 w-full rounded-lg bg-muted sm:w-20" />
           </div>
         </div>
       ))}
@@ -33,10 +33,10 @@ export function SupervisorRowSkeleton() {
   return (
     <div className="space-y-3" aria-busy="true" aria-label="Cargando supervisores">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="animate-pulse overflow-hidden rounded-xl border border-border/70 bg-background/80 dark:bg-slate-950/60 flex items-center justify-between gap-3 px-4 py-3">
+        <div key={i} className="animate-pulse overflow-hidden rounded-xl border border-border/70 bg-background/80 dark:bg-slate-950/60 flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1 space-y-2">
-            <div className="h-4 w-40 rounded-full bg-muted" />
-            <div className="h-3 w-56 rounded-full bg-muted" />
+            <div className="h-4 w-full max-w-[10rem] rounded-full bg-muted" />
+            <div className="h-3 w-full max-w-[14rem] rounded-full bg-muted" />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <div className="h-3 w-16 rounded-full bg-muted" />
@@ -52,22 +52,22 @@ export function DocumentCardSkeleton() {
   return (
     <div className="space-y-3" aria-busy="true" aria-label="Cargando documentos">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="animate-pulse rounded-xl border border-border bg-card p-4 flex items-start gap-3">
+        <div key={i} className="animate-pulse overflow-hidden rounded-xl border border-border bg-card p-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
           <div className="h-12 w-12 shrink-0 rounded-lg bg-muted" />
-          <div className="flex-1 min-w-0 space-y-2 pt-1">
-            <div className="h-4 w-2/3 rounded-full bg-muted" />
-            <div className="h-3 w-2/5 rounded-full bg-muted" />
-            <div className="mt-2 flex gap-2">
-              <div className="h-5 w-16 rounded-full bg-muted" />
-              <div className="h-5 w-20 rounded-full bg-muted" />
+          <div className="min-w-0 flex-1 space-y-2 pt-1">
+            <div className="h-4 w-full max-w-[14rem] rounded-full bg-muted" />
+            <div className="h-3 w-full max-w-[10rem] rounded-full bg-muted" />
+            <div className="mt-2 flex flex-wrap gap-2">
+              <div className="h-5 w-16 max-w-full rounded-full bg-muted" />
+              <div className="h-5 w-20 max-w-full rounded-full bg-muted" />
             </div>
-            <div className="h-3 w-1/4 rounded-full bg-muted" />
+            <div className="h-3 w-full max-w-[6rem] rounded-full bg-muted" />
           </div>
-          <div className="shrink-0 flex items-center gap-2">
-            <div className="h-8 w-14 rounded-lg bg-muted" />
-            <div className="h-8 w-14 rounded-lg bg-muted" />
-            <div className="h-6 w-20 rounded-full bg-muted" />
-            <div className="h-8 w-20 rounded-lg bg-muted" />
+          <div className="grid w-full max-w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:min-w-[260px] sm:items-center sm:justify-end sm:gap-2">
+            <div className="h-8 w-full rounded-lg bg-muted sm:w-14" />
+            <div className="h-8 w-full rounded-lg bg-muted sm:w-14" />
+            <div className="h-6 w-full rounded-full bg-muted sm:w-20" />
+            <div className="h-8 w-full rounded-lg bg-muted sm:w-20" />
           </div>
         </div>
       ))}
@@ -79,20 +79,20 @@ export function CycleDocumentCardSkeleton() {
   return (
     <div className="space-y-3 py-4" aria-busy="true" aria-label="Cargando documentos">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="animate-pulse rounded-xl border border-border bg-card p-4 flex items-start gap-3">
+        <div key={i} className="animate-pulse overflow-hidden rounded-xl border border-border bg-card p-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
           <div className="h-12 w-12 shrink-0 rounded-lg bg-muted" />
-          <div className="flex-1 min-w-0 space-y-2 pt-1">
-            <div className="h-4 w-2/3 rounded-full bg-muted" />
-            <div className="h-3 w-2/5 rounded-full bg-muted" />
-            <div className="mt-2 flex gap-2">
-              <div className="h-5 w-16 rounded-full bg-muted" />
-              <div className="h-5 w-20 rounded-full bg-muted" />
+          <div className="min-w-0 flex-1 space-y-2 pt-1">
+            <div className="h-4 w-full max-w-[14rem] rounded-full bg-muted" />
+            <div className="h-3 w-full max-w-[10rem] rounded-full bg-muted" />
+            <div className="mt-2 flex flex-wrap gap-2">
+              <div className="h-5 w-16 max-w-full rounded-full bg-muted" />
+              <div className="h-5 w-20 max-w-full rounded-full bg-muted" />
             </div>
-            <div className="h-3 w-1/4 rounded-full bg-muted" />
+            <div className="h-3 w-full max-w-[6rem] rounded-full bg-muted" />
           </div>
-          <div className="shrink-0 flex items-center gap-2">
-            <div className="h-8 w-14 rounded-lg bg-muted" />
-            <div className="h-8 w-16 rounded-lg bg-muted" />
+          <div className="grid w-full max-w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:items-center sm:justify-end sm:gap-2">
+            <div className="h-8 w-full rounded-lg bg-muted sm:w-14" />
+            <div className="h-8 w-full rounded-lg bg-muted sm:w-16" />
           </div>
         </div>
       ))}
@@ -172,14 +172,14 @@ export function PendingDocumentSkeleton() {
   return (
     <div className="space-y-4" aria-busy="true" aria-label="Cargando documentos pendientes">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="animate-pulse flex items-center gap-3 p-3 rounded-2xl border border-border">
+        <div key={i} className="animate-pulse overflow-hidden flex flex-col gap-3 p-3 rounded-2xl border border-border sm:flex-row sm:items-center">
           <div className="h-10 w-10 shrink-0 rounded-lg bg-muted" />
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="h-4 w-3/5 rounded-full bg-muted" />
-            <div className="h-3 w-2/5 rounded-full bg-muted" />
-            <div className="mt-1 h-5 w-1/3 rounded-full bg-muted" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-4 w-full max-w-[12rem] rounded-full bg-muted" />
+            <div className="h-3 w-full max-w-[8rem] rounded-full bg-muted" />
+            <div className="mt-1 h-5 w-full max-w-[6rem] rounded-full bg-muted" />
           </div>
-          <div className="h-8 w-16 shrink-0 rounded-lg bg-muted" />
+          <div className="h-8 w-full rounded-lg bg-muted sm:w-16" />
         </div>
       ))}
     </div>

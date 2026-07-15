@@ -45,6 +45,20 @@ export function preloadForms(): Promise<any[]> {
   return fetchFormsWithCache();
 }
 
+// Actualiza el caché en memoria cuando el admin guarda cambios de configuración,
+// sin esperar a que el TTL expire ni depender de que el consumidor esté montado.
+export function updateFormsCache(backendCode: string, update: { roles: string[]; dueAt: string | null }) {
+  if (!formsCache) return;
+  formsCache = {
+    ...formsCache,
+    data: formsCache.data.map((f: any) =>
+      String(f.form_code).replace(/_/g, "-") === backendCode
+        ? { ...f, due_at: update.dueAt, access_roles: update.roles }
+        : f
+    ),
+  };
+}
+
 interface FormAccessGuardProps {
   formId: FormId;
   title: string;
@@ -314,87 +328,90 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      {/* Botón Ver Historial - Esquina superior derecha de la página */}
-      {user ? (
-        <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
-          <SheetTrigger asChild>
-            <button className="fixed right-4 top-4 z-50 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-lg shadow-black/10 transition-transform hover:-translate-y-0.5 dark:bg-slate-900 dark:text-emerald-400 dark:shadow-black/30 sm:right-6 sm:top-6">
-              <History className="h-4 w-4" />
-              Ver historial
-            </button>
-          </SheetTrigger>
+      {/* Historial + Calendario, agrupados en la esquina superior derecha */}
+     <div className="fixed right-15 top-140 z-50 flex flex-row items-center gap-2 sm:right-6 sm:top-48 sm:flex-col sm:items-end">
+        {user ? (
+          <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100 dark:hover:bg-slate-800/80"
+              >
+                <History className="mr-2 h-4 w-4" />
+                Historial
+              </Button>
+            </SheetTrigger>
 
-          <SheetContent side="right" className="w-full sm:max-w-xl">
-            <SheetHeader>
-              <SheetTitle>Historial de archivos</SheetTitle>
-              <SheetDescription>
-                Revisa los documentos que ya subiste para {title.toLowerCase()}.
-              </SheetDescription>
-            </SheetHeader>
+            <SheetContent side="right" className="w-full sm:max-w-xl">
+              <SheetHeader>
+                <SheetTitle>Historial de archivos</SheetTitle>
+                <SheetDescription>
+                  Revisa los documentos que ya subiste para {title.toLowerCase()}.
+                </SheetDescription>
+              </SheetHeader>
 
-            <div className="mt-6">
-              {isLoadingHistory ? (
-                <p className="text-sm text-muted-foreground">Cargando...</p>
-              ) : history.length > 0 ? (
-                <ScrollArea className="h-[min(78vh,44rem)] pr-2">
-                  <div className="space-y-3">
-                    {history.map((item) => {
-                      const fileAvailable = item.has_file !== false;
-                      return (
-                        <div
-                          key={item.id}
-                          role={fileAvailable ? "button" : undefined}
-                          tabIndex={fileAvailable ? 0 : undefined}
-                          onClick={() => fileAvailable && openPreview(item)}
-                          onKeyDown={(e) => fileAvailable && e.key === 'Enter' && openPreview(item)}
-                          className={fileAvailable
-                            ? "cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/20"
-                            : "rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 opacity-60 dark:border-slate-800 dark:bg-slate-900/40"}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className={`rounded-xl p-2 shrink-0 ${fileAvailable ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"}`}>
-                              <FileText className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <p className="break-words text-sm font-semibold text-slate-900 dark:text-slate-50">
-                                {getFileName(item)}
-                              </p>
-                              {item.materia && <p className="text-xs text-muted-foreground">{item.materia}</p>}
-                              <p className="text-xs text-muted-foreground">
-                                {item.submitted_at ? new Date(item.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Fecha no disponible"}
-                              </p>
-                              {!fileAvailable && (
-                                <p className="text-xs font-medium text-amber-600 dark:text-amber-500">
-                                  Archivo no disponible en el servidor
+              <div className="mt-6">
+                {isLoadingHistory ? (
+                  <p className="text-sm text-muted-foreground">Cargando...</p>
+                ) : history.length > 0 ? (
+                  <ScrollArea className="h-[min(78vh,44rem)] pr-2">
+                    <div className="space-y-3">
+                      {history.map((item) => {
+                        const fileAvailable = item.has_file !== false;
+                        return (
+                          <div
+                            key={item.id}
+                            role={fileAvailable ? "button" : undefined}
+                            tabIndex={fileAvailable ? 0 : undefined}
+                            onClick={() => fileAvailable && openPreview(item)}
+                            onKeyDown={(e) => fileAvailable && e.key === 'Enter' && openPreview(item)}
+                            className={fileAvailable
+                              ? "cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/20"
+                              : "rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 opacity-60 dark:border-slate-800 dark:bg-slate-900/40"}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`rounded-xl p-2 shrink-0 ${fileAvailable ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"}`}>
+                                <FileText className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <p className="break-words text-sm font-semibold text-slate-900 dark:text-slate-50">
+                                  {getFileName(item)}
                                 </p>
-                              )}
+                                {item.materia && <p className="text-xs text-muted-foreground">{item.materia}</p>}
+                                <p className="text-xs text-muted-foreground">
+                                  {item.submitted_at ? new Date(item.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Fecha no disponible"}
+                                </p>
+                                {!fileAvailable && (
+                                  <p className="text-xs font-medium text-amber-600 dark:text-amber-500">
+                                    Archivo no disponible en el servidor
+                                  </p>
+                                )}
+                              </div>
+                              {fileAvailable
+                                ? <Eye className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-emerald-600" />
+                                : <span className="text-xs text-slate-400">—</span>}
                             </div>
-                            {fileAvailable
-                              ? <Eye className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-emerald-600" />
-                              : <span className="text-xs text-slate-400">—</span>}
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                    No hay archivos cargados en esta sesión para este formulario.
                   </div>
-                </ScrollArea>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
-                  No hay archivos cargados en esta sesión para este formulario.
-                </div>
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-      ) : null}
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+        ) : null}
 
-      {/* Botón Calendario - Abajo del botón Ver Historial */}
-      <div className="fixed right-4 top-16 z-50 sm:right-6 sm:top-20">
         <Button
           variant="outline"
           size="sm"
           onClick={() => window.open(getCalendarFileUrl(), "_blank")}
-          className="rounded-full bg-white text-slate-700 shadow-lg shadow-black/10 dark:bg-slate-900 dark:text-slate-300 dark:shadow-black/30"
+          className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100 dark:hover:bg-slate-800/80"
         >
           <Calendar className="mr-2 h-4 w-4" />
           Calendario
@@ -403,7 +420,7 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
 
       <FormClosedState
         title={title}
-        message={`Si necesitas acceso, solicita al administrador que actualice la fecha de vencimiento o los roles permitidos para ${title.toLowerCase()}.`}
+        message={`El periodo para enviar ${title.toLowerCase()} ya finalizó. Si tienes dudas sobre tu entrega, contacta a administración.`}
       />
 
       {/* Diálogo de vista previa */}

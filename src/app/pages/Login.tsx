@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent } from "../components/ui/card";
-import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon } from "lucide-react";
+import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon, X } from "lucide-react";
 
 export function Login() {
   const THEME_TOGGLE_COOLDOWN_MS = 700;
@@ -13,6 +13,9 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isForgotFlipped, setIsForgotFlipped] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSubmitted, setForgotSubmitted] = useState(false);
   const lastThemeToggleRef = useRef(0);
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -51,6 +54,21 @@ export function Login() {
     }
     lastThemeToggleRef.current = now;
     toggleTheme();
+  };
+
+  const handleForgotSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setForgotSubmitted(true);
+  };
+
+  const openForgotPassword = () => {
+    setForgotEmail(email);
+    setForgotSubmitted(false);
+    setIsForgotFlipped(true);
+  };
+
+  const closeForgotPassword = () => {
+    setIsForgotFlipped(false);
   };
 
   return (
@@ -173,80 +191,154 @@ export function Login() {
 
               <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-8 dark:via-slate-700" />
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2 group/email">
-                  <Label htmlFor="email" className={`${labelText} font-medium text-sm`}>
-                    Correo Electrónico
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 group-focus-within/email:text-[#3BBF82] transition-colors" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Ingresa tu correo institucional"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      disabled={isLoading}
-                      className={`${inputClasses} pl-12`}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2 group/password">
-                  <Label htmlFor="password" className={`${labelText} font-medium text-sm`}>
-                    Contraseña
-                  </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 group-focus-within/password:text-[#3BBF82] transition-colors" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={isLoading}
-                      className={`${inputClasses} pl-12`}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((s) => !s)}
-                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                      title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-[#3BBF82] transition-colors duration-200 dark:text-slate-400"
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full h-12 rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white font-semibold text-base shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+              <div className="relative [perspective:1800px]">
+                <div
+                  className={`relative transition-transform duration-700 [transform-style:preserve-3d] ${
+                    isForgotFlipped ? "[transform:rotateY(180deg)]" : ""
+                  }`}
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Ingresando...
-                    </>
-                  ) : (
-                    "Iniciar sesión"
-                  )}
-                </Button>
+                  <div className="w-full [backface-visibility:hidden]">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      <div className="space-y-2 group/email">
+                        <Label htmlFor="email" className={`${labelText} font-medium text-sm`}>
+                          Correo Electrónico
+                        </Label>
+                        <div className="relative">
+                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 group-focus-within/email:text-[#3BBF82] transition-colors" />
+                          <Input
+                            id="email"
+                            type="email"
+                            placeholder="Ingresa tu correo institucional"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                            disabled={isLoading}
+                            className={`${inputClasses} pl-12`}
+                          />
+                        </div>
+                      </div>
 
-                <div className="text-center mt-3">
-                  <button
-                    type="button"
-                    className="text-sm text-[#3BBF82] hover:underline font-medium"
-                    aria-label="Olvidaste la contraseña"
-                  >
-                    ¿Olvidaste la contraseña?
-                  </button>
+                      <div className="space-y-2 group/password">
+                        <Label htmlFor="password" className={`${labelText} font-medium text-sm`}>
+                          Contraseña
+                        </Label>
+                        <div className="relative">
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 group-focus-within/password:text-[#3BBF82] transition-colors" />
+                          <Input
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            disabled={isLoading}
+                            className={`${inputClasses} pl-12`}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((s) => !s)}
+                            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                            title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-[#3BBF82] transition-colors duration-200 dark:text-slate-400"
+                          >
+                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full h-12 rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white font-semibold text-base shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Ingresando...
+                          </>
+                        ) : (
+                          "Iniciar sesión"
+                        )}
+                      </Button>
+
+                      <button
+                        type="button"
+                        className="w-full text-center text-xs font-medium text-[#3BBF82] hover:underline transition-colors duration-200"
+                        aria-label="Olvidaste la contraseña"
+                        onClick={openForgotPassword}
+                      >
+                        ¿Olvidaste tu contraseña?
+                      </button>
+                    </form>
+                  </div>
+
+                  <div className="absolute inset-0 w-full [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                    <div className="flex h-full flex-col justify-between rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-lg dark:border-slate-800 dark:bg-slate-950/95">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">¿Olvidaste tu contraseña?</h3>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={closeForgotPassword}
+                          className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
+                          aria-label="Volver al login"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
+                        Ingresa tu correo institucional para recibir un enlace de recuperación.
+                      </p>
+
+                      <form onSubmit={handleForgotSubmit} className="mt-4 space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="forgot-email" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Correo electrónico
+                          </Label>
+                          <div className="relative">
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500" />
+                            <Input
+                              id="forgot-email"
+                              type="email"
+                              value={forgotEmail}
+                              onChange={(e) => setForgotEmail(e.target.value)}
+                              placeholder="Correo institucional"
+                              className="h-12 rounded-xl border bg-white/95 pl-12 pr-4 text-base text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:border-slate-700"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        {forgotSubmitted && (
+                          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+                            Vista de frontend lista. Aquí se mostraría el enlace de recuperación.
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            onClick={closeForgotPassword}
+                          >
+                            Regresar
+                          </Button>
+                          <Button
+                            type="submit"
+                            className="rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] text-white hover:from-[#2da06a] hover:to-[#1f7a54]"
+                          >
+                            Enviar enlace
+                          </Button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
                 </div>
-              </form>
+              </div>
             </CardContent>
           </Card>
         </div>

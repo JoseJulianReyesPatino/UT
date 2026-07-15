@@ -740,25 +740,38 @@ export default function RemedialPage({ deadlineInfo, onDirtyChange }: { deadline
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
+            {/* Selector de Plan - con estilos de Planeación */}
             <div className="space-y-2 md:col-span-2">
               <Label className="text-sm font-medium dark:text-white">Plan *</Label>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Button
-                  variant={formData.plan === "nuevo-modelo" ? "success" : "outline"}
-                  onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))}
-                  className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left shadow-sm"
+                <button
+                  type="button"
+                  onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
+                  className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
+                    formData.plan === "nuevo-modelo"
+                      ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
+                      : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
+                  }`}
                 >
-                  <span className="text-base font-semibold text-slate-900 dark:text-white">Plan Nuevo Modelo</span>
-                  <span className="text-xs text-muted-foreground dark:text-slate-400">TSU e Ingeniería</span>
-                </Button>
-                <Button
-                  variant={formData.plan === "plan-normal" ? "success" : "outline"}
-                  onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))}
-                  className="h-auto flex-col items-start justify-start rounded-2xl px-4 py-4 text-left shadow-sm"
+                  <div className="flex-1">
+                    <span className="block text-base font-semibold dark:text-white">Plan Nuevo Modelo</span>
+                    <span className="block text-xs text-muted-foreground dark:text-slate-400">TSU e Ingeniería</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
+                  className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
+                    formData.plan === "plan-normal"
+                      ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
+                      : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
+                  }`}
                 >
-                  <span className="text-base font-semibold text-slate-900 dark:text-white">Plan Normal</span>
-                  <span className="text-xs text-muted-foreground dark:text-slate-400">Ingenierías</span>
-                </Button>
+                  <div className="flex-1">
+                    <span className="block text-base font-semibold dark:text-white">Plan Normal</span>
+                    <span className="block text-xs text-muted-foreground dark:text-slate-400">Ingenierías</span>
+                  </div>
+                </button>
               </div>
             </div>
 

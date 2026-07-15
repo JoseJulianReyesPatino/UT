@@ -18,7 +18,7 @@ import { formatGroupCode } from "../../../lib/utils";
 import { useAuth } from "../../context/AuthContext";
 import { SearchableSelect } from "../../components/SearchableSelect";
 
-type ReviewSection = "all" | "pendientes" | "revisados" | "hoy";
+type ReviewSection = "all" | "pendientes" | "devueltos" | "reenviados" | "revisados" | "hoy";
 
 type EstadiaPendingDocument = {
   id: number;
@@ -31,6 +31,7 @@ type EstadiaPendingDocument = {
   carrera: string;
   grupo: string;
   fecha: string;
+  status?: string;
   file_path?: string | null;
   has_file?: boolean;
   returned?: boolean;
@@ -255,6 +256,7 @@ export default function Estadias() {
       fecha: doc.submitted_at ?? "",
       file_path: doc.file_path ?? null,
       has_file: (doc as any).has_file ?? (doc.file_path != null ? undefined : false),
+      status: doc.status ?? "pendiente",
       returned: doc.status === "devuelto",
       returnedAt: doc.returned_at ?? undefined,
       resubmittedAt: doc.resubmitted_at ?? undefined,
@@ -322,6 +324,9 @@ export default function Estadias() {
   const filteredPending = pendingDocuments.filter(matchesFilters);
   const filteredReviewed = reviewedDocuments.filter(matchesFilters);
   const filteredAll = allDocuments.filter(matchesFilters);
+  const filteredPendienteOnly = filteredPending.filter((d) => d.status !== "reenviado");
+  const filteredReenviados = filteredPending.filter((d) => d.status === "reenviado");
+  const filteredDevueltos = filteredAll.filter((d) => d.returned === true);
   const reviewedToday = filteredReviewed.filter((doc) => toLocalDateKey(doc.reviewedAt) === todayKey);
 
   useEffect(() => {
@@ -341,15 +346,17 @@ export default function Estadias() {
       setLoadError(null);
 
       try {
-        const [pendingResponse, reviewedResponse, returnedResponse] = await Promise.all([
+        const [pendingResponse, reviewedResponse, returnedResponse, reenviadoResponse] = await Promise.all([
           apiFetch("/documents", { query: { status: "pendiente", per_page: "500" } }),
           apiFetch("/documents", { query: { status: "revisado", per_page: "500" } }),
           apiFetch("/documents", { query: { status: "devuelto", per_page: "500" } }),
+          apiFetch("/documents", { query: { status: "reenviado", per_page: "500" } }),
         ]);
 
-        const pendingItems = extractApiDocuments(pendingResponse)
-          .filter(isEstadiasDocument)
-          .map((doc) => mapApiDocument(doc, "pending"));
+        const pendingItems = [
+          ...extractApiDocuments(pendingResponse).filter(isEstadiasDocument).map((doc) => mapApiDocument(doc, "pending")),
+          ...extractApiDocuments(reenviadoResponse).filter(isEstadiasDocument).map((doc) => mapApiDocument(doc, "pending")),
+        ];
 
         const reviewedItems = [
           ...extractApiDocuments(reviewedResponse).filter(isEstadiasDocument).map((doc) => mapApiDocument(doc, "reviewed")),
@@ -667,22 +674,32 @@ export default function Estadias() {
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="pendientes">Pendientes</SelectItem>
+              <SelectItem value="devueltos">Devueltos</SelectItem>
+              <SelectItem value="reenviados">Reenviados</SelectItem>
               <SelectItem value="revisados">Revisados</SelectItem>
               <SelectItem value="hoy">Revisados hoy</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <TabsList className="hidden sm:grid w-full grid-cols-4 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
+        <TabsList className="hidden sm:grid w-full grid-cols-6 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
           <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
             Todos
             <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredAll.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
             Pendientes
-            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPending.length}</Badge>
+            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPendienteOnly.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados<Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredReviewed.length}</Badge></TabsTrigger>
+          <TabsTrigger value="devueltos" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+            Devueltos
+            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredDevueltos.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="reenviados" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
+            Reenviados
+            <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredReenviados.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="revisados" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados<Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredReviewed.filter(d => !d.returned).length}</Badge></TabsTrigger>
           <TabsTrigger value="hoy" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Revisados hoy<Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{reviewedToday.length}</Badge></TabsTrigger>
         </TabsList>
 
@@ -691,8 +708,8 @@ export default function Estadias() {
             <CardHeader className="pb-4">
               {filtersBar}
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="overflow-x-hidden">
+              <div className="min-w-0 space-y-3">
                 {isLoading ? <DocumentCardSkeleton /> : null}
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
                 {!isLoading && !loadError && filteredAll.length === 0 ? (
@@ -790,13 +807,13 @@ export default function Estadias() {
             <CardHeader className="pb-4">
               {filtersBar}
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="overflow-x-hidden">
+              <div className="min-w-0 space-y-3">
                 {isLoading ? <DocumentCardSkeleton /> : null}
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
-                {!isLoading && !loadError && filteredPending.length === 0 ? (
+                {!isLoading && !loadError && filteredPendienteOnly.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
-                ) : !isLoading && !loadError && filteredPending.map((doc) => {
+                ) : !isLoading && !loadError && filteredPendienteOnly.map((doc) => {
                   const isReturned = Boolean(doc.returned);
                   return (
                   <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
@@ -881,16 +898,110 @@ export default function Estadias() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="devueltos" className="space-y-4 mt-6">
+          <Card className={sectionCardClassName}>
+            <CardHeader className="pb-4">{filtersBar}</CardHeader>
+            <CardContent className="overflow-x-hidden">
+              <div className="min-w-0 space-y-3">
+                {isLoading ? <DocumentCardSkeleton /> : null}
+                {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
+                {!isLoading && !loadError && filteredDevueltos.length === 0 ? (
+                  <EmptyState text="No hay documentos devueltos." />
+                ) : !isLoading && !loadError && filteredDevueltos.map((doc) => (
+                  <div key={doc.id} className={getDocumentRowClassName(true)}>
+                    <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <FileText className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium">{extractPreviewFileName(doc.documento)}</p>
+                        <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {doc.apartado && doc.apartado !== "Documento" && <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>}
+                          <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                          {doc.grupo && doc.grupo !== "-" && <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>}
+                        </div>
+                        {'returnedAt' in doc && doc.returnedAt && (
+                          <p className="mt-1 text-xs text-muted-foreground">Devuelto: {formatDateTimeFromIso(doc.returnedAt)}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+                      <ResponsiveActionButton variant="outline" size="sm" label="Ver" title="Ver PDF" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} icon={<Eye className="h-4 w-4" />} />
+                      <Badge variant="destructive">Devuelto</Badge>
+                      <ResponsiveActionButton
+                        variant="outline" size="sm" label="Cancelar" title="Cancelar devolución"
+                        className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
+                        onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
+                        icon={<Undo2 className="h-4 w-4" />}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reenviados" className="space-y-4 mt-6">
+          <Card className={sectionCardClassName}>
+            <CardHeader className="pb-4">{filtersBar}</CardHeader>
+            <CardContent className="overflow-x-hidden">
+              <div className="min-w-0 space-y-3">
+                {isLoading ? <DocumentCardSkeleton /> : null}
+                {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
+                {!isLoading && !loadError && filteredReenviados.length === 0 ? (
+                  <EmptyState text="No hay documentos reenviados." />
+                ) : !isLoading && !loadError && filteredReenviados.map((doc) => (
+                  <div key={doc.id} className={getDocumentRowClassName(false)}>
+                    <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <FileText className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium">{extractPreviewFileName(doc.documento)}</p>
+                        <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {doc.apartado && doc.apartado !== "Documento" && <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>}
+                          <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+                          {doc.grupo && doc.grupo !== "-" && <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>}
+                        </div>
+                        {'resubmittedAt' in doc && doc.resubmittedAt && (
+                          <p className="mt-1 text-xs text-muted-foreground">Reenviado: {formatDateTimeFromIso(doc.resubmittedAt)}</p>
+                        )}
+                        {doc.fecha && (
+                          <p className="mt-1 text-xs text-muted-foreground">Enviado orig.: {formatSentFecha(doc.fecha)}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+                      <ResponsiveActionButton variant="outline" size="sm" label="Ver" title="Ver PDF" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} icon={<Eye className="h-4 w-4" />} />
+                      <Badge variant="secondary" className="inline-flex items-center gap-1"><RefreshCw className="h-3 w-3" />Reenviado</Badge>
+                      <ResponsiveActionButton
+                        variant="default" size="sm" label="Revisar" title="Marcar como revisado"
+                        onClick={(e) => { e.stopPropagation(); setReviewConfirmation(doc as EstadiaPendingDocument); }}
+                        icon={<Check className="h-4 w-4" />}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="revisados" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
               {filtersBar}
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-x-hidden">
               {Object.entries(reviewedByDate).filter(([date]) => date).length === 0 ? (
                 <EmptyState text={emptyStateLegend} />
               ) : (
-                <div className="space-y-6">
+                <div className="min-w-0 space-y-6">
                   {Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => (
                     <div key={date}>
                       <div className="mb-3">
@@ -997,8 +1108,8 @@ export default function Estadias() {
             <CardHeader className="pb-4">
               {filtersBar}
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="overflow-x-hidden">
+              <div className="min-w-0 space-y-3">
                 {isLoading ? <DocumentCardSkeleton /> : reviewedToday.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : (
