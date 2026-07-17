@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import { Badge } from "../../components/ui/badge";
 import { useAuth } from "../../context/AuthContext";
@@ -15,7 +14,7 @@ import { toast } from "sonner";
 
 const defaultProfileAvatar = "/src/assets/perfil2.png";
 
-export function Profile() {
+export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: boolean) => void }> = {}) {
   const { user, updateProfile, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [firstName, setFirstName] = useState("");
@@ -46,6 +45,16 @@ export function Profile() {
     setLastName(user.lastNames ?? "");
     setAvatarPreview(user.avatar && user.avatar !== "/api/default-avatar" ? user.avatar : defaultProfileAvatar);
   }, [user]);
+
+  useEffect(() => {
+    if (!onDirtyChange || !user) return;
+    const dirty =
+      firstName !== (user.firstNames ?? "") ||
+      lastName !== (user.lastNames ?? "") ||
+      selectedAvatarFile !== null;
+    onDirtyChange(dirty);
+    return () => onDirtyChange(false);
+  }, [firstName, lastName, selectedAvatarFile, user, onDirtyChange]);
 
   useEffect(() => {
     if (!user) return;
@@ -350,7 +359,7 @@ export function Profile() {
         )}
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2 overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+          <Card data-tour="perfil-info-card" className="lg:col-span-2 overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader>
               <CardTitle className="dark:text-white">Información Personal</CardTitle>
               <CardDescription className="dark:text-slate-400">
@@ -358,23 +367,20 @@ export function Profile() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
-                  <AvatarImage
+              <div className="flex items-start gap-4">
+                <div
+                  className="h-20 w-20 shrink-0 rounded-full overflow-hidden ring-2 ring-emerald-200/60 dark:ring-emerald-900/40 cursor-pointer"
+                  onClick={() => setIsAvatarOpen(true)}
+                >
+                  <img
                     src={visibleAvatar}
                     alt={user?.name ?? "Foto de perfil"}
-                    onClick={() => setIsAvatarOpen(true)}
-                    className="cursor-pointer"
+                    className="h-full w-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).src = defaultProfileAvatar; }}
                   />
-                  <AvatarFallback
-                    className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-medium cursor-pointer"
-                    onClick={() => setIsAvatarOpen(true)}
-                  >
-                    {avatarInitials || "?"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="flex items-center gap-2">
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -449,9 +455,9 @@ export function Profile() {
                 </div>
               </div>
 
-              <div className="pt-4 flex gap-2 border-t border-border dark:border-slate-700">
-                <Button variant="outline" onClick={handleCancelChanges} className="rounded-2xl dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Cancelar</Button>
-                <Button variant="success" onClick={handleSaveChanges} disabled={isSavingProfile} className="rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
+              <div className="pt-4 flex flex-col sm:flex-row gap-2 border-t border-border dark:border-slate-700">
+                <Button variant="outline" onClick={handleCancelChanges} className="w-full sm:w-auto rounded-2xl dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Cancelar</Button>
+                <Button variant="success" onClick={handleSaveChanges} disabled={isSavingProfile} className="w-full sm:w-auto rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
                   {isSavingProfile ? "Guardando..." : "Guardar Cambios"}
                 </Button>
               </div>
@@ -568,7 +574,7 @@ export function Profile() {
           </Dialog>
 
           <div className="space-y-6">
-            <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+            <Card data-tour="perfil-account-card" className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
               <CardHeader>
                 <CardTitle className="dark:text-white">Información de Cuenta</CardTitle>
               </CardHeader>
@@ -585,7 +591,7 @@ export function Profile() {
               </CardContent>
             </Card>
 
-            <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+            <Card data-tour="perfil-security-card" className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
               <CardHeader>
                 <CardTitle className="dark:text-white">Seguridad</CardTitle>
               </CardHeader>
@@ -605,7 +611,7 @@ export function Profile() {
         </div>
 
         {user?.role !== "administrador" && user?.role !== "supervisor" && (
-          <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
+          <Card data-tour="perfil-stats-card" className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader>
               <CardTitle className="dark:text-white">Estadísticas</CardTitle>
               <CardDescription className="dark:text-slate-400">Resumen de tu actividad</CardDescription>

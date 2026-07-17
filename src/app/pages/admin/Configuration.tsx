@@ -7,6 +7,7 @@ import { Label } from "../../components/ui/label";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../../components/ui/command";
 import { Calendar } from "../../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { cn } from "../../components/ui/utils";
@@ -16,30 +17,20 @@ import { getDefaultFormConfig, getBackendFormCode, type FormId, type FormRole, t
 import { updateFormsCache } from "../../components/FormAccessGuard";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
-import { API_BASE_URL } from "../../lib/env";
 import { useTheme } from "../../context/ThemeContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, FileText, Grid2x2, Key, Moon, PencilLine, Plus, RefreshCw, Search, Shield, Sun, Trash2, Users, Settings2 } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, FileText, Grid2x2, Key, Layers, Loader2, Moon, PencilLine, Plus, RefreshCw, Search, Shield, Sun, Trash2, Users, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { carrieras } from "../../data/curricula";
-import { clearAvatarCache, getAvatarUrlWithTimestamp, getInitials, isImageUrl, useResolvedAvatarUrl } from "../../lib/avatar";
+import { clearAvatarCache, isImageUrl, useResolvedAvatarUrl } from "../../lib/avatar";
 import defaultAvatar from "../../../assets/perfil2.png";
 
-// Función para resolver URLs de avatar
-const getAbsoluteUrl = (url?: string | null): string | undefined => {
-  if (!url) return undefined;
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
-  if (url.startsWith('/')) {
-    const baseUrl = API_BASE_URL.replace(/\/api$/, '');
-    return `${baseUrl}${url}`;
-  }
-  return url;
-};
 
 type ConfigTab = "formularios" | "grupos" | "cuenta" | "supervisores";
 
 interface ConfigurationProps {
   initialTab?: ConfigTab;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 type SupervisorPermission = { user_id: number; user_name: string; email: string; sections: string[]; avatar?: string | null };
@@ -95,10 +86,15 @@ const getCuatrimestresForCareer = (selectedPlan: "nuevo-modelo" | "plan-normal",
   if (selectedPlan === "nuevo-modelo") {
     return careerType === "TSU"
       ? [0, 1, 2, 3, 4, 5, 6]
-      : [7, 8, 9, 10];
+      : [7, 8, 9, 10]; // cuatrimestre 10 = Estadías en nuevo modelo
   }
 
   return careerType === "TSU" ? [] : [7, 8, 9, 10, 11];
+};
+
+const cuatrimestresLabel = (n: number): string => {
+  if (n === 0) return "Propedéutico";
+  return `Cuatrimestre ${n}`;
 };
 
 type FormSectionId = "docentes" | "tutorias" | "estadias";
@@ -189,7 +185,7 @@ function DeadlineDatePicker({ value, disabled, onChange }: { value: string; disa
 }
 
 export function Configuration(props: Readonly<ConfigurationProps>) {
-  const { initialTab = "formularios" } = props;
+  const { initialTab = "formularios", onDirtyChange } = props;
   const { user, updateProfile, refreshUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
@@ -197,7 +193,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   // Estado inicial con getDefaultFormConfig - SIN localStorage
   const [formConfig, setFormConfig] = useState(getDefaultFormConfig());
   const [formCodeToId, setFormCodeToId] = useState<Record<FormId, number>>({} as Record<FormId, number>);
-  const [isFormConfigLoading, setIsFormConfigLoading] = useState(false);
+  const [, setIsFormConfigLoading] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   // Estado inicial con getDefaultFormConfig - SIN localStorage
   const [formDrafts, setFormDrafts] = useState<Record<FormId, { roles: FormRole[]; dueAt: string | null }>>(() => getDefaultFormConfig().formAccess);
@@ -258,6 +254,13 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isBulkCreateOpen, setIsBulkCreateOpen] = useState(false);
+  const [bulkPlan, setBulkPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
+  const [bulkCareerCode, setBulkCareerCode] = useState("");
+  const [bulkCuatQuantities, setBulkCuatQuantities] = useState<Record<number, number>>({});
+  const [bulkExcludedCuats, setBulkExcludedCuats] = useState<Set<number>>(new Set());
+  const [bulkCareerPopoverOpen, setBulkCareerPopoverOpen] = useState(false);
+  const [isBulkCreating, setIsBulkCreating] = useState(false);
   const [groupSearch, setGroupSearch] = useState("");
   const [groupViewPlan, setGroupViewPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
   const [openFormSection, setOpenFormSection] = useState<FormSectionId | null>(null);
@@ -370,6 +373,16 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     setProfileAvatar(user.avatar);
   }, [user]);
 
+  useEffect(() => {
+    if (!onDirtyChange || !user) return;
+    const dirty =
+      profileFirstNames !== (user.firstNames ?? "") ||
+      profileLastNames !== (user.lastNames ?? "") ||
+      profilePhone !== (user.phone ?? "") ||
+      selectedAvatarFile !== null;
+    onDirtyChange(dirty);
+  }, [profileFirstNames, profileLastNames, profilePhone, selectedAvatarFile, user, onDirtyChange]);
+
   const careerOptions = getCareerOptions(plan);
   const selectedCareer = careerOptions.find((career) => career.codigo === careerCode) ?? null;
   const cuatrimestresDisponibles = selectedCareer ? getCuatrimestresForCareer(plan, selectedCareer.tipo) : [];
@@ -383,7 +396,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const isEditingGroupDirty = Boolean(
     editingGroupOriginal && (
       editingGroupOriginal.plan !== editingGroupPlan ||
-      editingGroupOriginal.careerCode !== editingGroupCareerCode.trim().toUpperCase() ||
+      editingGroupOriginal.careerCode.trim().toUpperCase() !== editingGroupCareerCode.trim().toUpperCase() ||
       editingGroupOriginal.cuatrimestre !== editingGroupCuatrimestre ||
       editingGroupOriginal.groupNumber !== Number(editingGroupNumber)
     )
@@ -392,7 +405,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     () => groups.filter((group) => {
       const query = groupSearch.trim().toLowerCase();
       if (!query) return true;
-      return [group.name, group.plan, String(group.cuatrimestre), String(group.groupNumber), group.careerCode]
+      return [group.name, String(group.cuatrimestre), String(group.groupNumber), group.careerCode]
         .some((value) => value.toLowerCase().includes(query));
     }),
     [groups, groupSearch]
@@ -411,6 +424,21 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     [groupViewPlan, selectedPlanGroups]
   );
 
+  const bulkCareerOptions = getCareerOptions(bulkPlan);
+  const bulkSelectedCareer = bulkCareerOptions.find((c) => c.codigo === bulkCareerCode) ?? null;
+  const bulkCuatrimestres = bulkSelectedCareer ? getCuatrimestresForCareer(bulkPlan, bulkSelectedCareer.tipo) : [];
+  const bulkTotalGroups = Object.entries(bulkCuatQuantities)
+    .filter(([cuat]) => !bulkExcludedCuats.has(Number(cuat)))
+    .reduce((sum, [, n]) => sum + n, 0);
+  const bulkExistingByCuat = useMemo(() => {
+    if (!bulkCareerCode) return {} as Record<number, number>;
+    const result: Record<number, number> = {};
+    groups
+      .filter((g) => g.careerCode === bulkCareerCode && g.plan === bulkPlan)
+      .forEach((g) => { result[g.cuatrimestre] = (result[g.cuatrimestre] ?? 0) + 1; });
+    return result;
+  }, [groups, bulkCareerCode, bulkPlan]);
+
   const [openCareer, setOpenCareer] = useState<string | null>(null);
   const [openCuatrimestres, setOpenCuatrimestres] = useState<Set<string>>(new Set());
 
@@ -425,6 +453,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   useEffect(() => {
     setOpenCareer(null);
     setOpenCuatrimestres(new Set());
+    setGroupSearch("");
   }, [groupViewPlan]);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -436,12 +465,23 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   }, [plan]);
 
   useEffect(() => {
+    if (!bulkCareerCode) { setBulkCuatQuantities({}); return; }
+    const career = getCareerOptions(bulkPlan).find((c) => c.codigo === bulkCareerCode);
+    if (!career) { setBulkCuatQuantities({}); return; }
+    const cuats = getCuatrimestresForCareer(bulkPlan, career.tipo);
+    const initial: Record<number, number> = {};
+    cuats.forEach((c) => { initial[c] = 4; });
+    setBulkCuatQuantities(initial);
+    setBulkExcludedCuats(new Set());
+  }, [bulkCareerCode, bulkPlan]);
+
+  useEffect(() => {
     if (!selectedCareer) {
       setCuatrimestre("");
       return;
     }
 
-    if (!cuatrimestresDisponibles.includes(Number(cuatrimestre))) {
+    if (cuatrimestre === "" || !cuatrimestresDisponibles.includes(Number(cuatrimestre))) {
       setCuatrimestre("");
     }
   }, [selectedCareer, cuatrimestresDisponibles, cuatrimestre]);
@@ -454,7 +494,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       return;
     }
 
-    if (!editingCuatrimestresDisponibles.includes(Number(editingGroupCuatrimestre))) {
+    if (editingGroupCuatrimestre === "" || !editingCuatrimestresDisponibles.includes(Number(editingGroupCuatrimestre))) {
       setEditingGroupCuatrimestre("");
     }
   }, [editingGroupId, editingSelectedCareer, editingCuatrimestresDisponibles, editingGroupCuatrimestre]);
@@ -614,7 +654,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      setGroups((prev) => [res.data, ...prev]);
+      if (res?.data) setGroups((prev) => [res.data, ...prev]);
       setCareerCode("");
       setCuatrimestre("");
       setGroupNumber(1);
@@ -624,6 +664,66 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       toast.error(err?.message ?? 'No fue posible crear el grupo');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleBulkCreate = async () => {
+    if (!bulkCareerCode || bulkTotalGroups === 0) return;
+    setIsBulkCreating(true);
+    try {
+      const tasks: Array<{ cuatrimestre: number; groupNumber: number }> = [];
+      for (const [cuatStr, qty] of Object.entries(bulkCuatQuantities)) {
+        const cuat = Number(cuatStr);
+        if (bulkExcludedCuats.has(cuat)) continue;
+        // Partir del número más alto existente para no colisionar con grupos ya creados
+        const maxExisting = groups
+          .filter((g) => g.careerCode === bulkCareerCode && g.plan === bulkPlan && g.cuatrimestre === cuat)
+          .reduce((max, g) => Math.max(max, g.groupNumber), 0);
+        for (let i = maxExisting + 1; i <= maxExisting + qty; i++) {
+          tasks.push({ cuatrimestre: cuat, groupNumber: i });
+        }
+      }
+      // Procesar en lotes de 3 para no saturar el servidor
+      const BATCH_SIZE = 3;
+      const allResults: PromiseSettledResult<any>[] = [];
+      for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
+        const batch = tasks.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.allSettled(
+          batch.map(({ cuatrimestre, groupNumber }) =>
+            apiFetch('/groups', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ careerCode: bulkCareerCode, plan: bulkPlan, cuatrimestre, groupNumber }),
+            })
+          )
+        );
+        allResults.push(...batchResults);
+      }
+      const succeeded = allResults.filter((r) => r.status === "fulfilled") as PromiseFulfilledResult<any>[];
+      const failedCount = allResults.filter((r) => r.status === "rejected").length;
+      // Refrescar lista completa desde el API para tener el estado real
+      try {
+        const res = await apiFetch('/groups');
+        setGroups(res?.data ?? []);
+      } catch {
+        // Si falla el refresco, al menos agregar los creados exitosamente
+        const newGroups = succeeded.map((r) => r.value?.data).filter(Boolean);
+        if (newGroups.length > 0) setGroups((prev) => [...newGroups, ...prev]);
+      }
+      if (failedCount === 0) {
+        toast.success(`¡${succeeded.length} grupos creados correctamente!`);
+      } else if (succeeded.length > 0) {
+        toast.success(`${succeeded.length} grupos creados. ${failedCount} no se pudieron crear.`);
+      } else {
+        toast.error(`No se pudo crear ningún grupo. Intenta de nuevo.`);
+      }
+      setIsBulkCreateOpen(false);
+      setBulkCareerCode("");
+      setBulkCuatQuantities({});
+      setBulkExcludedCuats(new Set());
+      setBulkPlan("nuevo-modelo");
+    } finally {
+      setIsBulkCreating(false);
     }
   };
 
@@ -666,7 +766,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
         body: JSON.stringify(payload),
       });
 
-      setGroups((prev) => prev.map((g) => (g.id === editingGroupId ? res.data : g)));
+      if (res?.data) setGroups((prev) => prev.map((g) => (g.id === editingGroupId ? res.data : g)));
       clearEditingGroupState();
       toast.success('Grupo actualizado');
     } catch (err: any) {
@@ -715,6 +815,15 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   useEffect(() => {
     if (activeTab === "supervisores") void loadSupervisors();
   }, [activeTab, loadSupervisors]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent<string>).detail as ConfigTab;
+      if (tab) { setActiveTab(tab); setMobileSectionOpen(true); }
+    };
+    window.addEventListener("tour-sub-nav", handler);
+    return () => window.removeEventListener("tour-sub-nav", handler);
+  }, []);
 
   const handleSectionChange = (userId: number, sectionId: string, checked: boolean) => {
     setSupervisorDrafts((prev) => {
@@ -926,9 +1035,9 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   };
 
   const shellClass = "text-foreground";
-  const sidebarClass = "border-border bg-card shadow-sm";
+  const sidebarClass = "border-border/70 bg-card shadow-sm dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md";
   const sidebarCardClass = "border-b border-border bg-muted/40";
-  const sectionCardClass = "overflow-hidden border-border bg-card shadow-sm";
+  const sectionCardClass = "overflow-hidden border-border/70 bg-card shadow-sm dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md";
   const sectionHeaderClass = "bg-muted/40 border-b border-border";
   const softPanelClass = "rounded-[18px] border border-border bg-muted/30 p-4";
   const softSubpanelClass = "rounded-[16px] border border-border bg-card";
@@ -979,7 +1088,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
             <CardTitle className="text-base sm:text-lg">Secciones</CardTitle>
             <CardDescription className="text-xs sm:text-sm">Navega por la configuración</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-1 sm:space-y-2 p-2 sm:p-3">
+          <CardContent data-tour="admin-config-nav" className="space-y-1 sm:space-y-2 p-2 sm:p-3">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.value;
@@ -1025,9 +1134,12 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
             <span className="truncate">Volver a secciones</span>
           </button>
           {activeTab === "cuenta" && (
-            <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
+            <Card data-tour="admin-config-cuenta" className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
               <CardHeader className={`${sectionHeaderClass} shrink-0 p-4 sm:p-6`}>
-                <CardTitle className="text-base sm:text-lg">Configuración de tu Cuenta</CardTitle>
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  <Settings2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  Configuración de tu Cuenta
+                </CardTitle>
                 <CardDescription className="text-xs sm:text-sm">Gestiona tu foto, datos básicos y preferencias visuales.</CardDescription>
               </CardHeader>
               <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 p-4 sm:p-6 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
@@ -1284,8 +1396,15 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
           {activeTab === "formularios" && (
             <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
+              <CardHeader className={`${sectionHeaderClass} shrink-0 p-4 sm:p-6`}>
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  Formularios
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Configura el acceso y vencimiento de cada formulario del sistema.</CardDescription>
+              </CardHeader>
               <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 p-4 sm:p-6 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
-                <div className={softPanelClass}>
+                <div data-tour="admin-config-formularios" className={softPanelClass}>
                   <div className="mb-3">
                     <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">Control por formulario</h3>
                     <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Define vencimiento y roles permitidos para cada apartado del sistema.</p>
@@ -1537,37 +1656,47 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
               <CardHeader className={`${sectionHeaderClass} shrink-0 p-4 sm:p-6`}>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
-                    <CardTitle className="text-base sm:text-lg">Grupos</CardTitle>
+                    <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                      <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                      Grupos
+                    </CardTitle>
                     <CardDescription className="text-xs sm:text-sm">Crear y administrar grupos que aparecerán en los formularios</CardDescription>
                   </div>
-                  <Button onClick={() => setIsCreateGroupOpen(true)} variant="success" className="gap-2 text-sm shrink-0">
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    Crear grupo
-                  </Button>
+                  <div data-tour="admin-config-grupos-btns" className="flex flex-col sm:flex-row gap-2 shrink-0">
+                    <Button onClick={() => setIsBulkCreateOpen(true)} variant="outline" className="gap-2 text-sm">
+                      <Layers className="h-4 w-4" aria-hidden="true" />
+                      Creación rápida
+                    </Button>
+                    <Button onClick={() => setIsCreateGroupOpen(true)} variant="success" className="gap-2 text-sm">
+                      <Plus className="h-4 w-4" aria-hidden="true" />
+                      Crear grupo
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0 sm:pt-0 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
-                {/* Lista de grupos - Mejorado para móvil */}
+                {/* Lista de grupos */}
                 <div className={softPanelClass}>
+                  {/* Controles: búsqueda y selector de plan */}
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <h3 className="font-medium text-slate-900 dark:text-slate-100 text-sm sm:text-base">Grupos creados</h3>
+                      <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm sm:text-base">Grupos creados</h3>
                       <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                         {selectedPlanGroups.length} {selectedPlanGroups.length === 1 ? "grupo" : "grupos"} en {selectedPlanCareerGroups.length} {selectedPlanCareerGroups.length === 1 ? "carrera" : "carreras"} · {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
                       </p>
                     </div>
-                    <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto md:items-center">
-                      <div className="relative w-full sm:w-64">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:items-center">
+                      <div className="relative w-full sm:w-56">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                         <Input
                           value={groupSearch}
                           onChange={(event) => setGroupSearch(event.target.value)}
                           placeholder="Buscar grupo"
-                          className="pl-9 text-sm"
+                          className="pl-8 text-sm h-9"
                         />
                       </div>
                       <Select value={groupViewPlan} onValueChange={(value) => setGroupViewPlan(value as "nuevo-modelo" | "plan-normal")}>
-                        <SelectTrigger className="w-full sm:w-64 text-sm">
+                        <SelectTrigger className="w-full sm:w-52 text-sm h-9">
                           <SelectValue placeholder="Ver plan" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1578,121 +1707,155 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                     </div>
                   </div>
 
-                  {/* CONTENEDOR CON SCROLL PARA GRUPOS - Ajustado para móvil */}
-                  <div className="mt-4 space-y-4 max-h-[400px] sm:max-h-[500px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
-                    {filteredGroups.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-                        No hay grupos que coincidan con la búsqueda.
+                  {/* Lista scrollable */}
+                  <div className="mt-4 space-y-3 max-h-[420px] sm:max-h-[520px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
+                    {selectedPlanCareerGroups.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-muted/20 py-10 text-center">
+                        <Users className="h-8 w-8 text-muted-foreground/40" />
+                        <p className="text-sm text-muted-foreground">
+                          {groups.length === 0
+                            ? "Aún no hay grupos creados."
+                            : groupSearch.trim()
+                            ? "No hay grupos que coincidan con la búsqueda."
+                            : "No hay grupos en este plan todavía."}
+                        </p>
                       </div>
                     ) : (
                       <>
-                        <div className="rounded-[18px] border border-border bg-card p-3 sm:p-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-3 dark:border-slate-800">
-                            <div>
-                              <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
-                                {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
-                              </h4>
-                              <p className="text-xs text-slate-500 dark:text-slate-400">{selectedPlanGroups.length} grupos en este plan</p>
+                        {/* Banner del plan */}
+                        <div className="flex items-center justify-between gap-2 rounded-2xl border border-emerald-200/50 bg-gradient-to-r from-emerald-50 via-emerald-50/60 to-transparent px-3 py-2.5 dark:border-emerald-900/30 dark:from-emerald-950/50 dark:via-emerald-950/20 dark:to-transparent">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-100 dark:bg-emerald-900/60">
+                              <Grid2x2 className="h-3 w-3 text-emerald-700 dark:text-emerald-400" />
                             </div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{selectedPlanCareerGroups.length} carreras con grupos</p>
+                            <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+                              {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
+                            </span>
                           </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="rounded-full bg-white/80 px-2.5 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-emerald-200/70 dark:bg-slate-900/60 dark:text-slate-400 dark:ring-emerald-800/40">
+                              {selectedPlanCareerGroups.length} {selectedPlanCareerGroups.length === 1 ? "carrera" : "carreras"}
+                            </span>
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400">
+                              {selectedPlanGroups.length} {selectedPlanGroups.length === 1 ? "grupo" : "grupos"}
+                            </span>
+                          </div>
+                        </div>
 
-                          {/* CONTENEDOR INTERNO CON SCROLL PARA LAS CARRERAS - Ajustado para móvil */}
-                          <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-3 max-h-[300px] sm:max-h-[400px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent hover:scrollbar-thumb-emerald-500/40">
-                            {selectedPlanCareerGroups.length === 0 ? (
-                              <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-                                No hay grupos creados para este plan.
-                              </div>
-                            ) : (
-                              selectedPlanCareerGroups.map(({ career, groups: careerGroups }) => (
-                                <div key={career.codigo} className="rounded-[14px] border border-border bg-card/60">
-                                  <button
-                                    type="button"
-                                    onClick={() => setOpenCareer(openCareer === career.codigo ? null : career.codigo)}
-                                    className="w-full flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 text-left"
-                                    aria-expanded={openCareer === career.codigo}
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="truncate text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">{career.nombre}</p>
-                                      <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">{career.codigo} · {careerGroups.length} grupos creados</p>
-                                    </div>
-                                    <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                        {/* Acordeones por carrera */}
+                        {selectedPlanCareerGroups.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+                            No hay grupos creados para este plan.
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {selectedPlanCareerGroups.map(({ career, groups: careerGroups }) => (
+                              <div key={career.codigo} className="overflow-hidden rounded-[14px] border border-border/60 bg-card shadow-sm transition-shadow dark:border-slate-800/60 dark:bg-slate-900/40">
+                                {/* Header de carrera */}
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenCareer(openCareer === career.codigo ? null : career.codigo)}
+                                  className={`w-full flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors hover:bg-muted/40 dark:hover:bg-slate-800/30 ${openCareer === career.codigo ? "bg-muted/30 dark:bg-slate-800/20" : ""}`}
+                                  aria-expanded={openCareer === career.codigo}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${career.tipo === "TSU" ? "bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400" : "bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-400"}`}>
+                                      {career.tipo}
+                                    </span>
+                                    <p className="truncate text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100">{career.nombre}</p>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
                                       {careerGroups.length}
                                     </span>
-                                  </button>
+                                    <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${openCareer === career.codigo ? "rotate-180" : ""}`} />
+                                  </div>
+                                </button>
 
-                                  {openCareer === career.codigo && (() => {
-                                    const byCuat = careerGroups.reduce<Record<number, typeof careerGroups>>(
-                                      (acc, g) => { (acc[g.cuatrimestre] ??= []).push(g); return acc; },
-                                      {}
-                                    );
-                                    const cuatNums = Object.keys(byCuat).map(Number).sort((a, b) => a - b);
-                                    return (
-                                      <div className="space-y-2 border-t border-emerald-200/35 p-2 sm:p-3 dark:border-emerald-900/20 max-h-[340px] overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
-                                        {cuatNums.map((cuat) => {
-                                          const key = `${career.codigo}-${cuat}`;
-                                          const isOpen = openCuatrimestres.has(key);
-                                          return (
-                                            <div key={key} className="rounded-xl border border-emerald-200/40 dark:border-emerald-900/25 overflow-hidden">
-                                              <button
-                                                onClick={() => toggleCuatrimestre(key)}
-                                                className="flex w-full items-center justify-between gap-2 bg-emerald-50/60 px-3 py-2 text-left text-xs font-semibold text-emerald-800 hover:bg-emerald-100/60 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30 transition-colors"
-                                              >
-                                                <span>Cuatrimestre {cuat}</span>
-                                                <span className="flex items-center gap-1.5">
-                                                  <span className="rounded-full bg-emerald-200/70 px-2 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-800/50 dark:text-emerald-400">
-                                                    {byCuat[cuat].length} grupo{byCuat[cuat].length !== 1 ? "s" : ""}
-                                                  </span>
-                                                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                                {/* Contenido expandido: cuatrimestres */}
+                                {openCareer === career.codigo && (() => {
+                                  const byCuat = careerGroups.reduce<Record<number, typeof careerGroups>>(
+                                    (acc, g) => { (acc[g.cuatrimestre] ??= []).push(g); return acc; },
+                                    {}
+                                  );
+                                  const cuatNums = Object.keys(byCuat).map(Number).sort((a, b) => a - b);
+                                  return (
+                                    <div className="border-t border-border/50 dark:border-slate-800/50">
+                                      {cuatNums.map((cuat, idx) => {
+                                        const key = `${career.codigo}-${cuat}`;
+                                        const isOpen = openCuatrimestres.has(key);
+                                        return (
+                                          <div key={key} className={idx > 0 ? "border-t border-border/30 dark:border-slate-800/30" : ""}>
+                                            {/* Header de cuatrimestre */}
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleCuatrimestre(key)}
+                                              className="flex w-full items-center justify-between gap-2 bg-muted/30 px-4 py-2 text-left transition-colors hover:bg-muted/60 dark:bg-slate-800/20 dark:hover:bg-slate-800/40"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+                                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{cuatrimestresLabel(cuat)}</span>
+                                              </div>
+                                              <div className="flex items-center gap-1.5">
+                                                <span className="rounded-full bg-emerald-100/80 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                                                  {byCuat[cuat].length} {byCuat[cuat].length !== 1 ? "grupos" : "grupo"}
                                                 </span>
-                                              </button>
-                                              {isOpen && (
-                                                <div className="space-y-1.5 p-2">
+                                                <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`} />
+                                              </div>
+                                            </button>
+
+                                            {/* Chips de grupos */}
+                                            {isOpen && (
+                                              <div className="bg-background/60 p-2.5 dark:bg-slate-950/30">
+                                                <div className={`grid gap-1.5 ${byCuat[cuat].length > 1 ? "grid-cols-2" : ""}`}>
                                                   {byCuat[cuat].map((g) => (
-                                                    <div key={g.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 rounded-xl border border-border bg-muted/20 px-3 sm:px-4 py-2 sm:py-3">
-                                                      <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">
-                                                        <p className="truncate font-medium text-xs sm:text-sm">{g.name}</p>
-                                                        <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Grupo {g.groupNumber}</p>
+                                                    <div
+                                                      key={g.id}
+                                                      className="group flex items-center justify-between gap-2 rounded-xl border border-border/50 bg-background/80 px-3 py-2 transition-all hover:border-emerald-200/70 hover:shadow-sm dark:border-slate-800/50 dark:bg-slate-900/50 dark:hover:border-emerald-900/50"
+                                                    >
+                                                      <div className="flex min-w-0 items-center gap-2.5">
+                                                        <div className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/40 dark:bg-emerald-400" />
+                                                        <span className="truncate font-mono text-sm font-bold tracking-wide text-slate-800 dark:text-slate-100">{g.name}</span>
                                                       </div>
-                                                      <div className="flex items-center gap-2">
+                                                      <div className="flex shrink-0 items-center gap-0.5 opacity-50 transition-opacity group-hover:opacity-100">
                                                         <Button
-                                                          variant="outline"
+                                                          variant="ghost"
                                                           size="icon"
                                                           onClick={() => handleStartEditGroup(g)}
                                                           disabled={Boolean(editingGroupId)}
-                                                          className="h-8 w-8 sm:h-9 sm:w-9 rounded-full"
+                                                          className="h-7 w-7 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400"
                                                           aria-label={`Editar grupo ${g.name}`}
                                                           title="Editar grupo"
                                                         >
-                                                          <PencilLine className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                                                          <PencilLine className="h-3 w-3" />
                                                         </Button>
                                                         <Button
                                                           variant="ghost"
                                                           size="icon"
                                                           onClick={() => handleRemoveGroup(g.id)}
                                                           disabled={Boolean(editingGroupId)}
-                                                          className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                                                          className="h-7 w-7 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 dark:text-rose-500 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
                                                           aria-label={`Eliminar grupo ${g.name}`}
                                                           title="Eliminar grupo"
                                                         >
-                                                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                                                          <Trash2 className="h-3 w-3" />
                                                         </Button>
                                                       </div>
                                                     </div>
                                                   ))}
                                                 </div>
-                                              )}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              ))
-                            )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            ))}
                           </div>
-                        </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -1703,7 +1866,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
           {activeTab === "supervisores" && (
             <div className="flex flex-col flex-1 min-h-0 space-y-4">
-              <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
+              <Card data-tour="admin-config-supervisores" className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
                 <CardHeader className={`${sectionHeaderClass} shrink-0 p-4 sm:p-6`}>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
@@ -1891,7 +2054,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                 }
                 setIsLoading(true);
                 try {
-                  await deleteTarget.onConfirm();
+                  deleteTarget.onConfirm();
                 } finally {
                   setDeleteTarget(null);
                   setDeleteConfirmation("");
@@ -1964,7 +2127,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                 <SelectContent>
                   {editingCuatrimestresDisponibles.map((number) => (
                     <SelectItem key={number} value={String(number)}>
-                      {number}
+                      {cuatrimestresLabel(number)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1988,18 +2151,198 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
             <Button
               variant="outline"
               onClick={clearEditingGroupState}
-              disabled={isEditingGroupDirty}
+              disabled={isLoading}
               className="w-full sm:w-auto text-sm"
             >
-              Cerrar
+              {isEditingGroupDirty ? "Descartar cambios" : "Cerrar"}
             </Button>
             <Button
               variant="success"
               onClick={handleSaveGroupEdit}
-              disabled={!editingGroupId || !editingGroupCareerCode.trim() || !editingGroupCuatrimestre}
+              disabled={isLoading || !editingGroupId || !editingGroupCareerCode.trim() || !editingGroupCuatrimestre}
               className="w-full sm:w-auto text-sm"
             >
               Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de creación rápida por lote */}
+      <Dialog open={isBulkCreateOpen} onOpenChange={(open) => { if (!isBulkCreating) { setIsBulkCreateOpen(open); if (!open) { setBulkCareerCode(""); setBulkCuatQuantities({}); setBulkExcludedCuats(new Set()); setBulkPlan("nuevo-modelo"); } } }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Creación rápida de grupos</DialogTitle>
+            <DialogDescription className="text-sm">
+              Selecciona la carrera y define cuántos grupos crear por cuatrimestre. Descarta los que ya tengas creados.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Select value={bulkPlan} onValueChange={(v: any) => { setBulkPlan(v); setBulkCareerCode(""); setBulkCuatQuantities({}); setBulkExcludedCuats(new Set()); }}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
+                  <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                </SelectContent>
+              </Select>
+              <Popover open={bulkCareerPopoverOpen} onOpenChange={setBulkCareerPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={bulkCareerPopoverOpen}
+                    className="w-full justify-between text-sm font-normal h-9 px-3"
+                  >
+                    <span className="truncate text-left">
+                      {bulkCareerCode
+                        ? (bulkCareerOptions.find((c) => c.codigo === bulkCareerCode)?.nombre ?? "Carrera")
+                        : <span className="text-muted-foreground">Carrera</span>}
+                    </span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[--radix-popover-trigger-width] p-0"
+                  align="start"
+                  onWheel={(e) => e.stopPropagation()}
+                >
+                  <Command>
+                    <CommandInput placeholder="Buscar carrera..." className="h-9 text-sm" />
+                    <CommandList className="max-h-60">
+                      <CommandEmpty className="py-4 text-center text-sm text-muted-foreground">
+                        No se encontró ninguna carrera.
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {bulkCareerOptions.map((career) => (
+                          <CommandItem
+                            key={career.codigo}
+                            value={`${career.nombre} ${career.codigo}`}
+                            onSelect={() => { setBulkCareerCode(career.codigo); setBulkCareerPopoverOpen(false); }}
+                            className="py-2 text-sm"
+                          >
+                            <Check className={cn("mr-2 h-4 w-4 shrink-0", bulkCareerCode === career.codigo ? "opacity-100" : "opacity-0")} />
+                            <span className="break-words leading-snug">{career.nombre}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {bulkSelectedCareer && bulkCuatrimestres.length > 0 && (
+              <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Grupos por cuatrimestre
+                  </p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                    {bulkExcludedCuats.size > 0 && `${bulkExcludedCuats.size} descartado${bulkExcludedCuats.size !== 1 ? "s" : ""}`}
+                  </p>
+                </div>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                  {bulkCuatrimestres.map((cuat) => {
+                    const excluded = bulkExcludedCuats.has(cuat);
+                    return (
+                      <div
+                        key={cuat}
+                        className={`flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 transition-colors ${excluded ? "bg-muted/40 opacity-50" : "hover:bg-muted/30"}`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-sm ${excluded ? "line-through text-muted-foreground" : "text-slate-700 dark:text-slate-300"}`}>
+                            {cuatrimestresLabel(cuat)}
+                          </span>
+                          {(bulkExistingByCuat[cuat] ?? 0) > 0 && (
+                            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
+                              {bulkExistingByCuat[cuat]} ya {bulkExistingByCuat[cuat] === 1 ? "existe" : "existen"}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {!excluded ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setBulkCuatQuantities((prev) => ({ ...prev, [cuat]: Math.max(1, (prev[cuat] ?? 4) - 1) }))}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background text-sm font-bold transition-colors hover:bg-muted"
+                              >
+                                −
+                              </button>
+                              <span className="w-5 text-center font-mono text-sm font-semibold tabular-nums">
+                                {bulkCuatQuantities[cuat] ?? 4}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setBulkCuatQuantities((prev) => ({ ...prev, [cuat]: Math.min(8, (prev[cuat] ?? 4) + 1) }))}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background text-sm font-bold transition-colors hover:bg-muted"
+                              >
+                                +
+                              </button>
+                              <button
+                                type="button"
+                                title="Descartar este cuatrimestre"
+                                onClick={() => setBulkExcludedCuats((prev) => { const next = new Set(prev); next.add(cuat); return next; })}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              title="Incluir este cuatrimestre"
+                              onClick={() => setBulkExcludedCuats((prev) => { const next = new Set(prev); next.delete(cuat); return next; })}
+                              className="rounded-md border border-dashed border-slate-300 px-2.5 py-1 text-[11px] font-medium text-slate-400 transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-600 dark:hover:border-emerald-600 dark:hover:text-emerald-400"
+                            >
+                              Incluir
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between border-t border-border pt-2 mt-1">
+                  <span className="text-xs text-muted-foreground">Total a crear</span>
+                  <span className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    {bulkTotalGroups} {bulkTotalGroups === 1 ? "grupo" : "grupos"}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => { setIsBulkCreateOpen(false); setBulkCareerCode(""); setBulkCuatQuantities({}); setBulkExcludedCuats(new Set()); setBulkPlan("nuevo-modelo"); }}
+              disabled={isBulkCreating}
+              className="w-full sm:w-auto text-sm"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleBulkCreate}
+              variant="success"
+              disabled={!bulkCareerCode || bulkTotalGroups === 0 || isBulkCreating}
+              className="w-full sm:w-auto gap-2 text-sm"
+            >
+              {isBulkCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creando grupos...
+                </>
+              ) : (
+                <>
+                  <Layers className="h-4 w-4" />
+                  {bulkTotalGroups > 0 ? `Crear ${bulkTotalGroups} grupos` : "Crear grupos"}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2045,7 +2388,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                 <SelectContent>
                   {cuatrimestresDisponibles.map((number) => (
                     <SelectItem key={number} value={String(number)}>
-                      {number}
+                      {cuatrimestresLabel(number)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -2073,7 +2416,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
-              onClick={() => setIsCreateGroupOpen(false)}
+              onClick={() => { setIsCreateGroupOpen(false); setCareerCode(""); setCuatrimestre(""); setGroupNumber(1); }}
               className="w-full sm:w-auto text-sm"
             >
               Cancelar

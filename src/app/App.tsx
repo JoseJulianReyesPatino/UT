@@ -46,7 +46,11 @@ import {
   Menu,
   Sun,
   Moon,
+  HelpCircle,
 } from "lucide-react";
+import { TourOverlay } from "./components/tour/TourOverlay";
+import { adminTourSteps } from "./tours/adminTourSteps";
+import { getDocenteTourSteps } from "./tours/docenteTourSteps";
 
 // IMPORTAR LAS IMÁGENES AQUÍ
 import PlaneacionSuperiorImg from "../assets/superior_form.png";
@@ -85,6 +89,10 @@ function AppContent() {
   const initialSplashPlayedRef = useRef(false);
   const canAccessTutorias = user?.role === "tutor" || user?.roles?.includes("tutor");
   const isSupervisor = user?.role === "supervisor" || user?.roles?.includes("supervisor");
+  const isAdmin = user?.role === "administrador";
+  const [isAdminTourOpen, setIsAdminTourOpen] = useState(false);
+  const isDocente = !isAdmin && !isSupervisor;
+  const [isDocenteTourOpen, setIsDocenteTourOpen] = useState(false);
   const noticeBanner = notice ? (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4 sm:top-6">
       <Alert
@@ -439,9 +447,9 @@ function AppContent() {
         case "calendario":
           return <CalendarioAdmin />;
         case "configuracion":
-          return <Configuration />;
+          return <Configuration onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
         case "configuracion-cuenta":
-          return <Configuration initialTab="cuenta" />;
+          return <Configuration initialTab="cuenta" onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
         default:
           return <AdminDashboard onNavigate={setCurrentView} />;
       }
@@ -481,15 +489,15 @@ function AppContent() {
             { code: "ficha-tecnica",          label: "Ficha Técnica" },
           ]} />;
         case "perfil":
-          return <Profile />;
+          return <Profile onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
         default:
-          return <Profile />;
+          return <Profile onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
       }
     }
 
     {
       const wrapForm = (formId: Parameters<typeof FormAccessGuard>[0]["formId"], title: string, element: React.ReactNode) => (
-        <FormAccessGuard formId={formId} title={title}>
+        <FormAccessGuard formId={formId} title={title} tourForceOpen={isDocenteTourOpen}>
           {element}
         </FormAccessGuard>
       );
@@ -502,7 +510,7 @@ function AppContent() {
         case "dashboard":
           return <DocenteDashboard onNavigate={setCurrentView} />;
         case "planeacion":
-          return wrapForm("planeacion", "Planeación", <PlaneacionPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
+          return wrapForm("planeacion", "Planeación", <PlaneacionPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} isTourActive={isDocenteTourOpen} />);
         case "instrumento-30-normal":
           return wrapForm("instrumento-30-normal", "Instrumento 30%", <Instrumento30Page onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "instrumento-40-nuevo":
@@ -536,11 +544,11 @@ function AppContent() {
         case "tutorias-ficha-tecnica":
           return wrapForm("ficha-tecnica", "Ficha Técnica", <TutoriasPage initialType="ficha-tecnica" onNavigateHome={() => setCurrentView("tutorias")} />);
         case "historial":
-          return <DocumentHistory />;
+          return <DocumentHistory isTourActive={isDocenteTourOpen} />;
         case "mensajes":
           return <Messages initialOpen={deferredMessageOpen} onConsume={() => setDeferredMessageOpen(null)} />;
         case "perfil":
-          return <Profile />;
+          return <Profile onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
         default:
           return <DocenteDashboard onNavigate={setCurrentView} />;
       }
@@ -734,6 +742,34 @@ function AppContent() {
               </div>
             </main>
 
+            {isAdmin && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setIsAdminTourOpen(true)}
+                aria-label="Iniciar tutorial del sistema"
+                title="Iniciar tutorial del sistema"
+                className="fixed bottom-16 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+            )}
+
+            {isDocente && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setIsDocenteTourOpen(true)}
+                aria-label="Iniciar tutorial del sistema"
+                title="Iniciar tutorial del sistema"
+                className="fixed bottom-16 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+            )}
+
             <Button
               type="button"
               variant="outline"
@@ -747,6 +783,46 @@ function AppContent() {
             </Button>
 
             <Toaster />
+
+            {isAdmin && (
+              <TourOverlay
+                steps={adminTourSteps}
+                isOpen={isAdminTourOpen}
+                onClose={() => setIsAdminTourOpen(false)}
+                onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+                onNavigate={(view) => {
+                  const [mainView, subParam] = view.split(":");
+                  setCurrentView(mainView);
+                  if (subParam) {
+                    setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent("tour-sub-nav", { detail: subParam }));
+                    }, 200);
+                  }
+                }}
+              />
+            )}
+
+            {isDocente && (
+              <TourOverlay
+                steps={getDocenteTourSteps(
+                  // Mostrar tutorías solo si el usuario tiene rol docente Y tutor simultáneamente.
+                  // Tutor puro → ya conoce la sección; docente puro → no aparece en su menú.
+                  (user?.role === "docente" || (user?.roles?.includes("docente") ?? false)) && canAccessTutorias
+                )}
+                isOpen={isDocenteTourOpen}
+                onClose={() => setIsDocenteTourOpen(false)}
+                onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+                onNavigate={(view) => {
+                  const [mainView, subParam] = view.split(":");
+                  setCurrentView(mainView);
+                  if (subParam) {
+                    setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent("tour-sub-nav", { detail: subParam }));
+                    }, 200);
+                  }
+                }}
+              />
+            )}
 
             <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
               <DialogContent className="rounded-3xl border border-emerald-200/80 bg-white/95 px-6 py-6 shadow-2xl shadow-emerald-300/20 dark:border-slate-700 dark:bg-slate-950/95">

@@ -21,10 +21,10 @@ import {
 // --- Importar las imágenes desde assets ---
 // Imágenes para desktop
 import banner1 from "../../../assets/123.png";
-import banner2 from "../../../assets/Carrusel6.jpg";
-import banner3 from "../../../assets/carrusel3.png";
-import banner4 from "../../../assets/carrusel4.png";
-import banner5 from "../../../assets/carrusel5.png";
+import banner2 from "../../../assets/carruselPC1.jpg";
+import banner3 from "../../../assets/carruselPC2.jpg";
+import banner4 from "../../../assets/carruselPC3.jpg";
+import banner5 from "../../../assets/123.png";
 
 // Imágenes para móvil (versiones optimizadas)
 // Si no tienes versiones específicas para móvil, usa las mismas
@@ -33,6 +33,11 @@ import banner2Mobile from "../../../assets/carrusel2.png";
 import banner3Mobile from "../../../assets/carrusel3.png";
 import banner4Mobile from "../../../assets/carrusel4.png";
 import banner5Mobile from "../../../assets/carrusel5.png";
+
+// --- Importar logos para el slider ---
+import { CarrerasLogoSlider } from "../../components/CarrerasLogoSlider";
+// Agrega más logos aquí si tienes otros
+// import logoOtro from "../../../assets/OtroLogo.png";
 
 // --- Caché en memoria compartida ---
 let dashboardCache: {
@@ -143,6 +148,8 @@ type FormItem = {
 const introBanners = [banner1, banner2, banner3, banner4, banner5];
 const introBannersMobile = [banner1Mobile, banner2Mobile, banner3Mobile, banner4Mobile, banner5Mobile];
 
+// --- Arreglo de logos para el slider (duplicados para efecto continuo) ---
+
 // --- Skeletons de carga ---
 function StatCardSkeleton() {
   return (
@@ -219,8 +226,15 @@ function AutoFadeBannerCarousel({
   intervalMs?: number 
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(() => {
+    try { return localStorage.getItem("carousel_minimized") === "true"; } catch { return false; }
+  });
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+  const [imageLoaded, setImageLoaded] = useState(() => {
+    const firstSrc = (window.innerWidth < 640 && mobileImages?.length) ? mobileImages[0] : images[0];
+    if (!firstSrc) return true;
+    try { const img = new Image(); img.src = firstSrc; return img.complete; } catch { return false; }
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -253,10 +267,28 @@ function AutoFadeBannerCarousel({
   const toggleMinimize = (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    setIsMinimized(!isMinimized);
+    const next = !isMinimized;
+    setIsMinimized(next);
+    try { localStorage.setItem("carousel_minimized", String(next)); } catch {}
   };
 
   const currentImages = (isMobile && mobileImages && mobileImages.length > 0) ? mobileImages : images;
+
+  if (!imageLoaded) {
+    return (
+      <div className="relative w-full">
+        <div className="w-full animate-pulse rounded-2xl bg-muted aspect-[1852/849] sm:aspect-[5375/934]" />
+        <img
+          src={currentImages[0]}
+          alt=""
+          aria-hidden="true"
+          className="absolute opacity-0 pointer-events-none w-0 h-0"
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setImageLoaded(true)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full overflow-hidden rounded-2xl transition-all duration-300 ease-in-out">
@@ -369,6 +401,8 @@ function AutoFadeBannerCarousel({
     </div>
   );
 }
+
+// --- Componente del slider infinito de logos ---
 
 export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const { onNavigate } = props;
@@ -622,7 +656,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         )}
 
         {/* Stats cards */}
-        <div className="relative z-10 mt-3 grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <div data-tour="docente-dashboard-stats" className="relative z-10 mt-3 grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
           {isLoadingStats ? (
             <StatCardSkeleton />
           ) : (
@@ -661,7 +695,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         {/* Documentos Recientes y Próximas Entregas */}
         <div className="relative z-10 mt-3 grid gap-6 xl:grid-cols-2">
           {/* Card de Documentos Recientes */}
-          <Card className="overflow-hidden rounded-3xl border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+          <Card data-tour="docente-dashboard-recent" className="overflow-hidden rounded-3xl border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -758,7 +792,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           </Card>
 
           {/* Card de Próximas Entregas */}
-          <Card className="overflow-hidden rounded-3xl border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+          <Card data-tour="docente-dashboard-upcoming" className="overflow-hidden rounded-3xl border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -850,6 +884,11 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Slider infinito de logos institucionales */}
+        <div data-tour="docente-dashboard-carreras">
+          <CarrerasLogoSlider />
         </div>
       </div>
 

@@ -12,7 +12,7 @@ export default function SupervisorDashboard({ onNavigate }: Readonly<SupervisorD
   const { user } = useAuth();
   const firstName = user?.firstNames?.split(" ")[0] ?? user?.name?.split(" ")[0] ?? "Supervisor";
 
-  const statCardCls = "overflow-hidden rounded-[22px] border border-border bg-card shadow-sm";
+  const statCardCls = "overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md";
 
   return (
     <div className="relative space-y-6 overflow-hidden">
@@ -34,7 +34,7 @@ export default function SupervisorDashboard({ onNavigate }: Readonly<SupervisorD
         <button
           type="button"
           onClick={() => onNavigate?.("supervisor-planeacion")}
-          className="group relative overflow-hidden rounded-[22px] border border-border bg-card p-5 text-left shadow-sm transition-all hover:border-emerald-400/60 hover:shadow-md dark:hover:border-emerald-600/40"
+          className="group relative overflow-hidden rounded-[22px] border-border/70 bg-card p-5 text-left shadow-sm transition-all hover:border-emerald-400/60 hover:shadow-md dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md dark:hover:border-emerald-600/40"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-emerald-950/30" />
           <div className="relative flex items-center gap-4">
@@ -51,7 +51,7 @@ export default function SupervisorDashboard({ onNavigate }: Readonly<SupervisorD
         <button
           type="button"
           onClick={() => onNavigate?.("supervisor-instrumentos")}
-          className="group relative overflow-hidden rounded-[22px] border border-border bg-card p-5 text-left shadow-sm transition-all hover:border-emerald-400/60 hover:shadow-md dark:hover:border-emerald-600/40"
+          className="group relative overflow-hidden rounded-[22px] border-border/70 bg-card p-5 text-left shadow-sm transition-all hover:border-emerald-400/60 hover:shadow-md dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md dark:hover:border-emerald-600/40"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-emerald-950/30" />
           <div className="relative flex items-center gap-4">

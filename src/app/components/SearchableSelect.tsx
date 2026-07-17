@@ -22,12 +22,14 @@ export function SearchableSelect({
   options,
   placeholder,
   allLabel,
+  triggerClassName,
 }: {
   value: string;
   onValueChange: (value: string) => void;
   options: SearchableSelectOption[];
   placeholder?: string;
   allLabel: string;
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -47,7 +49,10 @@ export function SearchableSelect({
           type="button"
           role="combobox"
           aria-expanded={open}
-          className="flex w-full min-w-0 max-w-full items-center justify-between gap-1 rounded-full border border-input bg-background px-3 py-[7px] text-[13px] leading-tight shadow-sm hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 sm:text-sm"
+          className={cn(
+            "flex w-full min-w-0 max-w-full items-center justify-between gap-1 rounded-full border border-input bg-background px-3 py-[7px] text-[13px] leading-tight shadow-sm hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 sm:text-sm",
+            triggerClassName
+          )}
         >
           <span className="truncate text-left">{displayLabel}</span>
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />

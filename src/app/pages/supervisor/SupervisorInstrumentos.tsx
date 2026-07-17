@@ -161,7 +161,7 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
     });
   }, [currentDocs, currentFilter]);
 
-  const sectionCardCls = "overflow-hidden rounded-[22px] border border-border bg-card shadow-sm";
+  const sectionCardCls = "overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md";
 
   const renderDocumentCard = (doc: DocRecord) => {
     const rawTitle = doc.title ?? "";
@@ -174,7 +174,7 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
     const parcialNum = getParcialNum(doc.parcial);
 
     return (
-      <div key={doc.id} className="relative flex flex-col gap-4 rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted/50 lg:flex-row lg:items-center lg:justify-between">
+      <div key={doc.id} className="relative flex flex-col gap-4 rounded-2xl border border-border/70 bg-white p-4 transition-colors hover:bg-slate-50 dark:bg-slate-900/90 dark:hover:bg-slate-800/90 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-start gap-3 flex-1">
           <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
             <FileText className="h-6 w-6 text-muted-foreground" />
@@ -267,6 +267,39 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
     </div>
   );
 
+  const groupDocsByBatch = (docList: DocRecord[]): DocRecord[][] => {
+    const groups = new Map<string, DocRecord[]>();
+    for (const doc of docList) {
+      const key = doc.batch_id ?? `single-${doc.id}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(doc);
+    }
+    return Array.from(groups.values());
+  };
+
+  const renderBatchGroup = (group: DocRecord[]) => {
+    if (group.length === 1) return renderDocumentCard(group[0]);
+    const first = group[0];
+    const docenteName = first.uploaded_by_name ?? "Docente";
+    const apartado = first.form_title ?? first.title ?? "";
+    return (
+      <div key={first.batch_id} className="overflow-hidden rounded-2xl border border-emerald-200/60 dark:border-emerald-800/40">
+        <div className="flex items-center gap-2 bg-emerald-50/80 px-4 py-2.5 dark:bg-emerald-950/30">
+          <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+            {group.length} archivos del mismo envío
+          </span>
+          <span className="text-xs text-emerald-600/70 dark:text-emerald-500">
+            · {docenteName}{apartado ? ` · ${apartado}` : ""}
+          </span>
+        </div>
+        <div className="divide-y divide-border/50">
+          {group.map(renderDocumentCard)}
+        </div>
+      </div>
+    );
+  };
+
   const renderDocList = (docList: DocRecord[]) => {
     if (isCurrentLoading) {
       return <DocumentCardSkeleton />;
@@ -281,7 +314,11 @@ export default function SupervisorInstrumentos({ allowedSections }: Readonly<Sup
         </div>
       );
     }
-    return <div className="space-y-3">{docList.map(renderDocumentCard)}</div>;
+    return (
+      <div className="space-y-3">
+        {groupDocsByBatch(docList).map((group) => renderBatchGroup(group))}
+      </div>
+    );
   };
 
   return (

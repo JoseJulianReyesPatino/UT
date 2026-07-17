@@ -5,7 +5,10 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent } from "../components/ui/card";
-import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
+import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon, KeyRound, RotateCcw } from "lucide-react";
+import apiFetch from "../lib/api";
+import { toast } from "sonner";
 
 export function Login() {
   const THEME_TOGGLE_COOLDOWN_MS = 700;
@@ -15,7 +18,15 @@ export function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [isForgotFlipped, setIsForgotFlipped] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
-  const [forgotSubmitted, setForgotSubmitted] = useState(false);
+  const [forgotStep, setForgotStep] = useState<"email" | "code">("email");
+  const [forgotCode, setForgotCode] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [showForgotNew, setShowForgotNew] = useState(false);
+  const [showForgotConfirm, setShowForgotConfirm] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+  const [forgotSuccess, setForgotSuccess] = useState("");
   const lastThemeToggleRef = useRef(0);
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -30,10 +41,10 @@ export function Login() {
   const cardSurface = isDark
     ? "bg-slate-950/85 border-slate-800/80 shadow-[0_24px_70px_rgba(0,0,0,0.45)]"
     : "bg-white border-slate-100/50 shadow-2xl";
-  const labelText = isDark ? "text-slate-200" : "text-slate-700";
+  const labelText = isDark ? "text-white" : "text-slate-700";
   const helperText = isDark ? "text-slate-400" : "text-slate-500";
   const inputClasses =
-    "h-12 rounded-xl border bg-white/95 pl-12 pr-14 text-base text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 hover:border-slate-300 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:border-slate-700 dark:hover:border-slate-600";
+    "h-12 rounded-xl border bg-white/95 pl-12 pr-14 text-base text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 hover:border-slate-300 dark:bg-white/95 dark:text-slate-900 dark:placeholder:text-slate-400 dark:border-slate-300 dark:hover:border-slate-400";
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -56,19 +67,98 @@ export function Login() {
     toggleTheme();
   };
 
-  const handleForgotSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setForgotSubmitted(true);
-  };
-
   const openForgotPassword = () => {
     setForgotEmail(email);
-    setForgotSubmitted(false);
+    setForgotStep("email");
+    setForgotCode("");
+    setForgotNewPassword("");
+    setForgotConfirmPassword("");
+    setForgotError("");
+    setForgotSuccess("");
     setIsForgotFlipped(true);
   };
 
   const closeForgotPassword = () => {
     setIsForgotFlipped(false);
+  };
+
+  const handleForgotEmailSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setForgotError("");
+    setForgotLoading(true);
+    try {
+      await apiFetch("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+      setForgotStep("code");
+    } catch {
+      toast.error("No se pudo enviar el código. Verifica tu correo e intenta de nuevo.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setForgotError("");
+    setForgotCode("");
+    setForgotLoading(true);
+    try {
+      await apiFetch("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+      toast.success("¡Código reenviado! Revisa tu bandeja de entrada.");
+    } catch {
+      toast.error("No se pudo reenviar el código. Inténtalo de nuevo.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResetPasswordSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setForgotError("");
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError("Las contraseñas no coinciden.");
+      return;
+    }
+    if (forgotNewPassword.length < 8) {
+      setForgotError("La contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      await apiFetch("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({
+          email: forgotEmail,
+          token: forgotCode,
+          password: forgotNewPassword,
+          password_confirmation: forgotConfirmPassword,
+        }),
+      });
+      // Cerrar dialog y volver al login
+      setForgotStep("email");
+      setForgotCode("");
+      setForgotNewPassword("");
+      setForgotConfirmPassword("");
+      setForgotError("");
+      setIsForgotFlipped(false);
+      toast.success("¡Contraseña cambiada exitosamente! Ya puedes iniciar sesión con tu nueva contraseña.", {
+        duration: 6000,
+      });
+    } catch (err: any) {
+      if (err?.status === 422) {
+        const apiErrors = err?.errors?.token ?? err?.errors?.password;
+        const msg = Array.isArray(apiErrors) ? apiErrors[0] : "Código incorrecto o expirado. Solicita uno nuevo.";
+        setForgotError(msg);
+      } else {
+        toast.error("Ocurrió un error al cambiar la contraseña. Inténtalo de nuevo más tarde.");
+      }
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   return (
@@ -183,10 +273,16 @@ export function Login() {
                     Bienvenido
                   </p>
                 </div>
-                <p className={`${helperText} mt-2 text-center`}>
-                  <span className="lg:hidden">Accede al sistema de gestión académica digital</span>
-                  <span className="hidden lg:inline">Accede a tu plataforma académica institucional</span>
-                </p>
+                {isForgotFlipped ? (
+                  <p className={`${helperText} mt-2 text-center`}>
+                    Recupera el acceso a tu cuenta institucional
+                  </p>
+                ) : (
+                  <p className={`${helperText} mt-2 text-center`}>
+                    <span className="lg:hidden">Accede al sistema de gestión académica digital</span>
+                    <span className="hidden lg:inline">Accede a tu plataforma académica institucional</span>
+                  </p>
+                )}
               </div>
 
               <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-8 dark:via-slate-700" />
@@ -274,68 +370,58 @@ export function Login() {
                   </div>
 
                   <div className="absolute inset-0 w-full [backface-visibility:hidden] [transform:rotateY(180deg)]">
-                    <div className="flex h-full flex-col justify-between rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-lg dark:border-slate-800 dark:bg-slate-950/95">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">¿Olvidaste tu contraseña?</h3>
+
+                    {/* ── PASO 1: Ingresar correo ── */}
+                    {forgotStep === "email" && (
+                      <form onSubmit={handleForgotEmailSubmit} className="space-y-5">
+                        <div className="text-center">
+                          <h2 className={`text-xl font-bold ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                            ¿Olvidaste tu contraseña?
+                          </h2>
+                          <p className={`mt-1 text-sm ${helperText}`}>
+                            Te enviaremos un código de 6 dígitos a tu correo
+                          </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={closeForgotPassword}
-                          className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
-                          aria-label="Volver al login"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
 
-                      <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
-                        Ingresa tu correo institucional para recibir un enlace de recuperación.
-                      </p>
-
-                      <form onSubmit={handleForgotSubmit} className="mt-4 space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="forgot-email" className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Correo electrónico
+                        <div className="space-y-2 group/forgot-email">
+                          <Label htmlFor="forgot-email" className={`${labelText} font-medium text-sm`}>
+                            Correo Electrónico
                           </Label>
                           <div className="relative">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500" />
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 group-focus-within/forgot-email:text-[#3BBF82] transition-colors" />
                             <Input
                               id="forgot-email"
                               type="email"
                               value={forgotEmail}
                               onChange={(e) => setForgotEmail(e.target.value)}
-                              placeholder="Correo institucional"
-                              className="h-12 rounded-xl border bg-white/95 pl-12 pr-4 text-base text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-[#3BBF82] focus:border-transparent transition-all duration-200 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:border-slate-700"
+                              placeholder="Ingresa tu correo institucional"
+                              className={`${inputClasses} pl-12`}
                               required
+                              disabled={forgotLoading}
                             />
                           </div>
                         </div>
 
-                        {forgotSubmitted && (
-                          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
-                            Vista de frontend lista. Aquí se mostraría el enlace de recuperación.
-                          </div>
-                        )}
+                        <Button
+                          type="submit"
+                          disabled={forgotLoading}
+                          className="w-full h-12 rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white font-semibold text-base shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+                        >
+                          {forgotLoading ? (
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Enviando código...</>
+                          ) : "Enviar código"}
+                        </Button>
 
-                        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                            onClick={closeForgotPassword}
-                          >
-                            Regresar
-                          </Button>
-                          <Button
-                            type="submit"
-                            className="rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] text-white hover:from-[#2da06a] hover:to-[#1f7a54]"
-                          >
-                            Enviar enlace
-                          </Button>
-                        </div>
+                        <button
+                          type="button"
+                          className="w-full text-center text-xs font-medium text-[#3BBF82] hover:underline transition-colors duration-200"
+                          onClick={closeForgotPassword}
+                        >
+                          ¿Ya recuerdas tu contraseña? Inicia sesión
+                        </button>
                       </form>
-                    </div>
+                    )}
+
                   </div>
                 </div>
               </div>
@@ -355,6 +441,118 @@ export function Login() {
       >
         {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
       </Button>
+
+      {/* ── MODAL PASO 2: Código + nueva contraseña ── */}
+      <Dialog open={forgotStep === "code"} onOpenChange={(open) => { if (!open) { setForgotStep("email"); setForgotError(""); setForgotCode(""); setForgotNewPassword(""); setForgotConfirmPassword(""); } }}>
+        <DialogContent className="sm:max-w-md dark:bg-slate-950 dark:border-slate-800">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl dark:text-white">Ingresa tu código</DialogTitle>
+            <DialogDescription className="text-center dark:text-slate-400">
+              Revisa tu correo <span className="font-semibold text-foreground dark:text-slate-200">{forgotEmail}</span> · El código expira en <span className="font-semibold text-amber-500">30 min</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleResetPasswordSubmit} className="space-y-4 pt-2">
+            {/* Campo código */}
+            <div className="space-y-2 group/modal-code">
+              <Label htmlFor="modal-code" className="font-medium text-sm dark:text-white">
+                Código de verificación
+              </Label>
+              <div className="relative">
+                <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within/modal-code:text-[#3BBF82] transition-colors" />
+                <Input
+                  id="modal-code"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  value={forgotCode}
+                  onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="● ● ● ● ● ●"
+                  className={`${inputClasses} pl-12 text-center font-mono text-xl tracking-[0.5em]`}
+                  required
+                  disabled={forgotLoading}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Nueva contraseña */}
+            <div className="space-y-2 group/modal-new">
+              <Label htmlFor="modal-new-password" className="font-medium text-sm dark:text-white">
+                Nueva contraseña
+              </Label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within/modal-new:text-[#3BBF82] transition-colors" />
+                <Input
+                  id="modal-new-password"
+                  type={showForgotNew ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={forgotNewPassword}
+                  onChange={(e) => setForgotNewPassword(e.target.value)}
+                  placeholder="Mínimo 8 caracteres"
+                  className={`${inputClasses} pl-12 pr-12`}
+                  required
+                  disabled={forgotLoading}
+                />
+                <button type="button" onClick={() => setShowForgotNew((s) => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-[#3BBF82] transition-colors dark:text-slate-400">
+                  {showForgotNew ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirmar contraseña */}
+            <div className="space-y-2 group/modal-confirm">
+              <Label htmlFor="modal-confirm-password" className="font-medium text-sm dark:text-white">
+                Confirmar contraseña
+              </Label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within/modal-confirm:text-[#3BBF82] transition-colors" />
+                <Input
+                  id="modal-confirm-password"
+                  type={showForgotConfirm ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={forgotConfirmPassword}
+                  onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                  placeholder="Repite la nueva contraseña"
+                  className={`${inputClasses} pl-12 pr-12`}
+                  required
+                  disabled={forgotLoading}
+                />
+                <button type="button" onClick={() => setShowForgotConfirm((s) => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-[#3BBF82] transition-colors dark:text-slate-400">
+                  {showForgotConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            {forgotError && (
+              <p className="text-sm text-red-500 dark:text-red-400 text-center font-medium">{forgotError}</p>
+            )}
+
+            <Button
+              type="submit"
+              disabled={forgotLoading}
+              className="w-full h-12 rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white font-semibold text-base shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+            >
+              {forgotLoading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Cambiando contraseña...</>
+              ) : "Cambiar contraseña"}
+            </Button>
+
+            <button
+              type="button"
+              onClick={() => void handleResendCode()}
+              disabled={forgotLoading}
+              className="w-full flex items-center justify-center gap-1.5 h-9 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors disabled:opacity-50"
+            >
+              {forgotLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+              Reenviar código
+            </button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

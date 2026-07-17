@@ -19,6 +19,7 @@ import { apiFetch } from "../../lib/api";
 import { useFormAccess } from "../../hooks/useFormAccess";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { formatGroupCode } from "../../../lib/utils";
+import { HistorySheetSkeleton } from "./DocumentHistory";
 
 interface InstrumentoFormData {
   carrera: string;
@@ -52,6 +53,7 @@ export default function Instrumento40Page({ deadlineInfo, onDirtyChange }: { dea
   const formRef = useRef<HTMLDivElement | null>(null);
   const [groupsOptions, setGroupsOptions] = useState<Array<{ id: number; group_code: string; group_number: number }>>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: number; nombre: string } | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
@@ -117,15 +119,18 @@ export default function Instrumento40Page({ deadlineInfo, onDirtyChange }: { dea
   }, [formData.carrera, formData.cuatrimestre]);
 
   useEffect(() => {
+    setIsLoadingHistory(true);
     let cancelled = false;
     void (async () => {
       try {
-        if (!user) return;
+        if (!user) { setIsLoadingHistory(false); return; }
         const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 18, per_page: 50 } });
         if (cancelled) return;
         setHistory(Array.isArray(res?.data) ? res.data : []);
       } catch (error) {
         console.error("Could not load history", error);
+      } finally {
+        if (!cancelled) setIsLoadingHistory(false);
       }
     })();
 
@@ -206,6 +211,27 @@ export default function Instrumento40Page({ deadlineInfo, onDirtyChange }: { dea
     } catch (error) {
       toast.error("No fue posible eliminar el documento");
       console.error("Error al eliminar documentos", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleHideDocuments = async (documentIds: number[]) => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      for (const id of documentIds) {
+        await apiFetch(`/documents/${id}/hide`, { method: "PATCH" });
+      }
+      toast.success(documentIds.length > 1 ? `${documentIds.length} documentos ocultados del historial` : "Documento ocultado del historial");
+      await new Promise(resolve => setTimeout(resolve, 300));
+      if (user) {
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 18, per_page: 50 } });
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      }
+    } catch (error) {
+      toast.error("No fue posible ocultar el documento");
+      console.error("Error al ocultar documentos", error);
     } finally {
       setIsDeleting(false);
     }
@@ -601,7 +627,9 @@ export default function Instrumento40Page({ deadlineInfo, onDirtyChange }: { dea
               <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
             </SheetHeader>
             <div className="mt-4 space-y-4">
-              {groupedHistory.length > 0 ? (
+              {isLoadingHistory ? (
+                <HistorySheetSkeleton />
+              ) : groupedHistory.length > 0 ? (
                 <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
                   <div className="grid gap-3 p-1">
                     {groupedHistory.map((group) => {
@@ -623,6 +651,7 @@ export default function Instrumento40Page({ deadlineInfo, onDirtyChange }: { dea
                           onViewDocument={(docId) => { const doc = group.find((d: any) => d.id === docId); if (doc) openPreview(doc); }}
                           onEdit={() => void populateFormForEditBatch(group)}
                           onDelete={handleDeleteDocuments}
+                          onHide={handleHideDocuments}
                           onResubmit={(docId, fileName, returnedComment) => {
                             setResubmitTarget({ docId, fileName, returnedComment });
                             setResubmitFile(null);
@@ -681,14 +710,17 @@ export default function Instrumento40Page({ deadlineInfo, onDirtyChange }: { dea
             </div>
           )}
 
-          <div className="flex flex-col space-y-2">
-            <Label className="text-sm font-medium dark:text-white">Plan *</Label>
-            <div className="inline-flex w-fit max-w-xs flex-col rounded-2xl border-2 border-emerald-500 bg-emerald-50 px-4 py-3 text-sm shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30">
-              <span className="text-base font-semibold text-slate-900 dark:text-white">Plan Nuevo Modelo</span>
-              <span className="text-xs text-muted-foreground dark:text-slate-400">TSU e Ingenierías</span>
-            </div>
-          </div>
-
+       <div className="space-y-2">
+  <Label className="text-sm font-medium dark:text-white">Plan *</Label>
+  <div className="grid gap-3 sm:grid-cols-2">
+    <div className="flex items-start gap-3 rounded-2xl border-2 border-emerald-500 bg-emerald-50 px-4 py-4 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30">
+      <div className="flex-1">
+        <span className="block text-base font-semibold dark:text-white">Plan Nuevo Modelo</span>
+        <span className="block text-xs text-muted-foreground dark:text-slate-400">TSU e Ingenierías</span>
+      </div>
+    </div>
+  </div>
+</div>
           {/* Información académica */}
           <div className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4 dark:border-slate-800/70 dark:bg-slate-900/30 md:col-span-2 md:p-5">
             <div className="grid gap-4 md:grid-cols-2">

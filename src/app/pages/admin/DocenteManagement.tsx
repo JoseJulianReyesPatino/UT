@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
-import { UserPlus, Search, Edit, Key, UserCheck, UserX, ShieldAlert, Mail, SlidersHorizontal } from "lucide-react";
+import { UserPlus, Search, Edit, Key, UserCheck, UserX, Mail, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
@@ -173,42 +173,46 @@ function StatusConfirmationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <div className="flex items-start gap-3">
-            <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isDeactivating ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>
-              <ShieldAlert className="h-5 w-5" />
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden gap-0">
+        {/* Banda de encabezado con color según acción */}
+        <div className={`px-6 pt-6 pb-5 ${isDeactivating ? "bg-destructive/10" : "bg-success/10"}`}>
+          <div className="flex items-center gap-3 mb-1.5">
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${isDeactivating ? "bg-destructive/20 text-destructive" : "bg-success/20 text-success"}`}>
+              {isDeactivating ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
             </div>
-            <div className="space-y-1">
-              <DialogTitle>
-                {isDeactivating ? "Confirmar baja del docente" : "Confirmar alta del docente"}
-              </DialogTitle>
-              <DialogDescription>
-                Esta acción requiere confirmación adicional por seguridad.
-              </DialogDescription>
-            </div>
+            <DialogTitle className="text-base font-semibold leading-tight">
+              {isDeactivating ? "Dar de baja al docente" : "Dar de alta al docente"}
+            </DialogTitle>
           </div>
-        </DialogHeader>
+          <DialogDescription className="text-sm text-muted-foreground pl-12 leading-relaxed">
+            {isDeactivating
+              ? "El docente dejará de tener acceso al sistema hasta que sea dado de alta nuevamente."
+              : `Al confirmar, ${selectedDocente?.nombre ?? "el docente"} podrá volver a acceder al sistema con normalidad.`}
+          </DialogDescription>
+        </div>
+
+        {/* Tarjeta del docente */}
         {selectedDocente && (
-          <div className={`rounded-2xl border p-4 text-sm shadow-sm ${isDeactivating ? "border-destructive/15 bg-destructive/5" : "border-success/15 bg-success/5"}`}>
-            <div className="flex items-center gap-3">
-              <DocenteAvatar name={selectedDocente.nombre} avatar={selectedDocente.avatar} className="h-10 w-10" />
-              <div className="min-w-0">
-                <p className="font-semibold text-foreground truncate">{selectedDocente.nombre}</p>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Mail className="h-3.5 w-3.5" />
-                  <span className="truncate">{selectedDocente.email}</span>
+          <div className="px-6 py-5 border-y border-border/60">
+            <div className="flex items-center gap-3.5">
+              <DocenteAvatar name={selectedDocente.nombre} avatar={selectedDocente.avatar} className="h-11 w-11 shrink-0 ring-2 ring-border/40" />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-sm text-foreground truncate">{selectedDocente.nombre}</p>
+                <div className="flex items-center gap-1.5 mt-0.5 text-muted-foreground">
+                  <Mail className="h-3 w-3 shrink-0" />
+                  <span className="text-xs truncate">{selectedDocente.email}</span>
                 </div>
               </div>
+              <span className={`shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full border ${isDeactivating ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>
+                {isDeactivating ? "Activo" : "Inactivo"}
+              </span>
             </div>
-            <p className="mt-3 text-sm text-foreground/80">
-              {isDeactivating
-                ? "Para continuar con la baja, escribe el correo exacto del docente en el campo inferior."
-                : "Esta acción reactivará el acceso del usuario en la API."}
-            </p>
+
             {isDeactivating && (
-              <div className="space-y-2 pt-4">
-                <Label className="text-sm font-medium">Escribe el correo electrónico exacto para confirmar la baja</Label>
+              <div className="mt-4 space-y-2">
+                <Label className="text-xs font-medium text-foreground/80">
+                  Escribe el correo exacto para confirmar la baja
+                </Label>
                 <Input
                   type="email"
                   value={statusConfirmationEmail}
@@ -216,26 +220,30 @@ function StatusConfirmationDialog({
                   placeholder={selectedDocente.email}
                   autoComplete="off"
                   spellCheck={false}
-                  className="bg-background/80"
+                  className="h-9 bg-background text-sm"
                 />
-                <p className="text-xs text-muted-foreground">Debe coincidir carácter por carácter con el correo mostrado arriba.</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Debe coincidir carácter por carácter con el correo mostrado arriba.
+                </p>
               </div>
             )}
           </div>
         )}
-        <DialogFooter className="sm:justify-between">
-          <Button variant="outline" onClick={onCancel} disabled={isChangingStatus} className="sm:min-w-28">
+
+        {/* Pie del diálogo */}
+        <div className="px-6 py-4 flex items-center justify-end gap-2.5">
+          <Button variant="ghost" onClick={onCancel} disabled={isChangingStatus} className="h-9 px-4 text-sm">
             Cancelar
           </Button>
           <Button
             variant={buttonVariant}
             onClick={onConfirm}
-            className="sm:min-w-40"
+            className="h-9 px-5 text-sm min-w-36"
             disabled={!canConfirm}
           >
             {buttonLabel}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -371,7 +379,8 @@ export function DocenteManagement() {
       return (
         <div
           key={docente.id}
-          className="flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-background/80 p-4 transition-colors hover:bg-accent/60 dark:bg-slate-950/60 dark:hover:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between"
+          data-tour={docente.id === filteredDocentes[0]?.id ? "admin-docentes-user-card" : undefined}
+          className="flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-white p-4 transition-colors hover:bg-slate-50 dark:bg-slate-900/90 dark:hover:bg-slate-800/90 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex min-w-0 flex-1 items-center gap-4">
             <DocenteAvatar name={docente.nombre} avatar={docente.avatar} className="h-12 w-12 flex-shrink-0" />
@@ -619,18 +628,18 @@ export function DocenteManagement() {
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Gestión de Usuarios</h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">Administra usuarios y permisos del sistema.</p>
           </div>
-          <Button variant="success" onClick={() => setShowNewDialog(true)} className="self-start sm:self-auto shadow-md shadow-emerald-500/20">
+          <Button data-tour="admin-docentes-new-btn" variant="success" onClick={() => setShowNewDialog(true)} className="self-start sm:self-auto shadow-md shadow-emerald-500/20">
             <UserPlus className="h-4 w-4 mr-2" />
             Nuevo Usuario
           </Button>
         </div>
       </div>
 
-      <Card className="overflow-hidden border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-emerald-50/60 shadow-sm dark:border-emerald-900/50 dark:from-slate-950 dark:via-emerald-950/15 dark:to-emerald-950/20">
+      <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-emerald-900/50 dark:bg-slate-950/60 dark:backdrop-blur-md">
         <CardHeader>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CardTitle>Usuarios Registrados</CardTitle>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <div data-tour="admin-docentes-filters" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
               <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/75 px-3 py-2 dark:bg-slate-900/65">
                 <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Rol:</span>

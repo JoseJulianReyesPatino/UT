@@ -1,6 +1,7 @@
 export type DocRecord = {
   id: number;
   title: string;
+  batch_id?: string | null;
   submitted_at?: string | null;
   created_at?: string | null;
   materia?: string | null;

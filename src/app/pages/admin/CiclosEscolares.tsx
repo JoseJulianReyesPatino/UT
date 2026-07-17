@@ -7,6 +7,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import { AlertTriangle, Calendar, Check, ChevronLeft, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "../../components/ui/scroll-area";
@@ -568,7 +569,12 @@ export function CiclosEscolares() {
     }));
     if (plan === "Plan Nuevo Modelo") return nuevoModelo;
     if (plan === "Plan Normal") return planNormal;
-    return [...nuevoModelo, ...planNormal];
+    const seen = new Set<string>();
+    return [...nuevoModelo, ...planNormal].filter(({ value }) => {
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    });
   };
 
   const inferCuatrimestre = (parcial: string | null | undefined): string => {
@@ -1233,6 +1239,7 @@ export function CiclosEscolares() {
       for (const c of fromDocs) {
         if (!merged.includes(c)) merged.push(c);
       }
+      merged.sort((a, b) => Number(a) - Number(b));
       return merged;
     },
     [documents, selectedDocumentCategory, filterPlan, filterCarrera]
@@ -1284,6 +1291,7 @@ export function CiclosEscolares() {
       for (const c of fromDocs) {
         if (!merged.includes(c)) merged.push(c);
       }
+      merged.sort((a, b) => Number(a) - Number(b));
       return merged;
     },
     [tutorDocuments, selectedTutorCategory, filterTutorPlan, filterTutorCarrera]
@@ -1473,7 +1481,7 @@ export function CiclosEscolares() {
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Ciclos Escolares</h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">Administra los períodos académicos del sistema.</p>
           </div>
-          <Button variant="success" onClick={() => setShowNewDialog(true)} className="self-start sm:self-auto shadow-md shadow-emerald-500/20">
+          <Button data-tour="admin-ciclos-new-btn" variant="success" onClick={() => setShowNewDialog(true)} className="self-start sm:self-auto shadow-md shadow-emerald-500/20">
             <Plus className="h-4 w-4 mr-2" />
             Nuevo Ciclo
           </Button>
@@ -1493,14 +1501,14 @@ export function CiclosEscolares() {
         </div>
       ) : null}
 
-      <div className="grid gap-4">
+      <div data-tour="admin-ciclos-list" className="grid gap-4">
         {!isLoadingCycles && !cyclesLoadError && ciclos.map((ciclo) => {
           const documentsCount = cycleDocumentCount(ciclo);
 
           return (
             <Card
               key={ciclo.id}
-              className="overflow-hidden rounded-[22px] border border-border bg-card shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
+              className="overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md"
               tabIndex={0}
               onClick={() => openDocsForCycle(ciclo)}
               onKeyDown={(e) => {
@@ -1540,7 +1548,7 @@ export function CiclosEscolares() {
                       <p className="font-medium">{documentsCount}</p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
+                  <div data-tour="admin-ciclos-actions" className="flex flex-wrap gap-2 justify-start sm:justify-end">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button variant="outline" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openDocsForCycle(ciclo); }} aria-label="Ver documentos">
@@ -1751,9 +1759,9 @@ export function CiclosEscolares() {
 
       <Dialog open={showDocTypeDialog} onOpenChange={(open) => { if (!open) closeDocs(); }}>
         <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Seleccionar Tipo de Documentos</DialogTitle>
-            <DialogDescription className="text-base mt-2">
+          <DialogHeader className="pr-8 text-left">
+            <DialogTitle className="text-lg sm:text-2xl">Seleccionar Tipo de Documentos</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base mt-2">
               {isLoadingDocuments
                 ? "Cargando documentos del ciclo..."
                 : `¿Qué documentos deseas revisar para ${selectedCycle?.nombre}?`}
@@ -1765,46 +1773,42 @@ export function CiclosEscolares() {
               <span>Solo se cargaron {loadedDocsTotal} de {apiDocsTotal} documentos. Algunos pueden no aparecer en la lista.</span>
             </div>
           )}
-          <div className="grid gap-4 mt-2">
+          <div className="grid gap-3 mt-2">
             <Button
               onClick={() => handleSelectDocType("docentes")}
-              className="justify-start h-28 text-left flex flex-col items-start p-5 border-2 rounded-lg transition-all hover:shadow-lg"
+              className="w-full justify-start h-auto min-h-[5rem] text-left flex flex-col items-start gap-1 px-4 py-3 border-2 rounded-xl transition-all hover:shadow-lg whitespace-normal overflow-hidden"
               variant="outline"
               disabled={isLoadingDocuments || totalDocenteDocuments === 0}
             >
-              <FileText className="h-6 w-6 mb-3" />
-              <span className="font-semibold text-lg">Documentos Docentes {isLoadingDocuments ? "" : `(${totalDocenteDocuments})`}</span>
-              <span className="text-sm text-muted-foreground">Planeación, instrumentos, listas, asesorías y portafolio.</span>
+              <span className="font-semibold text-base leading-snug">Documentos Docentes {isLoadingDocuments ? "" : `(${totalDocenteDocuments})`}</span>
+              <span className="text-xs text-muted-foreground leading-snug">Planeación, instrumentos, listas, asesorías y portafolio.</span>
             </Button>
             <Button
               onClick={() => handleSelectDocType("estadias")}
-              className="justify-start h-28 text-left flex flex-col items-start p-5 border-2 rounded-lg transition-all hover:shadow-lg"
+              className="w-full justify-start h-auto min-h-[5rem] text-left flex flex-col items-start gap-1 px-4 py-3 border-2 rounded-xl transition-all hover:shadow-lg whitespace-normal overflow-hidden"
               variant="outline"
               disabled={isLoadingDocuments || totalEstadiasDocuments === 0}
             >
-              <FileText className="h-6 w-6 mb-3" />
-              <span className="font-semibold text-lg">Documentos de Estadías {isLoadingDocuments ? "" : `(${totalEstadiasDocuments})`}</span>
-              <span className="text-sm text-muted-foreground">Cartas, aceptación, terminación y acta final.</span>
+              <span className="font-semibold text-base leading-snug">Documentos de Estadías {isLoadingDocuments ? "" : `(${totalEstadiasDocuments})`}</span>
+              <span className="text-xs text-muted-foreground leading-snug">Cartas, aceptación, terminación y acta final.</span>
             </Button>
             <Button
               onClick={() => handleSelectDocType("tutores")}
-              className="justify-start h-28 text-left flex flex-col items-start p-5 border-2 rounded-lg transition-all hover:shadow-lg"
+              className="w-full justify-start h-auto min-h-[5rem] text-left flex flex-col items-start gap-1 px-4 py-3 border-2 rounded-xl transition-all hover:shadow-lg whitespace-normal overflow-hidden"
               variant="outline"
               disabled={isLoadingDocuments || totalTutorDocuments === 0}
             >
-              <FileText className="h-6 w-6 mb-3" />
-              <span className="font-semibold text-lg">Documentos Tutores {isLoadingDocuments ? "" : `(${totalTutorDocuments})`}</span>
-              <span className="text-sm text-muted-foreground">Carga académica, reportes, concentrados y fichas.</span>
+              <span className="font-semibold text-base leading-snug">Documentos Tutores {isLoadingDocuments ? "" : `(${totalTutorDocuments})`}</span>
+              <span className="text-xs text-muted-foreground leading-snug">Carga académica, reportes, concentrados y fichas.</span>
             </Button>
             <Button
               onClick={() => handleSelectDocType("remediales")}
-              className="justify-start h-28 text-left flex flex-col items-start p-5 border-2 rounded-lg transition-all hover:shadow-lg"
+              className="w-full justify-start h-auto min-h-[5rem] text-left flex flex-col items-start gap-1 px-4 py-3 border-2 rounded-xl transition-all hover:shadow-lg whitespace-normal overflow-hidden"
               variant="outline"
               disabled={isLoadingDocuments || totalRemedialDocuments === 0}
             >
-              <FileText className="h-6 w-6 mb-3" />
-              <span className="font-semibold text-lg">Documentos Remediales {isLoadingDocuments ? "" : `(${totalRemedialDocuments})`}</span>
-              <span className="text-sm text-muted-foreground">Actividades y actas de recuperación académica.</span>
+              <span className="font-semibold text-base leading-snug">Documentos Remediales {isLoadingDocuments ? "" : `(${totalRemedialDocuments})`}</span>
+              <span className="text-xs text-muted-foreground leading-snug">Actividades y actas de recuperación académica.</span>
             </Button>
           </div>
         </DialogContent>
@@ -1812,7 +1816,7 @@ export function CiclosEscolares() {
 
       <Dialog open={showDocumentTypeSelector} onOpenChange={(open) => { if (!open) closeDocs(); }}>
         <DialogContent className="max-w-3xl">
-          <DialogHeader className="pb-2">
+          <DialogHeader className="pb-2 pr-8">
             <div className="flex items-center gap-2 mb-1">
               <Button
                 onClick={() => {
@@ -1826,9 +1830,9 @@ export function CiclosEscolares() {
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
-              <div>
-                <DialogTitle className="text-2xl">{selectedDocumentType === "tutores" ? "Seleccionar Tipo de Tutoría" : selectedDocumentType === "estadias" ? "Seleccionar Tipo de Estadías" : "Seleccionar Tipo de Documento"}</DialogTitle>
-                <DialogDescription className="text-base mt-0.5">{selectedDocumentType === "tutores" ? "Elige el apartado de tutorías que deseas revisar" : selectedDocumentType === "estadias" ? "Elige el apartado de estadías que deseas revisar" : "Elige el documento que deseas revisar"}</DialogDescription>
+              <div className="text-left min-w-0">
+                <DialogTitle className="text-base sm:text-2xl leading-snug">{selectedDocumentType === "tutores" ? "Seleccionar Tipo de Tutoría" : selectedDocumentType === "estadias" ? "Seleccionar Tipo de Estadías" : "Seleccionar Tipo de Documento"}</DialogTitle>
+                <DialogDescription className="text-xs sm:text-base mt-0.5">{selectedDocumentType === "tutores" ? "Elige el apartado de tutorías que deseas revisar" : selectedDocumentType === "estadias" ? "Elige el apartado de estadías que deseas revisar" : "Elige el documento que deseas revisar"}</DialogDescription>
               </div>
             </div>
           </DialogHeader>
@@ -1871,8 +1875,8 @@ export function CiclosEscolares() {
       </Dialog>
 
       <Dialog open={showDocumentsModal} onOpenChange={(open) => { if (!open) closeDocumentsModal(); }}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="pb-2">
+        <DialogContent className="max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
+          <DialogHeader className="pb-2 pr-8">
             <div className="flex items-center gap-2 mb-1">
               <Button
                 onClick={() => {
@@ -1890,56 +1894,59 @@ export function CiclosEscolares() {
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
-              <div>
-                <DialogTitle className="text-2xl">{documentsModalTitle}</DialogTitle>
-                <DialogDescription className="text-base mt-0.5">{selectedCycle?.nombre}</DialogDescription>
+              <div className="text-left min-w-0">
+                <DialogTitle className="text-sm sm:text-xl leading-snug">{documentsModalTitle}</DialogTitle>
+                <DialogDescription className="text-xs sm:text-sm mt-0.5">{selectedCycle?.nombre}</DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 pr-4">
+          <div className="flex-1 overflow-y-auto min-h-0">
             {isLoadingDocuments ? (
               <CycleDocumentCardSkeleton />
             ) : selectedDocumentType === "docentes" ? (
               <>
-                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 py-4 border-b">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 py-4 border-b">
                   <Select value={filterPlan} onValueChange={(v) => { setFilterPlan(v); setFilterCarrera("all"); }}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Plan" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs rounded-md bg-background shadow-none"><SelectValue placeholder="Plan" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los planes</SelectItem>
                       {plansAvailable.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={filterCarrera} onValueChange={setFilterCarrera}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Carrera" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas las carreras</SelectItem>
-                      {carrerasAvailable.map((carrera) => <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={filterCarrera}
+                    onValueChange={setFilterCarrera}
+                    options={carrerasAvailable}
+                    placeholder="Buscar carrera..."
+                    allLabel="Todas las carreras"
+                    triggerClassName="h-8 text-xs rounded-md py-0 px-3 shadow-none"
+                  />
                   <Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Cuatrimestre" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs rounded-md bg-background shadow-none"><SelectValue placeholder="Cuatrimestre" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los cuatrimestres</SelectItem>
-                      {cuatrimestresAvailable.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                      {cuatrimestresAvailable.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>Cuatrimestre {cuatrimestre}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={filterMateria} onValueChange={setFilterMateria}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Materia" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas las materias</SelectItem>
-                      {materiasAvailable.map((materia) => <SelectItem key={materia} value={materia}>{materia}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Select value={filterDocente} onValueChange={setFilterDocente}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Docente" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los docentes</SelectItem>
-                      {docentesAvailable.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={filterMateria}
+                    onValueChange={setFilterMateria}
+                    options={materiasAvailable.map((m) => ({ value: m, label: m }))}
+                    placeholder="Buscar materia..."
+                    allLabel="Todas las materias"
+                    triggerClassName="h-8 text-xs rounded-md py-0 px-3 shadow-none"
+                  />
+                  <SearchableSelect
+                    value={filterDocente}
+                    onValueChange={setFilterDocente}
+                    options={docentesAvailable.map((d) => ({ value: d, label: d }))}
+                    placeholder="Buscar docente..."
+                    allLabel="Todos los docentes"
+                    triggerClassName="h-8 text-xs rounded-md py-0 px-3 shadow-none"
+                  />
                   <Select value={filterParcial} onValueChange={setFilterParcial}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Parcial" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs rounded-md bg-background shadow-none"><SelectValue placeholder="Parcial" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los parciales</SelectItem>
                       {parcialesAvailable.map((parcial) => <SelectItem key={parcial.value} value={parcial.value}>{parcial.label}</SelectItem>)}
@@ -1947,7 +1954,7 @@ export function CiclosEscolares() {
                   </Select>
                 </div>
 
-                <div className="space-y-2 pt-4 pb-4 max-h-[52vh] overflow-y-auto pr-1">
+                <div className="space-y-2 pt-4 pb-4">
                   <p className="text-xs text-muted-foreground">
                     Mostrando {filteredDocuments.length} de {totalSelectedDocenteCategory} documentos.
                   </p>
@@ -1974,9 +1981,9 @@ export function CiclosEscolares() {
                             <p className="text-xs text-muted-foreground">Materia: {doc.materia}</p>
                             <div className="flex flex-wrap gap-1 mt-1">
                               <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
-                              <Badge variant="outline" className="text-xs">Cuatrimestre {doc.cuatrimestre}</Badge>
-                              <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
-                              {doc.parcial !== "-" && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
+                              {doc.cuatrimestre && doc.cuatrimestre !== "-" && <Badge variant="outline" className="text-xs">Cuatrimestre {doc.cuatrimestre}</Badge>}
+                              {doc.grupo && doc.grupo !== "-" && <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>}
+                              {doc.parcial && doc.parcial !== "-" && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
                             </div>
                           </div>
                           <ResponsiveActionButton
@@ -1996,30 +2003,32 @@ export function CiclosEscolares() {
               </>
             ) : selectedDocumentType === "remediales" ? (
               <>
-                <div className="grid gap-3 grid-cols-2 md:grid-cols-2 lg:grid-cols-4 py-4 border-b">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 py-4 border-b">
                   <Select value={filterRemedialPlan} onValueChange={(v) => { setFilterRemedialPlan(v); setFilterRemedialCarrera("all"); }}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Plan" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs rounded-md bg-background shadow-none"><SelectValue placeholder="Plan" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los planes</SelectItem>
                       {Array.from(new Set(remedialDocuments.map((d) => d.plan).filter(Boolean))).map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={filterRemedialCarrera} onValueChange={setFilterRemedialCarrera}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Carrera" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas las carreras</SelectItem>
-                      {Array.from(new Set(remedialDocuments.filter((d) => filterRemedialPlan === "all" || d.plan === filterRemedialPlan).map((d) => d.carrera).filter(Boolean))).map((carrera) => <SelectItem key={carrera} value={carrera}>{carrera}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Select value={filterRemedialDocente} onValueChange={setFilterRemedialDocente}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Docente" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los docentes</SelectItem>
-                      {Array.from(new Set(remedialDocuments.map((d) => d.docente).filter(Boolean))).map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={filterRemedialCarrera}
+                    onValueChange={setFilterRemedialCarrera}
+                    options={Array.from(new Set(remedialDocuments.filter((d) => filterRemedialPlan === "all" || d.plan === filterRemedialPlan).map((d) => d.carrera).filter(Boolean))).map((c) => ({ value: c, label: c }))}
+                    placeholder="Buscar carrera..."
+                    allLabel="Todas las carreras"
+                    triggerClassName="h-8 text-xs rounded-md py-0 px-3 shadow-none"
+                  />
+                  <SearchableSelect
+                    value={filterRemedialDocente}
+                    onValueChange={setFilterRemedialDocente}
+                    options={Array.from(new Set(remedialDocuments.map((d) => d.docente).filter(Boolean))).map((d) => ({ value: d, label: d }))}
+                    placeholder="Buscar docente..."
+                    allLabel="Todos los docentes"
+                    triggerClassName="h-8 text-xs rounded-md py-0 px-3 shadow-none"
+                  />
                   <Select value={filterRemedialGrupo} onValueChange={setFilterRemedialGrupo}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Grupo" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs rounded-md bg-background shadow-none"><SelectValue placeholder="Grupo" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los grupos</SelectItem>
                       {Array.from(new Set(remedialDocuments.map((d) => d.grupo).filter((v): v is string => Boolean(v) && v !== "-"))).map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}
@@ -2027,7 +2036,7 @@ export function CiclosEscolares() {
                   </Select>
                 </div>
 
-                <div className="space-y-2 pt-4 pb-4 max-h-[52vh] overflow-y-auto pr-1">
+                <div className="space-y-2 pt-4 pb-4">
                   <p className="text-xs text-muted-foreground">
                     Mostrando {filteredRemedialDocuments.length} de {totalRemedialDocuments} documentos.
                   </p>
@@ -2053,9 +2062,8 @@ export function CiclosEscolares() {
                             <p className="text-xs text-muted-foreground">{doc.docente} • {doc.carrera}</p>
                             <div className="mt-1 flex flex-wrap gap-1">
                               <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
-                              {doc.grupo !== "-" && <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>}
-                              {doc.cuatrimestre !== "-" && <Badge variant="outline" className="text-xs">Cuatrimestre {doc.cuatrimestre}</Badge>}
-                              <Badge variant="outline" className="text-xs">{doc.tipo.replaceAll("-", " ")}</Badge>
+                              {doc.grupo && doc.grupo !== "-" && <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>}
+                              {doc.cuatrimestre && doc.cuatrimestre !== "-" && <Badge variant="outline" className="text-xs">Cuatrimestre {doc.cuatrimestre}</Badge>}
                             </div>
                           </div>
                           <ResponsiveActionButton
@@ -2075,38 +2083,40 @@ export function CiclosEscolares() {
               </>
             ) : selectedDocumentType === "estadias" ? (
               <>
-                <div className="grid gap-3 grid-cols-2 md:grid-cols-2 lg:grid-cols-4 py-4 border-b">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 py-4 border-b">
                   <Select value={filterEstadiasPlan} onValueChange={(v) => { setFilterEstadiasPlan(v); setFilterEstadiasCarrera("all"); }}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Plan" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs rounded-md bg-background shadow-none"><SelectValue placeholder="Plan" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los planes</SelectItem>
                       {tutorPlansAvailable.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={filterEstadiasCarrera} onValueChange={setFilterEstadiasCarrera}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Carrera" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas las carreras</SelectItem>
-                      {tutorCarrerasAvailable.map((carrera) => <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={filterEstadiasCarrera}
+                    onValueChange={setFilterEstadiasCarrera}
+                    options={tutorCarrerasAvailable}
+                    placeholder="Buscar carrera..."
+                    allLabel="Todas las carreras"
+                    triggerClassName="h-8 text-xs rounded-md py-0 px-3 shadow-none"
+                  />
                   <Select value={filterEstadiasGrupo} onValueChange={setFilterEstadiasGrupo}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Grupo" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs rounded-md bg-background shadow-none"><SelectValue placeholder="Grupo" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los grupos</SelectItem>
                       {Array.from(new Set(estadiasDocuments.map((document) => document.grupo).filter((value): value is string => Boolean(value) && value !== "-"))).map((grupo) => <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={filterEstadiasDocente} onValueChange={setFilterEstadiasDocente}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Docente" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los docentes</SelectItem>
-                      {Array.from(new Set(estadiasDocuments.map((document) => document.docente))).map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={filterEstadiasDocente}
+                    onValueChange={setFilterEstadiasDocente}
+                    options={Array.from(new Set(estadiasDocuments.map((d) => d.docente))).map((d) => ({ value: d, label: d }))}
+                    placeholder="Buscar docente..."
+                    allLabel="Todos los docentes"
+                    triggerClassName="h-8 text-xs rounded-md py-0 px-3 shadow-none"
+                  />
                 </div>
 
-                <div className="space-y-2 pt-4 pb-4 max-h-[52vh] overflow-y-auto pr-1">
+                <div className="space-y-2 pt-4 pb-4">
                   <p className="text-xs text-muted-foreground">
                     Mostrando {filteredEstadiasDocuments.length} de {totalSelectedEstadiasCategory} documentos.
                   </p>
@@ -2153,37 +2163,39 @@ export function CiclosEscolares() {
               </>
             ) : (
               <>
-                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5 py-4 border-b">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 py-4 border-b">
                   <Select value={filterTutorPlan} onValueChange={(v) => { setFilterTutorPlan(v); setFilterTutorCarrera("all"); }}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Plan" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs rounded-md bg-background shadow-none"><SelectValue placeholder="Plan" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los planes</SelectItem>
                       {tutorPlansAvailable.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={filterTutorCarrera} onValueChange={setFilterTutorCarrera}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Carrera" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas las carreras</SelectItem>
-                      {tutorCarrerasAvailable.map((carrera) => <SelectItem key={carrera.value} value={carrera.value}>{carrera.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={filterTutorCarrera}
+                    onValueChange={setFilterTutorCarrera}
+                    options={tutorCarrerasAvailable}
+                    placeholder="Buscar carrera..."
+                    allLabel="Todas las carreras"
+                    triggerClassName="h-8 text-xs rounded-md py-0 px-3 shadow-none"
+                  />
                   <Select value={filterTutorCuatrimestre} onValueChange={setFilterTutorCuatrimestre}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Cuatrimestre" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs rounded-md bg-background shadow-none"><SelectValue placeholder="Cuatrimestre" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los cuatrimestres</SelectItem>
-                      {tutorCuatrimestresAvailable.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{cuatrimestre}</SelectItem>)}
+                      {tutorCuatrimestresAvailable.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>Cuatrimestre {cuatrimestre}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={filterTutorDocente} onValueChange={setFilterTutorDocente}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Docente" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los docentes</SelectItem>
-                      {tutorDocentesAvailable.map((docente) => <SelectItem key={docente} value={docente}>{docente}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={filterTutorDocente}
+                    onValueChange={setFilterTutorDocente}
+                    options={tutorDocentesAvailable.map((d) => ({ value: d, label: d }))}
+                    placeholder="Buscar docente..."
+                    allLabel="Todos los docentes"
+                    triggerClassName="h-8 text-xs rounded-md py-0 px-3 shadow-none"
+                  />
                   <Select value={filterTutorParcial} onValueChange={setFilterTutorParcial}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Parcial" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs rounded-md bg-background shadow-none"><SelectValue placeholder="Parcial" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los parciales</SelectItem>
                       {tutorParcialesAvailable.map((parcial) => <SelectItem key={parcial.value} value={parcial.value}>{parcial.label}</SelectItem>)}
@@ -2191,7 +2203,7 @@ export function CiclosEscolares() {
                   </Select>
                 </div>
 
-                <div className="space-y-2 pt-4 pb-4 max-h-[52vh] overflow-y-auto pr-1">
+                <div className="space-y-2 pt-4 pb-4">
                   <p className="text-xs text-muted-foreground">
                     Mostrando {filteredTutorDocuments.length} de {totalSelectedTutorCategory} documentos.
                   </p>
@@ -2216,10 +2228,10 @@ export function CiclosEscolares() {
                             <p className="font-medium text-sm truncate">{doc.documento}</p>
                             <p className="text-xs text-muted-foreground">{doc.docente}</p>
                             <div className="mt-1 flex flex-wrap gap-1">
-                              {doc.cuatrimestre && <Badge variant="outline" className="text-xs">Q{doc.cuatrimestre}</Badge>}
-                              {doc.grupo && <Badge variant="outline" className="text-xs">{doc.grupo}</Badge>}
+                              {doc.cuatrimestre && doc.cuatrimestre !== "-" && <Badge variant="outline" className="text-xs">Q{doc.cuatrimestre}</Badge>}
+                              {doc.grupo && doc.grupo !== "-" && <Badge variant="outline" className="text-xs">{doc.grupo}</Badge>}
                               {doc.parcial && doc.parcial !== "-" && <Badge variant="outline" className="text-xs">{doc.parcial}</Badge>}
-                              <Badge variant="outline" className="text-xs">{doc.tipo.replaceAll("-", " ")}</Badge>
+                              <Badge variant="outline" className="text-xs">{doc.tipo.replace(/-/g, " ")}</Badge>
                             </div>
                           </div>
                           <ResponsiveActionButton
@@ -2238,10 +2250,10 @@ export function CiclosEscolares() {
                 </div>
               </>
             )}
-          </ScrollArea>
+          </div>
 
           <DialogFooter className="border-t pt-4">
-            <Button variant="outline" onClick={closeDocumentsModal}>Cerrar</Button>
+            <Button variant="outline" className="w-full sm:w-auto" onClick={closeDocumentsModal}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

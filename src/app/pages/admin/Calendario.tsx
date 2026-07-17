@@ -99,7 +99,7 @@ export function CalendarioAdmin() {
         </div>
       </div>
 
-      <Card className="overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
+      <Card className="overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md">
         <CardHeader>
           <CardTitle>Calendario vigente</CardTitle>
         </CardHeader>
@@ -136,7 +136,7 @@ export function CalendarioAdmin() {
                 </Button>
               </div>
 
-              <div className="rounded-2xl border border-border bg-background/80 p-4 shadow-sm">
+              <div className="rounded-2xl border border-border/70 bg-white p-4 shadow-sm dark:bg-slate-900/90">
                 <p className="text-sm font-medium text-foreground">Archivo actual</p>
                 <p className="text-sm text-muted-foreground">{calendar?.name ?? "Calendario25-26.pdf"}</p>
               </div>

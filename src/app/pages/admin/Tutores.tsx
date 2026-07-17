@@ -38,6 +38,7 @@ type TutorDocument = {
   reviewedAt?: string;
   submittedAt?: string;
   nota?: string | null;
+  batch_id?: string | null;
 };
 
 type TutorDocumentItem = TutorDocument;
@@ -116,6 +117,7 @@ const mapApiDocumentToTutorDocument = (doc: any): TutorDocument => ({
   reviewedAt: doc.reviewed_at ?? undefined,
   submittedAt: doc.submitted_at ?? undefined,
   nota: doc.nota ?? null,
+  batch_id: doc.batch_id ?? null,
 });
 
 const emptyStateLegend = "Aún no hay documentos de tutores para mostrar en esta sección. Cuando un tutor suba uno, aparecerá aquí automáticamente.";
@@ -160,10 +162,26 @@ export default function Tutores() {
   const [isLoading, setIsLoading] = useState(true);
   const [noteDialog, setNoteDialog] = useState<{ nota: string; tutor: string } | null>(null);
   const [reviewConfirmation, setReviewConfirmation] = useState<TutorDocument | null>(null);
+  const [highlightDocumentId, setHighlightDocumentId] = useState<number | null>(() => {
+    const stored = sessionStorage.getItem("adminHighlightDocumentId");
+    if (stored) { sessionStorage.removeItem("adminHighlightDocumentId"); return Number(stored); }
+    return null;
+  });
   // Conteos estables por sección — no se mezclan con los documentos activos del tab
   const [countAll, setCountAll] = useState(0);
   const [countPending, setCountPending] = useState(0);
   const [countReviewed, setCountReviewed] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading && highlightDocumentId !== null) {
+      const scrollTimer = setTimeout(() => {
+        const el = document.getElementById(`doc-row-${highlightDocumentId}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 150);
+      const clearTimer = setTimeout(() => setHighlightDocumentId(null), 4000);
+      return () => { clearTimeout(scrollTimer); clearTimeout(clearTimer); };
+    }
+  }, [isLoading, highlightDocumentId]);
 
   const buildQueryFromFilters = () => {
     const q: Record<string, any> = { uploader_role: 'tutor', tutorias_only: 1, per_page: 500, page: 1 };
@@ -461,14 +479,14 @@ export default function Tutores() {
     "absolute inset-0 z-10 rounded-xl cursor-pointer";
 
   const sectionCardClassName =
-    "overflow-hidden rounded-[22px] border border-border bg-card shadow-sm";
+    "overflow-hidden border-border/70 bg-card shadow-sm dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md";
 
   const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3";
-  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full text-[13px] leading-tight shadow-sm sm:text-sm";
+  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full bg-background text-[13px] leading-tight shadow-sm sm:text-sm";
   const filterSelectValueClassName = "truncate";
 
   const filtersBar = (
-    <div className={filtersGridClassName}>
+    <div data-tour="admin-tutores-filters" className={filtersGridClassName}>
       <SearchableSelect
         value={filterTutor}
         onValueChange={setFilterTutor}
@@ -498,10 +516,32 @@ export default function Tutores() {
     </div>
   );
 
+  const groupDocsByBatch = (docs: TutorDocumentItem[]): TutorDocumentItem[][] => {
+    const groups = new Map<string, TutorDocumentItem[]>();
+    for (const doc of docs) {
+      const key = doc.batch_id ?? `single-${doc.id}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(doc);
+    }
+    return Array.from(groups.values());
+  };
+
+  const batchHeader = (group: TutorDocumentItem[]) => (
+    <div className="flex items-center gap-2 border-b border-emerald-200/50 bg-emerald-50/80 px-4 py-2.5 dark:border-emerald-800/30 dark:bg-emerald-950/20">
+      <FileText className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+      <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+        {group.length} archivos del mismo envío
+      </span>
+      <span className="text-xs text-muted-foreground">
+        · {group[0].tutor} · {getTutoriasApartadoLabel(group[0].apartado)}
+      </span>
+    </div>
+  );
+
   const getDocumentRowClassName = (isReturned: boolean) => (
-    `relative flex flex-col gap-4 rounded-2xl border p-4 transition-colors lg:flex-row lg:items-center lg:justify-between ${isReturned
+    `relative flex flex-col gap-4 overflow-hidden rounded-xl border p-4 transition-colors lg:flex-row lg:items-center lg:justify-between ${isReturned
       ? "border-rose-500/25 bg-rose-500/10 hover:bg-rose-500/15"
-      : "border-border bg-background hover:bg-muted/50"
+      : "border-border/70 bg-white hover:bg-slate-50 dark:bg-slate-900/90 dark:hover:bg-slate-800/90"
     }`
   );
 
@@ -544,7 +584,7 @@ export default function Tutores() {
               </SelectContent>
             </Select>
           </div>
-          <TabsList className="hidden sm:grid w-full grid-cols-6 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
+          <TabsList data-tour="admin-tutores-tabs" className="hidden sm:grid w-full grid-cols-6 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
             <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
               Todos
               <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countAll}</Badge>
@@ -581,11 +621,12 @@ export default function Tutores() {
               <div className="space-y-3">
                 {isLoading ? <DocumentCardSkeleton /> : filteredAll.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
-                ) : filteredAll.map((doc) => {
+                ) : groupDocsByBatch(filteredAll).map((group) => {
+                  const renderRow = (doc: TutorDocumentItem) => {
                   const isReviewed = Boolean(doc.reviewedAt);
                   const isReturned = Boolean(doc.returned);
                   return (
-                    <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
+                    <div key={doc.id} id={`doc-row-${doc.id}`} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
                       <button
                         type="button"
                         aria-label={`Abrir vista previa de ${doc.documento}`}
@@ -683,6 +724,14 @@ export default function Tutores() {
                       </div>
                     </div>
                   );
+                  };
+                  if (group.length === 1) return renderRow(group[0]);
+                  return (
+                    <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                      {batchHeader(group)}
+                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderRow)}</div>
+                    </div>
+                  );
                 })}
               </div>
             </CardContent>
@@ -698,10 +747,11 @@ export default function Tutores() {
               <div className="space-y-3">
                 {isLoading ? <DocumentCardSkeleton /> : filteredPending.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
-                ) : filteredPending.map((doc) => {
+                ) : groupDocsByBatch(filteredPending).map((group) => {
+                  const renderRow = (doc: TutorDocumentItem) => {
                   const isReturned = Boolean(doc.returned);
                   return (
-                  <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
+                  <div key={doc.id} id={`doc-row-${doc.id}`} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
                     <button
                       type="button"
                       aria-label={`Abrir vista previa de ${doc.documento}`}
@@ -796,7 +846,16 @@ export default function Tutores() {
                       )}
                     </div>
                   </div>
-                )})}
+                  );
+                  };
+                  if (group.length === 1) return renderRow(group[0]);
+                  return (
+                    <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                      {batchHeader(group)}
+                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderRow)}</div>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -811,7 +870,8 @@ export default function Tutores() {
               <div className="space-y-3">
                 {isLoading ? <DocumentCardSkeleton /> : filteredDevueltos.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
-                ) : filteredDevueltos.map((doc) => (
+                ) : groupDocsByBatch(filteredDevueltos).map((group) => {
+                  const renderRow = (doc: TutorDocumentItem) => (
                   <div key={doc.id} className={getDocumentRowClassName(true)}>
                     <button
                       type="button"
@@ -876,7 +936,15 @@ export default function Tutores() {
                       </Tooltip>
                     </div>
                   </div>
-                ))}
+                  );
+                  if (group.length === 1) return renderRow(group[0]);
+                  return (
+                    <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                      {batchHeader(group)}
+                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderRow)}</div>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -891,7 +959,8 @@ export default function Tutores() {
               <div className="space-y-3">
                 {isLoading ? <DocumentCardSkeleton /> : filteredReenviados.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
-                ) : filteredReenviados.map((doc) => (
+                ) : groupDocsByBatch(filteredReenviados).map((group) => {
+                  const renderRow = (doc: TutorDocumentItem) => (
                   <div key={doc.id} className={getDocumentRowClassName(false)}>
                     <button
                       type="button"
@@ -964,7 +1033,15 @@ export default function Tutores() {
                       </Tooltip>
                     </div>
                   </div>
-                ))}
+                  );
+                  if (group.length === 1) return renderRow(group[0]);
+                  return (
+                    <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                      {batchHeader(group)}
+                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderRow)}</div>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -987,10 +1064,11 @@ export default function Tutores() {
                         <p className="text-xs text-muted-foreground">{docs.length} documentos revisados</p>
                       </div>
                       <div className="space-y-3">
-                        {docs.map((doc) => {
+                        {groupDocsByBatch(docs).map((group) => {
+                          const renderRevRow = (doc: TutorDocumentItem) => {
                           const isReturned = Boolean(doc.returned);
                           return (
-                          <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
+                          <div key={doc.id} id={`doc-row-${doc.id}`} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
                             <button
                               type="button"
                               aria-label={`Abrir vista previa de ${doc.documento}`}
@@ -1050,7 +1128,16 @@ export default function Tutores() {
                               <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "success"}>{getDocumentStatusLabel(doc)}</Badge>
                             </div>
                           </div>
-                        )})}
+                          );
+                          };
+                          if (group.length === 1) return renderRevRow(group[0]);
+                          return (
+                            <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                              {batchHeader(group)}
+                              <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderRevRow)}</div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -1070,10 +1157,11 @@ export default function Tutores() {
                 {isLoading ? <DocumentCardSkeleton /> : reviewedToday.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : (
-                  reviewedToday.map((doc) => {
+                  groupDocsByBatch(reviewedToday).map((group) => {
+                    const renderTodayRow = (doc: TutorDocumentItem) => {
                     const isReturned = Boolean(doc.returned);
                     return (
-                    <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
+                    <div key={doc.id} id={`doc-row-${doc.id}`} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
                         <button
                           type="button"
                           aria-label={`Abrir vista previa de ${doc.documento}`}
@@ -1152,7 +1240,16 @@ export default function Tutores() {
                         <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "success"}>{getDocumentStatusLabel(doc)}</Badge>
                       </div>
                     </div>
-                  )})
+                    );
+                    };
+                    if (group.length === 1) return renderTodayRow(group[0]);
+                    return (
+                      <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                        {batchHeader(group)}
+                        <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderTodayRow)}</div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </CardContent>

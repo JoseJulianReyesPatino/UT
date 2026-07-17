@@ -87,8 +87,11 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
         err.baseUrl = base;
         if (errors) err.errors = errors;
 
-        // Retry only on server-side issues when another base URL exists.
-        if (!isLastCandidate && res.status >= 500) {
+        // Solo reintentar en 5xx si el método es GET/HEAD (idempotente).
+        // POST/PUT/DELETE no se reintentan en 5xx porque el servidor pudo
+        // haber procesado la mutación y responder con error de serialización,
+        // lo que causaría duplicados en el siguiente intento.
+        if (!isLastCandidate && res.status >= 500 && (method === "GET" || method === "HEAD")) {
           lastError = err;
           continue;
         }

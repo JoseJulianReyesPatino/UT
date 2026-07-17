@@ -19,6 +19,7 @@ import { apiFetch } from "../../lib/api";
 import { useFormAccess } from "../../hooks/useFormAccess";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { formatGroupCode } from "../../../lib/utils";
+import { HistorySheetSkeleton } from "./DocumentHistory";
 
 interface PortafolioFormData {
   plan: Plan | "";
@@ -52,6 +53,7 @@ export default function PortafolioDigitalPage({ deadlineInfo, onDirtyChange }: {
   const formRef = useRef<HTMLDivElement | null>(null);
   const [groupsOptions, setGroupsOptions] = useState<Array<{ id: number; group_code: string; group_number: number }>>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: number; nombre: string } | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
@@ -121,15 +123,18 @@ export default function PortafolioDigitalPage({ deadlineInfo, onDirtyChange }: {
   }, [formData.carrera, formData.cuatrimestre]);
 
   useEffect(() => {
+    setIsLoadingHistory(true);
     let cancelled = false;
     void (async () => {
       try {
-        if (!user) return;
+        if (!user) { setIsLoadingHistory(false); return; }
         const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 6, per_page: 50 } });
         if (cancelled) return;
         setHistory(Array.isArray(res?.data) ? res.data : []);
       } catch (error) {
         console.error("Could not load history", error);
+      } finally {
+        if (!cancelled) setIsLoadingHistory(false);
       }
     })();
 
@@ -212,6 +217,27 @@ export default function PortafolioDigitalPage({ deadlineInfo, onDirtyChange }: {
     } catch (error) {
       toast.error("No fue posible eliminar el documento");
       console.error("Error al eliminar documentos", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleHideDocuments = async (documentIds: number[]) => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      for (const id of documentIds) {
+        await apiFetch(`/documents/${id}/hide`, { method: "PATCH" });
+      }
+      toast.success(documentIds.length > 1 ? `${documentIds.length} documentos ocultados del historial` : "Documento ocultado del historial");
+      await new Promise(resolve => setTimeout(resolve, 300));
+      if (user) {
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 6, per_page: 50 } });
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      }
+    } catch (error) {
+      toast.error("No fue posible ocultar el documento");
+      console.error("Error al ocultar documentos", error);
     } finally {
       setIsDeleting(false);
     }
@@ -612,7 +638,9 @@ export default function PortafolioDigitalPage({ deadlineInfo, onDirtyChange }: {
               <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
             </SheetHeader>
             <div className="mt-4 space-y-4">
-              {groupedHistory.length > 0 ? (
+              {isLoadingHistory ? (
+                <HistorySheetSkeleton />
+              ) : groupedHistory.length > 0 ? (
                 <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
                   <div className="grid gap-3 p-1">
                     {groupedHistory.map((group) => {
@@ -633,6 +661,7 @@ export default function PortafolioDigitalPage({ deadlineInfo, onDirtyChange }: {
                           onViewDocument={(docId) => { const doc = group.find((d: any) => d.id === docId); if (doc) openPreview(doc); }}
                           onEdit={() => void populateFormForEditBatch(group)}
                           onDelete={handleDeleteDocuments}
+                          onHide={handleHideDocuments}
                           onResubmit={(docId, fileName, returnedComment) => {
                             setResubmitTarget({ docId, fileName, returnedComment });
                             setResubmitFile(null);

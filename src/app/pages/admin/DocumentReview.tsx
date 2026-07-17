@@ -119,7 +119,12 @@ const getCareerFilterOptions = (plan: string): CareerFilterOption[] => {
 	const normalizedPlan = normalizeText(plan);
 	if (normalizedPlan.includes("nuevo")) return nuevoModelo;
 	if (normalizedPlan.includes("plan normal") || normalizedPlan.includes("normal")) return planNormal;
-	return [...nuevoModelo, ...planNormal];
+	const seen = new Set<string>();
+	return [...nuevoModelo, ...planNormal].filter(({ value }) => {
+		if (seen.has(value)) return false;
+		seen.add(value);
+		return true;
+	});
 };
 
 const normalizeText = (value?: string | null) =>
@@ -435,6 +440,22 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	const [pendingAction, setPendingAction] = useState<{ type: "review" | "send" | "return" | "cancel-return"; document: DocumentItem } | null>(null);
 	const [returnComment, setReturnComment] = useState("");
 	const [noteDialog, setNoteDialog] = useState<{ nota: string; docente: string } | null>(null);
+	const [highlightDocumentId, setHighlightDocumentId] = useState<number | null>(() => {
+		const stored = sessionStorage.getItem("adminHighlightDocumentId");
+		if (stored) { sessionStorage.removeItem("adminHighlightDocumentId"); return Number(stored); }
+		return null;
+	});
+
+	useEffect(() => {
+		if (!isLoading && highlightDocumentId !== null) {
+			const scrollTimer = setTimeout(() => {
+				const el = document.getElementById(`doc-row-${highlightDocumentId}`);
+				if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+			}, 150);
+			const clearTimer = setTimeout(() => setHighlightDocumentId(null), 4000);
+			return () => { clearTimeout(scrollTimer); clearTimeout(clearTimer); };
+		}
+	}, [isLoading, highlightDocumentId]);
 
 	const allDocuments = [...pendingDocuments, ...reviewedDocuments];
 	const todayKey = toLocalDateKey(new Date().toISOString());
@@ -574,10 +595,10 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	}, [previewBlobUrl]);
 
 	const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3";
-	const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full text-[13px] leading-tight shadow-sm sm:text-sm";
+	const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full bg-background text-[13px] leading-tight shadow-sm sm:text-sm";
 	const filterSelectValueClassName = "truncate";
-	const sectionCardClassName = "overflow-hidden rounded-[22px] border border-border bg-card shadow-sm";
-	const documentRowClassName = "relative flex flex-col gap-4 rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted/50 lg:flex-row lg:items-center lg:justify-between";
+	const sectionCardClassName = "overflow-hidden border-border/70 bg-card shadow-sm dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md";
+	const documentRowClassName = "relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-white p-4 transition-colors hover:bg-slate-50 dark:bg-slate-900/90 dark:hover:bg-slate-800/90 lg:flex-row lg:items-center lg:justify-between";
 	const previewCardOverlayClassName = "absolute inset-0 z-10 rounded-xl cursor-pointer";
 	const previewChipClassName = "h-8 rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground shadow-sm hover:bg-muted/50";
 
@@ -835,7 +856,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 	};
 
 	const renderFilters = () => (
-		<div className={filtersGridClassName}>
+		<div data-tour="admin-docreview-filters" className={filtersGridClassName}>
 			<Select value={filterPlan} onValueChange={setFilterPlan}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Plan" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los planes</SelectItem>{planesDisponibles.map((plan) => <SelectItem key={plan} value={plan}>{plan}</SelectItem>)}</SelectContent></Select>
 			<SearchableSelect value={filterCarrera} onValueChange={setFilterCarrera} options={carrerasDisponibles} placeholder="Buscar carrera..." allLabel="Todas las carreras" />
 			<Select value={filterCuatrimestre} onValueChange={setFilterCuatrimestre}><SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Cuatrimestre" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los cuatrimestres</SelectItem>{cuatrimestresDisponibles.map((cuatrimestre) => <SelectItem key={cuatrimestre} value={cuatrimestre}>{`Cuatrimestre ${cuatrimestre}`}</SelectItem>)}</SelectContent></Select>
@@ -862,8 +883,9 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 		const cuatrimestreLabel = `Cuatrimestre ${getDocumentCuatrimestre(doc as ApiDocument)}`;
 		const parcialLabel = getDocumentParcial(doc as ApiDocument);
 
+		const isHighlighted = highlightDocumentId === doc.id;
 		return (
-			<div key={doc.id} className={documentRowClassName}>
+			<div key={doc.id} id={`doc-row-${doc.id}`} className={`${documentRowClassName}${isHighlighted ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
 				<div className="flex items-start gap-3 flex-1">
 					<div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0"><FileText className="h-6 w-6 text-muted-foreground" /></div>
 					<div className="flex-1 min-w-0">
@@ -883,7 +905,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 						{"reviewedAt" in doc && doc.reviewedAt && <p className="mt-1 text-xs text-muted-foreground">Revisado: {formatDateTimeFromIso(doc.reviewedAt)}</p>}
 					</div>
 				</div>
-				<div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+				<div data-tour="admin-docreview-actions" className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
 					<ResponsiveActionButton variant="outline" size="sm" label="Ver" title={doc.has_file === false ? "El archivo no está disponible en el servidor" : "Ver PDF"} onClick={(e) => { e.stopPropagation(); if (doc.has_file !== false) setPreviewDocument(doc); }} disabled={doc.has_file === false} icon={<Eye className="h-4 w-4" />} />
 
 					{isReviewed ? null : <ResponsiveActionButton variant="outline" size="sm" label="Revisar" title="Revisar documento" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "review", document: doc }); }} icon={<Check className="h-4 w-4" />} />}
@@ -972,7 +994,7 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 							</SelectContent>
 						</Select>
 					</div>
-					<TabsList className="hidden sm:grid w-full grid-cols-6 gap-1.5 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
+					<TabsList data-tour="admin-docreview-tabs" className="hidden sm:grid w-full grid-cols-6 gap-1.5 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
 						<TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Todos <Badge variant="outline" className="ml-1.5 rounded-full bg-white/95 px-1.5 py-0.5 text-[10px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredAllDocuments.length}</Badge></TabsTrigger>
 						<TabsTrigger value="pendientes" className="inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Pendientes <Badge variant="outline" className="ml-1.5 rounded-full bg-white/95 px-1.5 py-0.5 text-[10px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredPendienteOnlyDocuments.length}</Badge></TabsTrigger>
 						<TabsTrigger value="devueltos" className="inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">Devueltos <Badge variant="outline" className="ml-1.5 rounded-full bg-white/95 px-1.5 py-0.5 text-[10px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredDevueltosDocuments.length}</Badge></TabsTrigger>

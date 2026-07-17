@@ -38,6 +38,7 @@ type EstadiaPendingDocument = {
   returnedAt?: string;
   resubmittedAt?: string;
   nota?: string | null;
+  batch_id?: string | null;
 };
 
 type EstadiaReviewedDocument = {
@@ -58,6 +59,7 @@ type EstadiaReviewedDocument = {
   returnedAt?: string;
   resubmittedAt?: string;
   nota?: string | null;
+  batch_id?: string | null;
 };
 
 type EstadiaDocumentItem = EstadiaPendingDocument | EstadiaReviewedDocument;
@@ -87,6 +89,7 @@ type ApiDocument = {
   resubmitted_at?: string | null;
   fileUrl?: string | null;
   nota?: string | null;
+  batch_id?: string | null;
 };
 
 const extractApiDocuments = (payload: unknown): ApiDocument[] => {
@@ -125,6 +128,22 @@ export default function Estadias() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [reviewConfirmation, setReviewConfirmation] = useState<EstadiaPendingDocument | null>(null);
+  const [highlightDocumentId, setHighlightDocumentId] = useState<number | null>(() => {
+    const stored = sessionStorage.getItem("adminHighlightDocumentId");
+    if (stored) { sessionStorage.removeItem("adminHighlightDocumentId"); return Number(stored); }
+    return null;
+  });
+
+  useEffect(() => {
+    if (!isLoading && highlightDocumentId !== null) {
+      const scrollTimer = setTimeout(() => {
+        const el = document.getElementById(`doc-row-${highlightDocumentId}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 150);
+      const clearTimer = setTimeout(() => setHighlightDocumentId(null), 4000);
+      return () => { clearTimeout(scrollTimer); clearTimeout(clearTimer); };
+    }
+  }, [isLoading, highlightDocumentId]);
   const [returnConfirmation, setReturnConfirmation] = useState<{ type: "return" | "cancel-return"; document: EstadiaDocumentItem } | null>(null);
   const [isConfirmingReturn, setIsConfirmingReturn] = useState(false);
   const [returnComment, setReturnComment] = useState("");
@@ -261,6 +280,7 @@ export default function Estadias() {
       returnedAt: doc.returned_at ?? undefined,
       resubmittedAt: doc.resubmitted_at ?? undefined,
       nota: doc.nota ?? null,
+      batch_id: doc.batch_id ?? null,
     };
 
     if (kind === "reviewed") {
@@ -290,20 +310,20 @@ export default function Estadias() {
   const previewCardOverlayClassName = "absolute inset-0 z-10 rounded-xl cursor-pointer";
 
   const sectionCardClassName =
-    "overflow-hidden rounded-[22px] border border-border bg-card shadow-sm";
+    "overflow-hidden border-border/70 bg-card shadow-sm dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md";
 
   const documentRowClassName =
-    "relative flex flex-col gap-4 rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted/50 lg:flex-row lg:items-center lg:justify-between";
+    "relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-white p-4 transition-colors hover:bg-slate-50 dark:bg-slate-900/90 dark:hover:bg-slate-800/90 lg:flex-row lg:items-center lg:justify-between";
 
   const getDocumentRowClassName = (isReturned: boolean) => (
-    `relative flex flex-col gap-4 rounded-2xl border p-4 transition-colors lg:flex-row lg:items-center lg:justify-between ${isReturned
+    `relative flex flex-col gap-4 overflow-hidden rounded-xl border p-4 transition-colors lg:flex-row lg:items-center lg:justify-between ${isReturned
       ? "border-rose-500/25 bg-rose-500/10 hover:bg-rose-500/15"
-      : "border-border bg-background hover:bg-muted/50"
+      : "border-border/70 bg-white hover:bg-slate-50 dark:bg-slate-900/90 dark:hover:bg-slate-800/90"
     }`
   );
 
   const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3";
-  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full text-[13px] leading-tight shadow-sm sm:text-sm";
+  const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full bg-background text-[13px] leading-tight shadow-sm sm:text-sm";
   const filterSelectValueClassName = "truncate";
 
   const matchesFilters = (doc: { ciclo: string; plan: string; carrera: string; cuatrimestre: string; grupo: string; docente: string; apartado: string; returned?: boolean }) => {
@@ -406,7 +426,7 @@ export default function Estadias() {
   const renderSelectItems = (values: string[]) => nonEmptyOptions(values).map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>);
 
   const filtersBar = (
-    <div className={filtersGridClassName}>
+    <div data-tour="admin-estadias-filters" className={filtersGridClassName}>
       <Select value={filterPlan} onValueChange={setFilterPlan}>
         <SelectTrigger className={filterSelectTriggerClassName}><SelectValue className={filterSelectValueClassName} placeholder="Filtrar por plan" /></SelectTrigger>
         <SelectContent>
@@ -643,6 +663,28 @@ export default function Estadias() {
     }
   };
 
+  const groupDocsByBatch = (docs: EstadiaDocumentItem[]): EstadiaDocumentItem[][] => {
+    const groups = new Map<string, EstadiaDocumentItem[]>();
+    for (const doc of docs) {
+      const key = doc.batch_id ?? `single-${doc.id}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(doc);
+    }
+    return Array.from(groups.values());
+  };
+
+  const batchHeader = (group: EstadiaDocumentItem[]) => (
+    <div className="flex items-center gap-2 border-b border-emerald-200/50 bg-emerald-50/80 px-4 py-2.5 dark:border-emerald-800/30 dark:bg-emerald-950/20">
+      <FileText className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+      <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+        {group.length} archivos del mismo envío
+      </span>
+      <span className="text-xs text-muted-foreground">
+        · {group[0].docente} · {group[0].apartado}
+      </span>
+    </div>
+  );
+
   return (
     <div className="relative space-y-6 overflow-hidden">
       <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -682,7 +724,7 @@ export default function Estadias() {
           </Select>
         </div>
 
-        <TabsList className="hidden sm:grid w-full grid-cols-6 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
+        <TabsList data-tour="admin-estadias-tabs" className="hidden sm:grid w-full grid-cols-6 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
           <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
             Todos
             <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{filteredAll.length}</Badge>
@@ -714,12 +756,12 @@ export default function Estadias() {
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
                 {!isLoading && !loadError && filteredAll.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
-                ) : !isLoading && !loadError && filteredAll.map((doc) => {
+                ) : !isLoading && !loadError && groupDocsByBatch(filteredAll).map((group) => {
+                  const renderRow = (doc: EstadiaDocumentItem) => {
                   const isReviewed = "reviewedAt" in doc;
                   const isReturned = Boolean(doc.returned);
-
                   return (
-                    <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
+                    <div key={doc.id} id={`doc-row-${doc.id}`} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
                       <div className="flex items-start gap-3 flex-1">
                         <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
                           <FileText className="h-6 w-6 text-muted-foreground" />
@@ -796,6 +838,14 @@ export default function Estadias() {
                       </div>
                     </div>
                   );
+                  };
+                  if (group.length === 1) return renderRow(group[0]);
+                  return (
+                    <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                      {batchHeader(group)}
+                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderRow)}</div>
+                    </div>
+                  );
                 })}
               </div>
             </CardContent>
@@ -813,10 +863,11 @@ export default function Estadias() {
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
                 {!isLoading && !loadError && filteredPendienteOnly.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
-                ) : !isLoading && !loadError && filteredPendienteOnly.map((doc) => {
+                ) : !isLoading && !loadError && groupDocsByBatch(filteredPendienteOnly).map((group) => {
+                  const renderRow = (doc: EstadiaPendingDocument) => {
                   const isReturned = Boolean(doc.returned);
                   return (
-                  <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
+                  <div key={doc.id} id={`doc-row-${doc.id}`} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
                     <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
                     <div className="flex items-start gap-3 flex-1">
                       <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -892,6 +943,14 @@ export default function Estadias() {
                     </div>
                   </div>
                   );
+                  };
+                  if (group.length === 1) return renderRow(group[0] as EstadiaPendingDocument);
+                  return (
+                    <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                      {batchHeader(group)}
+                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map((d) => renderRow(d as EstadiaPendingDocument))}</div>
+                    </div>
+                  );
                 })}
               </div>
             </CardContent>
@@ -907,7 +966,8 @@ export default function Estadias() {
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
                 {!isLoading && !loadError && filteredDevueltos.length === 0 ? (
                   <EmptyState text="No hay documentos devueltos." />
-                ) : !isLoading && !loadError && filteredDevueltos.map((doc) => (
+                ) : !isLoading && !loadError && groupDocsByBatch(filteredDevueltos).map((group) => {
+                  const renderRow = (doc: EstadiaDocumentItem) => (
                   <div key={doc.id} className={getDocumentRowClassName(true)}>
                     <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
                     <div className="flex items-start gap-3 flex-1">
@@ -938,7 +998,15 @@ export default function Estadias() {
                       />
                     </div>
                   </div>
-                ))}
+                  );
+                  if (group.length === 1) return renderRow(group[0]);
+                  return (
+                    <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                      {batchHeader(group)}
+                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderRow)}</div>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -953,7 +1021,8 @@ export default function Estadias() {
                 {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
                 {!isLoading && !loadError && filteredReenviados.length === 0 ? (
                   <EmptyState text="No hay documentos reenviados." />
-                ) : !isLoading && !loadError && filteredReenviados.map((doc) => (
+                ) : !isLoading && !loadError && groupDocsByBatch(filteredReenviados).map((group) => {
+                  const renderRow = (doc: EstadiaPendingDocument) => (
                   <div key={doc.id} className={getDocumentRowClassName(false)}>
                     <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
                     <div className="flex items-start gap-3 flex-1">
@@ -986,7 +1055,15 @@ export default function Estadias() {
                       />
                     </div>
                   </div>
-                ))}
+                  );
+                  if (group.length === 1) return renderRow(group[0] as EstadiaPendingDocument);
+                  return (
+                    <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                      {batchHeader(group)}
+                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map((d) => renderRow(d as EstadiaPendingDocument))}</div>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -1009,10 +1086,11 @@ export default function Estadias() {
                         <p className="text-xs text-muted-foreground">{docs.length} documentos revisados</p>
                       </div>
                       <div className="space-y-3">
-                    {docs.map((doc) => {
+                    {groupDocsByBatch(docs).map((group) => {
+                      const renderRevRow = (doc: EstadiaDocumentItem) => {
                       const isReturned = Boolean(doc.returned);
                       return (
-                        <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
+                        <div key={doc.id} id={`doc-row-${doc.id}`} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
                           <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
                           <div className="relative z-20 flex items-start gap-3 flex-1 pointer-events-none">
                             <div className="relative z-20 h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 pointer-events-none">
@@ -1093,6 +1171,14 @@ export default function Estadias() {
                           </div>
                         </div>
                       );
+                      };
+                      if (group.length === 1) return renderRevRow(group[0]);
+                      return (
+                        <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                          {batchHeader(group)}
+                          <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderRevRow)}</div>
+                        </div>
+                      );
                     })}
                       </div>
                     </div>
@@ -1113,10 +1199,11 @@ export default function Estadias() {
                 {isLoading ? <DocumentCardSkeleton /> : reviewedToday.length === 0 ? (
                   <EmptyState text={emptyStateLegend} />
                 ) : (
-                  reviewedToday.map((doc) => {
+                  groupDocsByBatch(reviewedToday).map((group) => {
+                    const renderTodayRow = (doc: EstadiaDocumentItem) => {
                     const isReturned = Boolean(doc.returned);
                     return (
-                    <div key={doc.id} className={getDocumentRowClassName(isReturned)}>
+                    <div key={doc.id} id={`doc-row-${doc.id}`} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
                         <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
                       <div className="relative z-20 flex items-start gap-3 flex-1 pointer-events-none">
                         <div className="relative z-20 h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 pointer-events-none">
@@ -1168,8 +1255,16 @@ export default function Estadias() {
                         <Badge variant="success">Revisado</Badge>
                       </div>
                     </div>
-                  )
-                })
+                    );
+                    };
+                    if (group.length === 1) return renderTodayRow(group[0]);
+                    return (
+                      <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
+                        {batchHeader(group)}
+                        <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderTodayRow)}</div>
+                      </div>
+                    );
+                  })
               )}
               </div>
             </CardContent>

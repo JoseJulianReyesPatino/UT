@@ -19,6 +19,56 @@ import { apiFetch } from "../../lib/api";
 import { useFormAccess } from "../../hooks/useFormAccess";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { formatGroupCode } from "../../../lib/utils";
+import { HistorySheetSkeleton } from "./DocumentHistory";
+
+const MOCK_PLANEACION_HISTORY: any[] = [
+  {
+    id: 9001,
+    title: "Planeacion_Matematicas_Parcial1 - planeacion_mat_p1.pdf",
+    submitted_at: "2026-04-15T10:30:00Z",
+    status: "revisado",
+    materia: "Matemáticas Avanzadas",
+    has_file: true,
+    batch_id: "tour-planeacion-1",
+    plan: "nuevo-modelo",
+    carrera_label: "Ingeniería en Software",
+    cuatrimestre: "5",
+    parcial: "1",
+    group_code: "ISC-5A",
+    docente: "Prof. Ejemplo",
+  },
+  {
+    id: 9002,
+    title: "Planeacion_BasesDatos_Parcial2 - planeacion_bd_p2.pdf",
+    submitted_at: "2026-05-20T09:15:00Z",
+    status: "devuelto",
+    materia: "Bases de Datos",
+    has_file: true,
+    batch_id: "tour-planeacion-2",
+    plan: "plan-normal",
+    carrera_label: "Ingeniería en Software",
+    cuatrimestre: "5",
+    parcial: "2",
+    group_code: "ISC-5A",
+    docente: "Prof. Ejemplo",
+    returned_comment: "Favor de incluir los objetivos de aprendizaje detallados.",
+  },
+  {
+    id: 9003,
+    title: "Planeacion_Redes_Parcial1 - planeacion_redes_p1.pdf",
+    submitted_at: "2026-06-01T14:00:00Z",
+    status: "pendiente",
+    materia: "Redes de Computadoras",
+    has_file: true,
+    batch_id: "tour-planeacion-3",
+    plan: "nuevo-modelo",
+    carrera_label: "Ingeniería en Software",
+    cuatrimestre: "7",
+    parcial: "1",
+    group_code: "ISC-7B",
+    docente: "Prof. Ejemplo",
+  },
+];
 
 interface PlaneacionFormData {
   plan: Plan | "";
@@ -44,7 +94,7 @@ const initialFormData: PlaneacionFormData = {
   nota: "",
 };
 
-export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null; onDirtyChange?: (dirty: boolean) => void }) {
+export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActive }: { deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null; onDirtyChange?: (dirty: boolean) => void; isTourActive?: boolean }) {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const formAccess = useFormAccess(1);
@@ -54,6 +104,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
   const formRef = useRef<HTMLDivElement | null>(null);
   const [groupsOptions, setGroupsOptions] = useState<Array<{ id: number; group_code: string; group_number: number }>>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: number; nombre: string } | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
@@ -152,22 +203,30 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
   }, [formData.carrera, formData.cuatrimestre]);
 
   useEffect(() => {
+    if (isTourActive) {
+      setHistory(MOCK_PLANEACION_HISTORY);
+      setIsLoadingHistory(false);
+      return;
+    }
+    setIsLoadingHistory(true);
     let cancelled = false;
     void (async () => {
       try {
-        if (!user) return;
+        if (!user) { setIsLoadingHistory(false); return; }
         const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 1, per_page: 50 } });
         if (cancelled) return;
         setHistory(Array.isArray(res?.data) ? res.data : []);
       } catch (error) {
         console.error("Could not load history", error);
+      } finally {
+        if (!cancelled) setIsLoadingHistory(false);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, isTourActive]);
 
   const cuatrimestresDisponibles = useMemo(() => {
     if (!formData.carrera || !formData.plan) return [];
@@ -394,34 +453,43 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
     }
   };
 
-  // Función para eliminar documentos (por lote) con manejo de errores mejorado
   const handleDeleteDocuments = async (documentIds: number[]) => {
     if (isDeleting) return;
-    
     setIsDeleting(true);
     try {
-      // Eliminar cada documento
       for (const id of documentIds) {
         await apiFetch(`/documents/${id}`, { method: "DELETE" });
       }
-      
-      toast.success(documentIds.length > 1 
-        ? `${documentIds.length} documentos eliminados correctamente` 
-        : "Documento eliminado correctamente"
-      );
-      
-      // Pequeña pausa para evitar conflictos de estado
+      toast.success(documentIds.length > 1 ? `${documentIds.length} documentos eliminados correctamente` : "Documento eliminado correctamente");
       await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Recargar el historial
       if (user) {
         const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 1, per_page: 50 } });
-        const newHistory = Array.isArray(res?.data) ? res.data : [];
-        setHistory(newHistory);
+        setHistory(Array.isArray(res?.data) ? res.data : []);
       }
     } catch (error) {
       toast.error("No fue posible eliminar el documento");
       console.error("Error al eliminar documentos", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleHideDocuments = async (documentIds: number[]) => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      for (const id of documentIds) {
+        await apiFetch(`/documents/${id}/hide`, { method: "PATCH" });
+      }
+      toast.success(documentIds.length > 1 ? `${documentIds.length} documentos ocultados del historial` : "Documento ocultado del historial");
+      await new Promise(resolve => setTimeout(resolve, 300));
+      if (user) {
+        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 1, per_page: 50 } });
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      }
+    } catch (error) {
+      toast.error("No fue posible ocultar el documento");
+      console.error("Error al ocultar documentos", error);
     } finally {
       setIsDeleting(false);
     }
@@ -605,6 +673,16 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
     }
   };
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ev = e as CustomEvent;
+      if (ev.detail === "open-historial") setSheetOpen(true);
+      else if (ev.detail === "form-plan") setSheetOpen(false);
+    };
+    window.addEventListener("tour-sub-nav", handler);
+    return () => window.removeEventListener("tour-sub-nav", handler);
+  }, []);
+
   return (
     <div className="relative w-full" ref={formRef}>
       <div className="max-w-4xl mx-auto space-y-1">
@@ -632,22 +710,25 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
             </Button>
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+                <Button data-tour="docente-history-btn" variant="outline" size="sm" className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
                   <History className="mr-2 h-4 w-4" />
                   Historial
                 </Button>
               </SheetTrigger>
               <SheetContent
+                data-tour="docente-historial-panel"
                 side="right"
                 className="w-full sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
-                overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
+                overlayClassName={isTourActive ? "bg-black/30 dark:bg-black/20" : "bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"}
               >
                 <SheetHeader>
                   <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
                   <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
                 </SheetHeader>
-                <div className="mt-4 space-y-4">
-                  {groupedHistory.length > 0 ? (
+                <div data-tour="docente-history-content" className="mt-4 space-y-4">
+                  {isLoadingHistory ? (
+                    <HistorySheetSkeleton />
+                  ) : groupedHistory.length > 0 ? (
                     <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
                       <div className="grid gap-3 p-1">
                         {groupedHistory.map((group) => {
@@ -673,6 +754,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
                               }}
                               onEdit={() => void populateFormForEditBatch(group)}
                               onDelete={handleDeleteDocuments}
+                              onHide={handleHideDocuments}
                               onResubmit={(docId, fileName, returnedComment) => {
                                 setResubmitTarget({ docId, fileName, returnedComment });
                                 setResubmitFile(null);
@@ -711,7 +793,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
           </div>
         </div>
 
-        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+        <Card data-tour="docente-form-card" className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
           <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
             <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Los campos marcados con * son obligatorios.</p>
             {editingDocumentId && !isMetadataOnlyEdit && (
@@ -733,7 +815,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
             )}
             <div className="grid gap-4 md:grid-cols-2">
               {/* Selector de Plan */}
-              <div className="space-y-2 md:col-span-2">
+              <div data-tour="docente-form-plan" className="space-y-2 md:col-span-2">
                 <Label className="text-sm font-medium dark:text-white">Plan *</Label>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <button
@@ -768,7 +850,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
               </div>
 
               {/* Información académica */}
-              <div className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4 dark:border-slate-800/70 dark:bg-slate-900/30 md:col-span-2 md:p-5">
+              <div data-tour="docente-form-fields" className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4 dark:border-slate-800/70 dark:bg-slate-900/30 md:col-span-2 md:p-5">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label className="dark:text-white">Carrera *</Label>
@@ -871,7 +953,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
               </div>
 
               {/* Documentos */}
-              <div className="space-y-2 md:col-span-2">
+              <div data-tour="docente-form-upload" className="space-y-2 md:col-span-2">
                 <Label className="dark:text-white">Documentos (PDF){!isMetadataOnlyEdit && " *"}</Label>
                 {isMetadataOnlyEdit ? (
                   <p className="text-sm text-muted-foreground dark:text-slate-400">Los archivos de este envío no se pueden cambiar desde aquí.</p>
@@ -984,7 +1066,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
               </div>
 
               {/* Nota */}
-              <div className="space-y-2 md:col-span-2">
+              <div data-tour="docente-form-nota" className="space-y-2 md:col-span-2">
                 <Label className="dark:text-white">Nota para administración (opcional)</Label>
                 <Textarea 
                   value={formData.nota} 
@@ -1001,7 +1083,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange }: { deadli
                 <span>Formulario cerrado &mdash; el plazo de env&iacute;o ha vencido. Solo puedes consultar tu historial.</span>
               </div>
             )}
-            <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
+            <div data-tour="docente-form-submit" className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
               {(editingDocumentId !== null || editingBatchDocIds.length > 0) ? (
                 <Button
                   variant="outline"

@@ -124,6 +124,34 @@ const getTipoLabel = (tipo: string): string => {
   return tipoMap[tipo] || tipo;
 };
 
+export function HistorySheetSkeleton() {
+  return (
+    <div className="space-y-3 p-1" aria-busy="true" aria-label="Cargando historial">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="animate-pulse rounded-2xl border border-border/70 dark:border-slate-700/60 p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl bg-muted shrink-0" />
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="h-4 w-3/4 rounded-full bg-muted" />
+              <div className="flex flex-wrap gap-2">
+                <div className="h-5 w-20 rounded-full bg-muted" />
+                <div className="h-5 w-28 rounded-full bg-muted" />
+                <div className="h-5 w-16 rounded-full bg-muted" />
+              </div>
+              <div className="h-3 w-32 rounded-full bg-muted" />
+            </div>
+            <div className="h-6 w-16 rounded-full bg-muted shrink-0" />
+          </div>
+          <div className="flex justify-end gap-2">
+            <div className="h-8 w-8 rounded-lg bg-muted" />
+            <div className="h-8 w-8 rounded-lg bg-muted" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DocumentHistorySkeleton() {
   return (
     <div className="space-y-3" aria-busy="true" aria-label="Cargando documentos">
@@ -155,11 +183,95 @@ function DocumentHistorySkeleton() {
   );
 }
 
-export function DocumentHistory() {
+const MOCK_DOCUMENTS: ApiDocument[] = [
+  {
+    id: 9001,
+    nombre: "Planeación — Matemáticas Avanzadas",
+    tipo: "planeacion",
+    tipoLabel: "Planeación",
+    materia: "Matemáticas Avanzadas",
+    parcial: "Parcial 1",
+    grupo: "ISC-5A",
+    carrera: "Ingeniería en Software",
+    plan: "Nuevo Modelo",
+    fecha: "2026-04-15T10:30:00Z",
+    hora: "10:30",
+    status: "revisado",
+    batch_id: "tour-doc-1",
+    has_file: true,
+  },
+  {
+    id: 9002,
+    nombre: "Planeación — Bases de Datos",
+    tipo: "planeacion",
+    tipoLabel: "Planeación",
+    materia: "Bases de Datos",
+    parcial: "Parcial 2",
+    grupo: "ISC-5A",
+    carrera: "Ingeniería en Software",
+    plan: "Plan Normal",
+    fecha: "2026-05-20T09:15:00Z",
+    hora: "09:15",
+    status: "devuelto",
+    observaciones: "Incluye los objetivos de aprendizaje en el apartado correspondiente.",
+    batch_id: "tour-doc-2",
+    has_file: true,
+  },
+  {
+    id: 9003,
+    nombre: "Instrumento 30% — Programación Orientada a Objetos",
+    tipo: "instrumento-30-normal",
+    tipoLabel: "Instrumento 30%",
+    materia: "Programación Orientada a Objetos",
+    parcial: "Parcial 1",
+    grupo: "ISC-7B",
+    carrera: "Ingeniería en Software",
+    plan: "Nuevo Modelo",
+    fecha: "2026-05-05T11:00:00Z",
+    hora: "11:00",
+    status: "reenviado",
+    batch_id: "tour-doc-3",
+    has_file: true,
+  },
+  {
+    id: 9004,
+    nombre: "Lista Concentrada — Grupo ISC-5A",
+    tipo: "lista-concentrada",
+    tipoLabel: "Lista Concentrada",
+    materia: "Todas",
+    parcial: "Parcial 1",
+    grupo: "ISC-5A",
+    carrera: "Ingeniería en Software",
+    plan: "Nuevo Modelo",
+    fecha: "2026-04-28T16:45:00Z",
+    hora: "16:45",
+    status: "pendiente",
+    batch_id: "tour-doc-4",
+    has_file: true,
+  },
+  {
+    id: 9005,
+    nombre: "Asesoría — Matemáticas Avanzadas",
+    tipo: "asesoria",
+    tipoLabel: "Asesoría",
+    materia: "Matemáticas Avanzadas",
+    parcial: "Parcial 2",
+    grupo: "ISC-5A",
+    carrera: "Ingeniería en Software",
+    plan: "Plan Normal",
+    fecha: "2026-05-30T08:30:00Z",
+    hora: "08:30",
+    status: "revisado",
+    batch_id: "tour-doc-5",
+    has_file: true,
+  },
+];
+
+export function DocumentHistory({ isTourActive }: { isTourActive?: boolean }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!isTourActive);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [documents, setDocuments] = useState<ApiDocument[]>([]);
+  const [documents, setDocuments] = useState<ApiDocument[]>(() => isTourActive ? MOCK_DOCUMENTS : []);
   const [filterStatus, setFilterStatus] = useState(() => {
     try {
       return normalizeStatusFilter(localStorage.getItem("docs-filter-status") || "all");
@@ -357,6 +469,12 @@ export function DocumentHistory() {
   }, [previewBlobUrl]);
 
   useEffect(() => {
+    if (isTourActive) {
+      setDocuments(MOCK_DOCUMENTS);
+      setIsLoading(false);
+      return;
+    }
+
     let isMounted = true;
 
     const loadDocuments = async () => {
@@ -367,6 +485,7 @@ export function DocumentHistory() {
         const response = await apiFetch("/documents", {
           query: {
             per_page: 100,
+            include_hidden: 1,
           },
         }) as any;
 
@@ -425,7 +544,7 @@ export function DocumentHistory() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isTourActive]);
 
   const ESTADIAS_TIPOS = new Set([
     "estadias",
@@ -519,7 +638,7 @@ export function DocumentHistory() {
                   {filteredDocuments.length} documento{filteredDocuments.length !== 1 ? "s" : ""} en {filteredGroups.length} envío{filteredGroups.length !== 1 ? "s" : ""}
                 </CardDescription>
               </div>
-              <div className="grid w-full gap-2 sm:w-auto sm:flex sm:flex-row sm:items-center sm:gap-3">
+              <div data-tour="historial-filters" className="grid w-full gap-2 sm:w-auto sm:flex sm:flex-row sm:items-center sm:gap-3">
                 <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -588,7 +707,7 @@ export function DocumentHistory() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="max-h-[34rem] space-y-3 overflow-y-auto pr-2">
+            <div data-tour="historial-list" className="max-h-[34rem] space-y-3 overflow-y-auto pr-2">
               {isLoading && <DocumentHistorySkeleton />}
 
               {!isLoading && loadError && (

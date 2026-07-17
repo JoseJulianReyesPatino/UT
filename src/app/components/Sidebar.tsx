@@ -156,6 +156,7 @@ function SidebarInstrumentSection({
               <button
                 key={child.id}
                 type="button"
+                data-tour={`nav-${child.id}`}
                 onClick={() => handleChildSelect(child.id)}
                 className={cn(
                   "group w-full flex items-start gap-2 rounded-lg px-2 py-2 text-left text-sm transition-all",
@@ -205,6 +206,7 @@ function SidebarInstrumentSection({
               <button
                 key={child.id}
                 type="button"
+                data-tour={`nav-${child.id}`}
                 onClick={() => handleChildSelect(child.id)}
                 className={cn(
                   "group w-full flex items-start gap-2 rounded-lg px-2 py-2 text-left text-sm transition-all",
@@ -554,6 +556,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                 <div key={item.id} className="space-y-1">
                   <button
                     type="button"
+                    data-tour={`nav-${item.id}`}
                     onClick={() => handleMenuItemClick(item.id, isMobile)}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",

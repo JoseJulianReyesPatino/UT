@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { CheckCircle2, Clock2, Undo2, Eye, PencilLine, Trash2, StickyNote, RefreshCw, UploadCloud } from "lucide-react";
+import { CheckCircle2, Clock2, Undo2, Eye, PencilLine, EyeOff, Trash2, StickyNote, RefreshCw, UploadCloud } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import {
   Dialog,
@@ -36,6 +36,7 @@ interface DocumentHistoryCardProps {
   onViewDocument: (documentId: number) => void;
   onEdit: () => void;
   onDelete: (documentIds: number[]) => Promise<void>;
+  onHide: (documentIds: number[]) => Promise<void>;
   onResubmit?: (docId: number, fileName: string, returnedComment?: string) => void;
   isDeleting?: boolean;
 }
@@ -83,7 +84,7 @@ function InfoChip({
 const devueltoDocForCard = (documents: Array<{ id: number; fileName: string; status?: string; returnedComment?: string }>) =>
   documents.find((d) => String(d.status ?? "").toLowerCase() === "devuelto");
 
-export function DocumentHistoryCard({
+export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
   documents = [],
   plan,
   carrera,
@@ -99,6 +100,7 @@ export function DocumentHistoryCard({
   onViewDocument,
   onEdit,
   onDelete,
+  onHide,
   onResubmit,
   isDeleting = false,
 }: DocumentHistoryCardProps) {
@@ -115,20 +117,34 @@ export function DocumentHistoryCard({
     return !s || s === "pendiente";
   });
 
+  // Puede eliminar permanentemente solo si TODOS los documentos del batch siguen pendientes
+  const canPermanentDelete = canEdit;
+
   const planLabel = plan
     ? (String(plan).toLowerCase().includes("nuevo") ? "Plan Nuevo Modelo" : "Plan Normal")
     : undefined;
 
   const handleDelete = async () => {
     if (isDeletingLocal || isDeleting) return;
-    
     setIsDeletingLocal(true);
     try {
-      const documentIds = documents.map(d => d.id);
-      await onDelete(documentIds);
+      await onDelete(documents.map(d => d.id));
       setOpenDeleteDialog(false);
     } catch (error) {
       console.error("Error al eliminar documentos", error);
+    } finally {
+      setIsDeletingLocal(false);
+    }
+  };
+
+  const handleHide = async () => {
+    if (isDeletingLocal || isDeleting) return;
+    setIsDeletingLocal(true);
+    try {
+      await onHide(documents.map(d => d.id));
+      setOpenDeleteDialog(false);
+    } catch (error) {
+      console.error("Error al ocultar documentos", error);
     } finally {
       setIsDeletingLocal(false);
     }
@@ -197,7 +213,7 @@ export function DocumentHistoryCard({
             </div>
           </div>
 
-          {/* Fila 3: Grid de información en chips - SIN ICONOS */}
+          {/* Fila 3: Grid de información en chips */}
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2">
             <InfoChip label="Plan" value={planLabel} />
             <InfoChip label="Carrera" value={carrera} />
@@ -256,17 +272,38 @@ export function DocumentHistoryCard({
                 </TooltipContent>
               </Tooltip>
             )}
-            <Button
-              size="sm"
-              variant="destructive"
-              className="flex-1 sm:flex-none sm:min-w-[5.5rem]"
-              onClick={() => setOpenDeleteDialog(true)}
-              disabled={isLoading}
-              title="Eliminar"
-            >
-              <Trash2 className="h-3.5 w-3.5 sm:mr-1.5" />
-              <span className="hidden sm:inline">{isLoading ? "Eliminando..." : "Eliminar"}</span>
-            </Button>
+            {canPermanentDelete ? (
+              <Button
+                size="sm"
+                variant="destructive"
+                className="flex-1 sm:flex-none sm:min-w-[5.5rem]"
+                onClick={() => setOpenDeleteDialog(true)}
+                disabled={isLoading}
+                title="Eliminar"
+              >
+                <Trash2 className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">{isLoading ? "Eliminando..." : "Eliminar"}</span>
+              </Button>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 sm:flex-none sm:min-w-[5.5rem] text-muted-foreground hover:text-foreground"
+                    onClick={() => setOpenDeleteDialog(true)}
+                    disabled={isLoading}
+                    title="Ocultar del historial"
+                  >
+                    <EyeOff className="h-3.5 w-3.5 sm:mr-1.5" />
+                    <span className="hidden sm:inline">{isLoading ? "Ocultando..." : "Ocultar"}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[220px] text-center text-xs">
+                  Este documento ya fue procesado. Solo puedes ocultarlo de tu historial; la administración seguirá teniéndolo disponible.
+                </TooltipContent>
+              </Tooltip>
+            )}
             {isDevuelto && returnedComment ? (
               <Button
                 size="sm"
@@ -284,33 +321,39 @@ export function DocumentHistoryCard({
         </div>
       </div>
 
-      {/* Diálogo de confirmación para eliminar */}
+      {/* Diálogo de confirmación — eliminar permanente o solo ocultar según el estado */}
       <AlertDialog open={openDeleteDialog} onOpenChange={setOpenDeleteDialog}>
         <AlertDialogContent className="dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="dark:text-white">
-              ¿Eliminar {documents.length > 1 ? `${documents.length} documentos` : "documento"}?
+              {canPermanentDelete
+                ? `¿Eliminar ${documents.length > 1 ? `${documents.length} documentos` : "el documento"}?`
+                : "¿Ocultar del historial?"}
             </AlertDialogTitle>
+            {/* ✅ FIX: Mensaje más claro sin redundancia */}
             <AlertDialogDescription className="dark:text-slate-400">
-              {documents.length > 1 
-                ? `Se eliminarán ${documents.length} documentos de la base de datos. Esta acción no se puede deshacer.`
-                : `Se eliminará "${documents[0]?.fileName}". Esta acción no se puede deshacer.`
-              }
+             {canPermanentDelete
+                ? (documents.length > 1
+                    ? `Se eliminarán ${documents.length} documentos de forma permanente. Esta acción no se puede deshacer.`
+                    : `Se eliminará "${documents[0]?.fileName}" de forma permanente. Esta acción no se puede deshacer.`)
+                : "El documento dejará de aparecer en tu historial, pero la administración podrá seguir accediendo a él. No se elimina nada del sistema."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel 
+            <AlertDialogCancel
               className="dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
               disabled={isLoading}
             >
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={canPermanentDelete ? handleDelete : handleHide}
               disabled={isLoading}
-              className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+              className={canPermanentDelete ? "bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800" : ""}
             >
-              {isLoading ? "Eliminando..." : "Eliminar"}
+              {isLoading
+                ? (canPermanentDelete ? "Eliminando..." : "Ocultando...")
+                : (canPermanentDelete ? "Eliminar" : "Ocultar del historial")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -336,4 +379,4 @@ export function DocumentHistoryCard({
       </Dialog>
     </>
   );
-}
+});

@@ -1,5 +1,5 @@
 ﻿import React, { useMemo, useState, useEffect } from "react";
-import { ArrowLeft, Ban, ChevronRight, FileText, Upload, X, History, Calendar, CalendarClock, FolderOpen } from "lucide-react";
+import { ArrowLeft, Ban, ChevronRight, FileText, Upload, X, History, Calendar, CalendarClock, FolderOpen, Eye, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "../../components/ui/button";
@@ -9,7 +9,7 @@ import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 import { PdfPreview } from "../../components/PdfPreview";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { DocumentHistoryCard } from "../../components/DocumentHistoryCard";
 import { getCalendarFileUrl } from "../../lib/calendar";
@@ -18,6 +18,7 @@ import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { FormClosedState } from "../../components/FormClosedState";
 import { preloadForms } from "../../components/FormAccessGuard";
+import { HistorySheetSkeleton } from "./DocumentHistory";
 
 type DocumentoTutorias =
   | "carga-academica"
@@ -60,45 +61,45 @@ const documentTypes: DocumentoConfig[] = [
   {
     id: "carga-academica",
     boton: "Carga Académica",
-    titulo: "CARGA ACADÉMICA",
+    titulo: "Carga Académica",
     descripcion: "Sube el archivo correspondiente para el registro de carga académica.",
-    etiquetaCarga: "Subir Carga Académica",
+    etiquetaCarga: "Subir carga académica",
     formId: 8,
     apartadoLabel: "carga-academica",
   },
   {
     id: "reporte-bajas",
     boton: "Reporte de Bajas",
-    titulo: "REPORTE DE BAJAS",
+    titulo: "Reporte de Bajas",
     descripcion: "Adjunta el reporte de bajas en formato PDF.",
-    etiquetaCarga: "Subir Reporte De Bajas",
+    etiquetaCarga: "Subir reporte de bajas",
     formId: 9,
     apartadoLabel: "reporte-bajas",
   },
   {
     id: "concentrado-asesorias",
     boton: "Concentrado de Asesorías",
-    titulo: "CONCENTRADO DE ASESORÍAS",
+    titulo: "Concentrado de Asesorías",
     descripcion: "Carga el concentrado de asesorías para su revisión.",
-    etiquetaCarga: "Subir Concentrado De Asesorías",
+    etiquetaCarga: "Subir concentrado de asesorías",
     formId: 10,
     apartadoLabel: "concentrado-asesorias",
   },
   {
     id: "acta-asistencia-grupal",
     boton: "Acta de Asistencia Grupal",
-    titulo: "ACTA DE ASISTENCIA GRUPAL",
+    titulo: "Acta de Asistencia Grupal",
     descripcion: "Selecciona el acta de asistencia grupal en PDF.",
-    etiquetaCarga: "Subir Acta De Asistencia Grupal",
+    etiquetaCarga: "Subir acta de asistencia grupal",
     formId: 11,
     apartadoLabel: "acta-asistencia-grupal",
   },
   {
     id: "ficha-tecnica",
     boton: "Ficha Técnica",
-    titulo: "FICHA TÉCNICA",
+    titulo: "Ficha Técnica",
     descripcion: "Sube la ficha técnica para continuar con el proceso.",
-    etiquetaCarga: "Subir Ficha Técnica",
+    etiquetaCarga: "Subir ficha técnica",
     formId: 12,
     apartadoLabel: "ficha-tecnica",
   },
@@ -121,21 +122,34 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ id: number; nombre: string } | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [deletingDocIds, setDeletingDocIds] = useState<number[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [cancelEditDialogOpen, setCancelEditDialogOpen] = useState(false);
+  const [isLoadingPdf, setIsLoadingPdf] = useState(false);
+  const [isMetadataOnlyEdit, setIsMetadataOnlyEdit] = useState(false);
+  const [editingBatchDocIds, setEditingBatchDocIds] = useState<number[]>([]);
+  const [editingBatchFileNames, setEditingBatchFileNames] = useState<string[]>([]);
+  const [resubmitTarget, setResubmitTarget] = useState<{ docId: number; fileName: string; returnedComment?: string } | null>(null);
+  const [resubmitFile, setResubmitFile] = useState<File | null>(null);
+  const [resubmitPreviewUrl, setResubmitPreviewUrl] = useState<string | null>(null);
+  const [showResubmitPreview, setShowResubmitPreview] = useState(false);
+  const [isResubmitting, setIsResubmitting] = useState(false);
 
   const selectedConfig = useMemo(
     () => documentTypes.find((type) => type.id === selectedType) ?? null,
     [selectedType]
   );
 
-  // Pre-cargar caché de formularios al montar para que la verificación por tipo sea instantánea
-  useEffect(() => { if (initialType === null) preloadForms().catch(() => {}); }, []);
+  // Pre-cargar caché de formularios al montar
+  useEffect(() => { preloadForms().catch(() => {}); }, []);
 
-  // Verificación de acceso por tipo (solo cuando no hay initialType, es decir, selector de tipos)
+  // Verificación de acceso por tipo
   useEffect(() => {
     if (initialType !== null || !selectedType || !user) {
       if (!initialType) { setTypeAccessClosed(false); setTypeDeadlineInfo(null); }
@@ -175,7 +189,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
   // Cargar historial cuando se selecciona un tipo de documento
   useEffect(() => {
     if (!selectedConfig || !user) return;
-
+    setIsLoadingHistory(true);
     let cancelled = false;
     void (async () => {
       try {
@@ -190,6 +204,8 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
         setHistory(Array.isArray(res?.data) ? res.data : []);
       } catch (error) {
         console.error("Could not load history", error);
+      } finally {
+        if (!cancelled) setIsLoadingHistory(false);
       }
     })();
 
@@ -197,6 +213,25 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
       cancelled = true;
     };
   }, [selectedConfig, user]);
+
+  const groupedHistory = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    for (const doc of history) {
+      const key = doc.batch_id ?? `single-${doc.id}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(doc);
+    }
+    return Array.from(groups.values()).sort(
+      (a, b) => new Date(b[0].submitted_at).getTime() - new Date(a[0].submitted_at).getTime()
+    );
+  }, [history]);
+
+  const getBatchStatus = (group: any[]) => {
+    if (group.some((d) => String(d.status ?? "").toLowerCase() === "devuelto")) return "devuelto";
+    if (group.some((d) => String(d.status ?? "").toLowerCase() === "reenviado")) return "reenviado";
+    if (group.every((d) => String(d.status ?? "").toLowerCase() === "revisado")) return "revisado";
+    return "pendiente";
+  };
 
   const isValid = useMemo(
     () => Boolean(
@@ -270,6 +305,10 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
   const resetForm = () => {
     setFormData({ ...initialFormData, docente: user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "" : "" });
     setEditingDocumentId(null);
+    setIsLoadingPdf(false);
+    setIsMetadataOnlyEdit(false);
+    setEditingBatchDocIds([]);
+    setEditingBatchFileNames([]);
   };
 
   const getArchivosLabel = () => {
@@ -326,17 +365,108 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
     setPreviewError(null);
   };
 
-  const populateFormForEdit = (document: any) => {
-    setEditingDocumentId(document.id);
-    setFormData({
-      archivos: [],
-      nota: document.nota ?? document.note ?? "",
-      docente: document.docente ?? (user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() : ""),
-    });
-    setSheetOpen(false);
+  const handleDeleteDocuments = async (documentIds: number[]) => {
+    setDeletingDocIds(documentIds);
+    try {
+      await Promise.all(documentIds.map((id) => apiFetch(`/documents/${id}`, { method: "DELETE" })));
+      setHistory((prev) => prev.filter((h) => !documentIds.includes(h.id)));
+      toast.success(documentIds.length > 1 ? "Documentos eliminados correctamente" : "Documento eliminado correctamente");
+    } catch {
+      toast.error("No fue posible eliminar el documento");
+    } finally {
+      setDeletingDocIds([]);
+    }
   };
 
-  const uploadMultipleFiles = async (files: File[], basePayload: any) => {
+  const handleHideDocuments = async (documentIds: number[]) => {
+    setDeletingDocIds(documentIds);
+    try {
+      await Promise.all(documentIds.map((id) => apiFetch(`/documents/${id}/hide`, { method: "PATCH" })));
+      setHistory((prev) => prev.filter((h) => !documentIds.includes(h.id)));
+      toast.success(documentIds.length > 1 ? "Documentos ocultados del historial" : "Documento ocultado del historial");
+    } catch {
+      toast.error("No fue posible ocultar el documento");
+    } finally {
+      setDeletingDocIds([]);
+    }
+  };
+
+  useEffect(() => {
+    if (!resubmitFile) {
+      setResubmitPreviewUrl(null);
+      setShowResubmitPreview(false);
+      return;
+    }
+    const url = URL.createObjectURL(resubmitFile);
+    setResubmitPreviewUrl(url);
+    setShowResubmitPreview(false);
+    return () => URL.revokeObjectURL(url);
+  }, [resubmitFile]);
+
+  const handleResubmit = async () => {
+    if (!resubmitTarget || !resubmitFile) return;
+    setIsResubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", resubmitFile, resubmitFile.name);
+      await apiFetch(`/documents/${resubmitTarget.docId}/resubmit`, { method: "POST", body: fd });
+      toast.success("Documento reenviado correctamente");
+      setResubmitTarget(null);
+      setResubmitFile(null);
+      if (user && selectedConfig) {
+        const res = await apiFetch("/documents", {
+          query: { uploaded_by: user.id, form_id: selectedConfig.formId, per_page: 50 },
+        });
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      }
+    } catch (error: any) {
+      toast.error(error?.message ?? "No fue posible reenviar el documento");
+    } finally {
+      setIsResubmitting(false);
+    }
+  };
+
+  const populateFormForEditBatch = async (documents: any[]) => {
+    const main = documents[0];
+
+    const anyProcessed = documents.some((d) => {
+      const s = String(d.status ?? "").trim().toLowerCase();
+      return s && s !== "pendiente";
+    });
+
+    setIsMetadataOnlyEdit(anyProcessed);
+    setEditingBatchDocIds(documents.map((d) => d.id));
+    setEditingBatchFileNames(documents.map((d) => getUploadedFileName(d)));
+    setEditingDocumentId(main.id);
+
+    setFormData({
+      archivos: [],
+      nota: main.note ?? main.nota ?? "",
+      docente: main.docente ?? (user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() : ""),
+    });
+    setSheetOpen(false);
+
+    if (anyProcessed) return;
+
+    setIsLoadingPdf(true);
+    try {
+      const files = await Promise.all(
+        documents.slice(0, 3).map(async (doc) => {
+          const blob = await fetchDocumentBlob(doc.id);
+          return new File([blob], getUploadedFileName(doc), { type: "application/pdf" });
+        })
+      );
+      setFormData((current) => ({ ...current, archivos: files }));
+      toast.success(`${files.length} documento${files.length > 1 ? "s" : ""} cargado${files.length > 1 ? "s" : ""} correctamente`, { duration: 2000 });
+    } catch (error) {
+      console.error("No se pudieron cargar todos los PDFs del lote", error);
+      toast.error("Algunos PDFs no se pudieron cargar. Verifica los archivos manualmente.");
+    } finally {
+      setIsLoadingPdf(false);
+    }
+  };
+
+  const uploadMultipleFiles = async (files: File[], basePayload: any, batchId?: string) => {
     const uploadedIds = [];
 
     for (let i = 0; i < files.length; i++) {
@@ -347,6 +477,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
       fd.append('file', file, file.name);
       fd.append('form_id', String(basePayload.form_id));
       fd.append('title', title);
+      if (batchId) fd.append('batch_id', batchId);
       if (basePayload.apartado_label) fd.append('apartado_label', basePayload.apartado_label);
       if (basePayload.original_document_id) fd.append('original_document_id', String(basePayload.original_document_id));
       if (basePayload.nota) fd.append('nota', basePayload.nota);
@@ -372,6 +503,29 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
 
     setIsSubmitting(true);
     try {
+      if (isMetadataOnlyEdit && editingBatchDocIds.length > 0) {
+        const metadataPayload: Record<string, unknown> = {
+          nota: formData.nota,
+        };
+
+        for (const docId of editingBatchDocIds) {
+          await apiFetch(`/documents/${docId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(metadataPayload),
+          });
+        }
+        toast.success("Datos actualizados correctamente");
+        resetForm();
+        if (user && selectedConfig) {
+          const res = await apiFetch("/documents", {
+            query: { uploaded_by: user.id, form_id: selectedConfig.formId, per_page: 50 },
+          });
+          setHistory(Array.isArray(res?.data) ? res.data : []);
+        }
+        return;
+      }
+
       const basePayload: any = {
         form_id: selectedConfig.formId,
         apartado_label: selectedConfig.apartadoLabel,
@@ -382,7 +536,14 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
       if (formData.nota) basePayload.nota = formData.nota;
       if (editingDocumentId) basePayload.original_document_id = String(editingDocumentId);
 
-      await uploadMultipleFiles(formData.archivos, basePayload);
+      const batchId = formData.archivos.length > 1 ? crypto.randomUUID() : undefined;
+      await uploadMultipleFiles(formData.archivos, basePayload, batchId);
+
+      if (editingBatchDocIds.length > 0) {
+        await Promise.allSettled(
+          editingBatchDocIds.map((id) => apiFetch(`/documents/${id}`, { method: "DELETE" }))
+        );
+      }
 
       toast.success(editingDocumentId ? "Documento actualizado correctamente" : "Documento enviado correctamente", {
         description: editingDocumentId ? "Tus documentos han sido actualizados." : "Tus documentos fueron enviados para revisión administrativa.",
@@ -410,30 +571,30 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-1">
-      {/* Fila superior: fecha límite + acciones */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        {(initialType ? deadlineInfo : typeDeadlineInfo) && (() => {
-          const di = initialType ? deadlineInfo : typeDeadlineInfo;
-          return (
-            <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
-              <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-              <span>
-                Cierra el <strong>{di!.formattedDeadline}</strong>
-                {di!.isUrgent && " · Tiempo limitado"}
-              </span>
-            </div>
-          );
-        })()}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.open(getCalendarFileUrl(), "_blank")}
-          className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
-        >
-          <Calendar className="mr-2 h-4 w-4" />
-          Calendario
-        </Button>
-        {selectedConfig && (
+      {/* Fila superior: fecha límite + acciones (solo cuando el formulario está abierto) */}
+      {!typeAccessClosed && selectedConfig && (
+        <div className="flex flex-wrap items-center justify-end gap-3 pt-1 sm:pt-2">
+          {(initialType ? deadlineInfo : typeDeadlineInfo) && (() => {
+            const di = initialType ? deadlineInfo : typeDeadlineInfo;
+            return (
+              <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+                <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Cierra el <strong>{di!.formattedDeadline}</strong>
+                  {di!.isUrgent && " · Tiempo limitado"}
+                </span>
+              </div>
+            );
+          })()}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(getCalendarFileUrl(), "_blank")}
+            className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
+          >
+            <Calendar className="mr-2 h-4 w-4" />
+            Calendario
+          </Button>
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="sm" className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
@@ -451,23 +612,33 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
                 <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
               </SheetHeader>
               <div className="mt-4 space-y-4">
-                {history.length > 0 ? (
+                {isLoadingHistory ? (
+                  <HistorySheetSkeleton />
+                ) : groupedHistory.length > 0 ? (
                   <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
                     <div className="grid gap-3 p-1">
-                      {history.map((h) => (
-                        <DocumentHistoryCard
-                          key={h.id}
-                          title=""
-                          fileName={getUploadedFileName(h)}
-                          carrera={h.carrera_label}
-                          subject={h.materia}
-                          submittedAt={new Date(h.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          status={h.status}
-                          returnedComment={String(h.status ?? "").toLowerCase() === "devuelto" ? h.returned_comment : undefined}
-                          onView={() => openPreview(h)}
-                          onEdit={() => populateFormForEdit(h)}
-                        />
-                      ))}
+                      {groupedHistory.map((group) => {
+                        const main = group[0];
+                        return (
+                          <DocumentHistoryCard
+                            key={main.batch_id ?? main.id}
+                            documents={group.map((d: any) => ({ id: d.id, fileName: getUploadedFileName(d), status: d.status, returnedComment: d.returned_comment ?? undefined }))}
+                            nota={main.nota}
+                            submittedAt={new Date(main.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            status={getBatchStatus(group)}
+                            returnedComment={getBatchStatus(group) === "devuelto" ? (group.find((d: any) => String(d.status ?? "").toLowerCase() === "devuelto")?.returned_comment ?? undefined) : undefined}
+                            onViewDocument={(docId) => { const doc = group.find((d: any) => d.id === docId); if (doc) openPreview(doc); }}
+                            onEdit={() => void populateFormForEditBatch(group)}
+                            onDelete={handleDeleteDocuments}
+                            onHide={handleHideDocuments}
+                            onResubmit={(docId, fileName, returnedComment) => {
+                              setResubmitTarget({ docId, fileName, returnedComment });
+                              setResubmitFile(null);
+                            }}
+                            isDeleting={group.some((d: any) => deletingDocIds.includes(d.id))}
+                          />
+                        );
+                      })}
                     </div>
                   </ScrollArea>
                 ) : formData.archivos.length === 0 ? (
@@ -485,20 +656,22 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
               </div>
             </SheetContent>
           </Sheet>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Título y subtítulo */}
-      <div className="space-y-1.5 pt-1">
-        <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
-          {selectedConfig ? selectedConfig.titulo : "Tutorías"}
-        </h1>
-        <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
-          {selectedConfig 
-            ? selectedConfig.descripcion 
-            : "Selecciona el tipo de archivo que deseas subir"}
-        </p>
-      </div>
+      {/* Título y subtítulo - se muestra en la pantalla de inicio o cuando el formulario está abierto */}
+      {(!selectedConfig || (selectedConfig && !typeAccessClosed)) && (
+        <div className={`space-y-1.5 pt-1 ${!selectedConfig ? "pt-8 sm:pt-12 md:pt-16" : ""}`}>
+          <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
+            {selectedConfig ? selectedConfig.titulo : "Tutorías"}
+          </h1>
+          <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
+            {selectedConfig 
+              ? selectedConfig.descripcion 
+              : "Selecciona el tipo de archivo que deseas subir"}
+          </p>
+        </div>
+      )}
 
       {selectedConfig === null ? (
         <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
@@ -525,19 +698,124 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
         </Card>
       ) : typeAccessClosed && initialType === null ? (
         <div className="space-y-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => { setSelectedType(null); setEditingDocumentId(null); setTypeAccessClosed(false); }}
-            className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Cambiar tipo
-          </Button>
+          {/* FormClosedState primero */}
           <FormClosedState
             title={selectedConfig.boton}
-            message={`El formulario de ${selectedConfig.boton.toLowerCase()} está cerrado. Si necesitas acceso, solicita al administrador que actualice la fecha de vencimiento o los roles permitidos.`}
+            message={`El periodo para enviar ${selectedConfig.boton.toLowerCase()} ya finalizó. Si tienes dudas sobre tu entrega, contacta a administración.`}
           />
+
+          {/* En móvil: fila horizontal debajo de la tarjeta. En desktop: bloque flotante en la esquina */}
+          <div className="mx-auto flex max-w-2xl flex-wrap justify-center gap-2 px-0 sm:fixed sm:right-6 sm:top-44 sm:z-50 sm:mx-0 sm:max-w-none sm:flex-nowrap sm:justify-start sm:px-0">
+            <div className="flex flex-row flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/20 bg-black/20 p-2 shadow-lg backdrop-blur-md dark:border-slate-700/50 dark:bg-slate-950/40 sm:flex-col sm:flex-nowrap sm:items-end sm:gap-2.5 sm:p-2.5">
+              {user && (
+                <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100 dark:hover:bg-slate-800/80"
+                    >
+                      <History className="mr-2 h-4 w-4" />
+                      Historial
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-full sm:max-w-xl">
+                    <SheetHeader>
+                      <SheetTitle>Historial de archivos</SheetTitle>
+                      <SheetDescription>
+                        Revisa los documentos que ya subiste para {selectedConfig.boton.toLowerCase()}.
+                      </SheetDescription>
+                    </SheetHeader>
+                    <div className="mt-6">
+                      {isLoadingHistory ? (
+                        <p className="text-sm text-muted-foreground dark:text-slate-400">Cargando...</p>
+                      ) : groupedHistory.length > 0 ? (
+                        <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
+                          <div className="grid gap-3 p-1">
+                            {groupedHistory.map((group) => {
+                              const main = group[0];
+                              return (
+                                <div
+                                  key={main.batch_id ?? main.id}
+                                  className="rounded-xl border border-border bg-card p-3 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/30 sm:rounded-2xl sm:p-5"
+                                >
+                                  <div className="flex flex-col gap-2.5 sm:gap-4">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-[10px] text-muted-foreground dark:text-slate-500 sm:text-xs">
+                                        {new Date(main.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                      </span>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground dark:text-slate-500 sm:text-[11px]">
+                                        {group.length > 1 ? `${group.length} documentos enviados` : "Documento"}
+                                      </p>
+                                      <div className="space-y-1">
+                                        {group.map((doc: any) => (
+                                          <button
+                                            key={doc.id}
+                                            type="button"
+                                            onClick={() => openPreview(doc)}
+                                            className="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/20 px-2.5 py-1.5 text-left transition hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-800/50 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800/40"
+                                          >
+                                            <span className="truncate text-xs font-semibold text-foreground dark:text-white sm:text-sm">
+                                              {getUploadedFileName(doc)}
+                                            </span>
+                                            <Eye className="h-3.5 w-3.5 shrink-0 text-muted-foreground dark:text-slate-500" />
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2">
+                                      {[
+                                        { label: "Nota", value: main.nota },
+                                      ].filter((c) => c.value).map((chip) => (
+                                        <div key={chip.label} className="flex items-start gap-1.5 rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 dark:border-slate-800/60 dark:bg-slate-900/40 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2">
+                                          <div className="min-w-0 w-full">
+                                            <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400 sm:text-[11px]">
+                                              {chip.label}
+                                            </p>
+                                            <p className="text-xs font-medium leading-snug text-foreground break-words dark:text-slate-100 sm:text-sm">
+                                              {chip.value}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </ScrollArea>
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                          No hay archivos cargados en esta sesión para este formulario.
+                        </div>
+                      )}
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(getCalendarFileUrl(), "_blank")}
+                className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100 dark:hover:bg-slate-800/80"
+              >
+                <Calendar className="mr-2 h-4 w-4" />
+                Calendario
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setSelectedType(null); setEditingDocumentId(null); setTypeAccessClosed(false); }}
+                className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100 dark:hover:bg-slate-800/80"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Cambiar tipo
+              </Button>
+            </div>
+          </div>
         </div>
       ) : (
         <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
@@ -557,9 +835,21 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
               </Button>
             </div>
 
-            {editingDocumentId && (
+            {editingDocumentId && !isMetadataOnlyEdit && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
                 Estás editando el documento. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+                {isLoadingPdf && (
+                  <span className="ml-2 inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando documentos...
+                  </span>
+                )}
+              </div>
+            )}
+            {isMetadataOnlyEdit && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-100">
+                <p className="font-medium">Modo edición de datos</p>
+                <p className="mt-0.5 text-xs">Este envío ya fue procesado por el administrador. Solo puedes actualizar los datos del formulario — los archivos no se pueden cambiar aquí. Para documentos devueltos usa el botón <strong>Reenviar</strong> en el historial.</p>
               </div>
             )}
 
@@ -567,68 +857,101 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
               {/* Documentos */}
               <div className="space-y-2 md:col-span-2">
                 <Label className="dark:text-white">Subir archivo *</Label>
-                <p className="text-sm text-muted-foreground dark:text-slate-400">
-                  Adjuntar el documento en formato PDF, con un límite de 15 MB por archivo. En caso de ser necesario, se permite la carga simultánea de hasta tres archivos.
-                </p>
+                {isMetadataOnlyEdit ? (
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">Los archivos de este envío no se pueden cambiar desde aquí.</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">
+                    Adjuntar el documento en formato PDF, con un límite de 15 MB por archivo. En caso de ser necesario, se permite la carga simultánea de hasta tres archivos.
+                  </p>
+                )}
 
-                <input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  id="tutorias-pdf-upload"
-                  onChange={handleFileChange}
-                  disabled={formData.archivos.length >= 3}
-                />
+                {isMetadataOnlyEdit ? (
+                  <div className="space-y-1.5 rounded-2xl border border-border/50 bg-muted/20 p-3 dark:border-slate-800/50 dark:bg-slate-900/20">
+                    {editingBatchFileNames.map((name, i) => (
+                      <div key={i} className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/60 px-3 py-2 dark:border-slate-800/40 dark:bg-slate-900/40">
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground dark:text-slate-500" />
+                        <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground dark:text-slate-400">{name}</span>
+                        <Ban className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 dark:text-slate-600" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      id="tutorias-pdf-upload"
+                      onChange={handleFileChange}
+                      disabled={formData.archivos.length >= 3 || isLoadingPdf}
+                    />
 
-                <div
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  className={`rounded-3xl border-2 border-dashed transition-all ${
-                    formData.archivos.length === 0 ? "p-6 text-center" : "p-4"
-                  } ${
-                    isDragging
-                      ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30"
-                      : "border-border bg-background/60 hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40"
-                  }`}
-                >
-                  {formData.archivos.length === 0 ? (
-                    <label htmlFor="tutorias-pdf-upload" className="block cursor-pointer space-y-3">
-                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors dark:bg-emerald-500/10 dark:text-emerald-400">
-                        <Upload className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium dark:text-white">{selectedConfig.etiquetaCarga}</p>
-                        <p className="text-xs text-muted-foreground dark:text-slate-400">
-                          {isDragging ? "Suelta aquí para cargar" : `${getArchivosLabel()} · ${getEspaciosLabel()}`}
-                        </p>
-                      </div>
-                    </label>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className={`grid gap-3 ${formData.archivos.length > 1 ? "sm:grid-cols-2" : ""} ${formData.archivos.length > 2 ? "lg:grid-cols-3" : ""}`}>
-                        {formData.archivos.map((archivo, index) => (
-                          <PdfPreview
-                            key={`${archivo.name}-${archivo.size}-${index}`}
-                            file={archivo}
-                            title="Documento cargado"
-                            onRemove={() => removeFile(index)}
-                          />
-                        ))}
-                      </div>
-
-                      {formData.archivos.length < 3 && (
-                        <label
-                          htmlFor="tutorias-pdf-upload"
-                          className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-background/60 py-3 text-sm text-muted-foreground transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:hover:border-emerald-500/40"
-                        >
-                          <FolderOpen className="h-4 w-4" />
-                          Agregar otro archivo · {getEspaciosLabel()}
+                    <div
+                      onDrop={handleDrop}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      className={`rounded-3xl border-2 border-dashed transition-all ${
+                        formData.archivos.length === 0 ? "p-6 text-center" : "p-4"
+                      } ${
+                        isDragging
+                          ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30"
+                          : "border-border bg-background/60 hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40"
+                      } ${isLoadingPdf ? "pointer-events-none opacity-60" : ""}`}
+                    >
+                      {isLoadingPdf ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="flex flex-col items-center gap-3">
+                            <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                            <p className="text-sm text-muted-foreground dark:text-slate-400">Cargando documento...</p>
+                          </div>
+                        </div>
+                      ) : formData.archivos.length === 0 ? (
+                        <label htmlFor="tutorias-pdf-upload" className="block cursor-pointer space-y-3">
+                          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors dark:bg-emerald-500/10 dark:text-emerald-400">
+                            <Upload className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium dark:text-white">{getArchivosLabel()}</p>
+                            <p className="text-xs text-muted-foreground dark:text-slate-400">
+                              {isDragging ? "Suelta aquí para cargar" : `${getEspaciosLabel()} · arrastra o haz clic`}
+                            </p>
+                          </div>
                         </label>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className={`grid gap-3 ${formData.archivos.length > 1 ? "sm:grid-cols-2" : ""} ${formData.archivos.length > 2 ? "lg:grid-cols-3" : ""}`}>
+                            {formData.archivos.map((archivo, index) => (
+                              <PdfPreview
+                                key={`${archivo.name}-${archivo.size}-${index}`}
+                                file={archivo}
+                                title="Documento cargado"
+                                onRemove={() => removeFile(index)}
+                                onReplace={(newFile) => {
+                                  if (newFile.size > 15 * 1024 * 1024) { toast.error(`${newFile.name} excede el límite de 15 MB`); return; }
+                                  if (newFile.type !== "application/pdf") { toast.error(`${newFile.name} debe ser un archivo PDF`); return; }
+                                  setFormData((current) => ({
+                                    ...current,
+                                    archivos: current.archivos.map((f, i) => (i === index ? newFile : f)),
+                                  }));
+                                }}
+                              />
+                            ))}
+                          </div>
+
+                          {formData.archivos.length < 3 && (
+                            <label
+                              htmlFor="tutorias-pdf-upload"
+                              className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-background/60 py-3 text-sm text-muted-foreground transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:hover:border-emerald-500/40"
+                            >
+                              <FolderOpen className="h-4 w-4" />
+                              Agregar otro archivo · {getEspaciosLabel()}
+                            </label>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
 
               {/* Nota */}
@@ -668,10 +991,16 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
 
             {/* Footer con acciones */}
             <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
-              <Button variant="outline" onClick={resetForm} disabled={isSubmitting} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
-                Limpiar
-              </Button>
-              <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting} className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
+              {(editingDocumentId !== null || editingBatchDocIds.length > 0) ? (
+                <Button variant="outline" onClick={() => setCancelEditDialogOpen(true)} disabled={isSubmitting || isLoadingPdf} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+                  Cancelar
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={resetForm} disabled={isSubmitting || isLoadingPdf} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+                  Limpiar
+                </Button>
+              )}
+              <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting || isLoadingPdf} className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
                 {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar documento" : "Enviar"}
               </Button>
             </div>
@@ -702,6 +1031,119 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
               </object>
             ) : null}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de reenvío de documento devuelto */}
+      <Dialog open={resubmitTarget !== null} onOpenChange={(open) => { if (!open) { setResubmitTarget(null); setResubmitFile(null); } }}>
+        <DialogContent className={`max-w-[calc(100vw-2rem)] ${resubmitFile ? "sm:max-w-2xl" : "sm:max-w-md"} dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md`}>
+          <DialogHeader>
+            <DialogTitle className="dark:text-white">Reenviar documento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 dark:border-slate-800/60 dark:bg-slate-900/40">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground dark:text-slate-500">Archivo</p>
+              <p className="break-all text-sm font-semibold dark:text-white">{resubmitTarget?.fileName}</p>
+            </div>
+            {resubmitTarget?.returnedComment && (
+              <div className="rounded-lg border border-red-200/60 bg-red-50/40 px-3 py-2 dark:border-red-900/40 dark:bg-red-950/20">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-red-600 dark:text-red-400">Motivo de devolución</p>
+                <p className="text-sm whitespace-pre-wrap break-words text-red-900 dark:text-red-100">{resubmitTarget.returnedComment}</p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label className="dark:text-white">Nuevo archivo PDF *</Label>
+              <input
+                type="file"
+                accept=".pdf"
+                id="resubmit-tutorias-pdf-upload"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  if (f.size > 15 * 1024 * 1024) { toast.error("El archivo excede el límite de 15 MB"); return; }
+                  if (f.type !== "application/pdf") { toast.error("Selecciona un archivo PDF válido"); return; }
+                  setResubmitFile(f);
+                  e.target.value = "";
+                }}
+              />
+              {resubmitFile ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-emerald-200/60 bg-emerald-50/30 px-3 py-2 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      <span className="min-w-0 flex-1 break-all text-sm leading-snug dark:text-white">{resubmitFile.name}</span>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowResubmitPreview((v) => !v)}
+                          title={showResubmitPreview ? "Ocultar vista previa" : "Ver documento"}
+                          className="rounded p-1 text-muted-foreground transition hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setResubmitFile(null)}
+                          className="rounded p-1 text-muted-foreground hover:text-destructive dark:text-slate-400 dark:hover:text-red-400"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {showResubmitPreview && resubmitPreviewUrl && (
+                    <div className="overflow-hidden rounded-lg border border-border dark:border-slate-700">
+                      <object data={resubmitPreviewUrl} type="application/pdf" className="h-[50vh] w-full">
+                        <a href={resubmitPreviewUrl} target="_blank" rel="noopener noreferrer" className="flex h-32 items-center justify-center text-sm text-primary underline dark:text-emerald-400">
+                          Abrir documento en nueva pestaña
+                        </a>
+                      </object>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <label htmlFor="resubmit-tutorias-pdf-upload" className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border px-4 py-6 text-center transition hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-950/10">
+                  <Upload className="h-6 w-6 text-muted-foreground dark:text-slate-400" />
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">Selecciona el nuevo PDF a reenviar</p>
+                </label>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="flex-row justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => { setResubmitTarget(null); setResubmitFile(null); }} disabled={isResubmitting} className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">
+              Cancelar
+            </Button>
+            <Button variant="success" onClick={() => void handleResubmit()} disabled={!resubmitFile || isResubmitting} className="dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
+              {isResubmitting ? "Reenviando..." : "Reenviar documento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cancelEditDialogOpen} onOpenChange={setCancelEditDialogOpen}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
+          <DialogHeader>
+            <DialogTitle className="dark:text-white">¿Cancelar edición?</DialogTitle>
+            <DialogDescription className="dark:text-slate-400">
+              Se perderán los cambios que hayas hecho en el formulario. El documento seguirá tal como estaba.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setCancelEditDialogOpen(false)}
+              className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
+            >
+              Seguir editando
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => { setCancelEditDialogOpen(false); resetForm(); }}
+            >
+              Sí, cancelar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

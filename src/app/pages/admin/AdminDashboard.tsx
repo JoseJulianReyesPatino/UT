@@ -6,7 +6,6 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Textarea } from "../../components/ui/textarea";
 import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
@@ -36,6 +35,11 @@ type PendingDocument = {
   revisado: boolean;
   submittedAt: string;
   filePath?: string | null;
+  materia?: string | null;
+  cuatrimestre?: string | null;
+  grupo?: string | null;
+  formulario?: string | null;
+  rawApartadoLabel?: string | null;
 };
 
 type ReviewedDocument = {
@@ -48,6 +52,8 @@ type ReviewedDocument = {
   reviewedAt: string;
   reviewedAtIso: string;
   filePath?: string | null;
+  formulario?: string | null;
+  rawApartadoLabel?: string | null;
 };
 
 type ActivityItem = {
@@ -55,6 +61,8 @@ type ActivityItem = {
   type: "review" | "upload";
   title: string;
   description: string;
+  formulario?: string | null;
+  rawApartadoLabel?: string | null;
   timestamp: string;
   related: string;
   relatedDocumentId: number;
@@ -71,6 +79,9 @@ type ApiDocument = {
   reviewed_at?: string | null;
   status?: string;
   file_path?: string | null;
+  materia?: string | null;
+  cuatrimestre?: string | null;
+  group_code?: string | null;
 };
 
 type ApiUserRole = string | { code?: string | null };
@@ -125,6 +136,51 @@ const isToday = (value?: string | null) => {
 
 const addPdfExt = (name: string) => name.toUpperCase().endsWith(".PDF") ? name : `${name}.pdf`;
 
+const ESTADIAS_APARTADOS: Record<string, string> = {
+  "carta-presentacion": "Carta de Presentación",
+  "carta-aceptacion": "Carta de Aceptación",
+  "carta-terminacion": "Carta de Terminación",
+  "acta-final-estadias": "Acta Final de Estadías",
+};
+
+const TUTORIAS_APARTADOS: Record<string, string> = {
+  "carga-academica": "Carga Académica",
+  "reporte-bajas": "Reporte de Bajas",
+  "concentrado-asesorias": "Concentrado de Asesorías",
+  "acta-asistencia-grupal": "Acta de Asistencia Grupal",
+  "ficha-tecnica": "Ficha Técnica",
+};
+
+const buildFormularioLabel = (doc: ApiDocument): string | null => {
+  const slug = doc.apartado_label ?? null;
+
+  if (slug && slug in ESTADIAS_APARTADOS) {
+    return `Estadías (${ESTADIAS_APARTADOS[slug]})`;
+  }
+
+  if (slug && slug in TUTORIAS_APARTADOS) {
+    return `Tutorías (${TUTORIAS_APARTADOS[slug]})`;
+  }
+
+  const form = doc.form_title && doc.form_title !== "Documento" ? doc.form_title : null;
+  return form ?? null;
+};
+
+const buildCuatrimestroLabel = (cuatrimestre?: string | null): string | null => {
+  if (!cuatrimestre) return null;
+  return cuatrimestre === "0" ? "Propedéutico" : `Cuatrimestre ${cuatrimestre}`;
+};
+
+const ESTADIAS_SLUG_SET = new Set(Object.keys(ESTADIAS_APARTADOS));
+const TUTORIAS_SLUG_SET = new Set(Object.keys(TUTORIAS_APARTADOS));
+
+const resolveAdminViewForDoc = (slug: string | null | undefined, activityType: "review" | "upload"): string => {
+  if (slug && ESTADIAS_SLUG_SET.has(slug)) return "estadias-admin";
+  if (slug && TUTORIAS_SLUG_SET.has(slug)) return "tutores";
+  if (slug === "remedial") return activityType === "review" ? "documentos-revisados" : "remediales";
+  return activityType === "review" ? "documentos-revisados" : "documentos";
+};
+
 const mapPendingDocument = (doc: ApiDocument): PendingDocument => ({
   id: Number(doc.id),
   docente: doc.uploaded_by_name ?? "Docente",
@@ -135,6 +191,11 @@ const mapPendingDocument = (doc: ApiDocument): PendingDocument => ({
   revisado: false,
   submittedAt: doc.submitted_at ?? "",
   filePath: doc.file_path ?? null,
+  materia: doc.materia && doc.materia !== "Sin materia" ? doc.materia : null,
+  cuatrimestre: buildCuatrimestroLabel(doc.cuatrimestre),
+  grupo: doc.group_code && doc.group_code !== "-" ? doc.group_code : null,
+  formulario: buildFormularioLabel(doc),
+  rawApartadoLabel: doc.apartado_label ?? null,
 });
 
 const mapReviewedDocument = (doc: ApiDocument): ReviewedDocument => {
@@ -149,6 +210,8 @@ const mapReviewedDocument = (doc: ApiDocument): ReviewedDocument => {
     reviewedAt: formatDate(reviewedAtIso),
     reviewedAtIso,
     filePath: doc.file_path ?? null,
+    formulario: buildFormularioLabel(doc),
+    rawApartadoLabel: doc.apartado_label ?? null,
   };
 };
 
@@ -170,6 +233,8 @@ const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocum
     type: "review",
     title: `Revisado documento de ${doc.docente}`,
     description: doc.documento,
+    formulario: doc.formulario ?? null,
+    rawApartadoLabel: doc.rawApartadoLabel ?? null,
     timestamp: doc.reviewedAtIso,
     related: doc.documento,
     relatedDocumentId: doc.id,
@@ -181,6 +246,8 @@ const buildRecentActivity = (pending: PendingDocument[], reviewed: ReviewedDocum
     type: "upload",
     title: `${doc.docente} subió un documento`,
     description: doc.documento,
+    formulario: doc.formulario ?? null,
+    rawApartadoLabel: doc.rawApartadoLabel ?? null,
     timestamp: doc.submittedAt,
     related: doc.documento,
     relatedDocumentId: doc.id,
@@ -205,7 +272,7 @@ function DashboardEmptyState({ text }: { text: string }) {
 
 const StatsGrid = React.memo(function StatsGrid({ stats, onNavigate }: { stats: any[]; onNavigate: (view: AdminView) => void }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+    <div data-tour="admin-dashboard-stats" className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {stats.map((stat) => {
         const Icon = stat.icon;
         return (
@@ -251,7 +318,7 @@ const PendingList = React.memo(function PendingList({ items, onOpen }: { items: 
               onOpen(doc);
             }
           }}
-          className="flex flex-col gap-3 p-3 rounded-2xl border border-slate-200 bg-white/70 hover:bg-slate-100/90 transition-colors cursor-pointer dark:border-slate-800 dark:bg-slate-900/70 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 p-3 rounded-2xl border border-border/70 bg-white hover:bg-slate-50 transition-colors cursor-pointer dark:bg-slate-900/90 dark:hover:bg-slate-800/90 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center dark:bg-emerald-950/50 dark:text-emerald-300">
@@ -260,10 +327,21 @@ const PendingList = React.memo(function PendingList({ items, onOpen }: { items: 
             <div className="min-w-0 flex-1">
               <p className="font-medium text-sm truncate text-foreground">{doc.documento}</p>
               <p className="text-xs text-muted-foreground">{doc.docente}</p>
-              {doc.carrera && (
-                <Badge variant="outline" className="mt-2 w-fit max-w-full text-[11px]">
-                  {doc.carrera}
-                </Badge>
+              {(doc.carrera || doc.materia || doc.cuatrimestre || doc.grupo) && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {doc.carrera && (
+                    <Badge variant="outline" className="text-[11px]">{doc.carrera}</Badge>
+                  )}
+                  {doc.materia && (
+                    <Badge variant="outline" className="text-[11px]">{doc.materia}</Badge>
+                  )}
+                  {doc.cuatrimestre && (
+                    <Badge variant="outline" className="text-[11px]">{doc.cuatrimestre}</Badge>
+                  )}
+                  {doc.grupo && (
+                    <Badge variant="outline" className="text-[11px]">{doc.grupo}</Badge>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -300,9 +378,12 @@ const ActivityList = React.memo(function ActivityList({ items, onOpen }: { items
           className="w-full text-left flex items-start gap-3 rounded-2xl p-3 border border-transparent hover:border-slate-200/70 hover:bg-slate-100/90 transition-colors cursor-pointer dark:hover:border-slate-800/70 dark:hover:bg-slate-900/50"
         >
           <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 mt-2 shadow-[0_0_0_4px_rgba(16,185,129,0.12)] dark:shadow-[0_0_0_4px_rgba(16,185,129,0.06)]" />
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground">{activity.title}</p>
-            <p className="text-xs text-muted-foreground">{activity.description}</p>
+            <p className="text-xs text-muted-foreground truncate">{activity.description}</p>
+            {activity.formulario && (
+              <p className="text-[11px] text-muted-foreground/70 truncate">{activity.formulario}</p>
+            )}
           </div>
           <p className="text-xs text-muted-foreground whitespace-nowrap">{formatRelativeTime(activity.timestamp)}</p>
         </button>
@@ -330,7 +411,6 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     submittedAt: string;
   }>(null);
 
-  const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -479,8 +559,10 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   }, []);
 
   const openActivity = useCallback((activity: ActivityItem) => {
-    setSelectedActivity(activity);
-  }, []);
+    sessionStorage.setItem("adminHighlightDocumentId", String(activity.relatedDocumentId));
+    const targetView = resolveAdminViewForDoc(activity.rawApartadoLabel, activity.type);
+    onNavigate(targetView);
+  }, [onNavigate]);
 
   useEffect(() => {
     let isMounted = true;
@@ -526,39 +608,6 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
     return () => clearInterval(id);
   }, []);
 
-  const openRelatedDocument = () => {
-    if (!selectedActivity) return;
-
-    const relatedDocument = pendingDocuments.find((item) => item.id === selectedActivity.relatedDocumentId)
-      ?? reviewedDocuments.find((item) => item.id === selectedActivity.relatedDocumentId);
-
-    if (relatedDocument && "revisado" in relatedDocument) {
-      openDocument(relatedDocument);
-      setSelectedActivity(null);
-      return;
-    }
-
-    if (relatedDocument) {
-      setSelectedDocument({
-        id: relatedDocument.id,
-        docente: relatedDocument.docente,
-        documento: relatedDocument.documento,
-        carrera: relatedDocument.carrera,
-        tipo: relatedDocument.tipo,
-        fecha: relatedDocument.fecha,
-        submittedAt: relatedDocument.submittedAt,
-      });
-    }
-
-    setSelectedActivity(null);
-  };
-
-  const selectedActivityDocument = selectedActivity
-    ? pendingDocuments.find((item) => item.id === selectedActivity.relatedDocumentId)
-      ?? reviewedDocuments.find((item) => item.id === selectedActivity.relatedDocumentId)
-      ?? null
-    : null;
-
   return (
     <div className="relative space-y-6 overflow-hidden">
       <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -572,7 +621,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
       {isLoading ? <StatsGridSkeleton /> : <StatsGrid stats={stats} onNavigate={onNavigate} />}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
+        <Card data-tour="admin-dashboard-pending" className="overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md">
           <CardHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-foreground">Documentos Pendientes de Revisión</CardTitle>
@@ -591,7 +640,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
+        <Card data-tour="admin-dashboard-activity" className="overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md">
           <CardHeader>
             <CardTitle className="text-foreground">Actividad Reciente</CardTitle>
             <CardDescription>Últimas acciones en el sistema</CardDescription>
@@ -712,60 +761,6 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(selectedActivity)} onOpenChange={(open) => !open && setSelectedActivity(null)}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Detalle de actividad</DialogTitle>
-            <DialogDescription>
-              La actividad seleccionada se puede abrir e inspeccionar.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedActivity && (
-            <Tabs defaultValue="activity" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="activity">Actividad</TabsTrigger>
-                <TabsTrigger value="document">Documento</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="activity" className="space-y-3">
-                <div className="rounded-lg border border-border p-3">
-                  <p className="text-sm font-medium">{selectedActivity.title}</p>
-                  <p className="text-xs text-muted-foreground">{selectedActivity.description}</p>
-                  <p className="text-xs text-muted-foreground">{formatRelativeTime(selectedActivity.timestamp)}</p>
-                  <p className="text-xs text-muted-foreground">Relacionado: {selectedActivity.related}</p>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="document" className="space-y-3">
-                {selectedActivityDocument ? (
-                  <div className="space-y-3">
-                    <div className="rounded-lg border border-border p-3">
-                      <p className="text-sm font-medium">{selectedActivityDocument.documento}</p>
-                      <p className="text-xs text-muted-foreground">{selectedActivityDocument.docente}</p>
-                      <p className="text-xs text-muted-foreground">{selectedActivityDocument.carrera}</p>
-                      <p className="text-xs text-muted-foreground">{selectedActivityDocument.tipo}</p>
-                      <p className="text-xs text-muted-foreground">Fecha: {selectedActivityDocument.fecha}</p>
-                    </div>
-                    <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
-                      Desde aquí puedes abrir el documento relacionado y revisar su contenido real.
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No se encontró un documento relacionado.</p>
-                )}
-              </TabsContent>
-            </Tabs>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedActivity(null)}>
-              Cerrar
-            </Button>
-            <Button onClick={openRelatedDocument}>
-              Abrir documento relacionado
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

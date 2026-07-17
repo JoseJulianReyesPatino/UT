@@ -5,7 +5,7 @@ import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Button } from "../../components/ui/button";
-import { Ban, History, Upload, FolderOpen, Calendar, CalendarClock, Loader2, FileText, X, Eye } from "lucide-react";
+import { Ban, History, Upload, FolderOpen, Calendar, CalendarClock, ArrowLeft, ChevronRight, Loader2, FileText, X, Eye } from "lucide-react";
 import { PdfPreview } from "../../components/PdfPreview";
 import { toast } from "sonner";
 import { getCalendarFileUrl } from "../../lib/calendar";
@@ -13,52 +13,99 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { DocumentHistoryCard } from "../../components/DocumentHistoryCard";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, Plan, Cuatrimestre } from "../../data/curricula";
+import { carrieras, Plan } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
-import { useFormAccess } from "../../hooks/useFormAccess";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { formatGroupCode } from "../../../lib/utils";
+import { FormClosedState } from "../../components/FormClosedState";
+import { preloadForms } from "../../components/FormAccessGuard";
+import { HistorySheetSkeleton } from "./DocumentHistory";
 
-interface ActaFinalFormData {
-  plan: Plan | "";
-  carrera: string;
-  cuatrimestre: Cuatrimestre | "";
-  materia: string;
-  grupo: string;
-  archivos: File[];
-  docente: string;
-  nota: string;
+type DocumentoEstadia = "carta-presentacion" | "carta-aceptacion" | "carta-terminacion" | "acta-final-estadias";
+
+const ESTADIAS_FORM_ID_MAP: Record<DocumentoEstadia, string> = {
+  "carta-presentacion": "carta-presentacion",
+  "carta-aceptacion": "carta-aceptacion",
+  "carta-terminacion": "carta-terminacion",
+  "acta-final-estadias": "estadias",
+};
+
+interface DocumentoConfig {
+  id: DocumentoEstadia;
+  boton: string;
+  titulo: string;
+  descripcion: string;
+  etiquetaCarga: string;
+  formId: number;
+  apartadoLabel: string;
 }
 
-const initialFormData: ActaFinalFormData = {
+interface EstadiaFormData {
+  plan: Plan | "";
+  carrera: string;
+  cuatrimestre: string;
+  grupo: string;
+  archivos: File[];
+  nota: string;
+  docente: string;
+}
+
+const documentTypes: DocumentoConfig[] = [
+  { 
+    id: "carta-presentacion", 
+    boton: "Carta de Presentación", 
+    titulo: "CARTA DE PRESENTACIÓN", 
+    descripcion: "Sube la carta de presentación correspondiente.", 
+    etiquetaCarga: "Subir Carta de Presentación",
+    formId: 13,
+    apartadoLabel: "carta-presentacion",
+  },
+  { 
+    id: "carta-aceptacion", 
+    boton: "Carta de Aceptación", 
+    titulo: "CARTA DE ACEPTACIÓN", 
+    descripcion: "Adjunta la carta de aceptación en PDF.", 
+    etiquetaCarga: "Subir Carta de Aceptación",
+    formId: 14,
+    apartadoLabel: "carta-aceptacion",
+  },
+  { 
+    id: "carta-terminacion", 
+    boton: "Carta de Terminación", 
+    titulo: "CARTA DE TERMINACIÓN", 
+    descripcion: "Sube la carta de terminación.", 
+    etiquetaCarga: "Subir Carta de Terminación",
+    formId: 15,
+    apartadoLabel: "carta-terminacion",
+  },
+  { 
+    id: "acta-final-estadias", 
+    boton: "Acta Final", 
+    titulo: "ACTA FINAL", 
+    descripcion: "Adjunta el acta final en PDF.", 
+    etiquetaCarga: "Subir Acta Final",
+    formId: 16,
+    apartadoLabel: "estadias",
+  },
+];
+
+const initialFormData: EstadiaFormData = {
   plan: "",
   carrera: "",
   cuatrimestre: "",
-  materia: "",
   grupo: "",
   archivos: [],
-  docente: "",
   nota: "",
+  docente: "",
 };
 
-export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null; onDirtyChange?: (dirty: boolean) => void }) {
+export default function EstadiasPage({ deadlineInfo, onDirtyChange }: { deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null; onDirtyChange?: (dirty: boolean) => void }) {
   const { user } = useAuth();
+  const [selectedType, setSelectedType] = useState<DocumentoEstadia | null>(null);
+  const [formData, setFormData] = useState<EstadiaFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const formAccess = useFormAccess(7);
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
-  const [formData, setFormData] = useState<ActaFinalFormData>(initialFormData);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const formRef = useRef<HTMLDivElement | null>(null);
-  const [groupsOptions, setGroupsOptions] = useState<Array<{ id: number; group_code: string; group_number: number }>>([]);
-  const [history, setHistory] = useState<any[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const [previewItem, setPreviewItem] = useState<{ id: number; nombre: string } | null>(null);
-  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [cancelEditDialogOpen, setCancelEditDialogOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [isMetadataOnlyEdit, setIsMetadataOnlyEdit] = useState(false);
   const [editingBatchDocIds, setEditingBatchDocIds] = useState<number[]>([]);
@@ -68,14 +115,62 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
   const [resubmitPreviewUrl, setResubmitPreviewUrl] = useState<string | null>(null);
   const [showResubmitPreview, setShowResubmitPreview] = useState(false);
   const [isResubmitting, setIsResubmitting] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const formRef = useRef<HTMLDivElement | null>(null);
+  const [groupsOptions, setGroupsOptions] = useState<Array<{ id: number; group_code: string; group_number: number }>>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewItem, setPreviewItem] = useState<{ id: number; nombre: string } | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [cancelEditDialogOpen, setCancelEditDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [typeAccessClosed, setTypeAccessClosed] = useState(false);
+  const [typeDeadlineInfo, setTypeDeadlineInfo] = useState<{ formattedDeadline: string; isUrgent: boolean } | null>(null);
+
+  // Pre-cargar caché de formularios al montar
+  useEffect(() => { preloadForms().catch(() => {}); }, []);
+
+  useEffect(() => {
+    if (!selectedType || !user) {
+      setTypeAccessClosed(false);
+      setTypeDeadlineInfo(null);
+      return;
+    }
+    const formIdStr = ESTADIAS_FORM_ID_MAP[selectedType];
+    preloadForms().then((forms) => {
+      const match = forms.find((f: any) => String(f.form_code).replace(/_/g, "-") === formIdStr);
+      if (!match) { setTypeAccessClosed(false); setTypeDeadlineInfo(null); return; }
+      const roles: string[] = match.access_roles ?? [];
+      const dueAt: string | null = match.due_at ?? null;
+      const roleOk = (roles.includes("docente") && (user.role === "docente" || user.roles?.includes("docente"))) ||
+                     (roles.includes("tutor") && (user.role === "tutor" || user.roles?.includes("tutor")));
+      const expired = Boolean(dueAt && new Date(dueAt).getTime() < Date.now());
+      setTypeAccessClosed(!roleOk || expired);
+      if (roleOk && !expired && dueAt) {
+        const deadline = new Date(dueAt);
+        const msLeft = deadline.getTime() - Date.now();
+        setTypeDeadlineInfo({
+          formattedDeadline: deadline.toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" }),
+          isUrgent: msLeft / (1000 * 60 * 60) < 24,
+        });
+      } else {
+        setTypeDeadlineInfo(null);
+      }
+    }).catch(() => { setTypeAccessClosed(false); setTypeDeadlineInfo(null); });
+  }, [selectedType, user]);
 
   useEffect(() => {
     if (!onDirtyChange) return;
     const hasEditing = editingDocumentId !== null || editingBatchDocIds.length > 0;
-    const hasFormData = formData.plan !== "" || formData.carrera !== "" || formData.cuatrimestre !== "" || formData.materia !== "" ||
+    const hasFormData = formData.plan !== "" || formData.carrera !== "" || formData.cuatrimestre !== "" ||
       formData.grupo !== "" || formData.archivos.length > 0 || formData.nota !== "";
     onDirtyChange(hasEditing || hasFormData);
   }, [onDirtyChange, editingDocumentId, editingBatchDocIds, formData]);
+
+  const selectedConfig = useMemo(() => documentTypes.find((d) => d.id === selectedType) ?? null, [selectedType]);
 
   useEffect(() => {
     if (user && !formData.docente) {
@@ -83,6 +178,12 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
       setFormData(prev => ({ ...prev, docente: nombreCompleto }));
     }
   }, [user]);
+
+  const cuatrimestresOptions = useMemo(() => {
+    if (formData.plan === "nuevo-modelo") return ["6", "10"];
+    if (formData.plan === "plan-normal") return ["6", "11"];
+    return [];
+  }, [formData.plan]);
 
   const carrerasDisponibles = useMemo(() => {
     if (!formData.plan) return [];
@@ -121,38 +222,31 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
   }, [formData.carrera, formData.cuatrimestre]);
 
   useEffect(() => {
+    if (!selectedConfig || !user) return;
+    setIsLoadingHistory(true);
     let cancelled = false;
     void (async () => {
       try {
-        if (!user) return;
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 7, per_page: 50 } });
+        const res = await apiFetch("/documents", {
+          query: {
+            uploaded_by: user.id,
+            form_id: selectedConfig.formId,
+            per_page: 50,
+          },
+        });
         if (cancelled) return;
         setHistory(Array.isArray(res?.data) ? res.data : []);
       } catch (error) {
         console.error("Could not load history", error);
+      } finally {
+        if (!cancelled) setIsLoadingHistory(false);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [user]);
-
-  const cuatrimestresDisponibles = useMemo(() => {
-    if (!formData.carrera || !formData.plan) return [];
-    const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
-    const carrera = plan[formData.carrera];
-    if (!carrera) return [];
-    return Object.keys(carrera.cuatrimestres);
-  }, [formData.carrera, formData.plan]);
-
-  const materiasDisponibles = useMemo(() => {
-    if (!formData.carrera || !formData.cuatrimestre || !formData.plan) return [];
-    const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
-    const carrera = plan[formData.carrera];
-    if (!carrera) return [];
-    return carrera.cuatrimestres[formData.cuatrimestre] || [];
-  }, [formData.carrera, formData.cuatrimestre, formData.plan]);
+  }, [selectedConfig, user]);
 
   const isValid = useMemo(() => {
     let grupoValido = false;
@@ -167,7 +261,6 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
       formData.plan &&
       formData.carrera &&
       formData.cuatrimestre &&
-      formData.materia &&
       grupoValido &&
       user &&
       formData.docente.trim()
@@ -197,23 +290,63 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
   };
 
   const handleDeleteDocuments = async (documentIds: number[]) => {
-    if (isDeleting) return;
     setIsDeleting(true);
     try {
-      for (const id of documentIds) {
-        await apiFetch(`/documents/${id}`, { method: "DELETE" });
-      }
-      toast.success(documentIds.length > 1 ? `${documentIds.length} documentos eliminados correctamente` : "Documento eliminado correctamente");
-      await new Promise(resolve => setTimeout(resolve, 300));
-      if (user) {
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 7, per_page: 50 } });
-        setHistory(Array.isArray(res?.data) ? res.data : []);
-      }
-    } catch (error) {
+      await Promise.all(documentIds.map((id) => apiFetch(`/documents/${id}`, { method: "DELETE" })));
+      setHistory((prev) => prev.filter((h) => !documentIds.includes(h.id)));
+      toast.success(documentIds.length > 1 ? "Documentos eliminados correctamente" : "Documento eliminado correctamente");
+    } catch {
       toast.error("No fue posible eliminar el documento");
-      console.error("Error al eliminar documentos", error);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleHideDocuments = async (documentIds: number[]) => {
+    setIsDeleting(true);
+    try {
+      await Promise.all(documentIds.map((id) => apiFetch(`/documents/${id}/hide`, { method: "PATCH" })));
+      setHistory((prev) => prev.filter((h) => !documentIds.includes(h.id)));
+      toast.success(documentIds.length > 1 ? "Documentos ocultados del historial" : "Documento ocultado del historial");
+    } catch {
+      toast.error("No fue posible ocultar el documento");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!resubmitFile) {
+      setResubmitPreviewUrl(null);
+      setShowResubmitPreview(false);
+      return;
+    }
+    const url = URL.createObjectURL(resubmitFile);
+    setResubmitPreviewUrl(url);
+    setShowResubmitPreview(false);
+    return () => URL.revokeObjectURL(url);
+  }, [resubmitFile]);
+
+  const handleResubmit = async () => {
+    if (!resubmitTarget || !resubmitFile) return;
+    setIsResubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", resubmitFile, resubmitFile.name);
+      await apiFetch(`/documents/${resubmitTarget.docId}/resubmit`, { method: "POST", body: fd });
+      toast.success("Documento reenviado correctamente");
+      setResubmitTarget(null);
+      setResubmitFile(null);
+      if (user && selectedConfig) {
+        const res = await apiFetch("/documents", {
+          query: { uploaded_by: user.id, form_id: selectedConfig.formId, per_page: 50 },
+        });
+        setHistory(Array.isArray(res?.data) ? res.data : []);
+      }
+    } catch (error: any) {
+      toast.error(error?.message ?? "No fue posible reenviar el documento");
+    } finally {
+      setIsResubmitting(false);
     }
   };
 
@@ -238,6 +371,12 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
     }
 
     setFormData((current) => ({ ...current, archivos: [...current.archivos, ...newFiles] }));
+  };
+
+  const handleSelectType = (type: DocumentoEstadia) => {
+    setFormData({ ...initialFormData, docente: user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() || user.name || "" : "" });
+    setEditingDocumentId(null);
+    setSelectedType(type);
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -285,8 +424,6 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
     setEditingBatchFileNames([]);
   };
 
-  const getCuatrimestreLabel = (k: string) => cuatrimestresLabels[k as keyof typeof cuatrimestresLabels] ?? String(k);
-
   const getArchivosLabel = () => {
     if (formData.archivos.length === 0) return "Selecciona tus archivos PDF";
     const count = formData.archivos.length;
@@ -315,6 +452,23 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
     return found?.codigo ?? "";
   };
 
+  const getUploadedFileName = (doc: any): string => {
+    const t = (doc?.title ?? '').toString().trim();
+    if (t && !/^undefined\b/i.test(t)) {
+      const parts = t.split(' - ');
+      const last = (parts.length > 1 ? parts[parts.length - 1] : t).trim();
+      return /\.pdf$/i.test(last) ? last : last + '.pdf';
+    }
+    const p = (doc?.file_path ?? doc?.fileUrl ?? '').toString();
+    if (p) {
+      const raw = decodeURIComponent(p.split('?')[0].split('/').pop() ?? '');
+      const cleaned = raw.replace(/^doc_[^_]+_/, '');
+      if (!cleaned) return 'Documento.pdf';
+      return /\.pdf$/i.test(cleaned) ? cleaned : cleaned + '.pdf';
+    }
+    return 'Documento.pdf';
+  };
+
   const populateFormForEditBatch = async (documents: any[]) => {
     const main = documents[0];
 
@@ -327,9 +481,6 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
 
     const planKey = normalizePlanKey(main.plan ?? "");
     const careerCode = findCareerCodeByLabel(main.carrera_label ?? "", planKey as any);
-    const allowedCuatrimestres = new Set(Object.keys(cuatrimestresLabels));
-    const rawCuatrimestre = String(main.cuatrimestre ?? "").trim();
-    const resolvedCuatrimestre = allowedCuatrimestres.has(rawCuatrimestre) ? rawCuatrimestre : "";
 
     const anyProcessed = documents.some((d) => {
       const s = String(d.status ?? "").trim().toLowerCase();
@@ -344,12 +495,11 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
     setFormData({
       plan: planKey as Plan,
       carrera: careerCode,
-      cuatrimestre: resolvedCuatrimestre as Cuatrimestre,
-      materia: main.materia ?? "",
+      cuatrimestre: main.parcial ?? "",
       grupo: main.group_code ? formatGroupCode(main.group_code) : "",
       archivos: [],
-      docente: main.docente ?? (user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() : ""),
       nota: main.note ?? main.nota ?? "",
+      docente: main.docente ?? (user ? `${user.firstNames ?? ""} ${user.lastNames ?? ""}`.trim() : ""),
     });
     setSheetOpen(false);
 
@@ -368,30 +518,13 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
         })
       );
       setFormData((current) => ({ ...current, archivos: files }));
-      toast.success(`${files.length} documentos cargados correctamente`, { duration: 2000 });
+      toast.success(`${files.length} documento${files.length > 1 ? "s" : ""} cargado${files.length > 1 ? "s" : ""} correctamente`, { duration: 2000 });
     } catch (error) {
       console.error("No se pudieron cargar todos los PDFs del lote", error);
       toast.error("Algunos PDFs no se pudieron cargar. Verifica los archivos manualmente.");
     } finally {
       setIsLoadingPdf(false);
     }
-  };
-
-  const getUploadedFileName = (doc: any): string => {
-    const t = (doc?.title ?? '').toString().trim();
-    if (t && !/^undefined\b/i.test(t)) {
-      const parts = t.split(' - ');
-      const last = (parts.length > 1 ? parts[parts.length - 1] : t).trim();
-      return /\.pdf$/i.test(last) ? last : last + '.pdf';
-    }
-    const p = (doc?.file_path ?? doc?.fileUrl ?? '').toString();
-    if (p) {
-      const raw = decodeURIComponent(p.split('?')[0].split('/').pop() ?? '');
-      const cleaned = raw.replace(/^doc_[^_]+_/, '');
-      if (!cleaned) return 'Documento.pdf';
-      return /\.pdf$/i.test(cleaned) ? cleaned : cleaned + '.pdf';
-    }
-    return 'Documento.pdf';
   };
 
   const openPreview = async (doc: any) => {
@@ -417,7 +550,7 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
     setPreviewError(null);
   };
 
-  const uploadMultipleFiles = async (files: File[], basePayload: any) => {
+  const uploadMultipleFiles = async (files: File[], basePayload: any, batchId?: string) => {
     const uploadedIds = [];
 
     for (let i = 0; i < files.length; i++) {
@@ -429,14 +562,14 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
       fd.append('file', file, file.name);
       fd.append('form_id', String(basePayload.form_id));
       fd.append('title', title);
+      if (batchId) fd.append('batch_id', batchId);
       if (basePayload.plan) fd.append('plan', String(basePayload.plan).replace(/-/g, '_'));
       if (basePayload.apartado_label) fd.append('apartado_label', basePayload.apartado_label);
       if (basePayload.carrera_label) fd.append('carrera_label', basePayload.carrera_label);
-      if (basePayload.materia) fd.append('materia', basePayload.materia);
       if (basePayload.group_id) fd.append('group_id', String(basePayload.group_id));
       if (basePayload.original_document_id) fd.append('original_document_id', String(basePayload.original_document_id));
+      if (basePayload.parcial) fd.append('parcial', basePayload.parcial);
       if (basePayload.nota) fd.append('nota', basePayload.nota);
-      if (basePayload.batch_id) fd.append('batch_id', basePayload.batch_id);
 
       try {
         const result = await apiFetch("/documents", { method: "POST", body: fd });
@@ -451,41 +584,8 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
     return uploadedIds;
   };
 
-  const handleResubmit = async () => {
-    if (!resubmitTarget || !resubmitFile) return;
-    setIsResubmitting(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", resubmitFile, resubmitFile.name);
-      await apiFetch(`/documents/${resubmitTarget.docId}/resubmit`, { method: "POST", body: fd });
-      toast.success("Documento reenviado correctamente");
-      setResubmitTarget(null);
-      setResubmitFile(null);
-      if (user) {
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 7, per_page: 50 } });
-        setHistory(Array.isArray(res?.data) ? res.data : []);
-      }
-    } catch (error: any) {
-      toast.error(error?.message ?? "No fue posible reenviar el documento");
-    } finally {
-      setIsResubmitting(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!resubmitFile) {
-      setResubmitPreviewUrl(null);
-      setShowResubmitPreview(false);
-      return;
-    }
-    const url = URL.createObjectURL(resubmitFile);
-    setResubmitPreviewUrl(url);
-    setShowResubmitPreview(false);
-    return () => URL.revokeObjectURL(url);
-  }, [resubmitFile]);
-
   const handleSubmit = async () => {
-    if (!isValid) {
+    if (!isValid || !selectedConfig) {
       toast.error("Completa todos los campos obligatorios");
       return;
     }
@@ -500,12 +600,11 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
         selectedGroup = groupsOptions.find(g => formatGroupCode(g.group_code) === formData.grupo);
       }
 
-      // Modo solo metadatos: PATCH a cada documento del lote sin tocar los archivos
       if (isMetadataOnlyEdit && editingBatchDocIds.length > 0) {
         const metadataPayload: Record<string, unknown> = {
           plan: formData.plan ? String(formData.plan).replace(/-/g, "_") : undefined,
           carrera_label: carreraLabel,
-          materia: formData.materia,
+          parcial: formData.cuatrimestre,
           nota: formData.nota,
         };
         if (selectedGroup) metadataPayload.group_id = selectedGroup.id;
@@ -520,23 +619,23 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
         toast.success("Datos actualizados correctamente");
         resetForm();
         if (user) {
-          const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 7, per_page: 50 } });
+          const res = await apiFetch("/documents", {
+            query: { uploaded_by: user.id, form_id: selectedConfig.formId, per_page: 50 },
+          });
           setHistory(Array.isArray(res?.data) ? res.data : []);
         }
         return;
       }
 
-      // Modo normal: crear nuevos registros con los archivos
-      const batchId = crypto.randomUUID();
       const basePayload: any = {
-        form_id: 7,
-        apartado_label: "acta-final",
+        form_id: selectedConfig.formId,
+        apartado_label: selectedConfig.apartadoLabel,
         carrera_label: carreraLabel,
         plan: formData.plan,
-        materia: formData.materia,
+        parcial: formData.cuatrimestre,
         docente: formData.docente,
         nota: formData.nota,
-        batch_id: batchId,
+        titulo: selectedConfig.titulo,
       };
 
       if (selectedGroup) {
@@ -546,16 +645,16 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
 
       if (editingDocumentId) basePayload.original_document_id = String(editingDocumentId);
 
-      await uploadMultipleFiles(formData.archivos, basePayload);
+      const batchId = formData.archivos.length > 1 ? crypto.randomUUID() : undefined;
+      await uploadMultipleFiles(formData.archivos, basePayload, batchId);
 
-      // Eliminar documentos pendientes anteriores del lote (re-edición)
       if (editingBatchDocIds.length > 0) {
         await Promise.allSettled(
           editingBatchDocIds.map((id) => apiFetch(`/documents/${id}`, { method: "DELETE" }))
         );
       }
 
-      toast.success(editingDocumentId ? "Acta final actualizada correctamente" : "Acta final enviada correctamente", {
+      toast.success(editingDocumentId ? "Documento actualizado correctamente" : "Documento enviado correctamente", {
         description: editingDocumentId ? "Tus documentos han sido actualizados." : "Tus documentos fueron enviados para revisión administrativa.",
       });
 
@@ -563,11 +662,13 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
       resetForm();
 
       if (user) {
-        const res = await apiFetch("/documents", { query: { uploaded_by: user.id, form_id: 7, per_page: 50 } });
+        const res = await apiFetch("/documents", {
+          query: { uploaded_by: user.id, form_id: selectedConfig.formId, per_page: 50 },
+        });
         setHistory(Array.isArray(res?.data) ? res.data : []);
       }
     } catch (error: any) {
-      toast.error(error?.message ?? "No fue posible subir el acta final");
+      toast.error(error?.message ?? "No fue posible subir el documento");
     } finally {
       setIsSubmitting(false);
     }
@@ -575,408 +676,578 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
 
   return (
     <div className="max-w-4xl mx-auto space-y-1" ref={formRef}>
-      {/* Fila superior: fecha límite + acciones */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        {deadlineInfo && (
-          <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
-            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-            <span>
-              Cierra el <strong>{deadlineInfo.formattedDeadline}</strong>
-              {deadlineInfo.isUrgent && " · Tiempo limitado"}
-            </span>
-          </div>
-        )}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.open(getCalendarFileUrl(), "_blank")}
-          className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
-        >
-          <Calendar className="mr-2 h-4 w-4" />
-          Calendario
-        </Button>
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
-              <History className="mr-2 h-4 w-4" />
-              Historial
-            </Button>
-          </SheetTrigger>
-          <SheetContent
-            side="right"
-            className="w-full sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
-            overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
+      {/* Fila superior: fecha límite + acciones (solo cuando el formulario está abierto) */}
+      {!typeAccessClosed && selectedConfig && (
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {typeDeadlineInfo && (
+            <div className="mr-auto flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+              <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                Cierra el <strong>{typeDeadlineInfo.formattedDeadline}</strong>
+                {typeDeadlineInfo.isUrgent && " · Tiempo limitado"}
+              </span>
+            </div>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(getCalendarFileUrl(), "_blank")}
+            className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100"
           >
-            <SheetHeader>
-              <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
-              <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
-            </SheetHeader>
-            <div className="mt-4 space-y-4">
-              {groupedHistory.length > 0 ? (
-                <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
-                  <div className="grid gap-3 p-1">
-                    {groupedHistory.map((group) => {
-                      const main = group[0];
-                      return (
-                        <DocumentHistoryCard
-                          key={main.batch_id ?? main.id}
-                          documents={group.map((d: any) => ({ id: d.id, fileName: getUploadedFileName(d), status: d.status, returnedComment: d.returned_comment ?? undefined }))}
-                          plan={main.plan}
-                          carrera={main.carrera_label}
-                          cuatrimestre={main.cuatrimestre ? cuatrimestresLabels[String(main.cuatrimestre) as keyof typeof cuatrimestresLabels] : undefined}
-                          subject={main.materia}
-                          grupo={main.group_code ? formatGroupCode(main.group_code) : undefined}
-                          nota={main.nota}
-                          submittedAt={new Date(main.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          status={getBatchStatus(group)}
-                          returnedComment={getBatchStatus(group) === "devuelto" ? (group.find((d: any) => String(d.status ?? "").toLowerCase() === "devuelto")?.returned_comment ?? undefined) : undefined}
-                          onViewDocument={(docId) => { const doc = group.find((d: any) => d.id === docId); if (doc) openPreview(doc); }}
-                          onEdit={() => void populateFormForEditBatch(group)}
-                          onDelete={handleDeleteDocuments}
-                          onResubmit={(docId, fileName, returnedComment) => {
-                            setResubmitTarget({ docId, fileName, returnedComment });
-                            setResubmitFile(null);
-                          }}
-                          isDeleting={isDeleting}
-                        />
-                      );
-                    })}
+            <Calendar className="mr-2 h-4 w-4" />
+            Calendario
+          </Button>
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100">
+                <History className="mr-2 h-4 w-4" />
+                Historial
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className="w-full sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
+              overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
+            >
+              <SheetHeader>
+                <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
+                <SheetDescription className="dark:text-slate-400">Selecciona un documento del historial para ver, descargar o editar.</SheetDescription>
+              </SheetHeader>
+              <div className="mt-4 space-y-4">
+                {isLoadingHistory ? (
+                  <HistorySheetSkeleton />
+                ) : groupedHistory.length > 0 ? (
+                  <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
+                    <div className="grid gap-3 p-1">
+                      {groupedHistory.map((group) => {
+                        const main = group[0];
+                        return (
+                          <DocumentHistoryCard
+                            key={main.batch_id ?? main.id}
+                            documents={group.map((d: any) => ({ id: d.id, fileName: getUploadedFileName(d), status: d.status, returnedComment: d.returned_comment ?? undefined }))}
+                            carrera={main.carrera_label}
+                            cuatrimestre={main.parcial ? `Cuatrimestre ${main.parcial}` : undefined}
+                            grupo={main.group_code ? formatGroupCode(main.group_code) : undefined}
+                            nota={main.nota}
+                            submittedAt={new Date(main.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            status={getBatchStatus(group)}
+                            returnedComment={getBatchStatus(group) === "devuelto" ? (group.find((d: any) => String(d.status ?? "").toLowerCase() === "devuelto")?.returned_comment ?? undefined) : undefined}
+                            onViewDocument={(docId) => { const doc = group.find((d: any) => d.id === docId); if (doc) openPreview(doc); }}
+                            onEdit={() => void populateFormForEditBatch(group)}
+                            onDelete={handleDeleteDocuments}
+                            onHide={handleHideDocuments}
+                            onResubmit={(docId, fileName, returnedComment) => {
+                              setResubmitTarget({ docId, fileName, returnedComment });
+                              setResubmitFile(null);
+                            }}
+                            isDeleting={isDeleting}
+                          />
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                ) : formData.archivos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
+                ) : (
+                  <div>
+                    <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
+                    <ul className="space-y-2">
+                      {formData.archivos.map((f, i) => (
+                        <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
+                      ))}
+                    </ul>
                   </div>
-                </ScrollArea>
-              ) : formData.archivos.length === 0 ? (
-                <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos cargados en esta sesión ni en el historial.</p>
-              ) : (
-                <div>
-                  <p className="mb-2 text-sm font-medium dark:text-white">Archivos en esta sesión</p>
-                  <ul className="space-y-2">
-                    {formData.archivos.map((f, i) => (
-                      <li key={`${f.name}-${i}`} className="text-sm dark:text-slate-300">{f.name}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      {/* Título y subtítulo */}
-      <div className="space-y-1.5 pt-1">
-        <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
-          Acta Final
-        </h1>
-        <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
-          Recordatorio: se sube en el 3er parcial.
-        </p>
-      </div>
-
-      <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
-        <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
-          <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Los campos marcados con * son obligatorios.</p>
-          {editingDocumentId && !isMetadataOnlyEdit && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-              Estás editando el acta final existente. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
-              {isLoadingPdf && (
-                <span className="ml-2 inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Cargando documentos...
-                </span>
-              )}
-            </div>
-          )}
-          {isMetadataOnlyEdit && (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-100">
-              <p className="font-medium">Modo edición de datos</p>
-              <p className="mt-0.5 text-xs">Este envío ya fue procesado por el administrador. Solo puedes actualizar los datos del formulario — los archivos no se pueden cambiar aquí. Para documentos devueltos usa el botón <strong>Reenviar</strong> en el historial.</p>
-            </div>
-          )}
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Selector de Plan - con estilos de Planeación */}
-            <div className="space-y-2 md:col-span-2">
-              <Label className="text-sm font-medium dark:text-white">Plan *</Label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "" }))}
-                  className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
-                    formData.plan === "nuevo-modelo"
-                      ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
-                      : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  <div className="flex-1">
-                    <span className="block text-base font-semibold dark:text-white">Plan Nuevo Modelo</span>
-                    <span className="block text-xs text-muted-foreground dark:text-slate-400">TSU e Ingeniería</span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData((current) => ({ ...current, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "" }))}
-                  className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
-                    formData.plan === "plan-normal"
-                      ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
-                      : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  <div className="flex-1">
-                    <span className="block text-base font-semibold dark:text-white">Plan Normal</span>
-                    <span className="block text-xs text-muted-foreground dark:text-slate-400">Ingenierías</span>
-                  </div>
-                </button>
+                )}
               </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      )}
+
+    {/* Título y subtítulo - se muestra en la pantalla de inicio y en el formulario abierto,
+          pero se oculta cuando está cerrado porque FormClosedState ya repite el título junto a la mascota */}
+      {!typeAccessClosed && (
+        <div className="space-y-1.5 pt-1">
+          <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
+            {selectedConfig ? selectedConfig.titulo : "Cartas y Acta"}
+          </h1>
+          <p className="text-white/90 drop-shadow-sm dark:text-slate-400">
+            {selectedConfig
+              ? selectedConfig.descripcion
+              : "Selecciona el tipo de archivo que deseas subir"}
+          </p>
+        </div>
+      )}
+      {selectedConfig === null ? (
+        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+          <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
+            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Selecciona una opción para continuar</p>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+              {documentTypes.map((type) => (
+                <Button
+                  key={type.id}
+                  variant="outline"
+                  onClick={() => handleSelectType(type.id)}
+                  className="h-auto min-h-24 justify-between rounded-2xl border-border bg-background px-4 py-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/40 dark:hover:bg-slate-800"
+                >
+                  <span className="flex flex-col items-start gap-1 whitespace-normal pr-3">
+                    <span className="text-sm font-semibold leading-snug dark:text-white">{type.boton}</span>
+                    <span className="text-xs text-muted-foreground dark:text-slate-400">Abrir formulario</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground dark:text-slate-500" />
+                </Button>
+              ))}
             </div>
-
-            {/* Información académica */}
-            <div className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4 dark:border-slate-800/70 dark:bg-slate-900/30 md:col-span-2 md:p-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label className="dark:text-white">Carrera *</Label>
-                  <Select
-                    value={formData.carrera}
-                    onValueChange={(value) => setFormData((current) => ({ ...current, carrera: value, cuatrimestre: "", materia: "", grupo: "" }))}
-                    disabled={!formData.plan}
-                  >
-                    <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                      <SelectValue placeholder="Selecciona la carrera" />
-                    </SelectTrigger>
-                    <SelectContent className="dark:border-slate-700 dark:bg-slate-900" position="popper" avoidCollisions={false}>
-                      {carrerasDisponibles.map((carrera) => (
-                        <SelectItem key={carrera.codigo} value={carrera.codigo} className="dark:text-white dark:hover:bg-slate-800">
-                          {carrera.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="dark:text-white">Cuatrimestre *</Label>
-                  <Select
-                    value={formData.cuatrimestre}
-                    onValueChange={(value) => setFormData((current) => ({ ...current, cuatrimestre: value as Cuatrimestre, materia: "", grupo: "" }))}
-                    disabled={!formData.carrera}
-                  >
-                    <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                      <SelectValue placeholder="Selecciona el cuatrimestre" />
-                    </SelectTrigger>
-                    <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
-                      {cuatrimestresDisponibles.map((cuatri) => (
-                        <SelectItem key={cuatri} value={cuatri} className="dark:text-white dark:hover:bg-slate-800">
-                          {getCuatrimestreLabel(cuatri)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label className="dark:text-white">Materia *</Label>
-                  <Select
-                    value={formData.materia}
-                    onValueChange={(value) => setFormData((current) => ({ ...current, materia: value, grupo: "" }))}
-                    disabled={!formData.cuatrimestre}
-                  >
-                    <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                      <SelectValue placeholder="Selecciona la materia" />
-                    </SelectTrigger>
-                    <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
-                      {materiasDisponibles.map((materia, index) => (
-                        <SelectItem key={`${materia.nombre}-${index}`} value={materia.nombre} className="dark:text-white dark:hover:bg-slate-800">
-                          {materia.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label className="dark:text-white">Grupo *</Label>
-                  <Select
-                    value={formData.grupo}
-                    onValueChange={(value) => setFormData((c) => ({ ...c, grupo: value }))}
-                    disabled={!formData.materia}
-                  >
-                    <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                      <SelectValue placeholder="Selecciona el grupo" />
-                    </SelectTrigger>
-                    <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
-                      {groupsOptions.length > 0 ? (
-                        groupsOptions.map((g) => (
-                          <SelectItem key={g.id} value={formatGroupCode(g.group_code)} className="dark:text-white dark:hover:bg-slate-800">
-                            {formatGroupCode(g.group_code)}
-                          </SelectItem>
-                        ))
+          </CardContent>
+        </Card>
+      ) : typeAccessClosed ? (
+        <div className="space-y-3">
+          {/* Bloque flotante: Historial (solo lectura) + Calendario + Cambiar tipo para formulario cerrado */}
+          <div className="mx-auto flex max-w-2xl justify-end px-0 pt-2 sm:fixed sm:right-6 sm:top-44 sm:z-50 sm:mx-0 sm:max-w-none sm:px-0 sm:pt-0">
+            <div className="flex flex-row items-center gap-2 rounded-2xl border border-white/20 bg-black/20 p-2 shadow-lg backdrop-blur-md dark:border-slate-700/50 dark:bg-slate-950/40 sm:flex-col sm:items-end sm:gap-2.5 sm:p-2.5">
+              {user && (
+                <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100 dark:hover:bg-slate-800/80"
+                    >
+                      <History className="mr-2 h-4 w-4" />
+                      Historial
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-full sm:max-w-xl">
+                    <SheetHeader>
+                      <SheetTitle>Historial de archivos</SheetTitle>
+                      <SheetDescription>
+                        Revisa los documentos que ya subiste para {selectedConfig.boton.toLowerCase()}.
+                      </SheetDescription>
+                    </SheetHeader>
+                    <div className="mt-6">
+                      {isLoadingHistory ? (
+                        <p className="text-sm text-muted-foreground dark:text-slate-400">Cargando...</p>
+                      ) : groupedHistory.length > 0 ? (
+                        <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
+                          <div className="grid gap-3 p-1">
+                            {groupedHistory.map((group) => {
+                              const main = group[0];
+                              return (
+                                <div
+                                  key={main.batch_id ?? main.id}
+                                  className="rounded-xl border border-border bg-card p-3 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/30 sm:rounded-2xl sm:p-5"
+                                >
+                                  <div className="flex flex-col gap-2.5 sm:gap-4">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-[10px] text-muted-foreground dark:text-slate-500 sm:text-xs">
+                                        {new Date(main.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                      </span>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground dark:text-slate-500 sm:text-[11px]">
+                                        {group.length > 1 ? `${group.length} documentos enviados` : "Documento"}
+                                      </p>
+                                      <div className="space-y-1">
+                                        {group.map((doc: any) => (
+                                          <button
+                                            key={doc.id}
+                                            type="button"
+                                            onClick={() => openPreview(doc)}
+                                            className="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/20 px-2.5 py-1.5 text-left transition hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-800/50 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800/40"
+                                          >
+                                            <span className="truncate text-xs font-semibold text-foreground dark:text-white sm:text-sm">
+                                              {getUploadedFileName(doc)}
+                                            </span>
+                                            <Eye className="h-3.5 w-3.5 shrink-0 text-muted-foreground dark:text-slate-500" />
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2">
+                                      {[
+                                        { label: "Carrera", value: main.carrera_label },
+                                        { label: "Grupo", value: main.group_code ? formatGroupCode(main.group_code) : undefined },
+                                        { label: "Cuatrimestre", value: main.parcial ? `Cuatrimestre ${main.parcial}` : undefined },
+                                      ].filter((c) => c.value).map((chip) => (
+                                        <div key={chip.label} className="flex items-start gap-1.5 rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 dark:border-slate-800/60 dark:bg-slate-900/40 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2">
+                                          <div className="min-w-0 w-full">
+                                            <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400 sm:text-[11px]">
+                                              {chip.label}
+                                            </p>
+                                            <p className="text-xs font-medium leading-snug text-foreground break-words dark:text-slate-100 sm:text-sm">
+                                              {chip.value}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    {main.nota ? (
+                                      <div className="flex items-start gap-1.5 rounded-lg border border-amber-200/70 bg-amber-50/60 px-2.5 py-1.5 dark:border-amber-900/40 dark:bg-amber-950/20 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2">
+                                        <div className="min-w-0">
+                                          <p className="text-[9px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400 sm:text-[11px]">
+                                            Nota para administración
+                                          </p>
+                                          <p className="text-xs text-amber-900 break-words whitespace-pre-wrap dark:text-amber-100 sm:text-sm">
+                                            {main.nota}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </ScrollArea>
                       ) : (
-                        <div className="px-3 py-4 text-center text-sm text-amber-700 dark:text-amber-300">
-                          No hay grupos disponibles.
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                          No hay archivos cargados en esta sesión para este formulario.
                         </div>
                       )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            {/* Documentos */}
-            <div className="space-y-2 md:col-span-2">
-              <Label className="dark:text-white">Acta Final (PDF) {!isMetadataOnlyEdit && "*"}</Label>
-              {isMetadataOnlyEdit ? (
-                <p className="text-sm text-muted-foreground dark:text-slate-400">Los archivos de este envío no se pueden cambiar desde aquí.</p>
-              ) : (
-                <p className="text-sm text-muted-foreground dark:text-slate-400">Adjunta documentos PDF de hasta 15 MB por archivo. Puedes cargar hasta tres archivos en total.</p>
-              )}
-
-              {isMetadataOnlyEdit ? (
-                <div className="space-y-1.5 rounded-2xl border border-border/50 bg-muted/20 p-3 dark:border-slate-800/50 dark:bg-slate-900/20">
-                  {editingBatchFileNames.map((name, i) => (
-                    <div key={i} className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/60 px-3 py-2 dark:border-slate-800/40 dark:bg-slate-900/40">
-                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground dark:text-slate-500" />
-                      <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground dark:text-slate-400">{name}</span>
-                      <Ban className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 dark:text-slate-600" />
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    multiple
-                    className="hidden"
-                    id="acta-final-pdf-upload"
-                    onChange={handleFileChange}
-                    disabled={formData.archivos.length >= 3 || isLoadingPdf}
-                  />
-
-                  <div
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    className={`rounded-3xl border-2 border-dashed transition-all ${
-                      formData.archivos.length === 0 ? "p-6 text-center" : "p-4"
-                    } ${
-                      isDragging
-                        ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30"
-                        : "border-border bg-background/60 hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40"
-                    } ${isLoadingPdf ? "opacity-60 pointer-events-none" : ""}`}
-                  >
-                    {isLoadingPdf ? (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="flex flex-col items-center gap-3">
-                          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-                          <p className="text-sm text-muted-foreground dark:text-slate-400">Cargando documento...</p>
-                        </div>
-                      </div>
-                    ) : formData.archivos.length === 0 ? (
-                      <label htmlFor="acta-final-pdf-upload" className="block cursor-pointer space-y-3">
-                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors dark:bg-emerald-500/10 dark:text-emerald-400">
-                          <Upload className="h-6 w-6" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium dark:text-white">{getArchivosLabel()}</p>
-                          <p className="text-xs text-muted-foreground dark:text-slate-400">
-                            {isDragging ? "Suelta aquí para cargar" : `${getEspaciosLabel()} · arrastra o haz clic`}
-                          </p>
-                        </div>
-                      </label>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className={`grid gap-3 ${formData.archivos.length > 1 ? "sm:grid-cols-2" : ""} ${formData.archivos.length > 2 ? "lg:grid-cols-3" : ""}`}>
-                          {formData.archivos.map((archivo, index) => (
-                            <PdfPreview
-                              key={`${archivo.name}-${archivo.size}-${index}`}
-                              file={archivo}
-                              title="Documento cargado"
-                              onRemove={() => removeFile(index)}
-                              onReplace={(newFile) => replaceFile(index, newFile)}
-                            />
-                          ))}
-                        </div>
-
-                        {formData.archivos.length < 3 && (
-                          <label
-                            htmlFor="acta-final-pdf-upload"
-                            className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-background/60 py-3 text-sm text-muted-foreground transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:hover:border-emerald-500/40"
-                          >
-                            <FolderOpen className="h-4 w-4" />
-                            Agregar otro archivo · {getEspaciosLabel()}
-                          </label>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </>
+                  </SheetContent>
+                </Sheet>
               )}
-            </div>
-
-            {/* Docente */}
-            <div className="space-y-2 md:col-span-2">
-              <Label className="dark:text-white">Nombre del docente</Label>
-              <div className="relative">
-                <Input
-                  value={formData.docente}
-                  readOnly
-                  placeholder="Nombre del docente"
-                  className="rounded-2xl bg-muted/50 cursor-default select-none pr-10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                />
-                <Ban className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground dark:text-slate-500" />
-              </div>
-            </div>
-
-            {/* Autorización */}
-            <div className="space-y-2 md:col-span-2">
-              <p className="text-sm font-medium dark:text-white">Declaración de autorización</p>
-              <p className="text-sm text-muted-foreground dark:text-slate-400">
-                Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares
-                y confirmo la veracidad de la información proporcionada.
-              </p>
-            </div>
-
-            {/* Nota */}
-            <div className="space-y-2 md:col-span-2">
-              <Label className="dark:text-white">Nota para administración (opcional)</Label>
-              <Textarea
-                value={formData.nota}
-                onChange={(e) => setFormData((c) => ({ ...c, nota: e.target.value }))}
-                placeholder="Agrega una nota para revisión"
-                className="min-h-[9rem] rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
-              />
-            </div>
-          </div>
-
-          {/* Footer con acciones */}
-          {formAccess.isExpired && (
-            <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 mb-2 text-sm font-medium text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-              <span>Formulario cerrado &mdash; el plazo de env&iacute;o ha vencido. Solo puedes consultar tu historial.</span>
-            </div>
-          )}
-          <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
-            {(editingDocumentId !== null || editingBatchDocIds.length > 0) ? (
               <Button
                 variant="outline"
-                onClick={() => setCancelEditDialogOpen(true)}
-                disabled={isSubmitting || isLoadingPdf}
-                className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white"
+                size="sm"
+                onClick={() => window.open(getCalendarFileUrl(), "_blank")}
+                className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100 dark:hover:bg-slate-800/80"
               >
-                Cancelar
+                <Calendar className="mr-2 h-4 w-4" />
+                Calendario
               </Button>
-            ) : (
-              <Button variant="outline" onClick={resetForm} disabled={isSubmitting || isLoadingPdf} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
-                Limpiar
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setSelectedType(null); setEditingDocumentId(null); setTypeAccessClosed(false); }}
+                className="shrink-0 rounded-full border-white/30 bg-white/15 text-white shadow-sm backdrop-blur-md hover:bg-white/25 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-100 dark:hover:bg-slate-800/80"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Cambiar tipo
               </Button>
-            )}
-            <Button
-              variant="success"
-              onClick={handleSubmit}
-              disabled={!isValid || isSubmitting || !formAccess.canSubmit || isLoadingPdf}
-              className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white"
-            >
-              {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar acta final" : "Enviar acta final"}
-            </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+
+          <FormClosedState
+            title={selectedConfig.boton}
+            message={`El formulario de ${selectedConfig.boton.toLowerCase()} está cerrado. Si necesitas acceso, solicita al administrador que actualice la fecha de vencimiento o los roles permitidos.`}
+          />
+        </div>
+      ) : (
+        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+          <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Los campos marcados con * son obligatorios.</p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => { setSelectedType(null); setEditingDocumentId(null); }} 
+                className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Cambiar tipo
+              </Button>
+            </div>
+
+            {editingDocumentId && !isMetadataOnlyEdit && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                Estás editando el documento. Ajusta los campos y selecciona el nuevo archivo PDF para actualizar.
+                {isLoadingPdf && (
+                  <span className="ml-2 inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando documentos...
+                  </span>
+                )}
+              </div>
+            )}
+            {isMetadataOnlyEdit && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-100">
+                <p className="font-medium">Modo edición de datos</p>
+                <p className="mt-0.5 text-xs">Este envío ya fue procesado por el administrador. Solo puedes actualizar los datos del formulario — los archivos no se pueden cambiar aquí. Para documentos devueltos usa el botón <strong>Reenviar</strong> en el historial.</p>
+              </div>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label className="text-sm font-medium dark:text-white">Plan *</Label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData((c) => ({ ...c, plan: "nuevo-modelo", carrera: "", cuatrimestre: "" }))}
+                    className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
+                      formData.plan === "nuevo-modelo"
+                        ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
+                        : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <span className="block text-base font-semibold dark:text-white">Plan Nuevo Modelo</span>
+                      <span className="block text-xs text-muted-foreground dark:text-slate-400">TSU e Ingeniería</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData((c) => ({ ...c, plan: "plan-normal", carrera: "", cuatrimestre: "" }))}
+                    className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
+                      formData.plan === "plan-normal"
+                        ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
+                        : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <span className="block text-base font-semibold dark:text-white">Plan Normal</span>
+                      <span className="block text-xs text-muted-foreground dark:text-slate-400">Ingenierías</span>
+                    </div>
+                  </button>
+                </div>
+                {formData.plan && (
+                  <div className="space-y-2 mt-3">
+                    <Label className="dark:text-white">Cuatrimestre *</Label>
+                    <Select
+                      value={formData.cuatrimestre}
+                      onValueChange={(v) => setFormData((c) => ({ ...c, cuatrimestre: v, grupo: "" }))}
+                    >
+                      <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                        <SelectValue placeholder="Selecciona el cuatrimestre" />
+                      </SelectTrigger>
+                      <SelectContent className="dark:border-slate-700 dark:bg-slate-900" position="popper" avoidCollisions={false}>
+                        {cuatrimestresOptions.map((c) => (
+                          <SelectItem key={c} value={c} className="dark:text-white dark:hover:bg-slate-800">
+                            Cuatrimestre {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {/* Información académica */}
+              <div className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4 dark:border-slate-800/70 dark:bg-slate-900/30 md:col-span-2 md:p-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label className="dark:text-white">Carrera *</Label>
+                    <Select 
+                      value={formData.carrera} 
+                      onValueChange={(v) => setFormData((c) => ({ ...c, carrera: v, grupo: "" }))} 
+                      disabled={!formData.plan}
+                    >
+                      <SelectTrigger className="w-full min-w-0 rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                        <SelectValue placeholder="Selecciona la carrera" />
+                      </SelectTrigger>
+                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-1rem)] dark:border-slate-700 dark:bg-slate-900" position="popper" avoidCollisions={false}>
+                        {carrerasDisponibles.map((c) => (
+                          <SelectItem key={c.codigo} value={c.codigo} className="max-w-full truncate dark:text-white dark:hover:bg-slate-800">{c.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="dark:text-white">Grupo *</Label>
+                    <Select 
+                      value={formData.grupo} 
+                      onValueChange={(value) => setFormData((c) => ({ ...c, grupo: value }))}
+                      disabled={!formData.carrera}
+                    >
+                      <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                        <SelectValue placeholder="Selecciona el grupo" />
+                      </SelectTrigger>
+                      <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
+                        {groupsOptions.length > 0 ? (
+                          groupsOptions.map((g) => (
+                            <SelectItem key={g.id} value={formatGroupCode(g.group_code)} className="dark:text-white dark:hover:bg-slate-800">
+                              {formatGroupCode(g.group_code)}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="px-3 py-4 text-center text-sm text-amber-700 dark:text-amber-300">
+                            No hay grupos disponibles.
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Documentos */}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="dark:text-white">{selectedConfig.etiquetaCarga}{!isMetadataOnlyEdit && " *"}</Label>
+                {isMetadataOnlyEdit ? (
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">Los archivos de este envío no se pueden cambiar desde aquí.</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">
+                    Adjuntar el documento en formato PDF, con un límite de 15 MB por archivo. Hasta 3 archivos.
+                  </p>
+                )}
+
+                {isMetadataOnlyEdit ? (
+                  <div className="space-y-1.5 rounded-2xl border border-border/50 bg-muted/20 p-3 dark:border-slate-800/50 dark:bg-slate-900/20">
+                    {editingBatchFileNames.map((name, i) => (
+                      <div key={i} className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/60 px-3 py-2 dark:border-slate-800/40 dark:bg-slate-900/40">
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground dark:text-slate-500" />
+                        <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground dark:text-slate-400">{name}</span>
+                        <Ban className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 dark:text-slate-600" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      multiple
+                      className="hidden"
+                      id="estadia-pdf-upload"
+                      onChange={handleFileChange}
+                      disabled={formData.archivos.length >= 3 || isLoadingPdf}
+                    />
+
+                    <div
+                      onDrop={handleDrop}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      className={`rounded-3xl border-2 border-dashed transition-all ${
+                        formData.archivos.length === 0 ? "p-6 text-center" : "p-4"
+                      } ${
+                        isDragging
+                          ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30"
+                          : "border-border bg-background/60 hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40"
+                      } ${isLoadingPdf ? "pointer-events-none opacity-60" : ""}`}
+                    >
+                      {isLoadingPdf ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="flex flex-col items-center gap-3">
+                            <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                            <p className="text-sm text-muted-foreground dark:text-slate-400">Cargando documento...</p>
+                          </div>
+                        </div>
+                      ) : formData.archivos.length === 0 ? (
+                        <label htmlFor="estadia-pdf-upload" className="block cursor-pointer space-y-3">
+                          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors dark:bg-emerald-500/10 dark:text-emerald-400">
+                            <Upload className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium dark:text-white">{getArchivosLabel()}</p>
+                            <p className="text-xs text-muted-foreground dark:text-slate-400">
+                              {isDragging ? "Suelta aquí para cargar" : `${getEspaciosLabel()} · arrastra o haz clic`}
+                            </p>
+                          </div>
+                        </label>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className={`grid gap-3 ${formData.archivos.length > 1 ? "sm:grid-cols-2" : ""} ${formData.archivos.length > 2 ? "lg:grid-cols-3" : ""}`}>
+                            {formData.archivos.map((archivo, index) => (
+                              <PdfPreview
+                                key={`${archivo.name}-${archivo.size}-${index}`}
+                                file={archivo}
+                                title="Documento cargado"
+                                onRemove={() => removeFile(index)}
+                                onReplace={(newFile) => replaceFile(index, newFile)}
+                              />
+                            ))}
+                          </div>
+
+                          {formData.archivos.length < 3 && (
+                            <label
+                              htmlFor="estadia-pdf-upload"
+                              className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-background/60 py-3 text-sm text-muted-foreground transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:hover:border-emerald-500/40"
+                            >
+                              <FolderOpen className="h-4 w-4" />
+                              Agregar otro archivo · {getEspaciosLabel()}
+                            </label>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Docente */}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="dark:text-white">Nombre del docente</Label>
+                <div className="relative">
+                  <Input
+                    value={formData.docente}
+                    readOnly
+                    placeholder="Nombre del docente"
+                    className="rounded-2xl bg-muted/50 cursor-default select-none pr-10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  />
+                  <Ban className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground dark:text-slate-500" />
+                </div>
+              </div>
+
+              {/* Autorización */}
+              <div className="space-y-2 md:col-span-2">
+                <p className="text-sm font-medium dark:text-white">Declaración de autorización</p>
+                <p className="text-sm text-muted-foreground dark:text-slate-400">
+                  Por la presente, otorgo mi autorización para que estos datos sean utilizados con fines exclusivamente escolares 
+                  y confirmo la veracidad de la información proporcionada.
+                </p>
+              </div>
+
+              {/* Nota */}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="dark:text-white">Nota para administración (opcional)</Label>
+                <Textarea
+                  value={formData.nota}
+                  onChange={(e) => setFormData((c) => ({ ...c, nota: e.target.value }))}
+                  placeholder="Agrega una nota para revisión"
+                  className="min-h-[9rem] rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+                />
+              </div>
+            </div>
+
+            {/* Footer con acciones */}
+            <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">
+              {(editingDocumentId !== null || editingBatchDocIds.length > 0) ? (
+                <Button variant="outline" onClick={() => setCancelEditDialogOpen(true)} disabled={isSubmitting || isLoadingPdf} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+                  Cancelar
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={resetForm} disabled={isSubmitting || isLoadingPdf} className="rounded-2xl sm:px-6 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-white">
+                  Limpiar
+                </Button>
+              )}
+              <Button variant="success" onClick={handleSubmit} disabled={!isValid || isSubmitting || isLoadingPdf} className="rounded-2xl sm:px-6 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
+                {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar documento" : "Enviar"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Diálogo de vista previa */}
+      <Dialog open={previewItem !== null} onOpenChange={(open) => { if (!open) closePreview(); }}>
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{previewItem?.nombre ?? "Documento"}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {previewLoading ? (
+              <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
+                <p>Cargando...</p>
+              </div>
+            ) : previewError ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                {previewError}
+              </div>
+            ) : previewBlobUrl ? (
+              <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border">
+                <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
+                  Abrir documento en nueva pestaña
+                </a>
+              </object>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Diálogo de reenvío de documento devuelto */}
       <Dialog open={resubmitTarget !== null} onOpenChange={(open) => { if (!open) { setResubmitTarget(null); setResubmitFile(null); } }}>
@@ -1000,7 +1271,7 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
               <input
                 type="file"
                 accept=".pdf"
-                id="resubmit-pdf-upload"
+                id="resubmit-estadia-pdf-upload"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -1038,17 +1309,8 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
                   </div>
                   {showResubmitPreview && resubmitPreviewUrl && (
                     <div className="overflow-hidden rounded-lg border border-border dark:border-slate-700">
-                      <object
-                        data={resubmitPreviewUrl}
-                        type="application/pdf"
-                        className="h-[50vh] w-full"
-                      >
-                        <a
-                          href={resubmitPreviewUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex h-32 items-center justify-center text-sm text-primary underline dark:text-emerald-400"
-                        >
+                      <object data={resubmitPreviewUrl} type="application/pdf" className="h-[50vh] w-full">
+                        <a href={resubmitPreviewUrl} target="_blank" rel="noopener noreferrer" className="flex h-32 items-center justify-center text-sm text-primary underline dark:text-emerald-400">
                           Abrir documento en nueva pestaña
                         </a>
                       </object>
@@ -1056,7 +1318,7 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
                   )}
                 </div>
               ) : (
-                <label htmlFor="resubmit-pdf-upload" className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border px-4 py-6 text-center transition hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-950/10">
+                <label htmlFor="resubmit-estadia-pdf-upload" className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border px-4 py-6 text-center transition hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-950/10">
                   <Upload className="h-6 w-6 text-muted-foreground dark:text-slate-400" />
                   <p className="text-sm text-muted-foreground dark:text-slate-400">Selecciona el nuevo PDF a reenviar</p>
                 </label>
@@ -1074,7 +1336,6 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo de confirmación para cancelar edición */}
       <Dialog open={cancelEditDialogOpen} onOpenChange={setCancelEditDialogOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
           <DialogHeader>
@@ -1098,33 +1359,6 @@ export default function ActaFinalPage({ deadlineInfo, onDirtyChange }: { deadlin
               Sí, cancelar
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo de vista previa */}
-      <Dialog open={previewItem !== null} onOpenChange={(open) => { if (!open) closePreview(); }}>
-        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{previewItem?.nombre ?? "Documento"}</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 min-h-0">
-            {previewLoading ? (
-              <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-                <p className="ml-2">Cargando...</p>
-              </div>
-            ) : previewError ? (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-                {previewError}
-              </div>
-            ) : previewBlobUrl ? (
-              <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border">
-                <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
-                  Abrir documento en nueva pestaña
-                </a>
-              </object>
-            ) : null}
-          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -6,7 +6,7 @@ import { Input } from "../../components/ui/input";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { Textarea } from "../../components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { ChevronLeft, CornerUpLeft, Paperclip, PencilLine, Plus, Search, Send, X, Trash, EyeOff, Eye } from "lucide-react";
+import { ChevronDown, ChevronLeft, CornerUpLeft, Paperclip, PencilLine, Plus, Search, Send, X, Trash, EyeOff, Eye, MessageSquareX } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import downloadIcon from "../../../assets/icons/download-circle.svg";
 import apiFetch from "../../lib/api";
@@ -133,6 +133,24 @@ const fmt12h = (local: Date): string => {
 const formatMessageTimestamp = (raw: string): string => {
   const utc = parseUTC(raw);
   return utc ? fmt12h(toMSTDate(utc)) : raw;
+};
+
+const formatConversationTimestamp = (raw: string): string => {
+  if (!raw) return '';
+  const utc = parseUTC(raw);
+  if (!utc) return raw;
+  const local = toMSTDate(utc);
+  const now = toMSTDate(new Date());
+  const localDay = Math.floor(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) / 86400000);
+  const nowDay  = Math.floor(Date.UTC(now.getUTCFullYear(),  now.getUTCMonth(),  now.getUTCDate())  / 86400000);
+  const diff = nowDay - localDay;
+  if (diff === 0) return fmt12h(local);
+  if (diff === 1) return 'Ayer';
+  if (diff < 7) {
+    const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    return dias[local.getUTCDay()];
+  }
+  return `${String(local.getUTCDate()).padStart(2,'0')}/${String(local.getUTCMonth()+1).padStart(2,'0')}/${local.getUTCFullYear()}`;
 };
 
 const formatDateSeparator = (raw: string): string => {
@@ -265,15 +283,16 @@ const ConversationRow = React.memo(({
       <div className="flex items-start gap-3 px-3 py-3.5">
         <div className="relative mt-0.5 shrink-0">
           <Avatar className="h-9 w-9 ring-1 ring-white/70 dark:ring-slate-900/60">
-            {showImage && imageUrl ? (
-              <AvatarImage src={imageUrl} alt={conversation.name} className="h-full w-full object-cover" />
-            ) : (
-              <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-medium">
-                {initials}
-              </AvatarFallback>
-            )}
+            <AvatarImage src={imageUrl ?? DEFAULT_AVATAR_PATH} alt={conversation.name} className="h-full w-full object-cover" />
+            <AvatarFallback className="bg-transparent p-0 overflow-hidden">
+              <img src={DEFAULT_AVATAR_PATH} alt={conversation.name} className="h-full w-full object-cover" />
+            </AvatarFallback>
           </Avatar>
-          <span className={cn("absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background", StatusDot({ status: conversation.status }))} />
+          <span className={cn(
+            "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
+            conversation.status === "online" ? "bg-emerald-500" :
+            conversation.status === "away"   ? "bg-amber-500"   : "bg-slate-400"
+          )} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
@@ -288,7 +307,9 @@ const ConversationRow = React.memo(({
             )}
           </div>
           <p className="mt-1 line-clamp-1 text-sm text-muted-foreground dark:text-slate-400">{conversation.lastMessage}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground/90 dark:text-slate-500">{conversation.timestamp}</p>
+          {conversation.lastMessage && conversation.lastMessage !== 'Nuevo chat' && (
+            <p className="mt-1 text-[11px] text-muted-foreground/90 dark:text-slate-500">{formatConversationTimestamp(conversation.timestamp)}</p>
+          )}
         </div>
       </div>
     </div>
@@ -346,30 +367,25 @@ const SuppressedConversationRow = React.memo(({
   const initials = conversation.avatarFallback || getInitials(conversation.name);
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 py-2 dark:border-slate-700">
+    <div className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/50 dark:hover:bg-slate-800/40">
       <div className="min-w-0 flex items-center gap-3">
-        <Avatar className="h-9 w-9 ring-1 ring-white/80 dark:ring-slate-900/60">
-          {showImage && imageUrl ? (
-            <AvatarImage src={imageUrl} alt={conversation.name} className="h-full w-full object-cover" />
-          ) : (
-            <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-medium">
-              {initials}
-            </AvatarFallback>
-          )}
+        <Avatar className="h-9 w-9 shrink-0">
+          <AvatarImage src={imageUrl ?? DEFAULT_AVATAR_PATH} alt={conversation.name} className="h-full w-full object-cover" />
+          <AvatarFallback className="bg-transparent p-0 overflow-hidden">
+            <img src={DEFAULT_AVATAR_PATH} alt={conversation.name} className="h-full w-full object-cover" />
+          </AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <p className="truncate font-semibold dark:text-white">{conversation.name}</p>
+          <p className="truncate text-sm font-semibold dark:text-white">{conversation.name}</p>
           <p className="text-xs text-muted-foreground dark:text-slate-400 truncate">{conversation.role}</p>
         </div>
       </div>
       <Button
         type="button"
         size="sm"
-        variant="outline"
-        className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
-        onClick={() => {
-          onRestore(conversation.id);
-        }}
+        variant="ghost"
+        className="shrink-0 h-8 px-3 text-xs font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+        onClick={() => onRestore(conversation.id)}
       >
         Restaurar
       </Button>
@@ -408,13 +424,10 @@ const MessageBubble = React.memo(({
       {!message.isOwn && (
         <div className="mr-2 mt-0.5 shrink-0">
           <Avatar className="h-8 w-8 ring-1 ring-white/80 dark:ring-slate-900/50">
-            {showImage && imageUrl ? (
-              <AvatarImage src={imageUrl} alt={message.sender} className="h-full w-full object-cover" />
-            ) : (
-              <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-medium">
-                {senderInitials}
-              </AvatarFallback>
-            )}
+            <AvatarImage src={imageUrl ?? DEFAULT_AVATAR_PATH} alt={message.sender} className="h-full w-full object-cover" />
+            <AvatarFallback className="bg-transparent p-0 overflow-hidden">
+              <img src={DEFAULT_AVATAR_PATH} alt={message.sender} className="h-full w-full object-cover" />
+            </AvatarFallback>
           </Avatar>
         </div>
       )}
@@ -563,14 +576,19 @@ function PendingAttachmentsBar({ attachments, onRemove }: Readonly<{ attachments
   );
 }
 
-function EmptyConversationState({ title, description }: Readonly<{ title: string; description: string }>) {
+function EmptyConversationState({ title, description, iconOnly }: Readonly<{ title: string; description?: string; iconOnly?: boolean }>) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   return (
     <div className="flex h-full min-h-[260px] items-center justify-center px-6 py-10 text-center">
-      <div className={cn("max-w-sm space-y-2 rounded-3xl border border-dashed p-6 shadow-sm", isDark ? "border-emerald-800 bg-slate-900/60" : "border-emerald-200 bg-white/70")}>
+      <div className={cn("max-w-sm space-y-3 rounded-3xl border border-dashed p-6 shadow-sm", isDark ? "border-emerald-800 bg-slate-900/60" : "border-emerald-200 bg-white/70")}>
+        {iconOnly && (
+          <div className="flex justify-center">
+            <MessageSquareX className="h-10 w-10 text-muted-foreground/50" />
+          </div>
+        )}
         <p className="text-base font-semibold text-foreground">{title}</p>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
     </div>
   );
@@ -665,6 +683,10 @@ export function MessagesAdmin(props: Readonly<{
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [confirmedLoadedChatId, setConfirmedLoadedChatId] = useState<number | null>(null);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const chatScrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const prevScrollMsgLenRef = useRef<number>(0);
+  const prevScrollChatRef = useRef<number | null>(null);
 
   const peerRoleLabel = "Docente";
   const recipientRoleCodes = ["docente", "tutor"];
@@ -1072,11 +1094,18 @@ export function MessagesAdmin(props: Readonly<{
   useEffect(() => { markConversationAsReadRef.current = markConversationAsRead; }, [markConversationAsRead]);
 
   useEffect(() => {
+    if (!isReady || !user?.id) return;
+    const interval = setInterval(() => {
+      void loadConversationsRef.current();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isReady, user?.id]);
+
+  useEffect(() => {
     if (!isReady || !user?.id || !selectedChat) return;
     const interval = setInterval(() => {
       void loadMessagesRef.current(selectedChat);
-      void loadConversationsRef.current();
-    }, 8000);
+    }, 3000);
     return () => clearInterval(interval);
   }, [isReady, selectedChat, user?.id]);
 
@@ -1307,6 +1336,12 @@ export function MessagesAdmin(props: Readonly<{
   }, []);
 
   useEffect(() => {
+    const currentLen = targetConversation?.messages.length ?? 0;
+    const prevLen = prevScrollMsgLenRef.current;
+    const chatChanged = selectedChat !== prevScrollChatRef.current;
+    prevScrollMsgLenRef.current = currentLen;
+    prevScrollChatRef.current = selectedChat;
+    if (!chatChanged && currentLen <= prevLen) return;
     const timeoutId = setTimeout(() => {
       if (messagesEndRef.current) {
         messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -1314,6 +1349,23 @@ export function MessagesAdmin(props: Readonly<{
     }, 100);
     return () => clearTimeout(timeoutId);
   }, [selectedChat, targetConversation?.messages.length]);
+
+  useEffect(() => {
+    setShowScrollBottom(false);
+    const container = chatScrollAreaRef.current;
+    if (!container) return;
+    const viewport = container.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement | null;
+    if (!viewport) return;
+    const handleScroll = () => {
+      setShowScrollBottom(viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight > 80);
+    };
+    viewport.addEventListener('scroll', handleScroll, { passive: true });
+    return () => viewport.removeEventListener('scroll', handleScroll);
+  }, [selectedChat]);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, []);
 
   useEffect(() => {
     if (draftRecipient) return;
@@ -1583,24 +1635,28 @@ export function MessagesAdmin(props: Readonly<{
         </div>
 
         <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-1">
-          <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md">
             {/* Cabecera del chat docente */}
-            <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3">
+            <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3 dark:bg-slate-950/60">
               {adminConversation ? (
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10 shrink-0 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
-                    {activeConversationAvatarUrl ? (
+                  <div className="relative shrink-0">
+                    <Avatar className="h-10 w-10 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
                       <AvatarImage
-                        src={activeConversationAvatarUrl}
+                        src={activeConversationAvatarUrl ?? DEFAULT_AVATAR_PATH}
                         alt={adminConversation.name}
                         className="h-full w-full object-cover"
                       />
-                    ) : (
-                      <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-semibold">
-                        {adminConversation.avatarFallback || getInitials(adminConversation.name)}
+                      <AvatarFallback className="bg-transparent p-0 overflow-hidden">
+                        <img src={DEFAULT_AVATAR_PATH} alt={adminConversation.name} className="h-full w-full object-cover" />
                       </AvatarFallback>
-                    )}
-                  </Avatar>
+                    </Avatar>
+                    <span className={cn(
+                      "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
+                      adminConversation.status === "online" ? "bg-emerald-500" :
+                      adminConversation.status === "away"   ? "bg-amber-500"   : "bg-slate-400"
+                    )} />
+                  </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-semibold text-foreground leading-tight">{adminConversation.name}</p>
@@ -1610,7 +1666,16 @@ export function MessagesAdmin(props: Readonly<{
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{adminConversation.role}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {adminConversation.role} &middot;{" "}
+                      <span className={cn(
+                        adminConversation.status === "online" ? "text-emerald-500" :
+                        adminConversation.status === "away"   ? "text-amber-500"   : "text-slate-400"
+                      )}>
+                        {adminConversation.status === "online" ? "En línea" :
+                         adminConversation.status === "away"   ? "Ausente"  : "Sin conexión"}
+                      </span>
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -1665,7 +1730,7 @@ export function MessagesAdmin(props: Readonly<{
             </div>
 
             {/* Pie: redacción */}
-            <div className="shrink-0 border-t border-border/60 bg-card p-4">
+            <div className="shrink-0 border-t border-border/60 bg-card p-4 dark:bg-slate-950/60">
               {replyingTo && (
                 <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
                   <div className="min-w-0">
@@ -1679,7 +1744,7 @@ export function MessagesAdmin(props: Readonly<{
               )}
               {pendingAttachments.length > 0 && <PendingAttachmentsBar attachments={pendingAttachments} onRemove={handleRemoveAttachment} />}
 
-              <div className="space-y-3">
+              <div data-tour="admin-messages-composer" className="space-y-3">
                 <Textarea
                   placeholder="Escribe un mensaje..."
                   value={message}
@@ -1708,7 +1773,7 @@ export function MessagesAdmin(props: Readonly<{
                     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
                   </div>
 
-                  <Button variant="success" className="rounded-full px-5 shadow-md shadow-emerald-500/20" onClick={handleSend}>
+                  <Button data-tour="admin-messages-send-btn" variant="success" className="rounded-full px-5 shadow-md shadow-emerald-500/20" onClick={handleSend}>
                     <Send className="h-4 w-4 mr-2" />
                     Enviar mensaje
                   </Button>
@@ -1765,6 +1830,7 @@ export function MessagesAdmin(props: Readonly<{
                 {(user?.role === "administrador" || user?.roles?.includes("administrador")) && (
                   <button
                     type="button"
+                    data-tour="admin-messages-new-conv-btn"
                     title="Nuevo chat"
                     onClick={() => setNewConversationOpen(true)}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
@@ -1777,6 +1843,7 @@ export function MessagesAdmin(props: Readonly<{
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
+                data-tour="admin-messages-search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por nombre o mensaje..."
@@ -1862,15 +1929,15 @@ export function MessagesAdmin(props: Readonly<{
         </Dialog>
 
         <Dialog open={restoreDialogOpen} onOpenChange={setRestoreDialogOpen}>
-          <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-sm p-0 overflow-hidden gap-0 dark:bg-slate-950 dark:border-slate-800">
+            <DialogHeader className="px-5 pt-5 pb-4">
               <DialogTitle className="dark:text-white">Restaurar chats suprimidos</DialogTitle>
               <DialogDescription className="dark:text-slate-400">
-                Selecciona qué chat deseas restaurar. No se restauran todos automáticamente.
+                Selecciona qué chat deseas restaurar.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-background/80 p-3 dark:border-slate-700/70 dark:bg-slate-900/80">
+            <div className="max-h-64 overflow-y-auto border-y border-border/50 divide-y divide-border/40 dark:border-slate-700/50 dark:divide-slate-700/40">
               {suppressedConversations.length > 0 ? (
                 suppressedConversations.map((conversation) => (
                   <SuppressedConversationRow
@@ -1880,13 +1947,13 @@ export function MessagesAdmin(props: Readonly<{
                   />
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground dark:text-slate-400">No hay chats suprimidos para restaurar.</p>
+                <p className="px-5 py-6 text-center text-sm text-muted-foreground dark:text-slate-400">No hay chats suprimidos para restaurar.</p>
               )}
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800" onClick={() => setRestoreDialogOpen(false)}>Cerrar</Button>
-            </DialogFooter>
+            <div className="px-5 py-4 flex justify-end">
+              <Button variant="ghost" className="h-9 px-4 text-sm dark:text-slate-300 dark:hover:bg-slate-800" onClick={() => setRestoreDialogOpen(false)}>Cerrar</Button>
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -1904,19 +1971,23 @@ export function MessagesAdmin(props: Readonly<{
             </button>
             {targetConversation ? (
               <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10 shrink-0 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
-                  {activeConversationAvatarUrl ? (
+                <div className="relative shrink-0">
+                  <Avatar className="h-10 w-10 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
                     <AvatarImage
-                      src={activeConversationAvatarUrl}
+                      src={activeConversationAvatarUrl ?? DEFAULT_AVATAR_PATH}
                       alt={targetConversation.name}
                       className="h-full w-full object-cover"
                     />
-                  ) : (
-                    <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-sm font-semibold">
-                      {targetConversation.avatarFallback || getInitials(targetConversation.name)}
+                    <AvatarFallback className="bg-transparent p-0 overflow-hidden">
+                      <img src={DEFAULT_AVATAR_PATH} alt={targetConversation.name} className="h-full w-full object-cover" />
                     </AvatarFallback>
-                  )}
-                </Avatar>
+                  </Avatar>
+                  <span className={cn(
+                    "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
+                    targetConversation.status === "online" ? "bg-emerald-500" :
+                    targetConversation.status === "away"   ? "bg-amber-500"   : "bg-slate-400"
+                  )} />
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold text-foreground leading-tight dark:text-white">{targetConversation.name}</p>
@@ -1926,7 +1997,16 @@ export function MessagesAdmin(props: Readonly<{
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">{targetConversation.role}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {targetConversation.role} &middot;{" "}
+                    <span className={cn(
+                      targetConversation.status === "online" ? "text-emerald-500" :
+                      targetConversation.status === "away"   ? "text-amber-500"   : "text-slate-400"
+                    )}>
+                      {targetConversation.status === "online" ? "En línea" :
+                       targetConversation.status === "away"   ? "Ausente"  : "Sin conexión"}
+                    </span>
+                  </p>
                 </div>
               </div>
             ) : (
@@ -1938,7 +2018,7 @@ export function MessagesAdmin(props: Readonly<{
           </div>
 
           {/* Área de mensajes */}
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div ref={chatScrollAreaRef} className="relative min-h-0 flex-1 overflow-hidden">
             {targetConversation ? (
               <ScrollArea className="h-full bg-muted/20 dark:bg-slate-900/30">
                 <div className="w-full min-w-0 overflow-x-hidden">
@@ -1966,7 +2046,7 @@ export function MessagesAdmin(props: Readonly<{
                   ) : (
                     <EmptyConversationState
                       title="Sin mensajes"
-                      description="Esta conversación se creará cuando se envíe el primer mensaje."
+                      iconOnly
                     />
                   )}
                   <div ref={messagesEndRef} />
@@ -1977,6 +2057,16 @@ export function MessagesAdmin(props: Readonly<{
                 title="Panel vacío"
                 description="Selecciona una conversación del panel lateral para ver el historial y responder."
               />
+            )}
+            {showScrollBottom && targetConversation && (
+              <button
+                type="button"
+                onClick={scrollToBottom}
+                className="absolute bottom-4 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 transition-colors"
+                aria-label="Ir al final de la conversación"
+              >
+                <ChevronDown className="h-5 w-5" />
+              </button>
             )}
           </div>
 
