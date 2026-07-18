@@ -22,9 +22,9 @@ import {
 // Imágenes para desktop
 import banner1 from "../../../assets/123.png";
 import banner2 from "../../../assets/carruselPC1.jpg";
-import banner3 from "../../../assets/carruselPC2.jpg";
-import banner4 from "../../../assets/carruselPC3.jpg";
-import banner5 from "../../../assets/123.png";
+import banner3 from "../../../assets/image.jpg";
+import banner4 from "../../../assets/carruselPC3.png";
+import banner5 from "../../../assets/carruselPC4.png";
 
 // Imágenes para móvil (versiones optimizadas)
 // Si no tienes versiones específicas para móvil, usa las mismas
