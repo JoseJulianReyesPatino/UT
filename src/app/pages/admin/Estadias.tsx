@@ -17,6 +17,7 @@ import { fetchDocumentBlob } from "../../lib/documents";
 import { formatGroupCode } from "../../../lib/utils";
 import { useAuth } from "../../context/AuthContext";
 import { SearchableSelect } from "../../components/SearchableSelect";
+import { useTourActive } from "../../context/TourContext";
 
 type ReviewSection = "all" | "pendientes" | "devueltos" | "reenviados" | "revisados" | "hoy";
 
@@ -108,8 +109,70 @@ const extractPreviewFileName = (documento: string) => {
   return raw.toLowerCase().endsWith(".pdf") ? raw : `${raw}.pdf`;
 };
 
+function TourFakeEstadiasRow({ isFirst }: { isFirst: boolean }) {
+  const fakeData = [
+    {
+      nombre: "carta_presentacion_estadias.pdf",
+      docente: "Dra. Ana García López",
+      carrera: "TSU en Tecnologías de la Información",
+      apartado: "Carta de presentación",
+      plan: "Nuevo modelo",
+      grupo: "11B-1",
+      fecha: "18/07/2026 2:30 PM",
+    },
+    {
+      nombre: "acta_final_estadias.pdf",
+      docente: "Ing. Carlos Mendoza Ríos",
+      carrera: "TSU en Administración",
+      apartado: "Acta final",
+      plan: "Nuevo modelo",
+      grupo: "10A-2",
+      fecha: "17/07/2026 10:15 AM",
+    },
+  ];
+  const doc = fakeData[isFirst ? 0 : 1];
+  return (
+    <div
+      data-tour={isFirst ? "admin-estadias-doc-row" : undefined}
+      className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-white p-4 lg:flex-row lg:items-center lg:justify-between dark:bg-slate-900/90"
+    >
+      <div className="flex items-start gap-3 flex-1">
+        <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+          <FileText className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium">{doc.nombre}</p>
+          <p className="text-sm text-muted-foreground">{doc.docente} • {doc.carrera}</p>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
+            <Badge variant="outline" className="text-xs">{doc.plan}</Badge>
+            <Badge variant="outline" className="text-xs">Grupo {doc.grupo}</Badge>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">Enviado: {doc.fecha}</p>
+        </div>
+      </div>
+      <div
+        data-tour={isFirst ? "admin-estadias-doc-actions" : undefined}
+        className="relative z-20 flex flex-wrap items-center gap-2 sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0"
+      >
+        <button className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border text-xs font-medium bg-background hover:bg-muted transition-colors">
+          <Eye className="h-3.5 w-3.5" /> Ver
+        </button>
+        <button className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border text-xs font-medium bg-background hover:bg-muted transition-colors">
+          <Check className="h-3.5 w-3.5" /> Revisar
+        </button>
+        <Badge variant="warning">Pendiente</Badge>
+        <button className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 transition-colors">
+          <Undo2 className="h-3.5 w-3.5" /> Devolver
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Estadias() {
   const { isReady, isAuthenticated } = useAuth();
+  const { isAdminTourActive } = useTourActive();
   const [pendingDocuments, setPendingDocuments] = useState<EstadiaPendingDocument[]>([]);
   const [reviewedDocuments, setReviewedDocuments] = useState<EstadiaReviewedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -752,16 +815,24 @@ export default function Estadias() {
             </CardHeader>
             <CardContent className="overflow-x-hidden">
               <div className="min-w-0 space-y-3">
-                {isLoading ? <DocumentCardSkeleton /> : null}
-                {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
-                {!isLoading && !loadError && filteredAll.length === 0 ? (
+                {/* Filas decorativas del recorrido — siempre visibles cuando el tour está activo */}
+                {isAdminTourActive && (
+                  <>
+                    <TourFakeEstadiasRow isFirst={true} />
+                    <TourFakeEstadiasRow isFirst={false} />
+                  </>
+                )}
+                {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
+                {!isAdminTourActive && !isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
+                {!isAdminTourActive && !isLoading && !loadError && filteredAll.length === 0 && (
                   <EmptyState text={emptyStateLegend} />
-                ) : !isLoading && !loadError && groupDocsByBatch(filteredAll).map((group) => {
-                  const renderRow = (doc: EstadiaDocumentItem) => {
+                )}
+                {!isAdminTourActive && !isLoading && !loadError && groupDocsByBatch(filteredAll).map((group, groupIdx) => {
+                  const renderRow = (doc: EstadiaDocumentItem, isFirstRow?: boolean) => {
                   const isReviewed = "reviewedAt" in doc;
                   const isReturned = Boolean(doc.returned);
                   return (
-                    <div key={doc.id} id={`doc-row-${doc.id}`} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
+                    <div key={doc.id} id={`doc-row-${doc.id}`} data-tour={isFirstRow ? "admin-estadias-doc-row" : undefined} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
                       <div className="flex items-start gap-3 flex-1">
                         <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
                           <FileText className="h-6 w-6 text-muted-foreground" />
@@ -792,7 +863,7 @@ export default function Estadias() {
                           )}
                         </div>
                       </div>
-                      <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+                      <div data-tour={isFirstRow ? "admin-estadias-doc-actions" : undefined} className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
                         <ResponsiveActionButton
                           variant="outline"
                           size="sm"
@@ -839,11 +910,11 @@ export default function Estadias() {
                     </div>
                   );
                   };
-                  if (group.length === 1) return renderRow(group[0]);
+                  if (group.length === 1) return renderRow(group[0], groupIdx === 0);
                   return (
                     <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
                       {batchHeader(group)}
-                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderRow)}</div>
+                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map((doc, docIdx) => renderRow(doc, groupIdx === 0 && docIdx === 0))}</div>
                     </div>
                   );
                 })}
@@ -1144,27 +1215,6 @@ export default function Estadias() {
                               onClick={(e) => { e.stopPropagation(); handleShareToMessages(doc); }}
                               icon={<MessageSquare className="h-4 w-4" />}
                             />
-
-                            {doc.returned ? (
-                              <ResponsiveActionButton
-                                variant="outline"
-                                size="sm"
-                                label="Cancelar"
-                                title="Cancelar devolución"
-                                className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
-                                onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
-                                icon={<Undo2 className="h-4 w-4" />}
-                              />
-                            ) : (
-                              <ResponsiveActionButton
-                                variant="destructive"
-                                size="sm"
-                                label="Devolver"
-                                title="Devolver"
-                                onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
-                                icon={<Undo2 className="h-4 w-4" />}
-                              />
-                            )}
 
                             {isReturned && <Badge variant="destructive">Devuelto</Badge>}
                             <Badge variant="success">Revisado</Badge>

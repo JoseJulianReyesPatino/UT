@@ -17,6 +17,7 @@ import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob, getDocumentDisplayFileName } from "../../lib/documents";
 import { carrieras } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
+import { useTourActive } from "../../context/TourContext";
 
 type ReviewSection = "all" | "pendientes" | "devueltos" | "reenviados" | "revisados" | "hoy";
 
@@ -142,10 +143,63 @@ const careerOptions: CareerOption[] = Array.from(
   ).values()
 );
 
+function TourFakeTutorRow({ isFirst }: { isFirst: boolean }) {
+  const fakeData = [
+    {
+      nombre: "carga_academica_tutorias.pdf",
+      tutor: "Mtra. Laura Pérez Salinas",
+      carrera: "TSU en Tecnologías de la Información",
+      apartado: "Carga académica",
+      fecha: "18/07/2026 9:00 AM",
+    },
+    {
+      nombre: "concentrado_asesorias.pdf",
+      tutor: "Lic. Roberto Cruz Vega",
+      carrera: "TSU en Administración",
+      apartado: "Concentrado de asesorías y bajas",
+      fecha: "17/07/2026 4:45 PM",
+    },
+  ];
+  const doc = fakeData[isFirst ? 0 : 1];
+  return (
+    <div
+      data-tour={isFirst ? "admin-tutores-doc-row" : undefined}
+      className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-white p-4 lg:flex-row lg:items-center lg:justify-between dark:bg-slate-900/90"
+    >
+      <div className="flex items-start gap-3 flex-1">
+        <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+          <FileText className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium">{doc.nombre}</p>
+          <p className="text-sm text-muted-foreground">{doc.tutor} • {doc.carrera}</p>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">Enviado: {doc.fecha}</p>
+        </div>
+      </div>
+      <div className="relative z-20 flex flex-wrap items-center gap-2 sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+        <button className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border text-xs font-medium bg-background hover:bg-muted transition-colors">
+          <Eye className="h-3.5 w-3.5" /> Ver
+        </button>
+        <button className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border text-xs font-medium bg-background hover:bg-muted transition-colors">
+          <Check className="h-3.5 w-3.5" /> Revisar
+        </button>
+        <Badge variant="warning">Pendiente</Badge>
+        <button className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 transition-colors">
+          <Undo2 className="h-3.5 w-3.5" /> Devolver
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // no mock initial data — load from backend
 
 export default function Tutores() {
   const { isReady, isAuthenticated } = useAuth();
+  const { isAdminTourActive } = useTourActive();
   const [pendingDocuments, setPendingDocuments] = useState<TutorDocument[]>([]);
   const [reviewedDocuments, setReviewedDocuments] = useState<TutorDocument[]>([]);
   const [filterTutor, setFilterTutor] = useState("all");
@@ -619,14 +673,21 @@ export default function Tutores() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading ? <DocumentCardSkeleton /> : filteredAll.length === 0 ? (
-                  <EmptyState text={emptyStateLegend} />
-                ) : groupDocsByBatch(filteredAll).map((group) => {
-                  const renderRow = (doc: TutorDocumentItem) => {
+                {/* Filas decorativas del recorrido — siempre visibles cuando el tour está activo */}
+                {isAdminTourActive && (
+                  <>
+                    <TourFakeTutorRow isFirst={true} />
+                    <TourFakeTutorRow isFirst={false} />
+                  </>
+                )}
+                {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
+                {!isAdminTourActive && !isLoading && filteredAll.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && groupDocsByBatch(filteredAll).map((group, groupIdx) => {
+                  const renderRow = (doc: TutorDocumentItem, isFirstRow?: boolean) => {
                   const isReviewed = Boolean(doc.reviewedAt);
                   const isReturned = Boolean(doc.returned);
                   return (
-                    <div key={doc.id} id={`doc-row-${doc.id}`} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
+                    <div key={doc.id} id={`doc-row-${doc.id}`} data-tour={isFirstRow ? "admin-tutores-doc-row" : undefined} className={`${getDocumentRowClassName(isReturned)}${highlightDocumentId === doc.id ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
                       <button
                         type="button"
                         aria-label={`Abrir vista previa de ${doc.documento}`}
@@ -725,11 +786,11 @@ export default function Tutores() {
                     </div>
                   );
                   };
-                  if (group.length === 1) return renderRow(group[0]);
+                  if (group.length === 1) return renderRow(group[0], groupIdx === 0);
                   return (
                     <div key={group[0].batch_id ?? group[0].id} className="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30">
                       {batchHeader(group)}
-                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderRow)}</div>
+                      <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map((doc, docIdx) => renderRow(doc, groupIdx === 0 && docIdx === 0))}</div>
                     </div>
                   );
                 })}
@@ -1113,18 +1174,6 @@ export default function Tutores() {
                                 </TooltipTrigger>
                                 <TooltipContent>Enviar</TooltipContent>
                               </Tooltip>
-                              {doc.returned ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button variant="outline" size="icon" className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }} aria-label="Cancelar devolución">
-                                      <Undo2 className="h-4 w-4" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Cancelar devolución</TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                <ResponsiveActionButton variant="destructive" size="sm" label="Devolver" title="Devolver documento" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} />
-                              )}
                               <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "success"}>{getDocumentStatusLabel(doc)}</Badge>
                             </div>
                           </div>
@@ -1210,32 +1259,6 @@ export default function Tutores() {
                           </TooltipTrigger>
                           <TooltipContent>Enviar</TooltipContent>
                         </Tooltip>
-
-                        {doc.returned ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
-                                onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }}
-                                aria-label="Cancelar devolución"
-                              >
-                                <Undo2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Cancelar devolución</TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <ResponsiveActionButton
-                            variant="destructive"
-                            size="sm"
-                            label="Devolver"
-                            title="Devolver documento"
-                            onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }}
-                            icon={<Undo2 className="h-4 w-4" />}
-                          />
-                        )}
 
                         <Badge variant={getDocumentStatusLabel(doc) === "Devuelto" ? "destructive" : "success"}>{getDocumentStatusLabel(doc)}</Badge>
                       </div>

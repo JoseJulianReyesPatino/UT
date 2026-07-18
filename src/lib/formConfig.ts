@@ -5,6 +5,7 @@ export type Group = {
   cuatrimestre: number; // e.g., 10
   groupNumber: number; // e.g., 1
   name: string; // computed, e.g., IDGS10-1
+  is_active?: boolean;
 };
 
 export type FormRole = "docente" | "tutor";

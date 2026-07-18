@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/too
 import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { carrieras } from "../../data/curricula";
+import { useTourActive } from "../../context/TourContext";
 
 type CycleStatus = "activo" | "cerrado";
 
@@ -278,6 +279,7 @@ const TUTOR_TYPES: TutorDocumentType[] = [
 
 
 export function CiclosEscolares() {
+  const { isAdminTourActive } = useTourActive();
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -1472,6 +1474,20 @@ export function CiclosEscolares() {
 
   const documentsModalTitle = getDocumentsModalTitle(selectedDocumentType, selectedDocumentCategory, selectedEstadiasCategory, selectedTutorCategory);
 
+  // Abre automáticamente el selector de documentos del primer ciclo disponible cuando el tour lo solicita
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail === "open-docs") {
+        const first = ciclos[0];
+        if (first) openDocsForCycle(first);
+      }
+    };
+    window.addEventListener("tour-sub-nav", handler);
+    return () => window.removeEventListener("tour-sub-nav", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ciclos]);
+
   return (
     <div className="relative space-y-6 overflow-hidden">
       <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -1758,7 +1774,12 @@ export function CiclosEscolares() {
       </Dialog>
 
       <Dialog open={showDocTypeDialog} onOpenChange={(open) => { if (!open) closeDocs(); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent
+          className="max-w-lg"
+          data-tour="admin-ciclos-doc-type"
+          style={isAdminTourActive ? { zIndex: 10000 } : undefined}
+          overlayClassName={isAdminTourActive ? "backdrop-blur-none" : undefined}
+        >
           <DialogHeader className="pr-8 text-left">
             <DialogTitle className="text-lg sm:text-2xl">Seleccionar Tipo de Documentos</DialogTitle>
             <DialogDescription className="text-sm sm:text-base mt-2">

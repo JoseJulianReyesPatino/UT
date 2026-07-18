@@ -8,6 +8,7 @@ import {
   Pencil,
   Key,
   UserX,
+  FileText,
 } from "lucide-react";
 import { type TourStep } from "../components/tour/TourOverlay";
 
@@ -162,6 +163,33 @@ export const adminTourSteps: TourStep[] = [
       "Esta sección incluye filtros específicos: Plan, Carrera, Cuatrimestre, Grupo, Docente, Apartado (tipo de documento) y Estado de devolución.",
     placement: "bottom",
   },
+  {
+    target: "admin-estadias-doc-row",
+    view: "estadias-admin",
+    title: "Fila de documento de estadía",
+    content: (
+      <>
+        Cada fila muestra el nombre del archivo, el docente que lo envió y su carrera. Las etiquetas indican el <strong>Apartado</strong> (carta de presentación, acta final, etc.) y el <strong>Plan educativo</strong>. La fecha de envío aparece debajo para tener siempre el contexto temporal.
+      </>
+    ),
+    placement: "top",
+  },
+  {
+    target: "admin-estadias-doc-actions",
+    view: "estadias-admin",
+    title: "Acciones sobre el documento",
+    content: (
+      <>
+        Desde cada fila puedes:{" "}
+        <Ic icon={Eye} label="Ver el PDF" /> (también haciendo clic en la fila),{" "}
+        <Ic icon={Check} label="Marcar como revisado" />,{" "}
+        <Ic icon={MessageCircleMore} label="Ver nota del docente" />,{" "}
+        <Ic icon={MessageSquare} label="Enviar por mensajes" />, y{" "}
+        <Ic icon={Undo2} label="Devolver con comentario" />.
+      </>
+    ),
+    placement: "top",
+  },
 
   // ── TUTORES ───────────────────────────────────────────────────────────────────
   {
@@ -188,6 +216,21 @@ export const adminTourSteps: TourStep[] = [
       "Busca por nombre de tutor, tipo de apartado o estado de devolución para localizar rápidamente el documento que necesitas revisar.",
     placement: "bottom",
   },
+  {
+    target: "admin-tutores-doc-row",
+    view: "tutores",
+    title: "Documentos de tutoría",
+    content: (
+      <>
+        Cada fila muestra el nombre del archivo, el tutor que lo envió y su tipo de apartado. Las acciones son las mismas que en las demás secciones:{" "}
+        <Ic icon={Eye} label="Ver PDF" />,{" "}
+        <Ic icon={Check} label="Revisar" />,{" "}
+        <Ic icon={MessageSquare} label="Enviar a mensajes" /> y{" "}
+        <Ic icon={Undo2} label="Devolver" />.
+      </>
+    ),
+    placement: "top",
+  },
 
   // ── CICLOS ESCOLARES ──────────────────────────────────────────────────────────
   {
@@ -211,8 +254,29 @@ export const adminTourSteps: TourStep[] = [
     view: "ciclos",
     title: "Lista de ciclos",
     content:
-      "Cada tarjeta representa un ciclo con su estado (Activo / Cerrado) y el total de documentos. Haz clic en la tarjeta para ver sus documentos, o usa los botones para editarlo, activarlo/cerrarlo o eliminarlo.",
+      "Cada tarjeta representa un ciclo con su estado (Activo / Cerrado) y el total de documentos asociados. Haz clic sobre la tarjeta para ver los documentos de ese ciclo.",
     placement: "bottom",
+  },
+  {
+    target: "admin-ciclos-actions",
+    view: "ciclos",
+    title: "Botones de cada ciclo",
+    content: (
+      <>
+        Los íconos de acción te permiten:{" "}
+        <Ic icon={FileText} label="Ver sus documentos" />,{" "}
+        <Ic icon={Pencil} label="Editar datos del ciclo" />, activarlo o cerrarlo, y eliminarlo (solo si no tiene documentos registrados).
+      </>
+    ),
+    placement: "bottom",
+  },
+  {
+    target: "admin-ciclos-doc-type",
+    view: "ciclos:open-docs",
+    title: "Contenido del ciclo escolar",
+    content:
+      "Al abrir un ciclo ves todos sus documentos agrupados por categoría: Docentes, Estadías, Tutores y Remediales. Cada botón muestra cuántos documentos tiene esa categoría en el ciclo seleccionado.",
+    placement: "right",
   },
 
   // ── MENSAJES ──────────────────────────────────────────────────────────────────

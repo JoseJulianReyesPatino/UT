@@ -79,6 +79,7 @@ export default function AsesoriaPage({ deadlineInfo, onDirtyChange }: { deadline
     const hasFormData = formData.plan !== "" || formData.carrera !== "" || formData.cuatrimestre !== "" || formData.materia !== "" ||
       formData.parcial !== "" || formData.grupo !== "" || formData.archivos.length > 0 || formData.nota !== "";
     onDirtyChange(hasEditing || hasFormData);
+    return () => onDirtyChange(false);
   }, [onDirtyChange, editingDocumentId, editingBatchDocIds, formData]);
 
   useEffect(() => {
@@ -110,7 +111,7 @@ export default function AsesoriaPage({ deadlineInfo, onDirtyChange }: { deadline
     let cancelled = false;
     void (async () => {
       try {
-        const res = await apiFetch("/groups", { query: { career_code: career, cuatrimestre: cuatri } });
+        const res = await apiFetch("/groups", { query: { career_code: career, cuatrimestre: cuatri, active_only: "1" } });
         if (cancelled) return;
         const data = Array.isArray(res?.data) ? res.data : [];
         setGroupsOptions(data.map((g: any) => ({ id: Number(g.id), group_code: g.group_code, group_number: Number(g.group_number) })));

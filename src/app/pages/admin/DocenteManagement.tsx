@@ -747,10 +747,18 @@ export function DocenteManagement() {
               <div className="flex flex-wrap items-center gap-4">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <label className="flex cursor-pointer items-center gap-2">
+                    <label className={`flex items-center gap-2 ${editDocente.roles?.supervisor ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                       <Checkbox
                         checked={!!editDocente.roles?.docente}
-                        onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), docente: Boolean(val) } }))}
+                        disabled={!!editDocente.roles?.supervisor}
+                        onCheckedChange={(val) => setEditDocente((current) => ({
+                          ...current,
+                          roles: {
+                            ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }),
+                            docente: Boolean(val),
+                            supervisor: Boolean(val) ? false : (current.roles?.supervisor ?? false),
+                          },
+                        }))}
                       />
                       <span className="text-sm">Docente</span>
                     </label>
@@ -759,10 +767,18 @@ export function DocenteManagement() {
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <label className="flex cursor-pointer items-center gap-2">
+                    <label className={`flex items-center gap-2 ${editDocente.roles?.supervisor ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                       <Checkbox
                         checked={!!editDocente.roles?.tutor}
-                        onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), tutor: Boolean(val) } }))}
+                        disabled={!!editDocente.roles?.supervisor}
+                        onCheckedChange={(val) => setEditDocente((current) => ({
+                          ...current,
+                          roles: {
+                            ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }),
+                            tutor: Boolean(val),
+                            supervisor: Boolean(val) ? false : (current.roles?.supervisor ?? false),
+                          },
+                        }))}
                       />
                       <span className="text-sm">Tutor</span>
                     </label>
@@ -771,17 +787,33 @@ export function DocenteManagement() {
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <label className="flex cursor-pointer items-center gap-2">
+                    <label className={`flex items-center gap-2 ${(editDocente.roles?.docente || editDocente.roles?.tutor) ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                       <Checkbox
                         checked={!!editDocente.roles?.supervisor}
-                        onCheckedChange={(val) => setEditDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), supervisor: Boolean(val) } }))}
+                        disabled={!!editDocente.roles?.docente || !!editDocente.roles?.tutor}
+                        onCheckedChange={(val) => setEditDocente((current) => ({
+                          ...current,
+                          roles: {
+                            ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }),
+                            supervisor: Boolean(val),
+                            docente: Boolean(val) ? false : (current.roles?.docente ?? false),
+                            tutor: Boolean(val) ? false : (current.roles?.tutor ?? false),
+                          },
+                        }))}
                       />
                       <span className="text-sm">Supervisor</span>
                     </label>
                   </TooltipTrigger>
-                  <TooltipContent>Puede visualizar y revisar documentos de todos los docentes del sistema.</TooltipContent>
+                  <TooltipContent>Puede visualizar documentos del sistema. Rol exclusivo: no se combina con Docente ni Tutor.</TooltipContent>
                 </Tooltip>
               </div>
+              <p className="text-xs text-muted-foreground">
+                {editDocente.roles?.supervisor
+                  ? "El Supervisor es un rol exclusivo — no se puede combinar con Docente ni Tutor."
+                  : (editDocente.roles?.docente || editDocente.roles?.tutor)
+                  ? "Docente y Tutor pueden combinarse, pero no con el rol de Supervisor."
+                  : "Selecciona al menos un rol para el usuario."}
+              </p>
             </div>
 
           </div>
@@ -904,10 +936,18 @@ export function DocenteManagement() {
               <div className="flex flex-wrap items-center gap-4">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <label className="flex cursor-pointer items-center gap-2">
+                    <label className={`flex items-center gap-2 ${newDocente.roles?.supervisor ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                       <Checkbox
                         checked={!!newDocente.roles?.docente}
-                        onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false }), docente: Boolean(val) } }))}
+                        disabled={!!newDocente.roles?.supervisor}
+                        onCheckedChange={(val) => setNewDocente((current) => ({
+                          ...current,
+                          roles: {
+                            ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }),
+                            docente: Boolean(val),
+                            supervisor: Boolean(val) ? false : (current.roles?.supervisor ?? false),
+                          },
+                        }))}
                       />
                       <span className="text-sm">Docente</span>
                     </label>
@@ -916,10 +956,18 @@ export function DocenteManagement() {
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <label className="flex cursor-pointer items-center gap-2">
+                    <label className={`flex items-center gap-2 ${newDocente.roles?.supervisor ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                       <Checkbox
                         checked={!!newDocente.roles?.tutor}
-                        onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), tutor: Boolean(val) } }))}
+                        disabled={!!newDocente.roles?.supervisor}
+                        onCheckedChange={(val) => setNewDocente((current) => ({
+                          ...current,
+                          roles: {
+                            ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }),
+                            tutor: Boolean(val),
+                            supervisor: Boolean(val) ? false : (current.roles?.supervisor ?? false),
+                          },
+                        }))}
                       />
                       <span className="text-sm">Tutor</span>
                     </label>
@@ -928,17 +976,33 @@ export function DocenteManagement() {
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <label className="flex cursor-pointer items-center gap-2">
+                    <label className={`flex items-center gap-2 ${(newDocente.roles?.docente || newDocente.roles?.tutor) ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                       <Checkbox
                         checked={!!newDocente.roles?.supervisor}
-                        onCheckedChange={(val) => setNewDocente((current) => ({ ...current, roles: { ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }), supervisor: Boolean(val) } }))}
+                        disabled={!!newDocente.roles?.docente || !!newDocente.roles?.tutor}
+                        onCheckedChange={(val) => setNewDocente((current) => ({
+                          ...current,
+                          roles: {
+                            ...(current.roles ?? { docente: false, tutor: false, administrador: false, supervisor: false }),
+                            supervisor: Boolean(val),
+                            docente: Boolean(val) ? false : (current.roles?.docente ?? false),
+                            tutor: Boolean(val) ? false : (current.roles?.tutor ?? false),
+                          },
+                        }))}
                       />
                       <span className="text-sm">Supervisor</span>
                     </label>
                   </TooltipTrigger>
-                  <TooltipContent>Puede visualizar y revisar documentos de todos los docentes del sistema.</TooltipContent>
+                  <TooltipContent>Puede visualizar documentos del sistema. Rol exclusivo: no se combina con Docente ni Tutor.</TooltipContent>
                 </Tooltip>
               </div>
+              <p className="text-xs text-muted-foreground">
+                {newDocente.roles?.supervisor
+                  ? "El Supervisor es un rol exclusivo — no se puede combinar con Docente ni Tutor."
+                  : (newDocente.roles?.docente || newDocente.roles?.tutor)
+                  ? "Docente y Tutor pueden combinarse, pero no con el rol de Supervisor."
+                  : "Selecciona al menos un rol para el usuario."}
+              </p>
             </div>
             
           </div>

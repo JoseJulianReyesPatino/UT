@@ -19,7 +19,7 @@ import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { useTheme } from "../../context/ThemeContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, FileText, Grid2x2, Key, Layers, Loader2, Moon, PencilLine, Plus, RefreshCw, Search, Shield, Sun, Trash2, Users, Settings2 } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, FileText, Grid2x2, Key, Layers, Loader2, Moon, PencilLine, Plus, Power, RefreshCw, Search, Shield, Sun, Trash2, Users, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { carrieras } from "../../data/curricula";
 import { clearAvatarCache, isImageUrl, useResolvedAvatarUrl } from "../../lib/avatar";
@@ -381,6 +381,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       profilePhone !== (user.phone ?? "") ||
       selectedAvatarFile !== null;
     onDirtyChange(dirty);
+    return () => onDirtyChange(false);
   }, [profileFirstNames, profileLastNames, profilePhone, selectedAvatarFile, user, onDirtyChange]);
 
   const careerOptions = getCareerOptions(plan);
@@ -794,6 +795,21 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       },
     });
     setDeleteConfirmation("");
+  };
+
+  const handleToggleGroupActive = async (group: Group) => {
+    const newActive = !(group.is_active ?? true);
+    try {
+      await apiFetch(`/groups/${group.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: newActive }),
+      });
+      setGroups((prev) => prev.map((g) => g.id === group.id ? { ...g, is_active: newActive } : g));
+      toast.success(newActive ? `Grupo ${group.name} activado` : `Grupo ${group.name} deshabilitado`);
+    } catch (err: any) {
+      toast.error(err?.message ?? 'No fue posible actualizar el grupo');
+    }
   };
 
   const loadSupervisors = useCallback(async () => {
@@ -1797,9 +1813,25 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                                 <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{cuatrimestresLabel(cuat)}</span>
                                               </div>
                                               <div className="flex items-center gap-1.5">
-                                                <span className="rounded-full bg-emerald-100/80 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
-                                                  {byCuat[cuat].length} {byCuat[cuat].length !== 1 ? "grupos" : "grupo"}
-                                                </span>
+                                                {(() => {
+                                                  const total = byCuat[cuat].length;
+                                                  const active = byCuat[cuat].filter((g) => g.is_active ?? true).length;
+                                                  const hasInactive = active < total;
+                                                  return hasInactive ? (
+                                                    <>
+                                                      <span className="rounded-full bg-emerald-100/80 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                                                        {active} activos
+                                                      </span>
+                                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                                                        {total} total
+                                                      </span>
+                                                    </>
+                                                  ) : (
+                                                    <span className="rounded-full bg-emerald-100/80 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                                                      {total} {total !== 1 ? "grupos" : "grupo"}
+                                                    </span>
+                                                  );
+                                                })()}
                                                 <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`} />
                                               </div>
                                             </button>
@@ -1808,16 +1840,34 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                             {isOpen && (
                                               <div className="bg-background/60 p-2.5 dark:bg-slate-950/30">
                                                 <div className={`grid gap-1.5 ${byCuat[cuat].length > 1 ? "grid-cols-2" : ""}`}>
-                                                  {byCuat[cuat].map((g) => (
+                                                  {byCuat[cuat].map((g) => {
+                                                    const isActive = g.is_active ?? true;
+                                                    return (
                                                     <div
                                                       key={g.id}
-                                                      className="group flex items-center justify-between gap-2 rounded-xl border border-border/50 bg-background/80 px-3 py-2 transition-all hover:border-emerald-200/70 hover:shadow-sm dark:border-slate-800/50 dark:bg-slate-900/50 dark:hover:border-emerald-900/50"
+                                                      className={`group flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition-all hover:shadow-sm ${isActive ? "border-border/50 bg-background/80 hover:border-emerald-200/70 dark:border-slate-800/50 dark:bg-slate-900/50 dark:hover:border-emerald-900/50" : "border-border/30 bg-muted/30 opacity-60 dark:border-slate-800/30 dark:bg-slate-900/20"}`}
                                                     >
                                                       <div className="flex min-w-0 items-center gap-2.5">
-                                                        <div className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/40 dark:bg-emerald-400" />
-                                                        <span className="truncate font-mono text-sm font-bold tracking-wide text-slate-800 dark:text-slate-100">{g.name}</span>
+                                                        <div className={`h-2 w-2 shrink-0 rounded-full shadow-sm ${isActive ? "bg-emerald-500 shadow-emerald-500/40 dark:bg-emerald-400" : "bg-slate-400 dark:bg-slate-600"}`} />
+                                                        <span className={`truncate font-mono text-sm font-bold tracking-wide ${isActive ? "text-slate-800 dark:text-slate-100" : "text-slate-400 line-through dark:text-slate-500"}`}>{g.name}</span>
+                                                        {!isActive && (
+                                                          <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                                                            Inactivo
+                                                          </span>
+                                                        )}
                                                       </div>
                                                       <div className="flex shrink-0 items-center gap-0.5 opacity-50 transition-opacity group-hover:opacity-100">
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="icon"
+                                                          onClick={() => void handleToggleGroupActive(g)}
+                                                          disabled={Boolean(editingGroupId)}
+                                                          className={`h-7 w-7 rounded-lg ${isActive ? "text-amber-500 hover:bg-amber-50 hover:text-amber-600 dark:text-amber-400 dark:hover:bg-amber-950/40" : "text-emerald-500 hover:bg-emerald-50 hover:text-emerald-600 dark:text-emerald-400 dark:hover:bg-emerald-950/40"}`}
+                                                          aria-label={isActive ? `Deshabilitar grupo ${g.name}` : `Activar grupo ${g.name}`}
+                                                          title={isActive ? "Deshabilitar grupo" : "Activar grupo"}
+                                                        >
+                                                          <Power className="h-3 w-3" />
+                                                        </Button>
                                                         <Button
                                                           variant="ghost"
                                                           size="icon"
@@ -1842,7 +1892,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                                         </Button>
                                                       </div>
                                                     </div>
-                                                  ))}
+                                                    );
+                                                  })}
                                                 </div>
                                               </div>
                                             )}

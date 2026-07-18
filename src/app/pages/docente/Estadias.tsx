@@ -168,6 +168,7 @@ export default function EstadiasPage({ deadlineInfo, onDirtyChange }: { deadline
     const hasFormData = formData.plan !== "" || formData.carrera !== "" || formData.cuatrimestre !== "" ||
       formData.grupo !== "" || formData.archivos.length > 0 || formData.nota !== "";
     onDirtyChange(hasEditing || hasFormData);
+    return () => onDirtyChange(false);
   }, [onDirtyChange, editingDocumentId, editingBatchDocIds, formData]);
 
   const selectedConfig = useMemo(() => documentTypes.find((d) => d.id === selectedType) ?? null, [selectedType]);
@@ -214,6 +215,7 @@ export default function EstadiasPage({ deadlineInfo, onDirtyChange }: { deadline
             career_code: career,
             cuatrimestre: cuatri,
             plan: String(plan).replace(/-/g, "_"),
+            active_only: "1",
           },
         });
         if (cancelled) return;

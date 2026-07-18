@@ -37,6 +37,7 @@ interface SidebarProps {
   onNavigate: (view: string) => void;
   mobileOpen?: boolean;
   onMobileOpenChange?: (open: boolean) => void;
+  onLogoutRequest?: () => void;
 }
 
 type SidebarMenuItem = { id: string; label: string; icon: React.ElementType };
@@ -240,7 +241,7 @@ const LOGO_LIGHT = "/src/assets/LogotipoUTSLRC.webp";
 const LOGO_DARK = "/src/assets/LogotipoUTSLRC-BLANCO.webp";
 
 export function Sidebar(props: Readonly<SidebarProps>) {
-  const { currentView, onNavigate, mobileOpen, onMobileOpenChange } = props;
+  const { currentView, onNavigate, mobileOpen, onMobileOpenChange, onLogoutRequest } = props;
   const { user, logout } = useAuth();
   const { theme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
@@ -392,8 +393,12 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const { canInstall, install } = usePWAInstall();
 
   const handleLogoutClick = React.useCallback(() => {
-    setLogoutDialogOpen(true);
-  }, []);
+    if (onLogoutRequest) {
+      onLogoutRequest();
+    } else {
+      setLogoutDialogOpen(true);
+    }
+  }, [onLogoutRequest]);
 
   const confirmLogout = React.useCallback(() => {
     setLogoutDialogOpen(false);

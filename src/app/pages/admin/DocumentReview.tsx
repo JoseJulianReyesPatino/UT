@@ -19,6 +19,7 @@ import { apiFetch } from "../../lib/api";
 import { formatGroupCode } from "../../../lib/utils";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { useAuth } from "../../context/AuthContext";
+import { useTourActive } from "../../context/TourContext";
 
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy" | "devueltos" | "reenviados";
 
@@ -417,8 +418,45 @@ const mapApiDocument = (doc: ApiDocument, kind: "pending" | "reviewed"): Pending
 	return base;
 };
 
+function TourFakeDocReviewRow({ isFirst }: { isFirst: boolean }) {
+	const fakeData = [
+		{ nombre: "planeacion_didactica_1A.pdf", docente: "Lic. Carlos Hernández Ruiz", carrera: "TSU en Desarrollo de Software Multiplataforma", cuatrimestre: "Cuatrimestre 1", grupo: "Grupo 1A", parcial: "1er Parcial", apartado: "Planeación Didáctica" },
+		{ nombre: "instrumento_evaluacion_2B.pdf", docente: "Ing. María González Torres", carrera: "TSU en Administración Área Capital Humano", cuatrimestre: "Cuatrimestre 2", grupo: "Grupo 2B", parcial: "2do Parcial", apartado: "Instrumento de Evaluación 40%" },
+	];
+	const d = fakeData[isFirst ? 0 : 1];
+	return (
+		<div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-white p-4 dark:bg-slate-900/90 lg:flex-row lg:items-center lg:justify-between">
+			<div className="flex items-start gap-3 flex-1">
+				<div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+					<FileText className="h-6 w-6 text-muted-foreground" />
+				</div>
+				<div className="flex-1 min-w-0">
+					<p className="font-semibold tracking-wide text-foreground">{d.apartado} - {d.nombre}</p>
+					<p className="text-xs text-muted-foreground">{d.docente} • {d.carrera}</p>
+					<div className="mt-2 flex flex-wrap gap-2">
+						<Badge variant="outline" className="text-xs">{d.cuatrimestre}</Badge>
+						<Badge variant="outline" className="text-xs">{d.grupo}</Badge>
+						<Badge variant="outline" className="text-xs">{d.parcial}</Badge>
+					</div>
+					<p className="mt-1 text-xs text-muted-foreground">Enviado: 10/jul/2026 09:15 a.m.</p>
+				</div>
+			</div>
+			<div
+				data-tour={isFirst ? "admin-docreview-actions" : undefined}
+				className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-none sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0 opacity-80"
+			>
+				<span className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 h-8 text-sm font-medium text-foreground shadow-sm"><Eye className="h-4 w-4" /> Ver</span>
+				<span className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 h-8 text-sm font-medium text-foreground shadow-sm"><Check className="h-4 w-4" /> Revisar</span>
+				<Badge variant="warning">Pendiente</Badge>
+				<span className="inline-flex items-center gap-1 rounded-md border border-destructive/60 bg-background px-3 h-8 text-sm font-medium text-destructive shadow-sm"><Undo2 className="h-4 w-4" /> Devolver</span>
+			</div>
+		</div>
+	);
+}
+
 export default function DocumentReview({ initialSection = "all", initialForm }: DocumentReviewProps) {
 	const { isReady, isAuthenticated } = useAuth();
+	const { isAdminTourActive } = useTourActive();
 	const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
 	const [reviewedDocuments, setReviewedDocuments] = useState<ReviewedDocument[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -1007,7 +1045,12 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
 							<CardContent>
-								{renderListState(<div className="space-y-3">{filteredAllDocuments.length === 0 ? <EmptyState text="No hay documentos en esta sección." /> : groupDocsByBatch(filteredAllDocuments).map((group) => renderBatchGroup(group))}</div>)}
+								{isAdminTourActive ? (
+									<div className="space-y-3">
+										<TourFakeDocReviewRow isFirst={true} />
+										<TourFakeDocReviewRow isFirst={false} />
+									</div>
+								) : renderListState(<div className="space-y-3">{filteredAllDocuments.length === 0 ? <EmptyState text="No hay documentos en esta sección." /> : groupDocsByBatch(filteredAllDocuments).map((group) => renderBatchGroup(group))}</div>)}
 							</CardContent>
 						</Card>
 					</TabsContent>

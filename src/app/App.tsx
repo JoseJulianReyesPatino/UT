@@ -51,6 +51,7 @@ import {
 import { TourOverlay } from "./components/tour/TourOverlay";
 import { adminTourSteps } from "./tours/adminTourSteps";
 import { getDocenteTourSteps } from "./tours/docenteTourSteps";
+import { TourContext } from "./context/TourContext";
 
 // IMPORTAR LAS IMÁGENES AQUÍ
 import PlaneacionSuperiorImg from "../assets/superior_form.png";
@@ -80,6 +81,7 @@ function AppContent() {
   const [deferredMessageOpen, setDeferredMessageOpen] = useState<null | { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string; filePath?: string } }>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [unsavedChangesOpen, setUnsavedChangesOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [pendingView, setPendingView] = useState<string | null>(null);
   const formEditingRef = useRef(false);
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== "undefined" ? !navigator.onLine : false);
@@ -135,6 +137,9 @@ function AppContent() {
     }
 
     if (!isAuthenticated) {
+      formEditingRef.current = false;
+      setUnsavedChangesOpen(false);
+      setPendingView(null);
       setMobileSidebarOpen(false);
       setDeferredMessageOpen(null);
       setCurrentView("dashboard");
@@ -372,10 +377,22 @@ function AppContent() {
     }
   };
 
+  const safeLogout = () => {
+    if (formEditingRef.current) {
+      setPendingView("__logout__");
+      setUnsavedChangesOpen(true);
+    } else {
+      setLogoutConfirmOpen(true);
+    }
+  };
+
   const confirmDiscardChanges = () => {
     formEditingRef.current = false;
     setUnsavedChangesOpen(false);
-    if (pendingView) {
+    if (pendingView === "__logout__") {
+      setPendingView(null);
+      logout();
+    } else if (pendingView) {
       setCurrentView(pendingView);
       setMobileSidebarOpen(false);
       setPendingView(null);
@@ -582,6 +599,7 @@ function AppContent() {
       )}
 
       {isReady && isAuthenticated && (
+        <TourContext.Provider value={{ isAdminTourActive: isAdminTourOpen }}>
         <div
           className={`fixed inset-0 overflow-hidden${isSplashExiting ? " z-[9999] tv-iris-reveal" : " z-0"}`}
           style={{
@@ -602,6 +620,7 @@ function AppContent() {
               onNavigate={safeNavigate}
               mobileOpen={mobileSidebarOpen}
               onMobileOpenChange={setMobileSidebarOpen}
+              onLogoutRequest={safeLogout}
             />
             <main className="relative flex-1 overflow-y-auto bg-transparent">
               <div className="pointer-events-none absolute inset-0 overflow-hidden" />
@@ -854,8 +873,21 @@ function AppContent() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+              <DialogContent className="rounded-3xl border border-emerald-200/80 bg-white/95 px-6 py-6 shadow-2xl shadow-emerald-300/20 dark:border-slate-700 dark:bg-slate-950/95">
+                <DialogHeader>
+                  <DialogTitle>¿Estás seguro que quieres salir del sistema?</DialogTitle>
+                </DialogHeader>
+                <DialogFooter className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <Button variant="outline" onClick={() => setLogoutConfirmOpen(false)}>Cancelar</Button>
+                  <Button onClick={() => { setLogoutConfirmOpen(false); logout(); }}>Salir</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
+        </TourContext.Provider>
       )}
     </>
   );
