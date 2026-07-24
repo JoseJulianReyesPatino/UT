@@ -9,10 +9,11 @@ import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { resolveApiAssetUrl } from "../../lib/env";
 import { clearAvatarCache, getInitials, useResolvedAvatarUrl } from "../../lib/avatar";
-import { Calendar, Eye, EyeOff, Key, Upload } from "lucide-react";
+import { Calendar, Eye, EyeOff, Key, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
+import defaultPerfilImg from "../../../assets/elementos/perfil2.webp";
 
-const defaultProfileAvatar = "/src/assets/elementos/perfil2.webp";
+const defaultProfileAvatar = defaultPerfilImg;
 
 export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: boolean) => void }> = {}) {
   const { user, updateProfile, refreshUser } = useAuth();
@@ -24,13 +25,14 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
-  const [isSavingPassword, setIsSavingPassword] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordStep, setPasswordStep] = useState<"request" | "verify">("request");
+  const [pwCode, setPwCode] = useState("");
+  const [pwNewPassword, setPwNewPassword] = useState("");
+  const [pwConfirmPassword, setPwConfirmPassword] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState("");
+  const [showPwNew, setShowPwNew] = useState(false);
+  const [showPwConfirm, setShowPwConfirm] = useState(false);
   const [profileStats, setProfileStats] = useState({
     documentsSent: 0,
     documentsReviewed: 0,
@@ -124,7 +126,9 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
   }, []);
 
   const handleRemoveAvatar = useCallback(async () => {
-    const hadServerAvatar = user?.avatar && user.avatar !== "/api/default-avatar";
+    // Un avatar real del servidor siempre llega como URL absoluta https://...
+    // Los paths locales de Vite (defaultPerfilImg) no son avatares del servidor.
+    const hadServerAvatar = !!(user?.avatar && user.avatar.startsWith("http"));
 
     setSelectedAvatarFile(null);
     setAvatarPreview(undefined);
@@ -134,15 +138,15 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
     }
 
     if (!hadServerAvatar) {
-      updateProfile({ avatar: undefined });
+      // No hay avatar de servidor — solo limpiar estado local, no tocar user.avatar
       return;
     }
 
     try {
       await apiFetch("/auth/profile", {
-        method: "POST",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ remove_avatar: true }),
+        body: JSON.stringify({ avatar_url: null }),
       });
 
       clearAvatarCache();
@@ -150,8 +154,9 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
       const refreshedUser = await refreshUser();
       
       if (refreshedUser) {
+        // No pasar avatar: undefined — refreshUser ya actualizó user.avatar
+        // al defaultPerfilImg a través de setUser en AuthContext.
         updateProfile({ 
-          avatar: undefined,
           name: refreshedUser.name,
           firstNames: refreshedUser.firstNames,
           lastNames: refreshedUser.lastNames,
@@ -257,47 +262,83 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
     }
   };
 
-  const handlePasswordSave = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error("Completa todos los campos de contraseña");
-      return;
-    }
+  const resetPasswordDialog = () => {
+    setPasswordStep("request");
+    setPwCode("");
+    setPwNewPassword("");
+    setPwConfirmPassword("");
+    setPwLoading(false);
+    setPwError("");
+    setShowPwNew(false);
+    setShowPwConfirm(false);
+  };
 
-    if (newPassword.length < 8) {
-      toast.error("La nueva contraseña debe tener al menos 8 caracteres");
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast.error("La confirmación no coincide");
-      return;
-    }
-
-    setIsSavingPassword(true);
-
+  const handleRequestPasswordCode = async () => {
+    if (!user?.email) return;
+    setPwError("");
+    setPwLoading(true);
     try {
-      await apiFetch("/auth/password", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+      await apiFetch("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email: user.email }),
+      });
+      setPasswordStep("verify");
+    } catch {
+      toast.error("No se pudo enviar el código. Inténtalo de nuevo.");
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const handleResendPasswordCode = async () => {
+    if (!user?.email) return;
+    setPwCode("");
+    setPwError("");
+    setPwLoading(true);
+    try {
+      await apiFetch("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email: user.email }),
+      });
+      toast.success("¡Código reenviado! Revisa tu bandeja de entrada.");
+    } catch {
+      toast.error("No se pudo reenviar el código. Inténtalo de nuevo.");
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const handleVerifyPasswordCode = async () => {
+    if (!user?.email) return;
+    setPwError("");
+    if (!pwCode.trim()) { setPwError("Ingresa el código de verificación."); return; }
+    if (pwNewPassword !== pwConfirmPassword) { setPwError("Las contraseñas no coinciden."); return; }
+    if (pwNewPassword.length < 8) { setPwError("La contraseña debe tener al menos 8 caracteres."); return; }
+    setPwLoading(true);
+    try {
+      await apiFetch("/auth/reset-password", {
+        method: "POST",
         body: JSON.stringify({
-          current_password: currentPassword,
-          password: newPassword,
-          password_confirmation: confirmPassword,
+          email: user.email,
+          token: pwCode,
+          password: pwNewPassword,
+          password_confirmation: pwConfirmPassword,
         }),
       });
-
-      toast.success("Contraseña actualizada correctamente");
       setIsPasswordOpen(false);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setShowCurrentPassword(false);
-      setShowNewPassword(false);
-      setShowConfirmPassword(false);
-    } catch (error: any) {
-      toast.error(error instanceof Error ? error.message : "No fue posible cambiar la contraseña");
+      resetPasswordDialog();
+      toast.success("¡Contraseña actualizada correctamente!", { duration: 5000 });
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; errors?: Record<string, string[]> };
+      if (apiErr?.status === 422) {
+        const apiErrors = apiErr?.errors?.token ?? apiErr?.errors?.password;
+        const msg = Array.isArray(apiErrors) ? apiErrors[0] : "Código incorrecto o expirado. Solicita uno nuevo.";
+        setPwError(msg);
+      } else {
+        toast.error("Ocurrió un error al cambiar la contraseña. Inténtalo de nuevo más tarde.");
+      }
     } finally {
-      setIsSavingPassword(false);
+      setPwLoading(false);
     }
   };
 
@@ -476,99 +517,127 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isPasswordOpen} onOpenChange={setIsPasswordOpen}>
-            <DialogContent className="dark:bg-slate-950 dark:border-slate-800">
+          <Dialog open={isPasswordOpen} onOpenChange={(open) => { setIsPasswordOpen(open); if (!open) resetPasswordDialog(); }}>
+            <DialogContent className="max-w-[95vw] sm:max-w-md dark:bg-slate-950 dark:border-slate-800">
               <DialogHeader>
                 <DialogTitle className="dark:text-white">Cambiar contraseña</DialogTitle>
-                <DialogDescription className="dark:text-slate-400">Actualiza tu contraseña de acceso</DialogDescription>
+                <DialogDescription className="dark:text-slate-400">
+                  {passwordStep === "request"
+                    ? "Te enviaremos un código de verificación a tu correo registrado."
+                    : "Ingresa el código que recibiste y establece tu nueva contraseña."}
+                </DialogDescription>
               </DialogHeader>
-              <div className="mt-4 space-y-4">
-                <div className="space-y-2">
-                  <Label className="dark:text-white">Contraseña actual</Label>
-                  <div className="relative">
-                    <Input
-                      type={showCurrentPassword ? "text" : "password"}
-                      value={currentPassword}
-                      onChange={(event) => setCurrentPassword(event.target.value)}
-                      placeholder="Ingresa tu contraseña actual"
-                      className="pr-10 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
-                    />
-                    <Button
+
+              {/* Indicador de pasos */}
+              <div className="flex items-center gap-2 mt-1">
+                {(["request", "verify"] as const).map((step, i) => (
+                  <React.Fragment key={step}>
+                    <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${passwordStep === step ? "bg-emerald-500 text-white" : i < (passwordStep === "verify" ? 1 : 0) ? "bg-emerald-200 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" : "bg-muted text-muted-foreground dark:bg-slate-800 dark:text-slate-400"}`}>
+                      {i + 1}
+                    </div>
+                    {i < 1 && <div className={`h-px flex-1 transition-colors ${passwordStep === "verify" ? "bg-emerald-400" : "bg-border dark:bg-slate-700"}`} />}
+                  </React.Fragment>
+                ))}
+                <span className="ml-1 text-xs text-muted-foreground dark:text-slate-400">
+                  {passwordStep === "request" ? "Enviar código" : "Verificar y cambiar"}
+                </span>
+              </div>
+
+              <div className="mt-1 space-y-4">
+                {passwordStep === "request" ? (
+                  <>
+                    <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 flex items-center gap-3 dark:border-slate-700 dark:bg-slate-900/60">
+                      <Key className="h-4 w-4 text-muted-foreground dark:text-slate-400 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground dark:text-slate-400">Correo registrado</p>
+                        <p className="text-sm font-medium truncate dark:text-white">{user?.email}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground dark:text-slate-400">
+                      Se enviará un código de 6 dígitos a ese correo. El código expira en 30 minutos.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="dark:text-white">Código de verificación</Label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={pwCode}
+                        onChange={(e) => setPwCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        placeholder="• • • • • •"
+                        className="text-center text-2xl font-mono tracking-[0.5em] rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                        autoComplete="one-time-code"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="dark:text-white">Nueva contraseña</Label>
+                      <div className="relative">
+                        <Input
+                          type={showPwNew ? "text" : "password"}
+                          value={pwNewPassword}
+                          onChange={(e) => setPwNewPassword(e.target.value)}
+                          placeholder="Mínimo 8 caracteres"
+                          className="pr-10 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
+                          autoComplete="new-password"
+                        />
+                        <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwNew((v) => !v)} aria-label={showPwNew ? "Ocultar" : "Mostrar"}>
+                          {showPwNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="dark:text-white">Confirmar contraseña</Label>
+                      <div className="relative">
+                        <Input
+                          type={showPwConfirm ? "text" : "password"}
+                          value={pwConfirmPassword}
+                          onChange={(e) => setPwConfirmPassword(e.target.value)}
+                          placeholder="Repite la nueva contraseña"
+                          className="pr-10 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
+                          autoComplete="new-password"
+                        />
+                        <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwConfirm((v) => !v)} aria-label={showPwConfirm ? "Ocultar" : "Mostrar"}>
+                          {showPwConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                    {pwError && (
+                      <p className="text-xs text-destructive font-medium">{pwError}</p>
+                    )}
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                      onClick={() => setShowCurrentPassword((value) => !value)}
-                      aria-label={showCurrentPassword ? "Ocultar contraseña actual" : "Mostrar contraseña actual"}
+                      onClick={handleResendPasswordCode}
+                      disabled={pwLoading}
+                      className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline disabled:opacity-50"
                     >
-                      {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="dark:text-white">Nueva contraseña</Label>
-                  <div className="relative">
-                    <Input
-                      type={showNewPassword ? "text" : "password"}
-                      value={newPassword}
-                      onChange={(event) => setNewPassword(event.target.value)}
-                      placeholder="Ingresa la nueva contraseña"
-                      className="pr-10 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                      onClick={() => setShowNewPassword((value) => !value)}
-                      aria-label={showNewPassword ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
-                    >
-                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="dark:text-white">Confirmar contraseña</Label>
-                  <div className="relative">
-                    <Input
-                      type={showConfirmPassword ? "text" : "password"}
-                      value={confirmPassword}
-                      onChange={(event) => setConfirmPassword(event.target.value)}
-                      placeholder="Repite la nueva contraseña"
-                      className="pr-10 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                      onClick={() => setShowConfirmPassword((value) => !value)}
-                      aria-label={showConfirmPassword ? "Ocultar confirmación" : "Mostrar confirmación"}
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    type="button"
-                    onClick={() => setIsPasswordOpen(false)}
-                    disabled={isSavingPassword}
-                    className="rounded-2xl dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
-                  >
-                    Cancelar
+                      ¿No recibiste el código? Reenviar
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => setIsPasswordOpen(false)}
+                  disabled={pwLoading}
+                  className="rounded-2xl dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
+                >
+                  Cancelar
+                </Button>
+                {passwordStep === "request" ? (
+                  <Button type="button" variant="success" onClick={handleRequestPasswordCode} disabled={pwLoading} className="rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
+                    {pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Enviando...</> : "Enviar código"}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="success"
-                    onClick={handlePasswordSave}
-                    disabled={isSavingPassword}
-                    className="rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white"
-                  >
-                    {isSavingPassword ? "Guardando..." : "Actualizar contraseña"}
+                ) : (
+                  <Button type="button" variant="success" onClick={handleVerifyPasswordCode} disabled={pwLoading} className="rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
+                    {pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verificando...</> : "Confirmar"}
                   </Button>
-                </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>

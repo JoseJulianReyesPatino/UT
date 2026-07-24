@@ -9,8 +9,16 @@ import {
   Key,
   UserX,
   FileText,
+  HelpCircle,
 } from "lucide-react";
 import { type TourStep } from "../components/tour/TourOverlay";
+import galloApuntarDerecha from "../../assets/gallos_tour/gallo_apuntar_derecha.png";
+import galloApuntarIzquierda from "../../assets/gallos_tour/gallo_apuntar_izquierda.png";
+import galloApuntarArriba from "../../assets/gallos_tour/gallo_apuntar_arriba.png";
+import galloExplicacion from "../../assets/gallos_tour/gallo_explicacion.png";
+import galloExplicacion2 from "../../assets/gallos_tour/gallo_explicacion_2.png";
+import galloGracias from "../../assets/gallos_tour/gallo_gracias.png";
+import galloCafe from "../../assets/gallos_tour/gallo_cafe.png";
 
 function Ic({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
@@ -30,6 +38,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Este es el menú principal. Desde aquí navegas a todas las secciones del sistema. Te daremos un recorrido completo para que conozcas cada apartado.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "admin-dashboard-stats",
@@ -38,6 +47,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Estas tarjetas muestran de un vistazo el total de docentes registrados y el estado de los documentos: pendientes, revisados y revisados hoy. Haz clic en cualquiera para ir directamente a esa sección.",
     placement: "bottom",
+    image: galloExplicacion,
   },
   {
     target: "admin-dashboard-pending",
@@ -46,6 +56,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Aquí aparecen los documentos más recientes que esperan tu aprobación. Puedes abrirlos directamente para revisarlos, marcarlos como revisados o devolverlos al docente con un comentario.",
     placement: "top",
+    image: galloExplicacion2,
   },
   {
     target: "admin-dashboard-activity",
@@ -54,6 +65,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Registro de las últimas acciones en el sistema: aprobaciones, devoluciones y envíos. Te permite dar seguimiento a lo que ha ocurrido en el día.",
     placement: "top",
+    image: galloExplicacion,
   },
 
   // ── GESTIÓN DE USUARIOS ──────────────────────────────────────────────────────
@@ -64,6 +76,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "En esta sección administras todos los usuarios del sistema: docentes, tutores y supervisores.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "admin-docentes-new-btn",
@@ -72,6 +85,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Usa este botón para registrar un nuevo usuario. Podrás asignarle uno o varios roles simultáneamente: Docente, Tutor y/o Supervisor. El sistema genera automáticamente una contraseña temporal.",
     placement: "bottom",
+    image: galloApuntarArriba,
   },
   {
     target: "admin-docentes-filters",
@@ -80,6 +94,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Filtra la lista por rol (docente, tutor, supervisor) y por estado (activo/inactivo). El buscador te permite encontrar usuarios por nombre o correo electrónico en tiempo real.",
     placement: "bottom",
+    image: galloExplicacion2,
   },
   {
     target: "admin-docentes-user-card",
@@ -94,6 +109,7 @@ export const adminTourSteps: TourStep[] = [
       </>
     ),
     placement: "top",
+    image: galloExplicacion,
   },
 
   // ── DOCUMENTOS ───────────────────────────────────────────────────────────────
@@ -104,6 +120,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Centro principal para revisar todos los documentos que los docentes han enviado al sistema.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "admin-docreview-tabs",
@@ -112,6 +129,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Organiza los documentos por su estado: Todos, Pendientes (sin revisar), Devueltos (con comentarios), Reenviados (corregidos por el docente), Revisados, y Revisados hoy.",
     placement: "bottom",
+    image: galloApuntarArriba,
   },
   {
     target: "admin-docreview-filters",
@@ -120,6 +138,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Refina la búsqueda por plan educativo, carrera, cuatrimestre, materia, grupo, docente, parcial y tipo de apartado. Puedes combinar varios filtros a la vez.",
     placement: "bottom",
+    image: galloExplicacion2,
   },
   {
     target: "admin-docreview-actions",
@@ -136,6 +155,7 @@ export const adminTourSteps: TourStep[] = [
       </>
     ),
     placement: "top",
+    image: galloExplicacion,
   },
 
   // ── ESTADÍAS ─────────────────────────────────────────────────────────────────
@@ -146,6 +166,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Revisión de documentos del proceso de estadías: cartas de presentación, cartas de aceptación, actas finales y documentos relacionados.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "admin-estadias-tabs",
@@ -154,6 +175,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Igual que en documentos, puedes filtrar por estado. La pestaña 'Reenviados' muestra documentos que el docente corrigió después de que los devolviste.",
     placement: "bottom",
+    image: galloApuntarArriba,
   },
   {
     target: "admin-estadias-filters",
@@ -162,6 +184,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Esta sección incluye filtros específicos: Plan, Carrera, Cuatrimestre, Grupo, Docente, Apartado (tipo de documento) y Estado de devolución.",
     placement: "bottom",
+    image: galloExplicacion2,
   },
   {
     target: "admin-estadias-doc-row",
@@ -173,6 +196,7 @@ export const adminTourSteps: TourStep[] = [
       </>
     ),
     placement: "top",
+    image: galloExplicacion,
   },
   {
     target: "admin-estadias-doc-actions",
@@ -189,6 +213,7 @@ export const adminTourSteps: TourStep[] = [
       </>
     ),
     placement: "top",
+    image: galloApuntarArriba,
   },
 
   // ── TUTORES ───────────────────────────────────────────────────────────────────
@@ -199,6 +224,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Revisión de los documentos que los tutores envían al sistema: carga académica, bajas, concentrados, actas y demás registros de tutoría.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "admin-tutores-tabs",
@@ -207,6 +233,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Filtra los documentos por estado. Funciona igual que la sección de documentos de docentes: pendientes, devueltos, reenviados y revisados.",
     placement: "bottom",
+    image: galloApuntarArriba,
   },
   {
     target: "admin-tutores-filters",
@@ -215,6 +242,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Busca por nombre de tutor, tipo de apartado o estado de devolución para localizar rápidamente el documento que necesitas revisar.",
     placement: "bottom",
+    image: galloExplicacion2,
   },
   {
     target: "admin-tutores-doc-row",
@@ -230,6 +258,7 @@ export const adminTourSteps: TourStep[] = [
       </>
     ),
     placement: "top",
+    image: galloExplicacion,
   },
 
   // ── CICLOS ESCOLARES ──────────────────────────────────────────────────────────
@@ -240,6 +269,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Administra los períodos académicos del sistema. Los documentos están organizados por ciclo para facilitar el seguimiento histórico.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "admin-ciclos-new-btn",
@@ -248,6 +278,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Con este botón registras un nuevo período escolar indicando el año, mes de inicio y fin, y las fechas exactas. El nombre se genera automáticamente.",
     placement: "bottom",
+    image: galloApuntarArriba,
   },
   {
     target: "admin-ciclos-list",
@@ -256,6 +287,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Cada tarjeta representa un ciclo con su estado (Activo / Cerrado) y el total de documentos asociados. Haz clic sobre la tarjeta para ver los documentos de ese ciclo.",
     placement: "bottom",
+    image: galloExplicacion,
   },
   {
     target: "admin-ciclos-actions",
@@ -269,6 +301,7 @@ export const adminTourSteps: TourStep[] = [
       </>
     ),
     placement: "bottom",
+    image: galloExplicacion2,
   },
   {
     target: "admin-ciclos-doc-type",
@@ -277,6 +310,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Al abrir un ciclo ves todos sus documentos agrupados por categoría: Docentes, Estadías, Tutores y Remediales. Cada botón muestra cuántos documentos tiene esa categoría en el ciclo seleccionado.",
     placement: "right",
+    image: galloApuntarIzquierda,
   },
 
   // ── MENSAJES ──────────────────────────────────────────────────────────────────
@@ -287,6 +321,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Sistema de comunicación directa entre el administrador y los docentes/tutores del sistema.",
     placement: "right",
+    image: galloCafe,
   },
   {
     target: "admin-messages-new-conv-btn",
@@ -295,6 +330,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Como administrador puedes iniciar nuevos chats con cualquier docente o tutor del sistema. Los docentes solo pueden responderte, no iniciar chats nuevos.",
     placement: "bottom",
+    image: galloApuntarArriba,
   },
   {
     target: "admin-messages-search",
@@ -303,6 +339,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Filtra la lista de chats por nombre del contacto o por el contenido del último mensaje para encontrar rápidamente una conversación.",
     placement: "right",
+    image: galloApuntarIzquierda,
   },
   {
     target: "admin-messages-composer",
@@ -311,6 +348,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Escribe tu mensaje aquí. Puedes adjuntar archivos con el botón 'Adjuntar archivo', responder a un mensaje específico, y enviar con Enter o con el botón verde.",
     placement: "top",
+    image: galloExplicacion,
   },
 
   // ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
@@ -321,6 +359,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Aquí controlas el comportamiento global del sistema: qué formularios están activos, cuándo vencen, los grupos disponibles, los permisos de supervisores y tu cuenta personal.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "admin-config-nav",
@@ -329,6 +368,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Cuatro secciones: Formularios, Grupos, Supervisores y Cuenta. Haz clic en cualquiera para acceder a ella.",
     placement: "right",
+    image: galloApuntarIzquierda,
   },
   {
     target: "admin-config-formularios",
@@ -337,6 +377,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Para cada formulario defines su modo de acceso: abierto sin límite, con fecha de vencimiento (día y hora exactos), o cerrado. También configuras qué roles pueden verlo: Docente, Tutor, o ambos.",
     placement: "right",
+    image: galloExplicacion,
   },
   {
     target: "admin-config-grupos-btns",
@@ -345,6 +386,7 @@ export const adminTourSteps: TourStep[] = [
     content:
       "'Crear grupo' agrega un grupo individual. 'Creación rápida' te permite crear varios grupos en lote para toda una carrera, indicando cuántos grupos hay por cuatrimestre.",
     placement: "bottom",
+    image: galloExplicacion2,
   },
   {
     target: "admin-config-supervisores",
@@ -353,13 +395,23 @@ export const adminTourSteps: TourStep[] = [
     content:
       "Asigna a cada supervisor las secciones del sistema a las que puede acceder. Usa 'Dar todo' o 'Quitar todo' para gestionar el acceso completo. Los cambios se guardan de forma individual por supervisor.",
     placement: "right",
+    image: galloApuntarIzquierda,
   },
   {
     target: "admin-config-cuenta",
     view: "configuracion:cuenta",
     title: "Tu cuenta — ¡listo!",
-    content:
-      "Aquí actualizas tu foto de perfil, nombre, apellidos, teléfono y contraseña. Ya conoces todas las secciones del sistema. Puedes repetir este tutorial usando el botón ❓ en la esquina inferior derecha.",
+    content: (
+      <>
+        Aquí actualizas tu foto de perfil, nombre, apellidos, teléfono y contraseña. Ya conoces todas las secciones del sistema. Puedes repetir este tutorial usando el botón{" "}
+        <HelpCircle className="inline h-3.5 w-3.5 align-middle text-emerald-500" />{" "}
+        en la esquina inferior derecha.
+        <p className="mt-2 font-medium text-emerald-600 dark:text-emerald-400">
+          ¡Gracias por completar la guía! Esperamos que el sistema sea de gran ayuda. ¡Que tengas un excelente día!
+        </p>
+      </>
+    ),
     placement: "right",
+    image: galloGracias,
   },
 ];

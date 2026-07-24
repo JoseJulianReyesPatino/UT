@@ -1058,21 +1058,33 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					<TabsContent value="pendientes" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
-							<CardContent>{renderListState(<div className="space-y-3">{filteredPendienteOnlyDocuments.length === 0 ? <EmptyState text="No hay documentos pendientes." /> : groupDocsByBatch(filteredPendienteOnlyDocuments).map((group) => renderBatchGroup(group))}</div>)}</CardContent>
+							<CardContent>
+								{isAdminTourActive ? (
+									<div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
+								) : renderListState(<div className="space-y-3">{filteredPendienteOnlyDocuments.length === 0 ? <EmptyState text="No hay documentos pendientes." /> : groupDocsByBatch(filteredPendienteOnlyDocuments).map((group) => renderBatchGroup(group))}</div>)}
+							</CardContent>
 						</Card>
 					</TabsContent>
 
 					<TabsContent value="devueltos" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
-							<CardContent>{renderListState(<div className="space-y-3">{filteredDevueltosDocuments.length === 0 ? <EmptyState text="No hay documentos devueltos." /> : groupDocsByBatch(filteredDevueltosDocuments).map((group) => renderBatchGroup(group))}</div>)}</CardContent>
+							<CardContent>
+								{isAdminTourActive ? (
+									<div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
+								) : renderListState(<div className="space-y-3">{filteredDevueltosDocuments.length === 0 ? <EmptyState text="No hay documentos devueltos." /> : groupDocsByBatch(filteredDevueltosDocuments).map((group) => renderBatchGroup(group))}</div>)}
+							</CardContent>
 						</Card>
 					</TabsContent>
 
 					<TabsContent value="reenviados" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
-							<CardContent>{renderListState(<div className="space-y-3">{filteredReenviadosDocuments.length === 0 ? <EmptyState text="No hay documentos reenviados." /> : groupDocsByBatch(filteredReenviadosDocuments).map((group) => renderBatchGroup(group))}</div>)}</CardContent>
+							<CardContent>
+								{isAdminTourActive ? (
+									<div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
+								) : renderListState(<div className="space-y-3">{filteredReenviadosDocuments.length === 0 ? <EmptyState text="No hay documentos reenviados." /> : groupDocsByBatch(filteredReenviadosDocuments).map((group) => renderBatchGroup(group))}</div>)}
+							</CardContent>
 						</Card>
 					</TabsContent>
 
@@ -1080,7 +1092,9 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
 							<CardContent>
-								{renderListState(
+								{isAdminTourActive ? (
+									<div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
+								) : renderListState(
 									Object.entries(reviewedByDate).length === 0
 										? <EmptyState text="No hay documentos revisados." />
 										: <div className="space-y-6">
@@ -1102,7 +1116,11 @@ export default function DocumentReview({ initialSection = "all", initialForm }: 
 					<TabsContent value="hoy" className="space-y-4 mt-6">
 						<Card className={sectionCardClassName}>
 							<CardHeader className="pb-4">{renderFilters()}</CardHeader>
-							<CardContent>{renderListState(<div className="space-y-3">{reviewedTodayDocuments.length === 0 ? <EmptyState text="No hay documentos revisados hoy." /> : groupDocsByBatch(reviewedTodayDocuments).map((group) => renderBatchGroup(group, { allowReturn: false }))}</div>)}</CardContent>
+							<CardContent>
+								{isAdminTourActive ? (
+									<div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
+								) : renderListState(<div className="space-y-3">{reviewedTodayDocuments.length === 0 ? <EmptyState text="No hay documentos revisados hoy." /> : groupDocsByBatch(reviewedTodayDocuments).map((group) => renderBatchGroup(group, { allowReturn: false }))}</div>)}
+							</CardContent>
 						</Card>
 					</TabsContent>
 				</Tabs>

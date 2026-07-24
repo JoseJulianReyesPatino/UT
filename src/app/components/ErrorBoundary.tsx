@@ -34,7 +34,7 @@ export class ErrorBoundary extends React.Component<
             ¡Ups! Hubo un problema.
           </p>
           <button
-            onClick={() => this.setState({ hasError: false })}
+            onClick={() => window.location.reload()}
             className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 active:bg-emerald-800 transition-colors shadow-md"
           >
             Recargar sección

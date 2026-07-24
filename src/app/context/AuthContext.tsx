@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useMemo, useEffe
 import { AUTH_TOKEN_STORAGE_KEY, resolveApiAssetUrl } from "../lib/env";
 import { apiFetch } from "../lib/api";
 import { clearAvatarCache } from "../lib/avatar";
+import defaultPerfilImg from "../../assets/elementos/perfil2.webp";
 
 type UserRole = "docente" | "tutor" | "administrador" | "supervisor";
 
@@ -108,7 +109,7 @@ const splitNameParts = (fullName: string) => {
 };
 
 const profileCacheKey = (userId: string) => `utslrc-profile:${userId}`;
-const defaultProfileAvatar = "/src/assets/elementos/perfil2.webp";
+const defaultProfileAvatar = defaultPerfilImg;
 
 const loadCachedProfile = (userId: string) => {
   try {
@@ -231,10 +232,18 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
         body: JSON.stringify({ email, password }),
       })) as ApiLoginResponse;
 
-      const apiUser = mapApiUser(payload.user);
+      // CRITICAL: Save token to localStorage FIRST, before any state updates
+      // This ensures subsequent requests will have the token available
+      if (!payload?.token) {
+        throw new Error('No token received from login');
+      }
       localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, payload.token);
+
+      const apiUser = mapApiUser(payload.user);
       saveCachedProfile(apiUser);
       flashNotice('success', `¡Bienvenido(a) ${apiUser.name.split(' ')[0]}!`);
+      
+      // Update user state to trigger UI re-render
       setUser(apiUser);
 
       // PRECARGA DE FORMS INMEDIATA después del login

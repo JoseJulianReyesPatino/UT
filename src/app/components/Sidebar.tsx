@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import apiFetch from "../lib/api";
 import { getInitials, useResolvedAvatarUrl } from "../lib/avatar";
+import defaultPerfilImg from "../../assets/elementos/perfil2.webp";
 import {
   FileText,
   BarChart3,
@@ -30,7 +31,7 @@ import {
   Download,
 } from "lucide-react";
 
-const defaultProfileAvatar = "/src/assets/elementos/perfil2.webp";
+const defaultProfileAvatar = defaultPerfilImg;
 
 interface SidebarProps {
   currentView: string;
@@ -626,7 +627,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                   className="cursor-pointer"
                 />
                 <AvatarFallback className="bg-transparent p-0 overflow-hidden">
-                  <img src="/src/assets/elementos/perfil2.webp" alt="Foto de perfil" className="h-full w-full object-cover" />
+                  <img src={defaultProfileAvatar} alt="Foto de perfil" className="h-full w-full object-cover" />
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">

@@ -806,9 +806,10 @@ export default function Tutores() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading ? <DocumentCardSkeleton /> : filteredPending.length === 0 ? (
-                  <EmptyState text={emptyStateLegend} />
-                ) : groupDocsByBatch(filteredPending).map((group) => {
+                {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
+                {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
+                {!isAdminTourActive && !isLoading && filteredPending.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && groupDocsByBatch(filteredPending).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => {
                   const isReturned = Boolean(doc.returned);
                   return (
@@ -929,9 +930,10 @@ export default function Tutores() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading ? <DocumentCardSkeleton /> : filteredDevueltos.length === 0 ? (
-                  <EmptyState text={emptyStateLegend} />
-                ) : groupDocsByBatch(filteredDevueltos).map((group) => {
+                {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
+                {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
+                {!isAdminTourActive && !isLoading && filteredDevueltos.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && groupDocsByBatch(filteredDevueltos).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => (
                   <div key={doc.id} className={getDocumentRowClassName(true)}>
                     <button
@@ -1018,9 +1020,10 @@ export default function Tutores() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading ? <DocumentCardSkeleton /> : filteredReenviados.length === 0 ? (
-                  <EmptyState text={emptyStateLegend} />
-                ) : groupDocsByBatch(filteredReenviados).map((group) => {
+                {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
+                {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
+                {!isAdminTourActive && !isLoading && filteredReenviados.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && groupDocsByBatch(filteredReenviados).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => (
                   <div key={doc.id} className={getDocumentRowClassName(false)}>
                     <button
@@ -1114,7 +1117,9 @@ export default function Tutores() {
               {filtersBar}
             </CardHeader>
             <CardContent>
-              {isLoading ? <DocumentCardSkeleton /> : Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
+              {isAdminTourActive ? (
+                <div className="space-y-3"><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></div>
+              ) : isLoading ? <DocumentCardSkeleton /> : Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
                 <EmptyState text={emptyStateLegend} />
               ) : (
                 <div className="space-y-6">
@@ -1203,10 +1208,10 @@ export default function Tutores() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isLoading ? <DocumentCardSkeleton /> : reviewedToday.length === 0 ? (
-                  <EmptyState text={emptyStateLegend} />
-                ) : (
-                  groupDocsByBatch(reviewedToday).map((group) => {
+                {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
+                {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
+                {!isAdminTourActive && !isLoading && reviewedToday.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && groupDocsByBatch(reviewedToday).map((group) => {
                     const renderTodayRow = (doc: TutorDocumentItem) => {
                     const isReturned = Boolean(doc.returned);
                     return (
@@ -1272,8 +1277,7 @@ export default function Tutores() {
                         <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderTodayRow)}</div>
                       </div>
                     );
-                  })
-                )}
+                  })}
               </div>
             </CardContent>
           </Card>
