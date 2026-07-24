@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { PendingDocumentSkeleton, ActivitySkeleton, StatsGridSkeleton } from "./skeletons";
-import FormNotFoundImg from "../../../assets/Form_Not_Found.png";
+import FormNotFoundImg from "../../../assets/elementos/Form_Not_Found.webp";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";

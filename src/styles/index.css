@@ -9,7 +9,7 @@ html, body, #root {
 body {
   margin: 0;
   min-height: 100vh;
-  background-image: url('/src/assets/ut_imagen14.png');
+  background-image: url('/src/assets/elementos/ut_imagen14.webp');
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
@@ -19,7 +19,7 @@ body {
 html:not(.dark) body {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.10)),
-    url('/src/assets/ut_imagen14.png');
+    url('/src/assets/elementos/ut_imagen14.webp');
   background-color: transparent;
   background-blend-mode: screen;
 }

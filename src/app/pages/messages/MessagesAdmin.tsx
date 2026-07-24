@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getInitials, isImageUrl, useResolvedAvatarUrl } from "../../lib/avatar";
-import defaultAvatar from "../../../assets/perfil2.png";
+import defaultAvatar from "../../../assets/elementos/perfil2.webp";
 
 const DEFAULT_AVATAR_PATH = defaultAvatar;
 

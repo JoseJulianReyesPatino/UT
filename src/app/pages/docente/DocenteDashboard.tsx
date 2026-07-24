@@ -20,19 +20,21 @@ import {
 
 // --- Importar las imágenes desde assets ---
 // Imágenes para desktop
-import banner1 from "../../../assets/123.png";
-import banner2 from "../../../assets/carruselPC1.jpg";
-import banner3 from "../../../assets/image.jpg";
-import banner4 from "../../../assets/carruselPC3.png";
-import banner5 from "../../../assets/carruselPC4.png";
+import banner1 from "../../../assets/carrusel_web/carruselPC1.webp";
+import banner2 from "../../../assets/carrusel_web/carruselPC2.webp";
+import banner3 from "../../../assets/carrusel_web/carruselPC3.webp";
+import banner4 from "../../../assets/carrusel_web/carruselPC4.webp";
+import banner5 from "../../../assets/carrusel_web/carruselPC5.webp";
+import banner6 from "../../../assets/carrusel_web/carruselPC6.webp";
+
 
 // Imágenes para móvil (versiones optimizadas)
 // Si no tienes versiones específicas para móvil, usa las mismas
-import banner1Mobile from "../../../assets/carrusel1.png";
-import banner2Mobile from "../../../assets/carrusel2.png";
-import banner3Mobile from "../../../assets/carrusel3.png";
-import banner4Mobile from "../../../assets/carrusel4.png";
-import banner5Mobile from "../../../assets/carrusel5.png";
+import banner1Mobile from "../../../assets/carrusel_movil/carrusel1.webp";
+import banner2Mobile from "../../../assets/carrusel_movil/carrusel2.webp";
+import banner3Mobile from "../../../assets/carrusel_movil/carrusel3.webp";
+import banner4Mobile from "../../../assets/carrusel_movil/carrusel4.webp";
+import banner5Mobile from "../../../assets/carrusel_movil/carrusel5.webp";
 
 // --- Importar logos para el slider ---
 import { CarrerasLogoSlider } from "../../components/CarrerasLogoSlider";
@@ -145,7 +147,7 @@ type FormItem = {
 };
 
 // --- Arreglo de banners ---
-const introBanners = [banner1, banner2, banner3, banner4, banner5];
+const introBanners = [banner1, banner2, banner3, banner4, banner5, banner6];
 const introBannersMobile = [banner1Mobile, banner2Mobile, banner3Mobile, banner4Mobile, banner5Mobile];
 
 // --- Arreglo de logos para el slider (duplicados para efecto continuo) ---
@@ -406,7 +408,7 @@ function AutoFadeBannerCarousel({
 
 export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const { onNavigate } = props;
-  const manualDocenteUrl = new URL("../../../assets/Manual de Usuario del Docente.pdf", import.meta.url).href;
+  const manualDocenteUrl = new URL("../../../assets/elementos/Manual de Usuario del Docente.pdf", import.meta.url).href;
 
   const { isReady, user } = useAuth();
 

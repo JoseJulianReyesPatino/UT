@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
-import FormNotFoundImg from "../../../assets/Form_Not_Found.png";
+import FormNotFoundImg from "../../../assets/elementos/Form_Not_Found.webp";
 import { DocumentCardSkeleton } from "./skeletons";
 import { SearchableSelect } from "../../components/SearchableSelect";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";

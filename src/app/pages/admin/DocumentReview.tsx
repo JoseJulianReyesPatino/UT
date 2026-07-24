@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
-import FormNotFoundImg from "../../../assets/Form_Not_Found.png";
+import FormNotFoundImg from "../../../assets/elementos/Form_Not_Found.webp";
 import { DocumentCardSkeleton } from "./skeletons";
 import { Check, Eye, FileText, MessageCircleMore, MessageSquare, RefreshCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";

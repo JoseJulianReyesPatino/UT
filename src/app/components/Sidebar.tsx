@@ -30,7 +30,7 @@ import {
   Download,
 } from "lucide-react";
 
-const defaultProfileAvatar = "/src/assets/perfil2.png";
+const defaultProfileAvatar = "/src/assets/elementos/perfil2.webp";
 
 interface SidebarProps {
   currentView: string;
@@ -237,8 +237,8 @@ function SidebarInstrumentSection({
   );
 }
 
-const LOGO_LIGHT = "/src/assets/LogotipoUTSLRC.webp";
-const LOGO_DARK = "/src/assets/LogotipoUTSLRC-BLANCO.webp";
+const LOGO_LIGHT = "/src/assets/elementos/LogotipoUTSLRC.webp";
+const LOGO_DARK = "/src/assets/elementos/LogotipoUTSLRC-BLANCO.webp";
 
 export function Sidebar(props: Readonly<SidebarProps>) {
   const { currentView, onNavigate, mobileOpen, onMobileOpenChange, onLogoutRequest } = props;
@@ -626,7 +626,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                   className="cursor-pointer"
                 />
                 <AvatarFallback className="bg-transparent p-0 overflow-hidden">
-                  <img src="/src/assets/perfil2.png" alt="Foto de perfil" className="h-full w-full object-cover" />
+                  <img src="/src/assets/elementos/perfil2.webp" alt="Foto de perfil" className="h-full w-full object-cover" />
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">

@@ -1,5 +1,5 @@
 import React from "react";
-import gallosMascot from "../../assets/Form_Not_Found.png";
+import gallosMascot from "../../assets/elementos/Form_Not_Found.webp";
 // import accentLine from "../../assets/ut_imagen9.png"; // Ya no es necesario
 
 interface FormClosedStateProps {

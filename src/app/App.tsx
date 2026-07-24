@@ -24,8 +24,8 @@ import Instrumento40Page from "./pages/docente/Instrumento40";
 import Instrumento60Page from "./pages/docente/Instrumento60";
 import Instrumento70Page from "./pages/docente/Instrumento70";
 import RemedialPage from "./pages/docente/Remedial";
-import LogoUTSLRC from "../assets/LogotipoUTSLRC.webp";
-import LogoUTSLRCWhite from "../assets/LogotipoUTSLRC-BLANCO.webp";
+import LogoUTSLRC from "../assets/elementos/LogotipoUTSLRC.webp";
+import LogoUTSLRCWhite from "../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
 import ListaConcentradaPage from "./pages/docente/ListaConcentrada";
 import AsesoriaPage from "./pages/docente/Asesoria";
 import PortafolioDigitalPage from "./pages/docente/PortafolioDigital";
@@ -54,18 +54,18 @@ import { getDocenteTourSteps } from "./tours/docenteTourSteps";
 import { TourContext } from "./context/TourContext";
 
 // IMPORTAR LAS IMÁGENES AQUÍ
-import PlaneacionSuperiorImg from "../assets/superior_form.png";
-import Instrumento30SuperiorImg from "../assets/superior_form.png";
-import Instrumento40SuperiorImg from "../assets/superior_form.png";
-import Instrumento60SuperiorImg from "../assets/superior_form.png";
-import Instrumento70SuperiorImg from "../assets/superior_form.png";
-import RemedialSuperiorImg from "../assets/superior_form.png";
-import ListaConcentradaSuperiorImg from "../assets/superior_form.png";
-import PortafolioDigitalSuperiorImg from "../assets/superior_form.png";
-import AsesoriaSuperiorImg from "../assets/superior_form.png";
-import EstadiasSuperiorImg from "../assets/superior_form.png";
-import ActaFinalSuperiorImg from "../assets/superior_form.png";
-import TutoriasSuperiorImg from "../assets/superior_form.png";
+import PlaneacionSuperiorImg from "../assets/elementos/superior_form.webp";
+import Instrumento30SuperiorImg from "../assets/elementos/superior_form.webp";
+import Instrumento40SuperiorImg from "../assets/elementos/superior_form.webp";
+import Instrumento60SuperiorImg from "../assets/elementos/superior_form.webp";
+import Instrumento70SuperiorImg from "../assets/elementos/superior_form.webp";
+import RemedialSuperiorImg from "../assets/elementos/superior_form.webp";
+import ListaConcentradaSuperiorImg from "../assets/elementos/superior_form.webp";
+import PortafolioDigitalSuperiorImg from "../assets/elementos/superior_form.webp";
+import AsesoriaSuperiorImg from "../assets/elementos/superior_form.webp";
+import EstadiasSuperiorImg from "../assets/elementos/superior_form.webp";
+import ActaFinalSuperiorImg from "../assets/elementos/superior_form.webp";
+import TutoriasSuperiorImg from "../assets/elementos/superior_form.webp";
 
 
 
@@ -604,8 +604,8 @@ function AppContent() {
           className={`fixed inset-0 overflow-hidden${isSplashExiting ? " z-[9999] tv-iris-reveal" : " z-0"}`}
           style={{
             backgroundImage: theme === "dark"
-              ? "url('/src/assets/ut_imagen14.png')"
-              : "linear-gradient(rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.10)), url('/src/assets/ut_imagen14.png')",
+              ? "url('/src/assets/elementos/ut_imagen14.webp')"
+              : "linear-gradient(rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.10)), url('/src/assets/elementos/ut_imagen14.webp')",
             backgroundColor: theme === "dark" ? "#000000" : "transparent",
             backgroundBlendMode: theme === "dark" ? "normal" : "screen",
             backgroundPosition: "center",

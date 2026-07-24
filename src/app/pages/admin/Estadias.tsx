@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
-import FormNotFoundImg from "../../../assets/Form_Not_Found.png";
+import FormNotFoundImg from "../../../assets/elementos/form_Not_Found.webp";
 import { DocumentCardSkeleton } from "./skeletons";
 import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";

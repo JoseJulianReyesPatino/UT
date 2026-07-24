@@ -17,7 +17,7 @@ import { apiFetch } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { useResolvedAvatarUrl } from "../../lib/avatar";
 
-const defaultAvatar = new URL("../../../assets/perfil2.png", import.meta.url).href;
+const defaultAvatar = new URL("../../../assets/elementos/perfil2.webp", import.meta.url).href;
 
 type UserRole = "docente" | "tutor" | "administrador" | "supervisor";
 type StatusFilter = "all" | "activo" | "inactivo";

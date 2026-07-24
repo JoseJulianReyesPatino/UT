@@ -1,5 +1,5 @@
 import React from "react";
-import formNotFound from "../../assets/Form_Not_Found.png";
+import formNotFound from "../../assets/elementos/Form_Not_Found.webp";
 
 interface State { hasError: boolean }
 

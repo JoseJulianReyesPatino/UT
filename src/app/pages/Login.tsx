@@ -31,9 +31,9 @@ export function Login() {
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
-  const logoSrc = isDark ? "/src/assets/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/LogotipoUTSLRC.webp";
-  const superiorImage = new URL("../../assets/superior.webp", import.meta.url).href;
-  const inferiorImage = new URL("../../assets/inferior.webp", import.meta.url).href;
+  const logoSrc = isDark ? "/src/assets/elementos/LogotipoUTSLRC-BLANCO.webp" : "/src/assets/elementos/LogotipoUTSLRC.webp";
+  const superiorImage = new URL("../../assets/elementos/superior.webp", import.meta.url).href;
+  const inferiorImage = new URL("../../assets/elementos/inferior.webp", import.meta.url).href;
 
   const pageBackground = isDark
     ? "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950"
@@ -231,7 +231,7 @@ export function Login() {
                 
                 {/* Imagen del gallo */}
                 <img
-                  src="/src/assets/mascota3.webp"
+                  src="/src/assets/elementos/mascota3.webp"
                   alt="Mascota institucional"
                   className="relative z-10 h-full w-full object-contain drop-shadow-2xl transition-transform duration-300 hover:scale-110 origin-center -translate-y-12"
                 />

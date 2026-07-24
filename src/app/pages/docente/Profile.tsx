@@ -12,7 +12,7 @@ import { clearAvatarCache, getInitials, useResolvedAvatarUrl } from "../../lib/a
 import { Calendar, Eye, EyeOff, Key, Upload } from "lucide-react";
 import { toast } from "sonner";
 
-const defaultProfileAvatar = "/src/assets/perfil2.png";
+const defaultProfileAvatar = "/src/assets/elementos/perfil2.webp";
 
 export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: boolean) => void }> = {}) {
   const { user, updateProfile, refreshUser } = useAuth();

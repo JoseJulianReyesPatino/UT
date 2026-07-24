@@ -23,7 +23,7 @@ import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, 
 import { toast } from "sonner";
 import { carrieras } from "../../data/curricula";
 import { clearAvatarCache, isImageUrl, useResolvedAvatarUrl } from "../../lib/avatar";
-import defaultAvatar from "../../../assets/perfil2.png";
+import defaultAvatar from "../../../assets/elementos/perfil2.webp";
 
 
 type ConfigTab = "formularios" | "grupos" | "cuenta" | "supervisores";

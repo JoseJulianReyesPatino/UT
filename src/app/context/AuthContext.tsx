@@ -108,7 +108,7 @@ const splitNameParts = (fullName: string) => {
 };
 
 const profileCacheKey = (userId: string) => `utslrc-profile:${userId}`;
-const defaultProfileAvatar = "/src/assets/perfil2.png";
+const defaultProfileAvatar = "/src/assets/elementos/perfil2.webp";
 
 const loadCachedProfile = (userId: string) => {
   try {

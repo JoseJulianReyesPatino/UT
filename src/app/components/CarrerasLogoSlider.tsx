@@ -1,17 +1,17 @@
-import electromecanicaClaro from "../../assets/logotipos_carreras/Electromecanica_Industrial_claro.png";
-import electromecanicaOscuro from "../../assets/logotipos_carreras/Electromecanica_Industrial_oscuro.png";
-import energiaClaro from "../../assets/logotipos_carreras/Energia_renobable_claro.png";
-import energiaOscuro from "../../assets/logotipos_carreras/Energia_renobable_oscuro.png";
-import mecatronicaClaro from "../../assets/logotipos_carreras/logo-mecatronica_claro.png";
-import mecatronicaOscuro from "../../assets/logotipos_carreras/logo-mecatronica_oscuro.png";
-import negociosClaro from "../../assets/logotipos_carreras/Negocios_claro.png";
-import negociosOscuro from "../../assets/logotipos_carreras/Negocios_oscuro.png";
-import ociClaro from "../../assets/logotipos_carreras/Oci_logotipo_claro.png";
-import ociOscuro from "../../assets/logotipos_carreras/Oci_logotipo_oscuro.png";
-import bioalimentariosClaro from "../../assets/logotipos_carreras/Procesos_Bioalimentarios-claro.png";
-import bioalimentariosOscuro from "../../assets/logotipos_carreras/Procesos_Bioalimentarios-oscuro.png";
-import tiClaro from "../../assets/logotipos_carreras/TI2-claro.png";
-import tiOscuro from "../../assets/logotipos_carreras/TI-oscuro.png";
+import electromecanicaClaro from "../../assets/logotipos_carreras/Electromecanica_Industrial_claro.webp";
+import electromecanicaOscuro from "../../assets/logotipos_carreras/Electromecanica_Industrial_oscuro.webp";
+import energiaClaro from "../../assets/logotipos_carreras/Energia_renobable_claro.webp";
+import energiaOscuro from "../../assets/logotipos_carreras/Energia_renobable_oscuro.webp";
+import mecatronicaClaro from "../../assets/logotipos_carreras/logo-mecatronica_claro.webp";
+import mecatronicaOscuro from "../../assets/logotipos_carreras/logo-mecatronica_oscuro.webp";
+import negociosClaro from "../../assets/logotipos_carreras/Negocios_claro.webp";
+import negociosOscuro from "../../assets/logotipos_carreras/Negocios_oscuro.webp";
+import ociClaro from "../../assets/logotipos_carreras/Oci_logotipo_claro.webp";
+import ociOscuro from "../../assets/logotipos_carreras/Oci_logotipo_oscuro.webp";
+import bioalimentariosClaro from "../../assets/logotipos_carreras/Procesos_Bioalimentarios-claro.webp";
+import bioalimentariosOscuro from "../../assets/logotipos_carreras/Procesos_Bioalimentarios-oscuro.webp";
+import tiClaro from "../../assets/logotipos_carreras/TI2-claro.webp";
+import tiOscuro from "../../assets/logotipos_carreras/TI-oscuro.webp";
 
 const CARRERAS: { claro: string; oscuro: string; alt: string }[] = [
   { claro: mecatronicaClaro,     oscuro: mecatronicaOscuro,     alt: "Mecatrónica" },
