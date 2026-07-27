@@ -36,6 +36,7 @@ import banner2Mobile from "../../../assets/carrusel_movil/carrusel2.webp";
 import banner3Mobile from "../../../assets/carrusel_movil/carrusel3.webp";
 import banner4Mobile from "../../../assets/carrusel_movil/carrusel4.webp";
 import banner5Mobile from "../../../assets/carrusel_movil/carrusel5.webp";
+import banner6Mobile from "../../../assets/carrusel_movil/carrusel6.png";
 
 // --- Importar logos para el slider ---
 import { CarrerasLogoSlider } from "../../components/CarrerasLogoSlider";
@@ -149,7 +150,7 @@ type FormItem = {
 
 // --- Arreglo de banners ---
 const introBanners = [banner1, banner2, banner3, banner4, banner5, banner6];
-const introBannersMobile = [banner1Mobile, banner2Mobile, banner3Mobile, banner4Mobile, banner5Mobile];
+const introBannersMobile = [banner1Mobile, banner2Mobile, banner3Mobile, banner4Mobile, banner5Mobile, banner6Mobile];
 
 // --- Arreglo de logos para el slider (duplicados para efecto continuo) ---
 

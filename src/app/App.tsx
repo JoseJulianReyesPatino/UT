@@ -1,72 +1,55 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
-import { Login } from "./pages/Login";
-import DocenteDashboard from "./pages/docente/DocenteDashboard";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import { DocumentHistory } from "./pages/docente/DocumentHistory";
-import { Messages } from "./pages/Messages";
-import DocenteManagement from "./pages/admin/DocenteManagement";
-import Tutores from "./pages/admin/Tutores";
-import CiclosEscolares from "./pages/admin/CiclosEscolares";
-import DocumentReview from "./pages/admin/DocumentReview";
-import Configuration from "./pages/admin/Configuration";
-import EstadiasAdmin from "./pages/admin/Estadias";
-import CalendarioAdmin from "./pages/admin/Calendario";
-import { Profile } from "./pages/docente/Profile";
-import SupervisorPlaneacion from "./pages/supervisor/SupervisorPlaneacion";
-import SupervisorInstrumentos from "./pages/supervisor/SupervisorInstrumentos";
-import SupervisorDocPage from "./pages/supervisor/SupervisorDocPage";
-import PlaneacionPage from "./pages/docente/Planeacion";
-import Instrumento30Page from "./pages/docente/Instrumento30";
-import Instrumento40Page from "./pages/docente/Instrumento40";
-import Instrumento60Page from "./pages/docente/Instrumento60";
-import Instrumento70Page from "./pages/docente/Instrumento70";
-import RemedialPage from "./pages/docente/Remedial";
-import LogoUTSLRC from "../assets/elementos/LogotipoUTSLRC.webp";
-import LogoUTSLRCWhite from "../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
-import ListaConcentradaPage from "./pages/docente/ListaConcentrada";
-import AsesoriaPage from "./pages/docente/Asesoria";
-import PortafolioDigitalPage from "./pages/docente/PortafolioDigital";
-import ActaFinalPage from "./pages/docente/ActaFinal";
-import EstadiasPage from "./pages/docente/Estadias";
-import TutoriasPage from "./pages/docente/Tutorias";
-import { Sidebar } from "./components/Sidebar";
-import { FormAccessGuard } from "./components/FormAccessGuard";
 import { Alert, AlertDescription } from "./components/ui/alert";
 import { getFormConfig, saveFormConfig, getFormIdsForBackendCode, type FormId } from "../lib/formConfig";
 import { apiFetch } from "./lib/api";
-
 import { toast } from "sonner";
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "./components/ui/alert-dialog";
-import {
-  Menu,
-  Sun,
-  Moon,
-  HelpCircle,
-} from "lucide-react";
-import { TourOverlay } from "./components/tour/TourOverlay";
+import { HelpCircle, Loader2, Menu, Moon, Sun } from "lucide-react";
 import { adminTourSteps } from "./tours/adminTourSteps";
 import { getDocenteTourSteps } from "./tours/docenteTourSteps";
 import { TourContext } from "./context/TourContext";
+import { Login } from "./pages/Login";
+import { Sidebar } from "./components/Sidebar";
+import { FormAccessGuard } from "./components/FormAccessGuard";
+import LogoUTSLRC from "../assets/elementos/LogotipoUTSLRC.webp";
+import LogoUTSLRCWhite from "../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
+import SuperiorFormImg from "../assets/elementos/superior_form.webp";
 
-// IMPORTAR LAS IMÁGENES AQUÍ
-import PlaneacionSuperiorImg from "../assets/elementos/superior_form.webp";
-import Instrumento30SuperiorImg from "../assets/elementos/superior_form.webp";
-import Instrumento40SuperiorImg from "../assets/elementos/superior_form.webp";
-import Instrumento60SuperiorImg from "../assets/elementos/superior_form.webp";
-import Instrumento70SuperiorImg from "../assets/elementos/superior_form.webp";
-import RemedialSuperiorImg from "../assets/elementos/superior_form.webp";
-import ListaConcentradaSuperiorImg from "../assets/elementos/superior_form.webp";
-import PortafolioDigitalSuperiorImg from "../assets/elementos/superior_form.webp";
-import AsesoriaSuperiorImg from "../assets/elementos/superior_form.webp";
-import EstadiasSuperiorImg from "../assets/elementos/superior_form.webp";
-import ActaFinalSuperiorImg from "../assets/elementos/superior_form.webp";
-import TutoriasSuperiorImg from "../assets/elementos/superior_form.webp";
+// Páginas cargadas bajo demanda — solo se descargan cuando el usuario las visita
+const DocenteDashboard = React.lazy(() => import("./pages/docente/DocenteDashboard"));
+const AdminDashboard = React.lazy(() => import("./pages/admin/AdminDashboard"));
+const DocumentHistory = React.lazy(() => import("./pages/docente/DocumentHistory").then(m => ({ default: m.DocumentHistory })));
+const Messages = React.lazy(() => import("./pages/Messages").then(m => ({ default: m.Messages })));
+const DocenteManagement = React.lazy(() => import("./pages/admin/DocenteManagement"));
+const Tutores = React.lazy(() => import("./pages/admin/Tutores"));
+const CiclosEscolares = React.lazy(() => import("./pages/admin/CiclosEscolares"));
+const DocumentReview = React.lazy(() => import("./pages/admin/DocumentReview"));
+const Configuration = React.lazy(() => import("./pages/admin/Configuration"));
+const EstadiasAdmin = React.lazy(() => import("./pages/admin/Estadias"));
+const CalendarioAdmin = React.lazy(() => import("./pages/admin/Calendario"));
+const Profile = React.lazy(() => import("./pages/docente/Profile").then(m => ({ default: m.Profile })));
+const SupervisorPlaneacion = React.lazy(() => import("./pages/supervisor/SupervisorPlaneacion"));
+const SupervisorInstrumentos = React.lazy(() => import("./pages/supervisor/SupervisorInstrumentos"));
+const SupervisorDocPage = React.lazy(() => import("./pages/supervisor/SupervisorDocPage"));
+const PlaneacionPage = React.lazy(() => import("./pages/docente/Planeacion"));
+const Instrumento30Page = React.lazy(() => import("./pages/docente/Instrumento30"));
+const Instrumento40Page = React.lazy(() => import("./pages/docente/Instrumento40"));
+const Instrumento60Page = React.lazy(() => import("./pages/docente/Instrumento60"));
+const Instrumento70Page = React.lazy(() => import("./pages/docente/Instrumento70"));
+const RemedialPage = React.lazy(() => import("./pages/docente/Remedial"));
+const ListaConcentradaPage = React.lazy(() => import("./pages/docente/ListaConcentrada"));
+const AsesoriaPage = React.lazy(() => import("./pages/docente/Asesoria"));
+const PortafolioDigitalPage = React.lazy(() => import("./pages/docente/PortafolioDigital"));
+const ActaFinalPage = React.lazy(() => import("./pages/docente/ActaFinal"));
+const EstadiasPage = React.lazy(() => import("./pages/docente/Estadias"));
+const TutoriasPage = React.lazy(() => import("./pages/docente/Tutorias"));
+const TourOverlay = React.lazy(() => import("./components/tour/TourOverlay").then(m => ({ default: m.TourOverlay })));
 
 
 
@@ -628,108 +611,9 @@ function AppContent() {
               <div className="pointer-events-none absolute inset-0 overflow-hidden" />
 
               {/* IMÁGENES DECORATIVAS - HIJAS DIRECTAS DE <main> */}
-              {currentView === "planeacion" && (
+              {["planeacion","instrumento-30-normal","instrumento-40-nuevo","instrumento-60-nuevo","instrumento-70-normal","remedial","lista-concentrada","asesoria","portafolio","estadias","acta-final","tutorias"].includes(currentView) && (
                 <img
-                  src={PlaneacionSuperiorImg}
-                  alt="Decoración superior"
-                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-                  style={{ top: '-0.5rem', right: '0.1rem' }}
-                />
-              )}
-
-              {currentView === "instrumento-30-normal" && (
-                <img
-                  src={Instrumento30SuperiorImg}
-                  alt="Decoración superior"
-                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-                  style={{ top: '-0.5rem', right: '0.1rem' }}
-                />
-              )}
-
-              {currentView === "instrumento-40-nuevo" && (
-                <img
-                  src={Instrumento40SuperiorImg}
-                  alt="Decoración superior"
-                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-                  style={{ top: '-0.5rem', right: '0.1rem' }}
-                />
-           )}
-
-                {currentView === "instrumento-60-nuevo" && (
-                <img
-                  src={Instrumento60SuperiorImg}
-                  alt="Decoración superior"
-                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-                  style={{ top: '-0.5rem', right: '0.1rem' }}
-                />
-           )}
-
-            {currentView === "instrumento-70-normal" && (
-                <img
-                  src={Instrumento70SuperiorImg}
-                  alt="Decoración superior"
-                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-                  style={{ top: '-0.5rem', right: '0.1rem' }}
-                />
-           )}
-
-            {currentView === "remedial" && (
-                <img
-                  src={RemedialSuperiorImg}
-                  alt="Decoración superior"
-                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-                  style={{ top: '-0.5rem', right: '0.1rem' }}
-                />
-              )}
-
-               {currentView === "lista-concentrada" && (
-                <img
-                  src={ListaConcentradaSuperiorImg}
-                  alt="Decoración superior"
-                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-                  style={{ top: '-0.5rem', right: '0.1rem' }}
-                />
-              )}
-
-               {currentView === "asesoria" && (
-                <img
-                  src={AsesoriaSuperiorImg}
-                  alt="Decoración superior"
-                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-                  style={{ top: '-0.5rem', right: '0.1rem' }}
-                />
-              )}
-
-               {currentView === "portafolio" && (
-                <img
-                  src={PortafolioDigitalSuperiorImg}
-                  alt="Decoración superior"
-                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-                  style={{ top: '-0.5rem', right: '0.1rem' }}
-                />
-              )}
-
-              {currentView === "estadias" && (
-                <img
-                  src={EstadiasSuperiorImg}
-                  alt="Decoración superior"
-                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-                  style={{ top: '-0.5rem', right: '0.1rem' }}
-                />
-              )}
-
-              {currentView === "acta-final" && (
-                <img
-                  src={ActaFinalSuperiorImg}
-                  alt="Decoración superior"
-                  className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
-                  style={{ top: '-0.5rem', right: '0.1rem' }}
-                />
-              )}
-
-               {currentView === "tutorias" && (
-                <img
-                  src={TutoriasSuperiorImg}
+                  src={SuperiorFormImg}
                   alt="Decoración superior"
                   className="hidden md:block pointer-events-none select-none absolute w-24 sm:w-32 lg:w-44 opacity-90 z-0"
                   style={{ top: '-0.5rem', right: '0.1rem' }}
@@ -759,7 +643,9 @@ function AppContent() {
                 </div>
               </div>
               <div className="container relative z-10 mx-auto max-w-7xl p-6 lg:p-8">
-                {renderContent()}
+                <Suspense fallback={<div className="flex min-h-[calc(100dvh-8rem)] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>}>
+                  {renderContent()}
+                </Suspense>
               </div>
             </main>
 
@@ -828,47 +714,47 @@ function AppContent() {
 
             <Toaster />
 
-            {isAdmin && (
-              <TourOverlay
-                steps={adminTourSteps}
-                isOpen={isAdminTourOpen}
-                onClose={() => setIsAdminTourOpen(false)}
-                onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
-                onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
-                onNavigate={(view) => {
-                  const [mainView, subParam] = view.split(":");
-                  setCurrentView(mainView);
-                  if (subParam) {
-                    setTimeout(() => {
-                      window.dispatchEvent(new CustomEvent("tour-sub-nav", { detail: subParam }));
-                    }, 200);
-                  }
-                }}
-              />
-            )}
+            <Suspense fallback={null}>
+              {isAdmin && (
+                <TourOverlay
+                  steps={adminTourSteps}
+                  isOpen={isAdminTourOpen}
+                  onClose={() => setIsAdminTourOpen(false)}
+                  onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+                  onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
+                  onNavigate={(view) => {
+                    const [mainView, subParam] = view.split(":");
+                    setCurrentView(mainView);
+                    if (subParam) {
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent("tour-sub-nav", { detail: subParam }));
+                      }, 200);
+                    }
+                  }}
+                />
+              )}
 
-            {isDocente && (
-              <TourOverlay
-                steps={getDocenteTourSteps(
-                  // Mostrar tutorías solo si el usuario tiene rol docente Y tutor simultáneamente.
-                  // Tutor puro → ya conoce la sección; docente puro → no aparece en su menú.
-                  (user?.role === "docente" || (user?.roles?.includes("docente") ?? false)) && canAccessTutorias
-                )}
-                isOpen={isDocenteTourOpen}
-                onClose={() => setIsDocenteTourOpen(false)}
-                onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
-                onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
-                onNavigate={(view) => {
-                  const [mainView, subParam] = view.split(":");
-                  setCurrentView(mainView);
-                  if (subParam) {
-                    setTimeout(() => {
-                      window.dispatchEvent(new CustomEvent("tour-sub-nav", { detail: subParam }));
-                    }, 200);
-                  }
-                }}
-              />
-            )}
+              {isDocente && (
+                <TourOverlay
+                  steps={getDocenteTourSteps(
+                    (user?.role === "docente" || (user?.roles?.includes("docente") ?? false)) && canAccessTutorias
+                  )}
+                  isOpen={isDocenteTourOpen}
+                  onClose={() => setIsDocenteTourOpen(false)}
+                  onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+                  onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
+                  onNavigate={(view) => {
+                    const [mainView, subParam] = view.split(":");
+                    setCurrentView(mainView);
+                    if (subParam) {
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent("tour-sub-nav", { detail: subParam }));
+                      }, 200);
+                    }
+                  }}
+                />
+              )}
+            </Suspense>
 
             <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
               <DialogContent className="rounded-3xl border border-emerald-200/80 bg-white/95 px-6 py-6 shadow-2xl shadow-emerald-300/20 dark:border-slate-700 dark:bg-slate-950/95">
