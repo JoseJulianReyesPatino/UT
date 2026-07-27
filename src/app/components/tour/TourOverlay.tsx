@@ -7,6 +7,7 @@ export interface TourStep {
   content: React.ReactNode;
   placement?: "top" | "bottom" | "left" | "right";
   view?: string;
+  image?: string;
 }
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
   onClose: () => void;
   onNavigate?: (view: string) => void;
   onOpenMobileSidebar?: () => void;
+  onCloseMobileSidebar?: () => void;
 }
 
 const GAP = 12;
@@ -28,11 +30,12 @@ function tooltipPos(
   preferred: string,
   tw: number,
   th: number,
+  extraRightMargin = 0,
 ): React.CSSProperties {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
-  const clampX = (x: number) => Math.max(MARGIN, Math.min(x, vw - tw - MARGIN));
+  const clampX = (x: number) => Math.max(MARGIN, Math.min(x, vw - tw - MARGIN - extraRightMargin));
   const clampY = (y: number) => Math.max(MARGIN, Math.min(y, vh - th - MARGIN));
 
   const midX = rect.left + rect.width / 2;
@@ -40,7 +43,7 @@ function tooltipPos(
 
   const tryRight = (): React.CSSProperties | null => {
     const left = rect.right + GAP;
-    if (left + tw + MARGIN <= vw) return { top: clampY(midY - th / 2), left };
+    if (left + tw + MARGIN + extraRightMargin <= vw) return { top: clampY(midY - th / 2), left };
     return null;
   };
   const tryLeft = (): React.CSSProperties | null => {
@@ -88,7 +91,19 @@ function spotlightRect(rect: DOMRect) {
   return { top: rect.top, left: rect.left, width: rect.width, height: h };
 }
 
-export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSidebar }: Props) {
+// When the sidebar renders twice (desktop + mobile drawer), both have the same
+// data-tour attribute. querySelector always picks the first (desktop, display:none).
+// This helper finds the first element that is actually visible (non-zero rect).
+function findTourElement(target: string): Element | null {
+  const all = document.querySelectorAll(`[data-tour="${target}"]`);
+  for (const el of Array.from(all)) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 || r.height > 0) return el;
+  }
+  return all[0] ?? null;
+}
+
+export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSidebar, onCloseMobileSidebar }: Props) {
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_BP);
@@ -97,6 +112,9 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
   const [spotReady, setSpotReady] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const prevViewRef = useRef<string | undefined>(undefined);
+  // Tracks whether the previous step was a nav step (sidebar was opened), so we
+  // know to wait longer for the sidebar close animation before looking up the element.
+  const prevStepWasNavRef = useRef(false);
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < MOBILE_BP);
@@ -108,8 +126,13 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
     if (isOpen) {
       setStep(0);
       prevViewRef.current = undefined;
+      prevStepWasNavRef.current = false;
       setSpotReady(false);
+    } else {
+      // Close the sidebar when the tour ends so it doesn't stay open on mobile
+      if (window.innerWidth < MOBILE_BP) onCloseMobileSidebar?.();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   useEffect(() => {
@@ -126,20 +149,35 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
 
     const isNavTarget = current.target.startsWith("nav-");
     const mobileVp = window.innerWidth < MOBILE_BP;
-    if (isNavTarget && mobileVp && onOpenMobileSidebar) {
-      onOpenMobileSidebar();
+    const prevWasNav = prevStepWasNavRef.current;
+    prevStepWasNavRef.current = isNavTarget;
+
+    if (mobileVp) {
+      if (isNavTarget) {
+        // Open sidebar so the nav item is visible and spotlight-able
+        onOpenMobileSidebar?.();
+      } else {
+        // Close sidebar so page content is visible for non-nav steps
+        onCloseMobileSidebar?.();
+      }
     }
 
-    const delay = navigated ? 700 : isNavTarget && mobileVp ? 400 : 200;
+    // Give extra time when coming from a nav step — the sidebar close animation
+    // needs to finish before the target element becomes measurable.
+    const delay = navigated ? 700
+      : isNavTarget && mobileVp ? 400
+      : prevWasNav && mobileVp ? 500
+      : 200;
+
     const t = setTimeout(() => {
-      const el = document.querySelector(`[data-tour="${current.target}"]`);
+      const el = findTourElement(current.target);
       if (!el) { setRect(null); setSpotReady(false); return; }
       el.scrollIntoView({ behavior: "instant" as ScrollBehavior, block: "nearest" });
       setRect(el.getBoundingClientRect());
       setSpotReady(true);
     }, delay);
     return () => clearTimeout(t);
-  }, [step, isOpen, steps, onNavigate, onOpenMobileSidebar]);
+  }, [step, isOpen, steps, onNavigate, onOpenMobileSidebar, onCloseMobileSidebar]);
 
   // Measure tooltip height only when step or open state changes — prevents per-render flicker.
   // useLayoutEffect runs synchronously after DOM update so the new content is measurable.
@@ -159,10 +197,14 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
   const isLast = step === steps.length - 1;
   const spot = rect ? spotlightRect(rect) : null;
 
+  // Reserve space to the right so the mascot image never exits the viewport
+  const hasImage = !!current.image && !isMobile;
+  const imageReserve = hasImage ? 128 : 0;
+
   const tooltipStyle: React.CSSProperties = isMobile
     ? { bottom: 0, left: 0, right: 0, width: "100%", maxHeight: "60vh", overflowY: "auto" }
     : rect
-    ? { ...tooltipPos(rect, placement, tw, tooltipH), width: tw }
+    ? { ...tooltipPos(rect, placement, tw, tooltipH, imageReserve), width: tw }
     : { top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: tw };
 
   const borderRadius = isMobile ? "20px 20px 0 0" : "16px";
@@ -170,6 +212,16 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
   // Tooltip is hidden during navigation (when rect exists but spotReady is false)
   // to avoid it briefly showing at the old position before the new one is measured.
   const tooltipOpacity = !rect || spotReady ? 1 : 0;
+
+  // Mascot position: fixed element to the right of the card, calculated from the card's position.
+  // Rendered as a sibling element (not inside the card) to avoid overflow/clipping issues.
+  const mascotPos = (() => {
+    if (!hasImage) return null;
+    const ts = tooltipStyle as { top?: unknown; left?: unknown };
+    if (typeof ts.top !== "number" || typeof ts.left !== "number") return null;
+    // Center of the circle: 44px to the right of card edge (circle straddles edge by ~20px)
+    return { left: ts.left + tw + 44, top: ts.top + tooltipH / 2 };
+  })();
 
   return (
     <>
@@ -218,7 +270,7 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
       {/* ── Tooltip card ────────────────────────────────────────────────────── */}
       <div
         ref={tooltipRef}
-        className="fixed z-[10001] overflow-hidden border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        className="fixed z-[10001] overflow-visible border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
         style={{
           ...tooltipStyle,
           borderRadius,
@@ -267,7 +319,10 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
           </div>
 
           {/* Content */}
-          <div className="px-4 pb-3">
+          <div
+            className="px-4 pb-3"
+            style={hasImage ? { paddingRight: "2.75rem" } : undefined}
+          >
             <h3 className="mb-1.5 text-[15px] font-semibold leading-snug text-slate-900 dark:text-white">
               {current.title}
             </h3>
@@ -315,6 +370,74 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
           </div>
         </div>
       </div>
+
+      {/* ── Mascot — concentric semi-transparent rings behind the gallo ── */}
+      {mascotPos && (
+        <div
+          key={`img-${step}`}
+          className="pointer-events-none fixed"
+          style={{
+            left: mascotPos.left,
+            top: mascotPos.top,
+            transform: "translate(-50%, -50%)",
+            zIndex: 10002,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: tooltipOpacity,
+            transition: "opacity 220ms ease",
+          }}
+        >
+          {/* Ring 1 — outermost, most transparent */}
+          <div aria-hidden="true" style={{
+            position: "absolute", top: "50%", left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: isLast ? "12rem" : "10rem",
+            height: isLast ? "12rem" : "10rem",
+            borderRadius: "50%",
+            background: "rgba(16,185,129,0.04)",
+            border: "1px solid rgba(16,185,129,0.15)",
+            boxShadow: "0 0 22px 8px rgba(16,185,129,0.08)",
+            zIndex: 1,
+          }} />
+          {/* Ring 2 — middle */}
+          <div aria-hidden="true" style={{
+            position: "absolute", top: "50%", left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: isLast ? "9.5rem" : "7.5rem",
+            height: isLast ? "9.5rem" : "7.5rem",
+            borderRadius: "50%",
+            background: "rgba(16,185,129,0.08)",
+            border: "1.5px solid rgba(16,185,129,0.28)",
+            zIndex: 2,
+          }} />
+          {/* Ring 3 — innermost, most visible */}
+          <div aria-hidden="true" style={{
+            position: "absolute", top: "50%", left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: isLast ? "6.5rem" : "5rem",
+            height: isLast ? "6.5rem" : "5rem",
+            borderRadius: "50%",
+            background: "rgba(16,185,129,0.14)",
+            border: "2px solid rgba(16,185,129,0.42)",
+            zIndex: 3,
+          }} />
+          {/* Gallo image — on top of all rings */}
+          <img
+            src={current.image}
+            alt=""
+            aria-hidden="true"
+            className="object-contain drop-shadow-lg"
+            style={{
+              position: "relative",
+              zIndex: 4,
+              height: isLast ? "11rem" : "9.5rem",
+              width: "auto",
+              animation: "_tour-content-in 280ms cubic-bezier(0.4,0,0.2,1) both",
+            }}
+          />
+        </div>
+      )}
     </>
   );
 }

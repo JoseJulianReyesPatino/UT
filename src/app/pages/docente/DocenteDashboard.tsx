@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import apiFetch from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
+import { useTourActive } from "../../context/TourContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -404,6 +405,42 @@ function AutoFadeBannerCarousel({
   );
 }
 
+const FAKE_STATS = [
+  {
+    title: "Documentos Pendientes",
+    value: "2",
+    description: "Pendientes de revisión",
+    icon: Clock,
+    action: "historial",
+    cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70",
+    accentClass: "from-slate-400/35 via-slate-300/20 to-transparent",
+  },
+  {
+    title: "Documentos Aprobados",
+    value: "5",
+    description: "Este cuatrimestre",
+    icon: CheckCircle2,
+    action: "historial",
+    cardClass: "bg-gradient-to-br from-emerald-50 via-white to-emerald-50/80 border-emerald-200/70 dark:from-emerald-950/20 dark:via-slate-950 dark:to-emerald-950/25 dark:border-emerald-800/60",
+    accentClass: "from-emerald-400/35 via-emerald-300/20 to-transparent",
+  },
+  {
+    title: "En Revisión",
+    value: "1",
+    description: "Actualmente en proceso",
+    icon: AlertCircle,
+    action: "historial",
+    cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70",
+    accentClass: "from-slate-400/35 via-slate-300/20 to-transparent",
+  },
+];
+
+const FAKE_RECENT_DOCS: DocumentItem[] = [
+  { id: 9801, nombre: "Planeación Didáctica — 1er Parcial", tipo: "Planeación Didáctica", fecha: "2026-07-10", status: "revisado" },
+  { id: 9802, nombre: "Instrumento 40% — Programación Web", tipo: "Instrumento 40%", fecha: "2026-07-08", status: "pendiente" },
+  { id: 9803, nombre: "Lista Concentrada — Cuatrimestre 2", tipo: "Lista Concentrada", fecha: "2026-07-05", status: "devuelto" },
+];
+
 // --- Componente del slider infinito de logos ---
 
 export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
@@ -411,6 +448,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const manualDocenteUrl = new URL("../../../assets/elementos/Manual de Usuario del Docente.pdf", import.meta.url).href;
 
   const { isReady, user } = useAuth();
+  const { isDocenteTourActive } = useTourActive();
 
   // --- Estado para el diálogo de vista previa ---
   const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
@@ -659,10 +697,10 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
         {/* Stats cards */}
         <div data-tour="docente-dashboard-stats" className="relative z-10 mt-3 grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {isLoadingStats ? (
+          {!isDocenteTourActive && isLoadingStats ? (
             <StatCardSkeleton />
           ) : (
-            stats.map((stat) => {
+            (isDocenteTourActive ? FAKE_STATS : stats).map((stat) => {
               const Icon = stat.icon;
               const handleClick = () => {
                 if (onNavigate && stat.action) onNavigate(stat.action);
@@ -711,15 +749,15 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             </CardHeader>
             <CardContent>
               <div className="max-h-[60vh] space-y-3 overflow-x-hidden overflow-y-auto pr-2 sm:max-h-[24rem]">
-                {isLoadingDocuments ? (
+                {(!isDocenteTourActive && isLoadingDocuments) ? (
                   <RecentDocsSkeleton />
-                ) : recentDocuments.length === 0 ? (
+                ) : (!isDocenteTourActive && recentDocuments.length === 0) ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600" />
                     <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">No tienes documentos enviados</p>
                   </div>
                 ) : (
-                  recentDocuments.map((doc) => {
+                  (isDocenteTourActive ? FAKE_RECENT_DOCS : recentDocuments).map((doc) => {
                     const s = (doc.status ?? '').toLowerCase();
                     let docStatusVariant: "success" | "warning" | "outline" | "destructive" = "warning";
                     let docStatusLabel = "Pendiente";

@@ -38,6 +38,11 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
   const method = (options.method ?? "GET").toUpperCase();
   const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
 
+  // DEBUG: Log token status for troubleshooting
+  if (process.env.NODE_ENV === "development" && !token && method !== "POST") {
+    console.warn(`[API] No token found for ${method} ${path}`);
+  }
+
   // FIXED: No establecer Content-Type automáticamente si es FormData
   const isFormData = options.body instanceof FormData;
 
@@ -54,6 +59,8 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+  } else if (method !== "GET" || path.includes("/auth/login")) {
+    // For protected endpoints without token, still attempt the request (middleware will handle auth check)
   }
 
   const candidateBases = path.startsWith("http")
@@ -87,11 +94,26 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
         err.baseUrl = base;
         if (errors) err.errors = errors;
 
+        // Enhanced logging for 401 errors
+        if (res.status === 401 && process.env.NODE_ENV === "development") {
+          const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+          console.error(`[401 Unauthenticated] ${method} ${path}`, {
+            hasToken: !!token,
+            tokenLength: token?.length ?? 0,
+            tokenPrefix: token?.substring(0, 20) ?? "none",
+            message,
+          });
+        }
+
         // Solo reintentar en 5xx si el método es GET/HEAD (idempotente).
         // POST/PUT/DELETE no se reintentan en 5xx porque el servidor pudo
         // haber procesado la mutación y responder con error de serialización,
         // lo que causaría duplicados en el siguiente intento.
-        if (!isLastCandidate && res.status >= 500 && (method === "GET" || method === "HEAD")) {
+        if (
+          !isLastCandidate &&
+          res.status >= 500 &&
+          (method === "GET" || method === "HEAD")
+        ) {
           lastError = err;
           continue;
         }
@@ -106,7 +128,7 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
       error.isOffline = error.isOffline || isOfflineNetwork;
 
       const isNetworkError = !error?.status;
-      
+
       if (!isLastCandidate && isNetworkError) {
         lastError = error;
         continue;

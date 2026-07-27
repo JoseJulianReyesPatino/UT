@@ -130,7 +130,10 @@ const toFetchHeaders = () => {
 
 // Fetch autenticado con deduplicación: si ya hay un request en vuelo para
 // la misma URL, reutiliza la Promise en lugar de abrir una segunda conexión.
-const fetchAvatarBlob = (absoluteUrl: string, effectiveUrl: string): Promise<string | undefined> => {
+const fetchAvatarBlob = (
+  absoluteUrl: string,
+  effectiveUrl: string,
+): Promise<string | undefined> => {
   const inFlight = inFlightFetches.get(effectiveUrl);
   if (inFlight) return inFlight;
 
@@ -213,6 +216,14 @@ export const useResolvedAvatarUrl = (
 
     // Para data URLs o blob URLs, usarlas directamente sin fetch
     if (url.startsWith("data:") || url.startsWith("blob:")) {
+      setResolvedUrl(url);
+      return;
+    }
+
+    // Para assets locales de Vite (/src/assets/ o /assets/), retornar directamente
+    // sin pasar por resolveApiAssetUrl ni fetch — son rutas del servidor de desarrollo,
+    // no de la API backend.
+    if (url.startsWith("/src/assets/") || url.startsWith("/assets/")) {
       setResolvedUrl(url);
       return;
     }

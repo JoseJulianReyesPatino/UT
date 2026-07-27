@@ -278,6 +278,50 @@ const TUTOR_TYPES: TutorDocumentType[] = [
 ];
 
 
+function TourFakeCicloCard({ isFirst }: { isFirst: boolean }) {
+  const fake = isFirst
+    ? { nombre: "Ciclo Enero–Junio 2026", anio: 2026, periodo: "Ene–Jun", fechaInicio: "13/ene/2026", fechaFin: "30/jun/2026", status: "activo" as const, docs: 48 }
+    : { nombre: "Ciclo Agosto–Diciembre 2025", anio: 2025, periodo: "Ago–Dic", fechaInicio: "11/ago/2025", fechaFin: "19/dic/2025", status: "cerrado" as const, docs: 132 };
+  return (
+    <Card className="overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm dark:border-emerald-900/30 dark:bg-slate-950/60">
+      {fake.status === "activo" && (
+        <div className="h-1 bg-gradient-to-r from-emerald-400/80 via-emerald-300/50 to-transparent" />
+      )}
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="break-words">{fake.nombre}</CardTitle>
+              <Badge variant={fake.status === "activo" ? "success" : "outline"} className="shrink-0">
+                {fake.status === "activo" ? "Activo" : "Cerrado"}
+              </Badge>
+            </div>
+            <CardDescription>{fake.fechaInicio} — {fake.fechaFin}</CardDescription>
+          </div>
+          <Calendar className="h-5 w-5 text-muted-foreground self-start" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-6 text-sm min-w-0">
+            <div><p className="text-muted-foreground">Año</p><p className="font-medium">{fake.anio}</p></div>
+            <div><p className="text-muted-foreground">Período</p><p className="font-medium">{fake.periodo}</p></div>
+            <div><p className="text-muted-foreground">Documentos</p><p className="font-medium">{fake.docs}</p></div>
+          </div>
+          <div data-tour={isFirst ? "admin-ciclos-actions" : undefined} className="flex flex-wrap gap-2 justify-start sm:justify-end pointer-events-none opacity-80">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background shadow-sm"><FileText className="h-4 w-4" /></span>
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background shadow-sm"><Pencil className="h-4 w-4" /></span>
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background shadow-sm"><Trash2 className="h-4 w-4" /></span>
+            {fake.status === "activo"
+              ? <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background shadow-sm"><X className="h-4 w-4" /></span>
+              : <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background shadow-sm"><Check className="h-4 w-4" /></span>}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function CiclosEscolares() {
   const { isAdminTourActive } = useTourActive();
   const [showNewDialog, setShowNewDialog] = useState(false);
@@ -1504,7 +1548,7 @@ export function CiclosEscolares() {
         </div>
       </div>
 
-      {isLoadingCycles ? (
+      {!isAdminTourActive && (isLoadingCycles ? (
         <CycleCardSkeleton />
       ) : cyclesLoadError ? (
         <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-8 text-center text-sm text-destructive">
@@ -1515,10 +1559,16 @@ export function CiclosEscolares() {
           <p className="font-medium">No hay ciclos escolares registrados</p>
           <p className="mt-1 text-sm">Crea el primer ciclo con el botón "Nuevo Ciclo".</p>
         </div>
-      ) : null}
+      ) : null)}
 
       <div data-tour="admin-ciclos-list" className="grid gap-4">
-        {!isLoadingCycles && !cyclesLoadError && ciclos.map((ciclo) => {
+        {isAdminTourActive && (
+          <>
+            <TourFakeCicloCard isFirst={true} />
+            <TourFakeCicloCard isFirst={false} />
+          </>
+        )}
+        {!isAdminTourActive && !isLoadingCycles && !cyclesLoadError && ciclos.map((ciclo) => {
           const documentsCount = cycleDocumentCount(ciclo);
 
           return (

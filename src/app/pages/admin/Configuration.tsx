@@ -19,7 +19,7 @@ import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { useTheme } from "../../context/ThemeContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, FileText, Grid2x2, Key, Layers, Loader2, Moon, PencilLine, Plus, Power, RefreshCw, Search, Shield, Sun, Trash2, Users, Settings2 } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, FileText, Grid2x2, Key, Layers, Loader2, Moon, PencilLine, Plus, Power, RefreshCw, Search, Shield, Sun, Trash2, Upload, Users, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { carrieras } from "../../data/curricula";
 import { clearAvatarCache, isImageUrl, useResolvedAvatarUrl } from "../../lib/avatar";
@@ -243,15 +243,16 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   }, [user?.avatar, avatarCacheBust]);
   const resolvedCurrentAvatar = useResolvedAvatarUrl(userAvatarPath);
 
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordStep, setPasswordStep] = useState<"request" | "verify">("request");
+  const [pwCode, setPwCode] = useState("");
+  const [pwNewPassword, setPwNewPassword] = useState("");
+  const [pwConfirmPassword, setPwConfirmPassword] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState("");
+  const [showPwNew, setShowPwNew] = useState(false);
+  const [showPwConfirm, setShowPwConfirm] = useState(false);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isBulkCreateOpen, setIsBulkCreateOpen] = useState(false);
@@ -898,6 +899,38 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     reader.readAsDataURL(file);
   };
 
+  // Un avatar real del servidor siempre llega como URL absoluta https://... desde la API.
+  // Los paths locales de Vite (defaultPerfilImg) no son avatares del servidor.
+  const hasServerAvatar = !!(user?.avatar && user.avatar.startsWith("http"));
+
+  const handleRemoveAvatar = useCallback(async () => {
+    setSelectedAvatarFile(null);
+    setProfileAvatar(undefined);
+    setSavedAvatarPreview(undefined);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    if (!hasServerAvatar) return;
+
+    try {
+      await apiFetch("/auth/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatar_url: null }),
+      });
+      clearAvatarCache();
+      const refreshedUser = await refreshUser();
+      if (refreshedUser) {
+        // No pasar avatar: undefined — refreshUser ya actualizó user.avatar
+        // al defaultPerfilImg a través de setUser en AuthContext.
+        updateProfile({ name: refreshedUser.name, firstNames: refreshedUser.firstNames, lastNames: refreshedUser.lastNames });
+      }
+      window.dispatchEvent(new CustomEvent("ut-avatar-updated", { detail: { userId: user?.id, avatarUrl: undefined } }));
+      toast.success("Foto de perfil eliminada");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "No fue posible quitar la foto");
+    }
+  }, [hasServerAvatar, user, refreshUser, updateProfile]);
+
   const handleSaveProfile = async () => {
     if (!user) {
       toast.error("No se pudo cargar el usuario actual");
@@ -1005,48 +1038,85 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     }
   };
 
-  const handleSavePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error("Completa todos los campos de contraseña");
-      return;
-    }
+  const resetPasswordDialog = () => {
+    setPasswordStep("request");
+    setPwCode("");
+    setPwNewPassword("");
+    setPwConfirmPassword("");
+    setPwLoading(false);
+    setPwError("");
+    setShowPwNew(false);
+    setShowPwConfirm(false);
+  };
 
-    const strength = getPasswordStrength(newPassword);
-    if (strength.score < 4) {
-      toast.error("La contraseña es demasiado débil. Usa mayúsculas, minúsculas, números y caracteres especiales");
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast.error("La confirmación no coincide");
-      return;
-    }
-
-    setIsSavingPassword(true);
-
+  const handleRequestPasswordCode = async () => {
+    if (!user?.email) return;
+    setPwError("");
+    setPwLoading(true);
     try {
-      await apiFetch("/auth/password", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+      await apiFetch("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email: user.email }),
+      });
+      setPasswordStep("verify");
+    } catch {
+      toast.error("No se pudo enviar el código. Inténtalo de nuevo.");
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const handleResendPasswordCode = async () => {
+    if (!user?.email) return;
+    setPwCode("");
+    setPwError("");
+    setPwLoading(true);
+    try {
+      await apiFetch("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email: user.email }),
+      });
+      toast.success("¡Código reenviado! Revisa tu bandeja de entrada.");
+    } catch {
+      toast.error("No se pudo reenviar el código. Inténtalo de nuevo.");
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const handleVerifyPasswordCode = async () => {
+    if (!user?.email) return;
+    setPwError("");
+    if (!pwCode.trim()) { setPwError("Ingresa el código de verificación."); return; }
+    if (pwNewPassword !== pwConfirmPassword) { setPwError("Las contraseñas no coinciden."); return; }
+    if (pwNewPassword.length < 8) { setPwError("La contraseña debe tener al menos 8 caracteres."); return; }
+    const strength = getPasswordStrength(pwNewPassword);
+    if (strength.score < 3) { setPwError("La contraseña es demasiado débil. Agrega mayúsculas, números o caracteres especiales."); return; }
+    setPwLoading(true);
+    try {
+      await apiFetch("/auth/reset-password", {
+        method: "POST",
         body: JSON.stringify({
-          current_password: currentPassword,
-          password: newPassword,
-          password_confirmation: confirmPassword,
+          email: user.email,
+          token: pwCode,
+          password: pwNewPassword,
+          password_confirmation: pwConfirmPassword,
         }),
       });
-
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setShowCurrentPassword(false);
-      setShowNewPassword(false);
-      setShowConfirmPassword(false);
       setIsPasswordOpen(false);
-      toast.success("Contraseña actualizada correctamente");
-    } catch (error: any) {
-      toast.error(error instanceof Error ? error.message : "No fue posible actualizar la contraseña");
+      resetPasswordDialog();
+      toast.success("¡Contraseña actualizada correctamente!", { duration: 5000 });
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; errors?: Record<string, string[]> };
+      if (apiErr?.status === 422) {
+        const apiErrors = apiErr?.errors?.token ?? apiErr?.errors?.password;
+        const msg = Array.isArray(apiErrors) ? apiErrors[0] : "Código incorrecto o expirado. Solicita uno nuevo.";
+        setPwError(msg);
+      } else {
+        toast.error("Ocurrió un error al cambiar la contraseña. Inténtalo de nuevo más tarde.");
+      }
     } finally {
-      setIsSavingPassword(false);
+      setPwLoading(false);
     }
   };
 
@@ -1161,31 +1231,53 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
               <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 p-4 sm:p-6 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
                 {/* Avatar - Mejorado para móvil */}
                 <div className="flex flex-col sm:flex-row gap-4 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 sm:p-4 sm:items-center dark:border-slate-800 dark:bg-slate-900/60">
-                  <Avatar className="h-16 w-16 sm:h-20 sm:w-20 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
+                  <Avatar className="h-16 w-16 sm:h-20 sm:w-20 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40 overflow-hidden">
                     <AvatarImage
                       src={selectedAvatarFile ? profileAvatar : (savedAvatarPreview ?? resolvedCurrentAvatar)}
                       alt={profileFirstNames || "Usuario"}
-                      className="cursor-pointer"
+                      className="cursor-pointer object-cover"
                       onClick={() => setIsAvatarOpen(true)}
                     />
                     <AvatarFallback
-                      className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-base sm:text-xl cursor-pointer"
+                      className="p-0 overflow-hidden cursor-pointer"
                       onClick={() => setIsAvatarOpen(true)}
                     >
-                      {(profileFirstNames || profileLastNames || user?.name || "U").split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      <img src={defaultAvatar} alt="Avatar por defecto" className="h-full w-full object-cover" />
                     </AvatarFallback>
                   </Avatar>
-                  <div className="space-y-2 flex-1">
-                    <Label htmlFor="avatar" className="text-sm">Foto de perfil</Label>
-                    <Input 
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Cambiar foto
+                      </Button>
+                      {(selectedAvatarFile || hasServerAvatar) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          onClick={handleRemoveAvatar}
+                          className="rounded-2xl dark:hover:bg-slate-800 dark:text-slate-300"
+                        >
+                          Quitar foto
+                        </Button>
+                      )}
+                    </div>
+                    <Input
                       ref={fileInputRef}
-                      id="avatar" 
-                      type="file" 
-                      accept="image/png,image/jpeg,image/webp" 
+                      id="avatar"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
                       onChange={handleAvatarChange}
-                      className="text-sm" 
+                      className="hidden"
                     />
-                    <p className="text-xs text-muted-foreground">Formatos: PNG/JPG/WEBP. Tamaño máximo: 4MB.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Formatos: PNG/JPG/WEBP. Tamaño máximo: 4MB.</p>
                   </div>
                 </div>
 
@@ -1209,131 +1301,137 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
                 <Dialog
                   open={isPasswordOpen}
-                  onOpenChange={(open) => {
-                    setIsPasswordOpen(open);
-                    if (!open) {
-                      setCurrentPassword("");
-                      setNewPassword("");
-                      setConfirmPassword("");
-                      setShowCurrentPassword(false);
-                      setShowNewPassword(false);
-                      setShowConfirmPassword(false);
-                    }
-                  }}
+                  onOpenChange={(open) => { setIsPasswordOpen(open); if (!open) resetPasswordDialog(); }}
                 >
                   <DialogContent className="max-w-[95vw] sm:max-w-md">
                     <DialogHeader>
                       <DialogTitle>Cambiar contraseña</DialogTitle>
-                      <DialogDescription>Actualiza tu contraseña de acceso al sistema.</DialogDescription>
+                      <DialogDescription>
+                        {passwordStep === "request"
+                          ? "Te enviaremos un código de verificación a tu correo registrado."
+                          : "Ingresa el código que recibiste y establece tu nueva contraseña."}
+                      </DialogDescription>
                     </DialogHeader>
-                    <div className="mt-2 space-y-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm">Contraseña actual</Label>
-                        <div className="relative">
-                          <Input
-                            type={showCurrentPassword ? "text" : "password"}
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                            placeholder="Ingresa tu contraseña actual"
-                            autoComplete="new-password"
-                            className="pr-10 text-sm"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                            onClick={() => setShowCurrentPassword((v) => !v)}
-                            aria-label={showCurrentPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                          >
-                            {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm">Nueva contraseña</Label>
-                        <div className="relative">
-                          <Input
-                            type={showNewPassword ? "text" : "password"}
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            placeholder="Ingresa la nueva contraseña"
-                            className="pr-10 text-sm"
-                            autoComplete="new-password"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                            onClick={() => setShowNewPassword((v) => !v)}
-                            aria-label={showNewPassword ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
-                          >
-                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                        {newPassword.length > 0 && (() => {
-                          const strength = getPasswordStrength(newPassword);
-                          return (
-                            <div className="space-y-1.5">
-                              <div className="flex gap-1">
-                                {[1, 2, 3, 4, 5].map((step) => (
-                                  <div
-                                    key={step}
-                                    className={`h-1.5 flex-1 rounded-full transition-colors ${step <= strength.score ? strength.color : "bg-muted"}`}
-                                  />
-                                ))}
-                              </div>
-                              <p className={`text-xs font-medium ${strength.score < 4 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                                {strength.label}
-                                {strength.score < 4 && " — usa mayúsculas, minúsculas, números y caracteres especiales"}
-                              </p>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm">Confirmar contraseña</Label>
-                        <div className="relative">
-                          <Input
-                            type={showConfirmPassword ? "text" : "password"}
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            placeholder="Repite la nueva contraseña"
-                            className="pr-10 text-sm"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                            onClick={() => setShowConfirmPassword((v) => !v)}
-                            aria-label={showConfirmPassword ? "Ocultar confirmación" : "Mostrar confirmación"}
-                          >
-                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      </div>
+
+                    {/* Indicador de pasos */}
+                    <div className="flex items-center gap-2 mt-1">
+                      {(["request", "verify"] as const).map((step, i) => (
+                        <React.Fragment key={step}>
+                          <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${passwordStep === step ? "bg-emerald-500 text-white" : i < (passwordStep === "verify" ? 1 : 0) ? "bg-emerald-200 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                            {i + 1}
+                          </div>
+                          {i < 1 && <div className={`h-px flex-1 transition-colors ${passwordStep === "verify" ? "bg-emerald-400" : "bg-border"}`} />}
+                        </React.Fragment>
+                      ))}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        {passwordStep === "request" ? "Enviar código" : "Verificar y cambiar"}
+                      </span>
                     </div>
+
+                    <div className="mt-1 space-y-4">
+                      {passwordStep === "request" ? (
+                        <>
+                          <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 flex items-center gap-3">
+                            <Key className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-xs text-muted-foreground">Correo registrado</p>
+                              <p className="text-sm font-medium truncate">{user?.email}</p>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Se enviará un código de 6 dígitos a ese correo. El código expira en 30 minutos.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Código de verificación</Label>
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={6}
+                              value={pwCode}
+                              onChange={(e) => setPwCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                              placeholder="• • • • • •"
+                              className="text-center text-2xl font-mono tracking-[0.5em]"
+                              autoComplete="one-time-code"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Nueva contraseña</Label>
+                            <div className="relative">
+                              <Input
+                                type={showPwNew ? "text" : "password"}
+                                value={pwNewPassword}
+                                onChange={(e) => setPwNewPassword(e.target.value)}
+                                placeholder="Mínimo 8 caracteres"
+                                className="pr-10 text-sm"
+                                autoComplete="new-password"
+                              />
+                              <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwNew((v) => !v)} aria-label={showPwNew ? "Ocultar" : "Mostrar"}>
+                                {showPwNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                            {pwNewPassword.length > 0 && (() => {
+                              const strength = getPasswordStrength(pwNewPassword);
+                              return (
+                                <div className="space-y-1.5">
+                                  <div className="flex gap-1">
+                                    {[1, 2, 3, 4, 5].map((s) => (
+                                      <div key={s} className={`h-1.5 flex-1 rounded-full transition-colors ${s <= strength.score ? strength.color : "bg-muted"}`} />
+                                    ))}
+                                  </div>
+                                  <p className={`text-xs font-medium ${strength.score < 4 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                    {strength.label}{strength.score < 4 && " — usa mayúsculas, minúsculas, números y símbolos"}
+                                  </p>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Confirmar contraseña</Label>
+                            <div className="relative">
+                              <Input
+                                type={showPwConfirm ? "text" : "password"}
+                                value={pwConfirmPassword}
+                                onChange={(e) => setPwConfirmPassword(e.target.value)}
+                                placeholder="Repite la nueva contraseña"
+                                className="pr-10 text-sm"
+                                autoComplete="new-password"
+                              />
+                              <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwConfirm((v) => !v)} aria-label={showPwConfirm ? "Ocultar" : "Mostrar"}>
+                                {showPwConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          {pwError && (
+                            <p className="text-xs text-destructive font-medium">{pwError}</p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleResendPasswordCode}
+                            disabled={pwLoading}
+                            className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline disabled:opacity-50"
+                          >
+                            ¿No recibiste el código? Reenviar
+                          </button>
+                        </>
+                      )}
+                    </div>
+
                     <DialogFooter className="mt-2 flex-col sm:flex-row gap-2">
-                      <Button
-                        variant="outline"
-                        type="button"
-                        onClick={() => setIsPasswordOpen(false)}
-                        disabled={isSavingPassword}
-                        className="w-full sm:w-auto text-sm"
-                      >
+                      <Button variant="outline" type="button" onClick={() => setIsPasswordOpen(false)} disabled={pwLoading} className="w-full sm:w-auto text-sm">
                         Cancelar
                       </Button>
-                      <Button
-                        type="button"
-                        variant="success"
-                        onClick={handleSavePassword}
-                        disabled={isSavingPassword}
-                        className="w-full sm:w-auto text-sm"
-                      >
-                        {isSavingPassword ? "Guardando..." : "Actualizar contraseña"}
-                      </Button>
+                      {passwordStep === "request" ? (
+                        <Button type="button" variant="success" onClick={handleRequestPasswordCode} disabled={pwLoading} className="w-full sm:w-auto text-sm">
+                          {pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Enviando...</> : "Enviar código"}
+                        </Button>
+                      ) : (
+                        <Button type="button" variant="success" onClick={handleVerifyPasswordCode} disabled={pwLoading} className="w-full sm:w-auto text-sm">
+                          {pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verificando...</> : "Confirmar"}
+                        </Button>
+                      )}
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>

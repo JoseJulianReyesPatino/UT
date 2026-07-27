@@ -930,11 +930,11 @@ export default function Estadias() {
             </CardHeader>
             <CardContent className="overflow-x-hidden">
               <div className="min-w-0 space-y-3">
-                {isLoading ? <DocumentCardSkeleton /> : null}
-                {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
-                {!isLoading && !loadError && filteredPendienteOnly.length === 0 ? (
-                  <EmptyState text={emptyStateLegend} />
-                ) : !isLoading && !loadError && groupDocsByBatch(filteredPendienteOnly).map((group) => {
+                {isAdminTourActive && (<><TourFakeEstadiasRow isFirst={true} /><TourFakeEstadiasRow isFirst={false} /></>)}
+                {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
+                {!isAdminTourActive && !isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
+                {!isAdminTourActive && !isLoading && !loadError && filteredPendienteOnly.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && !loadError && groupDocsByBatch(filteredPendienteOnly).map((group) => {
                   const renderRow = (doc: EstadiaPendingDocument) => {
                   const isReturned = Boolean(doc.returned);
                   return (
@@ -1033,11 +1033,11 @@ export default function Estadias() {
             <CardHeader className="pb-4">{filtersBar}</CardHeader>
             <CardContent className="overflow-x-hidden">
               <div className="min-w-0 space-y-3">
-                {isLoading ? <DocumentCardSkeleton /> : null}
-                {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
-                {!isLoading && !loadError && filteredDevueltos.length === 0 ? (
-                  <EmptyState text="No hay documentos devueltos." />
-                ) : !isLoading && !loadError && groupDocsByBatch(filteredDevueltos).map((group) => {
+                {isAdminTourActive && (<><TourFakeEstadiasRow isFirst={true} /><TourFakeEstadiasRow isFirst={false} /></>)}
+                {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
+                {!isAdminTourActive && !isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
+                {!isAdminTourActive && !isLoading && !loadError && filteredDevueltos.length === 0 && <EmptyState text="No hay documentos devueltos." />}
+                {!isAdminTourActive && !isLoading && !loadError && groupDocsByBatch(filteredDevueltos).map((group) => {
                   const renderRow = (doc: EstadiaDocumentItem) => (
                   <div key={doc.id} className={getDocumentRowClassName(true)}>
                     <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
@@ -1088,11 +1088,11 @@ export default function Estadias() {
             <CardHeader className="pb-4">{filtersBar}</CardHeader>
             <CardContent className="overflow-x-hidden">
               <div className="min-w-0 space-y-3">
-                {isLoading ? <DocumentCardSkeleton /> : null}
-                {!isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
-                {!isLoading && !loadError && filteredReenviados.length === 0 ? (
-                  <EmptyState text="No hay documentos reenviados." />
-                ) : !isLoading && !loadError && groupDocsByBatch(filteredReenviados).map((group) => {
+                {isAdminTourActive && (<><TourFakeEstadiasRow isFirst={true} /><TourFakeEstadiasRow isFirst={false} /></>)}
+                {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
+                {!isAdminTourActive && !isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
+                {!isAdminTourActive && !isLoading && !loadError && filteredReenviados.length === 0 && <EmptyState text="No hay documentos reenviados." />}
+                {!isAdminTourActive && !isLoading && !loadError && groupDocsByBatch(filteredReenviados).map((group) => {
                   const renderRow = (doc: EstadiaPendingDocument) => (
                   <div key={doc.id} className={getDocumentRowClassName(false)}>
                     <button type="button" aria-label={`Abrir vista previa de ${doc.documento}`} onClick={() => setPreviewDocument(doc)} className={previewCardOverlayClassName} />
@@ -1146,7 +1146,9 @@ export default function Estadias() {
               {filtersBar}
             </CardHeader>
             <CardContent className="overflow-x-hidden">
-              {Object.entries(reviewedByDate).filter(([date]) => date).length === 0 ? (
+              {isAdminTourActive ? (
+                <div className="min-w-0 space-y-3"><TourFakeEstadiasRow isFirst={true} /><TourFakeEstadiasRow isFirst={false} /></div>
+              ) : Object.entries(reviewedByDate).filter(([date]) => date).length === 0 ? (
                 <EmptyState text={emptyStateLegend} />
               ) : (
                 <div className="min-w-0 space-y-6">
@@ -1246,10 +1248,10 @@ export default function Estadias() {
             </CardHeader>
             <CardContent className="overflow-x-hidden">
               <div className="min-w-0 space-y-3">
-                {isLoading ? <DocumentCardSkeleton /> : reviewedToday.length === 0 ? (
-                  <EmptyState text={emptyStateLegend} />
-                ) : (
-                  groupDocsByBatch(reviewedToday).map((group) => {
+                {isAdminTourActive && (<><TourFakeEstadiasRow isFirst={true} /><TourFakeEstadiasRow isFirst={false} /></>)}
+                {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
+                {!isAdminTourActive && !isLoading && reviewedToday.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && reviewedToday.length > 0 && groupDocsByBatch(reviewedToday).map((group) => {
                     const renderTodayRow = (doc: EstadiaDocumentItem) => {
                     const isReturned = Boolean(doc.returned);
                     return (
@@ -1314,8 +1316,7 @@ export default function Estadias() {
                         <div className="divide-y divide-border/50 dark:divide-slate-800/50">{group.map(renderTodayRow)}</div>
                       </div>
                     );
-                  })
-              )}
+                  })}
               </div>
             </CardContent>
           </Card>

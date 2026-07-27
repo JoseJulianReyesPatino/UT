@@ -42,6 +42,7 @@ import { toast } from "sonner";
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "./components/ui/alert-dialog";
 import {
   Menu,
   Sun,
@@ -95,6 +96,7 @@ function AppContent() {
   const [isAdminTourOpen, setIsAdminTourOpen] = useState(false);
   const isDocente = !isAdmin && !isSupervisor;
   const [isDocenteTourOpen, setIsDocenteTourOpen] = useState(false);
+  const [showTourConfirm, setShowTourConfirm] = useState<"admin" | "docente" | null>(null);
   const noticeBanner = notice ? (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4 sm:top-6">
       <Alert
@@ -599,7 +601,7 @@ function AppContent() {
       )}
 
       {isReady && isAuthenticated && (
-        <TourContext.Provider value={{ isAdminTourActive: isAdminTourOpen }}>
+        <TourContext.Provider value={{ isAdminTourActive: isAdminTourOpen, isDocenteTourActive: isDocenteTourOpen }}>
         <div
           className={`fixed inset-0 overflow-hidden${isSplashExiting ? " z-[9999] tv-iris-reveal" : " z-0"}`}
           style={{
@@ -761,12 +763,12 @@ function AppContent() {
               </div>
             </main>
 
-            {isAdmin && (
+            {isAdmin && !isAdminTourOpen && (
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => setIsAdminTourOpen(true)}
+                onClick={() => setShowTourConfirm("admin")}
                 aria-label="Iniciar tutorial del sistema"
                 title="Iniciar tutorial del sistema"
                 className="fixed bottom-16 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900"
@@ -775,12 +777,12 @@ function AppContent() {
               </Button>
             )}
 
-            {isDocente && (
+            {isDocente && !isDocenteTourOpen && (
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => setIsDocenteTourOpen(true)}
+                onClick={() => setShowTourConfirm("docente")}
                 aria-label="Iniciar tutorial del sistema"
                 title="Iniciar tutorial del sistema"
                 className="fixed bottom-16 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900"
@@ -788,6 +790,29 @@ function AppContent() {
                 <HelpCircle className="h-4 w-4" />
               </Button>
             )}
+
+            <AlertDialog open={showTourConfirm !== null} onOpenChange={(open) => { if (!open) setShowTourConfirm(null); }}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Iniciar el tutorial?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Se iniciará la guía interactiva del sistema. Te llevará paso a paso por cada sección principal.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      if (showTourConfirm === "admin") setIsAdminTourOpen(true);
+                      else if (showTourConfirm === "docente") setIsDocenteTourOpen(true);
+                      setShowTourConfirm(null);
+                    }}
+                  >
+                    Sí, iniciar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             <Button
               type="button"
@@ -809,6 +834,7 @@ function AppContent() {
                 isOpen={isAdminTourOpen}
                 onClose={() => setIsAdminTourOpen(false)}
                 onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+                onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
                 onNavigate={(view) => {
                   const [mainView, subParam] = view.split(":");
                   setCurrentView(mainView);
@@ -831,6 +857,7 @@ function AppContent() {
                 isOpen={isDocenteTourOpen}
                 onClose={() => setIsDocenteTourOpen(false)}
                 onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+                onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
                 onNavigate={(view) => {
                   const [mainView, subParam] = view.split(":");
                   setCurrentView(mainView);

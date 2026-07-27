@@ -18,6 +18,13 @@ import {
   FileText,
 } from "lucide-react";
 import { type TourStep } from "../components/tour/TourOverlay";
+import galloApuntarDerecha from "../../assets/gallos_tour/gallo_apuntar_derecha.png";
+import galloApuntarIzquierda from "../../assets/gallos_tour/gallo_apuntar_izquierda.png";
+import galloApuntarArriba from "../../assets/gallos_tour/gallo_apuntar_arriba.png";
+import galloExplicacion from "../../assets/gallos_tour/gallo_explicacion.png";
+import galloExplicacion2 from "../../assets/gallos_tour/gallo_explicacion_2.png";
+import galloGracias from "../../assets/gallos_tour/gallo_gracias.png";
+import galloCafe from "../../assets/gallos_tour/gallo_cafe.png";
 
 function Ic({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
@@ -37,6 +44,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Este es tu menú de navegación. Desde aquí accedes a todos los formularios y secciones del sistema. Te daremos un recorrido completo para que conozcas cada apartado y cómo usarlo.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "docente-dashboard-stats",
@@ -45,6 +53,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Estas tres tarjetas te muestran el estado general de tus documentos: cuántos tienes pendientes de revisión, cuántos ya fueron aprobados y cuántos fueron devueltos con comentarios. Haz clic en cualquiera para ir directamente a tu historial filtrado por ese estado.",
     placement: "bottom",
+    image: galloExplicacion,
   },
   {
     target: "docente-dashboard-recent",
@@ -59,6 +68,7 @@ const allDocenteSteps: TourStep[] = [
       </>
     ),
     placement: "top",
+    image: galloExplicacion2,
   },
   {
     target: "docente-dashboard-upcoming",
@@ -67,6 +77,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "El sistema calcula automáticamente cuánto tiempo falta para que venza cada formulario activo. Los más urgentes aparecen primero. Cuando un formulario no tiene fecha límite el administrador lo mantiene abierto indefinidamente.",
     placement: "top",
+    image: galloExplicacion,
   },
   {
     target: "docente-dashboard-carreras",
@@ -75,6 +86,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Panel informativo que muestra los logotipos de las carreras que ofrece la universidad. Cambia de imagen instantáneamente al alternar entre modo claro y oscuro.",
     placement: "top",
+    image: galloCafe,
   },
 
   // ── PLANEACIÓN ───────────────────────────────────────────────────────────────
@@ -85,6 +97,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Aquí subes tu planeación de clase en formato PDF. La fecha recomendada de entrega es 3 días después de la aplicación de cada parcial. El formulario solo acepta archivos PDF de hasta 15 MB.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "docente-history-btn",
@@ -96,6 +109,7 @@ const allDocenteSteps: TourStep[] = [
       </>
     ),
     placement: "bottom",
+    image: galloApuntarArriba,
   },
   {
     target: "docente-historial-panel",
@@ -110,6 +124,7 @@ const allDocenteSteps: TourStep[] = [
       </>
     ),
     placement: "left",
+    image: galloApuntarIzquierda,
   },
 
   // ── PLANEACIÓN — FORMULARIO ───────────────────────────────────────────────
@@ -120,6 +135,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Lo primero que debes elegir es el plan al que pertenece tu grupo. «Plan Nuevo Modelo» aplica para programas TSU e Ingeniería del nuevo currículo. «Plan Normal» aplica para las Ingenierías del plan anterior. Esta selección determina qué carreras y cuatrimestres estarán disponibles en los campos siguientes.",
     placement: "bottom",
+    image: galloExplicacion2,
   },
   {
     target: "docente-form-fields",
@@ -128,6 +144,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Completa los cinco campos en orden: Carrera (se habilita al elegir el plan), Cuatrimestre (se habilita al elegir la carrera), Materia (se habilita al elegir el cuatrimestre), Parcial (Primero, Segundo o Tercero) y Grupo (los grupos disponibles los crea el administrador). Cada campo depende del anterior, así que ve llenándolos de arriba hacia abajo.",
     placement: "top",
+    image: galloExplicacion,
   },
   {
     target: "docente-form-upload",
@@ -139,6 +156,7 @@ const allDocenteSteps: TourStep[] = [
       </>
     ),
     placement: "top",
+    image: galloExplicacion2,
   },
   {
     target: "docente-form-nota",
@@ -147,6 +165,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Campo opcional donde puedes escribirle un mensaje al administrador relacionado con este envío. Por ejemplo, si reenvías después de una corrección puedes explicar qué cambios hiciste. El administrador verá esta nota al revisar tu documento.",
     placement: "top",
+    image: galloExplicacion,
   },
   {
     target: "docente-form-submit",
@@ -158,6 +177,7 @@ const allDocenteSteps: TourStep[] = [
       </>
     ),
     placement: "top",
+    image: galloApuntarArriba,
   },
 
   // ── INSTRUMENTO 30/40 ────────────────────────────────────────────────────────
@@ -168,6 +188,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Aquí subes el instrumento de evaluación que vale el 30% de la calificación del parcial, correspondiente al Plan Normal (Ingenierías). El proceso es idéntico al de Planeación: elige el plan, carrera, cuatrimestre, materia, parcial y grupo, adjunta el PDF y envía. También tienes disponible el botón Historial para revisar tus envíos anteriores.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "nav-instrumento-40-nuevo",
@@ -176,6 +197,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Instrumento de evaluación con ponderación del 40% para el Plan Nuevo Modelo (TSU e Ingeniería). Funciona igual que el formulario de Planeación. Recuerda que el formulario solo estará disponible durante el período que configure el administrador.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
 
   // ── INSTRUMENTO 60/70 ────────────────────────────────────────────────────────
@@ -186,6 +208,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Instrumento de evaluación del 60% para el Plan Nuevo Modelo. Se sube cuando el administrador habilite el acceso para este período. El historial de este formulario es independiente del resto de instrumentos.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "nav-instrumento-70-normal",
@@ -194,6 +217,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Instrumento de evaluación del 70% para el Plan Normal (Ingenierías). Mismo proceso de carga de PDF con los mismos campos de datos académicos. Puedes consultar envíos anteriores desde el botón Historial.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
 
   // ── REMEDIAL ─────────────────────────────────────────────────────────────────
@@ -204,6 +228,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Aquí subes el instrumento de evaluación del examen remedial de tus alumnos. Este formulario tiene su propio historial independiente. Solo está disponible cuando el administrador lo habilite para el período de exámenes remediales del cuatrimestre.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
 
   // ── LISTA CONCENTRADA ─────────────────────────────────────────────────────────
@@ -214,6 +239,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Aquí entregas la lista concentrada de calificaciones de tu grupo. Es el documento oficial con el resumen de notas por parcial. Se llena al término de cada parcial y se sube en PDF. El historial guarda todos tus envíos anteriores de este formulario.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
 
   // ── ASESORÍA ──────────────────────────────────────────────────────────────────
@@ -224,6 +250,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "En esta sección registras las asesorías académicas que brindas a tus alumnos fuera del horario de clase. Sube el documento en PDF con la evidencia: lista de asistencia, temas tratados y firmas de los alumnos. Puedes subir hasta 3 archivos por entrega.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
 
   // ── PORTAFOLIO ────────────────────────────────────────────────────────────────
@@ -234,6 +261,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "El portafolio digital es el compendio de evidencias de tu práctica docente al cierre del cuatrimestre. Incluye tus instrumentos de evaluación, listas de asistencia, planeaciones y demás documentos probatorios. Sube el archivo PDF cuando el administrador habilite el acceso al finalizar el cuatrimestre.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
 
   // ── ACTA FINAL ────────────────────────────────────────────────────────────────
@@ -244,6 +272,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Envía aquí el acta oficial de calificaciones finales del cuatrimestre. Este documento debe haberse capturado previamente en el sistema institucional. El PDF que subas debe incluir la firma del docente y el sello correspondiente.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
 
   // ── ESTADÍAS ─────────────────────────────────────────────────────────────────
@@ -254,6 +283,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Si eres asesor de estadías, en esta sección gestionas toda la documentación del proceso: carta de presentación del alumno, carta de aceptación de la empresa, reportes de seguimiento y documentos de cierre. Cada tipo de documento tiene su propio apartado dentro del formulario.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
 
   // ── TUTORÍAS ──────────────────────────────────────────────────────────────────
@@ -264,6 +294,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Esta sección aparece únicamente si tu cuenta tiene el rol de tutor asignado. Aquí subes los documentos de tutoría del cuatrimestre: carga académica, bajas, concentrados de asistencia, actas de tutoría y demás reportes que solicite la coordinación.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
 
   // ── MENSAJES ─────────────────────────────────────────────────────────────────
@@ -274,6 +305,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Sistema de comunicación directa con el administrador. Recibirás notificaciones aquí cuando el administrador devuelva un documento con comentarios o cuando necesite aclaraciones sobre algún envío. El ícono de mensajes en el menú muestra una burbuja roja cuando tienes mensajes sin leer.",
     placement: "right",
+    image: galloCafe,
   },
   {
     target: "docente-messages-search",
@@ -282,6 +314,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Como docente o tutor, tu único contacto dentro del sistema es el Administrador. Usa este campo para localizar cualquier mensaje específico dentro de esa conversación: escribe una palabra o frase y el chat filtra los resultados en tiempo real.",
     placement: "right",
+    image: galloApuntarIzquierda,
   },
   {
     target: "docente-messages-composer",
@@ -293,6 +326,7 @@ const allDocenteSteps: TourStep[] = [
       </>
     ),
     placement: "top",
+    image: galloExplicacion,
   },
 
   // ── HISTORIAL ────────────────────────────────────────────────────────────────
@@ -310,6 +344,7 @@ const allDocenteSteps: TourStep[] = [
       </>
     ),
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "historial-filters",
@@ -335,6 +370,7 @@ const allDocenteSteps: TourStep[] = [
       </>
     ),
     placement: "bottom",
+    image: galloExplicacion2,
   },
   {
     target: "historial-list",
@@ -370,6 +406,7 @@ const allDocenteSteps: TourStep[] = [
       </>
     ),
     placement: "top",
+    image: galloExplicacion,
   },
 
   // ── MI PERFIL ─────────────────────────────────────────────────────────────────
@@ -380,6 +417,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Aquí gestionas toda la información de tu cuenta: foto de perfil, nombre, y contraseña de acceso. También puedes ver las estadísticas de tu actividad en el sistema.",
     placement: "right",
+    image: galloApuntarDerecha,
   },
   {
     target: "perfil-info-card",
@@ -391,6 +429,7 @@ const allDocenteSteps: TourStep[] = [
       </>
     ),
     placement: "right",
+    image: galloExplicacion,
   },
   {
     target: "perfil-account-card",
@@ -399,6 +438,7 @@ const allDocenteSteps: TourStep[] = [
     content:
       "Muestra la fecha en que tu cuenta fue creada en el sistema. Este dato es de solo lectura y lo asigna el administrador al registrarte.",
     placement: "left",
+    image: galloApuntarIzquierda,
   },
   {
     target: "perfil-security-card",
@@ -410,6 +450,7 @@ const allDocenteSteps: TourStep[] = [
       </>
     ),
     placement: "left",
+    image: galloApuntarIzquierda,
   },
   {
     target: "perfil-stats-card",
@@ -417,10 +458,16 @@ const allDocenteSteps: TourStep[] = [
     title: "Estadísticas de actividad — ¡listo!",
     content: (
       <>
-        Resumen de tu actividad en el sistema: total de documentos enviados, cuántos han sido revisados y aprobados, cuántos siguen en revisión y cuántos fueron devueltos. Ya conoces todas las secciones del sistema. Puedes repetir este tutorial en cualquier momento usando el botón <Ic icon={HelpCircle} label="Tutorial" /> que aparece en la esquina inferior derecha de la pantalla.
+        Resumen de tu actividad en el sistema: total de documentos enviados, cuántos han sido revisados y aprobados, cuántos siguen en revisión y cuántos fueron devueltos. Ya conoces todas las secciones del sistema. Puedes repetir este tutorial usando el botón{" "}
+        <HelpCircle className="inline h-3.5 w-3.5 align-middle text-emerald-500" />{" "}
+        en la esquina inferior derecha.
+        <p className="mt-2 font-medium text-emerald-600 dark:text-emerald-400">
+          ¡Gracias por completar la guía! Esperamos que el sistema sea de gran ayuda. ¡Que tengas un excelente día!
+        </p>
       </>
     ),
     placement: "top",
+    image: galloGracias,
   },
 ];
 
