@@ -133,7 +133,9 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
         lastError = error;
         continue;
       }
-      console.error("API Fetch Error:", error);
+      if (!error?.status || error.status >= 500) {
+        console.error("API Fetch Error:", error);
+      }
       throw error;
     }
   }

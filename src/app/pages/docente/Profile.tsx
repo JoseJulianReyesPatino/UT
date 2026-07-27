@@ -9,7 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { resolveApiAssetUrl } from "../../lib/env";
 import { clearAvatarCache, getInitials, useResolvedAvatarUrl } from "../../lib/avatar";
-import { Calendar, Eye, EyeOff, Key, Loader2, Upload } from "lucide-react";
+import { Calendar, Check, Eye, EyeOff, Key, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import defaultPerfilImg from "../../../assets/elementos/perfil2.webp";
 
@@ -24,13 +24,15 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
   const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
-  const [passwordStep, setPasswordStep] = useState<"request" | "verify">("request");
-  const [pwCode, setPwCode] = useState("");
+  const [passwordStep, setPasswordStep] = useState<"current" | "new" | "confirm">("current");
+  const [pwCurrentPassword, setPwCurrentPassword] = useState("");
   const [pwNewPassword, setPwNewPassword] = useState("");
   const [pwConfirmPassword, setPwConfirmPassword] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
   const [pwError, setPwError] = useState("");
+  const [showPwCurrent, setShowPwCurrent] = useState(false);
   const [showPwNew, setShowPwNew] = useState(false);
   const [showPwConfirm, setShowPwConfirm] = useState(false);
   const [profileStats, setProfileStats] = useState({
@@ -48,15 +50,18 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
     setAvatarPreview(user.avatar && user.avatar !== "/api/default-avatar" ? user.avatar : defaultProfileAvatar);
   }, [user]);
 
+  const isDirty = useMemo(() =>
+    firstName !== (user?.firstNames ?? "") ||
+    lastName !== (user?.lastNames ?? "") ||
+    selectedAvatarFile !== null,
+    [firstName, lastName, selectedAvatarFile, user]
+  );
+
   useEffect(() => {
     if (!onDirtyChange || !user) return;
-    const dirty =
-      firstName !== (user.firstNames ?? "") ||
-      lastName !== (user.lastNames ?? "") ||
-      selectedAvatarFile !== null;
-    onDirtyChange(dirty);
+    onDirtyChange(isDirty);
     return () => onDirtyChange(false);
-  }, [firstName, lastName, selectedAvatarFile, user, onDirtyChange]);
+  }, [isDirty, user, onDirtyChange]);
 
   useEffect(() => {
     if (!user) return;
@@ -126,8 +131,7 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
   }, []);
 
   const handleRemoveAvatar = useCallback(async () => {
-    // Un avatar real del servidor siempre llega como URL absoluta https://...
-    // Los paths locales de Vite (defaultPerfilImg) no son avatares del servidor.
+    if (isRemovingAvatar) return;
     const hadServerAvatar = !!(user?.avatar && user.avatar.startsWith("http"));
 
     setSelectedAvatarFile(null);
@@ -138,10 +142,10 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
     }
 
     if (!hadServerAvatar) {
-      // No hay avatar de servidor — solo limpiar estado local, no tocar user.avatar
       return;
     }
 
+    setIsRemovingAvatar(true);
     try {
       await apiFetch("/auth/profile", {
         method: "PATCH",
@@ -152,26 +156,26 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
       clearAvatarCache();
 
       const refreshedUser = await refreshUser();
-      
+
       if (refreshedUser) {
-        // No pasar avatar: undefined — refreshUser ya actualizó user.avatar
-        // al defaultPerfilImg a través de setUser en AuthContext.
-        updateProfile({ 
+        updateProfile({
           name: refreshedUser.name,
           firstNames: refreshedUser.firstNames,
           lastNames: refreshedUser.lastNames,
         });
       }
 
-      window.dispatchEvent(new CustomEvent('ut-avatar-updated', { 
-        detail: { userId: user?.id, avatarUrl: undefined } 
+      window.dispatchEvent(new CustomEvent('ut-avatar-updated', {
+        detail: { userId: user?.id, avatarUrl: undefined }
       }));
 
       toast.success("Foto de perfil eliminada");
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "No fue posible quitar la foto");
+    } finally {
+      setIsRemovingAvatar(false);
     }
-  }, [user, refreshUser, updateProfile]);
+  }, [isRemovingAvatar, user, refreshUser, updateProfile]);
 
   const handleSaveChanges = useCallback(async () => {
     if (!user) return;
@@ -262,65 +266,76 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
     }
   };
 
+  const getPasswordStrength = (password: string) => {
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[a-z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+    if (score <= 2) return { score, label: "Débil", color: "bg-red-500" };
+    if (score === 3) return { score, label: "Media", color: "bg-yellow-500" };
+    if (score === 4) return { score, label: "Fuerte", color: "bg-emerald-500" };
+    return { score, label: "Muy fuerte", color: "bg-emerald-600" };
+  };
+
   const resetPasswordDialog = () => {
-    setPasswordStep("request");
-    setPwCode("");
+    setPasswordStep("current");
+    setPwCurrentPassword("");
     setPwNewPassword("");
     setPwConfirmPassword("");
     setPwLoading(false);
     setPwError("");
+    setShowPwCurrent(false);
     setShowPwNew(false);
     setShowPwConfirm(false);
   };
 
-  const handleRequestPasswordCode = async () => {
-    if (!user?.email) return;
+  const handleNextStep1 = async () => {
     setPwError("");
+    if (!pwCurrentPassword) {
+      setPwError("Ingresa tu contraseña actual.");
+      return;
+    }
     setPwLoading(true);
     try {
-      await apiFetch("/auth/forgot-password", {
+      await apiFetch("/auth/verify-password", {
         method: "POST",
-        body: JSON.stringify({ email: user.email }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pwCurrentPassword }),
       });
-      setPasswordStep("verify");
-    } catch {
-      toast.error("No se pudo enviar el código. Inténtalo de nuevo.");
+      setPasswordStep("new");
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; errors?: Record<string, string[]> };
+      setPwError(apiErr?.errors?.password?.[0] ?? "Contraseña incorrecta. Inténtalo de nuevo.");
     } finally {
       setPwLoading(false);
     }
   };
 
-  const handleResendPasswordCode = async () => {
-    if (!user?.email) return;
-    setPwCode("");
+  const handleNextStep2 = () => {
     setPwError("");
-    setPwLoading(true);
-    try {
-      await apiFetch("/auth/forgot-password", {
-        method: "POST",
-        body: JSON.stringify({ email: user.email }),
-      });
-      toast.success("¡Código reenviado! Revisa tu bandeja de entrada.");
-    } catch {
-      toast.error("No se pudo reenviar el código. Inténtalo de nuevo.");
-    } finally {
-      setPwLoading(false);
+    const strength = getPasswordStrength(pwNewPassword);
+    if (strength.score < 5) {
+      setPwError("La contraseña debe incluir mayúsculas, minúsculas, números y un carácter especial.");
+      return;
     }
+    setPasswordStep("confirm");
   };
 
-  const handleVerifyPasswordCode = async () => {
-    if (!user?.email) return;
+  const handleSubmitPassword = async () => {
     setPwError("");
-    if (!pwCode.trim()) { setPwError("Ingresa el código de verificación."); return; }
-    if (pwNewPassword !== pwConfirmPassword) { setPwError("Las contraseñas no coinciden."); return; }
-    if (pwNewPassword.length < 8) { setPwError("La contraseña debe tener al menos 8 caracteres."); return; }
+    if (pwNewPassword !== pwConfirmPassword) {
+      setPwError("Las contraseñas no coinciden.");
+      return;
+    }
     setPwLoading(true);
     try {
-      await apiFetch("/auth/reset-password", {
-        method: "POST",
+      await apiFetch("/auth/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: user.email,
-          token: pwCode,
+          current_password: pwCurrentPassword,
           password: pwNewPassword,
           password_confirmation: pwConfirmPassword,
         }),
@@ -331,9 +346,14 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
     } catch (err: unknown) {
       const apiErr = err as { status?: number; errors?: Record<string, string[]> };
       if (apiErr?.status === 422) {
-        const apiErrors = apiErr?.errors?.token ?? apiErr?.errors?.password;
-        const msg = Array.isArray(apiErrors) ? apiErrors[0] : "Código incorrecto o expirado. Solicita uno nuevo.";
-        setPwError(msg);
+        const currentPwErrors = apiErr?.errors?.current_password;
+        const pwErrors = apiErr?.errors?.password;
+        if (currentPwErrors?.length) {
+          setPasswordStep("current");
+          setPwError(currentPwErrors[0]);
+        } else {
+          setPwError(Array.isArray(pwErrors) ? pwErrors[0] : "Ocurrió un error de validación.");
+        }
       } else {
         toast.error("Ocurrió un error al cambiar la contraseña. Inténtalo de nuevo más tarde.");
       }
@@ -426,6 +446,7 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
                       variant="outline"
                       size="sm"
                       onClick={() => fileInputRef.current?.click()}
+                      disabled={isRemovingAvatar || isSavingProfile}
                       className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                     >
                       <Upload className="mr-2 h-4 w-4" />
@@ -437,9 +458,10 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
                         size="sm"
                         type="button"
                         onClick={handleRemoveAvatar}
+                        disabled={isRemovingAvatar || isSavingProfile}
                         className="rounded-2xl dark:hover:bg-slate-800 dark:text-slate-300"
                       >
-                        Quitar foto
+                        {isRemovingAvatar ? "Quitando..." : "Quitar foto"}
                       </Button>
                     )}
                   </div>
@@ -498,7 +520,7 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
 
               <div className="pt-4 flex flex-col sm:flex-row gap-2 border-t border-border dark:border-slate-700">
                 <Button variant="outline" onClick={handleCancelChanges} className="w-full sm:w-auto rounded-2xl dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Cancelar</Button>
-                <Button variant="success" onClick={handleSaveChanges} disabled={isSavingProfile} className="w-full sm:w-auto rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
+                <Button variant="success" onClick={handleSaveChanges} disabled={!isDirty || isSavingProfile} className="w-full sm:w-auto rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
                   {isSavingProfile ? "Guardando..." : "Guardar Cambios"}
                 </Button>
               </div>
@@ -517,61 +539,74 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isPasswordOpen} onOpenChange={(open) => { setIsPasswordOpen(open); if (!open) resetPasswordDialog(); }}>
+          <Dialog
+            open={isPasswordOpen}
+            onOpenChange={(open) => { setIsPasswordOpen(open); if (!open) resetPasswordDialog(); }}
+            key={isPasswordOpen ? "open" : "closed"}
+          >
             <DialogContent className="max-w-[95vw] sm:max-w-md dark:bg-slate-950 dark:border-slate-800">
               <DialogHeader>
                 <DialogTitle className="dark:text-white">Cambiar contraseña</DialogTitle>
                 <DialogDescription className="dark:text-slate-400">
-                  {passwordStep === "request"
-                    ? "Te enviaremos un código de verificación a tu correo registrado."
-                    : "Ingresa el código que recibiste y establece tu nueva contraseña."}
+                  {passwordStep === "current" && "Confirma tu contraseña actual para continuar."}
+                  {passwordStep === "new" && "Crea una contraseña segura para tu cuenta."}
+                  {passwordStep === "confirm" && "Confirma tu nueva contraseña para guardar los cambios."}
                 </DialogDescription>
               </DialogHeader>
 
-              {/* Indicador de pasos */}
+              {/* Indicador de 3 pasos */}
               <div className="flex items-center gap-2 mt-1">
-                {(["request", "verify"] as const).map((step, i) => (
-                  <React.Fragment key={step}>
-                    <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${passwordStep === step ? "bg-emerald-500 text-white" : i < (passwordStep === "verify" ? 1 : 0) ? "bg-emerald-200 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" : "bg-muted text-muted-foreground dark:bg-slate-800 dark:text-slate-400"}`}>
-                      {i + 1}
-                    </div>
-                    {i < 1 && <div className={`h-px flex-1 transition-colors ${passwordStep === "verify" ? "bg-emerald-400" : "bg-border dark:bg-slate-700"}`} />}
-                  </React.Fragment>
-                ))}
+                {(["current", "new", "confirm"] as const).map((step, i) => {
+                  const stepIndex = ["current", "new", "confirm"].indexOf(passwordStep);
+                  const isDone = i < stepIndex;
+                  const isActive = passwordStep === step;
+                  return (
+                    <React.Fragment key={step}>
+                      <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                        isActive ? "bg-emerald-500 text-white" : isDone ? "bg-emerald-200 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" : "bg-muted text-muted-foreground dark:bg-slate-800 dark:text-slate-400"
+                      }`}>
+                        {isDone ? <Check className="h-3 w-3" /> : i + 1}
+                      </div>
+                      {i < 2 && <div className={`h-px flex-1 transition-colors ${isDone ? "bg-emerald-400" : "bg-border dark:bg-slate-700"}`} />}
+                    </React.Fragment>
+                  );
+                })}
                 <span className="ml-1 text-xs text-muted-foreground dark:text-slate-400">
-                  {passwordStep === "request" ? "Enviar código" : "Verificar y cambiar"}
+                  {passwordStep === "current" && "Contraseña actual"}
+                  {passwordStep === "new" && "Nueva contraseña"}
+                  {passwordStep === "confirm" && "Confirmar contraseña"}
                 </span>
               </div>
 
               <div className="mt-1 space-y-4">
-                {passwordStep === "request" ? (
-                  <>
-                    <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 flex items-center gap-3 dark:border-slate-700 dark:bg-slate-900/60">
-                      <Key className="h-4 w-4 text-muted-foreground dark:text-slate-400 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-xs text-muted-foreground dark:text-slate-400">Correo registrado</p>
-                        <p className="text-sm font-medium truncate dark:text-white">{user?.email}</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground dark:text-slate-400">
-                      Se enviará un código de 6 dígitos a ese correo. El código expira en 30 minutos.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="space-y-2">
-                      <Label className="dark:text-white">Código de verificación</Label>
+                {/* Paso 1: Contraseña actual */}
+                {passwordStep === "current" && (
+                  <div className="space-y-2">
+                    <Label className="dark:text-white">Contraseña actual</Label>
+                    <div className="relative">
                       <Input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={pwCode}
-                        onChange={(e) => setPwCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                        placeholder="• • • • • •"
-                        className="text-center text-2xl font-mono tracking-[0.5em] rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white"
-                        autoComplete="one-time-code"
+                        type={showPwCurrent ? "text" : "password"}
+                        value={pwCurrentPassword}
+                        onChange={(e) => setPwCurrentPassword(e.target.value)}
+                        placeholder="Ingresa tu contraseña actual"
+                        className="pr-10 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
+                        autoComplete="new-password"
+                        readOnly
+                        onFocus={(e) => e.currentTarget.removeAttribute("readOnly")}
+                        autoFocus
+                        onKeyDown={(e) => e.key === "Enter" && handleNextStep1()}
                       />
+                      <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwCurrent((v) => !v)} aria-label={showPwCurrent ? "Ocultar" : "Mostrar"}>
+                        {showPwCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
                     </div>
+                    {pwError && <p className="text-xs text-destructive font-medium">{pwError}</p>}
+                  </div>
+                )}
+
+                {/* Paso 2: Nueva contraseña con guía */}
+                {passwordStep === "new" && (
+                  <div className="space-y-3">
                     <div className="space-y-2">
                       <Label className="dark:text-white">Nueva contraseña</Label>
                       <div className="relative">
@@ -579,43 +614,81 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
                           type={showPwNew ? "text" : "password"}
                           value={pwNewPassword}
                           onChange={(e) => setPwNewPassword(e.target.value)}
-                          placeholder="Mínimo 8 caracteres"
+                          placeholder="Crea una contraseña segura"
                           className="pr-10 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                           autoComplete="new-password"
+                          autoFocus
+                          onKeyDown={(e) => e.key === "Enter" && handleNextStep2()}
                         />
                         <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwNew((v) => !v)} aria-label={showPwNew ? "Ocultar" : "Mostrar"}>
                           {showPwNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
                     </div>
+                    {pwNewPassword.length > 0 && (() => {
+                      const strength = getPasswordStrength(pwNewPassword);
+                      return (
+                        <div className="space-y-1.5">
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <div key={s} className={`h-1.5 flex-1 rounded-full transition-colors ${s <= strength.score ? strength.color : "bg-muted dark:bg-slate-700"}`} />
+                            ))}
+                          </div>
+                          <p className={`text-xs font-medium ${strength.score < 5 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                            {strength.label}
+                          </p>
+                        </div>
+                      );
+                    })()}
+                    <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-1.5 dark:border-slate-700 dark:bg-slate-900/40">
+                      <p className="text-xs font-semibold text-muted-foreground dark:text-slate-400 mb-2">Tu contraseña debe incluir:</p>
+                      {[
+                        { label: "Mínimo 8 caracteres", met: pwNewPassword.length >= 8 },
+                        { label: "Letra mayúscula (A-Z)", met: /[A-Z]/.test(pwNewPassword) },
+                        { label: "Letra minúscula (a-z)", met: /[a-z]/.test(pwNewPassword) },
+                        { label: "Número (0-9)", met: /[0-9]/.test(pwNewPassword) },
+                        { label: "Carácter especial (!@#$%...)", met: /[^A-Za-z0-9]/.test(pwNewPassword) },
+                      ].map((criterion) => (
+                        <div key={criterion.label} className="flex items-center gap-2">
+                          <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors ${criterion.met ? "bg-emerald-500" : "bg-muted border border-border dark:bg-slate-800 dark:border-slate-600"}`}>
+                            {criterion.met && <Check className="h-2.5 w-2.5 text-white" />}
+                          </div>
+                          <span className={`text-xs transition-colors ${criterion.met ? "text-foreground dark:text-white font-medium" : "text-muted-foreground dark:text-slate-400"}`}>{criterion.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {pwError && <p className="text-xs text-destructive font-medium">{pwError}</p>}
+                  </div>
+                )}
+
+                {/* Paso 3: Confirmar nueva contraseña */}
+                {passwordStep === "confirm" && (
+                  <div className="space-y-3">
                     <div className="space-y-2">
-                      <Label className="dark:text-white">Confirmar contraseña</Label>
+                      <Label className="dark:text-white">Confirmar nueva contraseña</Label>
                       <div className="relative">
                         <Input
                           type={showPwConfirm ? "text" : "password"}
                           value={pwConfirmPassword}
                           onChange={(e) => setPwConfirmPassword(e.target.value)}
-                          placeholder="Repite la nueva contraseña"
+                          placeholder="Repite tu nueva contraseña"
                           className="pr-10 rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
                           autoComplete="new-password"
+                          autoFocus
+                          onKeyDown={(e) => e.key === "Enter" && !pwLoading && handleSubmitPassword()}
                         />
                         <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwConfirm((v) => !v)} aria-label={showPwConfirm ? "Ocultar" : "Mostrar"}>
                           {showPwConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
+                      {pwConfirmPassword.length > 0 && (
+                        <p className={`text-xs font-medium ${pwNewPassword === pwConfirmPassword ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                          {pwNewPassword === pwConfirmPassword ? "Las contraseñas coinciden ✓" : "Las contraseñas no coinciden"}
+                        </p>
+                      )}
                     </div>
-                    {pwError && (
-                      <p className="text-xs text-destructive font-medium">{pwError}</p>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleResendPasswordCode}
-                      disabled={pwLoading}
-                      className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline disabled:opacity-50"
-                    >
-                      ¿No recibiste el código? Reenviar
-                    </button>
-                  </>
+                    {pwError && <p className="text-xs text-destructive font-medium">{pwError}</p>}
+                  </div>
                 )}
               </div>
 
@@ -623,19 +696,25 @@ export function Profile({ onDirtyChange }: Readonly<{ onDirtyChange?: (dirty: bo
                 <Button
                   variant="outline"
                   type="button"
-                  onClick={() => setIsPasswordOpen(false)}
+                  onClick={() => { setIsPasswordOpen(false); resetPasswordDialog(); }}
                   disabled={pwLoading}
                   className="rounded-2xl dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
                 >
                   Cancelar
                 </Button>
-                {passwordStep === "request" ? (
-                  <Button type="button" variant="success" onClick={handleRequestPasswordCode} disabled={pwLoading} className="rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
-                    {pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Enviando...</> : "Enviar código"}
+                {passwordStep === "current" && (
+                  <Button type="button" variant="success" onClick={handleNextStep1} disabled={pwLoading} className="rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
+                    {pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verificando...</> : "Continuar"}
                   </Button>
-                ) : (
-                  <Button type="button" variant="success" onClick={handleVerifyPasswordCode} disabled={pwLoading} className="rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
-                    {pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verificando...</> : "Confirmar"}
+                )}
+                {passwordStep === "new" && (
+                  <Button type="button" variant="success" onClick={handleNextStep2} className="rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
+                    Continuar
+                  </Button>
+                )}
+                {passwordStep === "confirm" && (
+                  <Button type="button" variant="success" onClick={handleSubmitPassword} disabled={pwLoading} className="rounded-2xl dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white">
+                    {pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</> : "Guardar contraseña"}
                   </Button>
                 )}
               </div>

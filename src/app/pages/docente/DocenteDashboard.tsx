@@ -220,12 +220,12 @@ function ProximasSkeleton() {
 function AutoFadeBannerCarousel({ 
   images, 
   mobileImages, 
-  href, 
+  links, 
   intervalMs = 4500 
 }: { 
   images: string[]; 
   mobileImages?: string[];
-  href: string; 
+  links?: (string | undefined)[];
   intervalMs?: number 
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -302,25 +302,36 @@ function AutoFadeBannerCarousel({
             : 'aspect-[1852/849] sm:aspect-[5375/934]'
         }`}
       >
-        <a
-          href={href}
-          target="_blank"
-          rel="noreferrer"
-          className={`relative block h-full w-full transition-transform duration-200 ${
-            !isMinimized ? 'hover:scale-[1.01]' : ''
-          }`}
-        >
-          {currentImages.map((src, index) => (
-            <img
-              key={src}
-              src={src}
-              alt="Manual Docente"
-              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out ${
-                index === activeIndex ? "opacity-100" : "opacity-0"
-              } ${isMinimized ? 'opacity-0' : ''}`}
+        <div className="group relative block h-full w-full">
+          {/* Todas las imágenes son puramente visuales: nunca reciben clics directamente. */}
+          {currentImages.map((src, index) => {
+            const isActive = index === activeIndex;
+            return (
+              <img
+                key={src}
+                src={src}
+                alt="Banner institucional"
+                className={`absolute inset-0 h-full w-full object-cover transition-all duration-1000 ease-in-out ${
+                  isActive ? "opacity-100 group-hover:scale-[1.01]" : "opacity-0"
+                } ${isMinimized ? "opacity-0" : ""}`}
+                style={{ pointerEvents: "none" }}
+              />
+            );
+          })}
+
+          {/* Único elemento clickeable del carrusel: solo existe si la imagen ACTIVA tiene link asignado. */}
+          {!isMinimized && links?.[activeIndex] && (
+            <a
+              href={links[activeIndex]}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Abrir documento"
+              className="absolute inset-0 z-[6] block"
+              // IMPORTANTE: No usar aria-hidden en el elemento que puede recibir foco
+              // Si necesitas ocultarlo, usa inert o condicionalmente no renderizarlo
             />
-          ))}
-        </a>
+          )}
+        </div>
 
         {/* Botón de minimizar/expandir */}
         <button
@@ -375,29 +386,13 @@ function AutoFadeBannerCarousel({
             </button>
           </>
         )}
-
-        {/* Estado minimizado - Diseño mejorado con texto semitransparente */}
+        {/* Estado minimizado - texto con fondo propio, legible sin depender de la imagen */}
         {isMinimized && (
-          <div className="absolute inset-0 flex items-center justify-center px-4">
-            <div className="flex flex-col items-center gap-1">
-              {/* Icono decorativo */}
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100/70 dark:bg-emerald-900/50">
-                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-emerald-600/70 dark:text-emerald-400/70" aria-hidden="true">
-                  <rect x="2" y="2" width="20" height="20" rx="2" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-                  <path d="M8 8h8M8 12h6M8 16h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              
-              {/* Texto semitransparente con mensaje institucional */}
-              <div className="text-center">
-                <p className="text-sm font-medium text-slate-600/80 dark:text-slate-300/80">
-                  Carrusel minimizado
-                </p>
-                <p className="text-xs text-slate-500/60 dark:text-slate-400/60">
-                  Haz clic en <span className="font-medium text-emerald-600/80 dark:text-emerald-400/80">Expandir</span> para ver las imágenes
-                </p>
-              </div>
-            </div>
+          <div className="absolute inset-0 flex items-center justify-center bg-emerald-950/70 px-4">
+            <p className="text-center text-xs sm:text-sm font-medium text-white/90">
+              Carrusel minimizado — haz clic en{" "}
+              <span className="font-semibold text-white">Expandir</span> para ver las imágenes
+            </p>
           </div>
         )}
       </div>
@@ -445,7 +440,12 @@ const FAKE_RECENT_DOCS: DocumentItem[] = [
 
 export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const { onNavigate } = props;
-  const manualDocenteUrl = new URL("../../../assets/elementos/Manual de Usuario del Docente.pdf", import.meta.url).href;
+  const manualDocenteUrl = new URL("../../../assets/manuales/Manual de Usuario del Docente.pdf", import.meta.url).href;
+  const nomenclaturaUrl = new URL("../../../assets/manuales/Nomenclatura.pdf", import.meta.url).href;
+
+  // Solo el banner 1 (índice 0) y el banner 2 (índice 1) tienen un CTA dibujado.
+  // El resto son puramente informativos/decorativos y no deben ser clickeables.
+  const bannerLinks: (string | undefined)[] = [manualDocenteUrl, nomenclaturaUrl];
 
   const { isReady, user } = useAuth();
   const { isDocenteTourActive } = useTourActive();
@@ -681,10 +681,10 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
       <div className="relative z-10">
         {/* Carrusel con imágenes responsive */}
-        <AutoFadeBannerCarousel 
+       <AutoFadeBannerCarousel 
           images={introBanners} 
           mobileImages={introBannersMobile}
-          href={manualDocenteUrl} 
+          links={bannerLinks}
         />
 
         {/* Mensaje de error de carga */}
