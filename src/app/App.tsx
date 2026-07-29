@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
@@ -10,7 +10,7 @@ import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "./components/ui/alert-dialog";
-import { HelpCircle, Loader2, Menu, Moon, Sun } from "lucide-react";
+import { Check, ChevronUp, HelpCircle, ImageIcon, Loader2, Menu, Moon, Sun, X } from "lucide-react";
 import { adminTourSteps } from "./tours/adminTourSteps";
 import { getDocenteTourSteps } from "./tours/docenteTourSteps";
 import { TourContext } from "./context/TourContext";
@@ -20,6 +20,10 @@ import { FormAccessGuard } from "./components/FormAccessGuard";
 import LogoUTSLRC from "../assets/elementos/LogotipoUTSLRC.webp";
 import LogoUTSLRCWhite from "../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
 import SuperiorFormImg from "../assets/elementos/superior_form.webp";
+import BgDefault from "../assets/Fondos/ut_imagen14.webp";
+import BgITIID from "../assets/Fondos/Fondo_ITIID.png";
+import BgMecatronica from "../assets/Fondos/Fondo_Mecatronica.png";
+import BgAlimentarios from "../assets/Fondos/Fondo_Procesos_Alimentarios.png";
 
 // Páginas cargadas bajo demanda — solo se descargan cuando el usuario las visita
 const DocenteDashboard = React.lazy(() => import("./pages/docente/DocenteDashboard"));
@@ -53,6 +57,17 @@ const TourOverlay = React.lazy(() => import("./components/tour/TourOverlay").the
 
 
 
+const BG_OPTIONS = [
+  { key: "default",      label: "Universidad",  src: BgDefault },
+  { key: "itiid",        label: "ITIID",        src: BgITIID },
+  { key: "mecatronica",  label: "Mecatrónica",  src: BgMecatronica },
+  { key: "alimentarios", label: "Alimentos",    src: BgAlimentarios },
+] as const;
+const BG_STORAGE_KEY       = "utslrc-bg-key";
+const BG_OVERLAY_KEY       = "utslrc-bg-overlay";
+const CONTAINER_ALPHA_KEY  = "utslrc-container-alpha";
+const CONTAINER_BLUR_KEY   = "utslrc-container-blur";
+
 function AppContent() {
   const { isAuthenticated, isReady, user, notice, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -80,6 +95,140 @@ function AppContent() {
   const isDocente = !isAdmin && !isSupervisor;
   const [isDocenteTourOpen, setIsDocenteTourOpen] = useState(false);
   const [showTourConfirm, setShowTourConfirm] = useState<"admin" | "docente" | null>(null);
+  const [selectedBgKey, setSelectedBgKey] = useState<string>("default");
+  const [bgOverlay, setBgOverlay] = useState<number>(30);
+  const [containerAlpha, setContainerAlpha] = useState<number>(90);
+  const [containerBlur, setContainerBlur] = useState<number>(0);
+  const [isBgPanelOpen, setIsBgPanelOpen] = useState(false);
+  const [isToolbarExpanded, setIsToolbarExpanded] = useState(false);
+  const activeBgSrc = BG_OPTIONS.find(b => b.key === selectedBgKey)?.src ?? BgDefault;
+
+  // Clave de localStorage con user.id para aislar preferencias por usuario
+  const prefKey = useCallback((base: string) => `${base}-${user?.id ?? "__guest__"}`, [user?.id]);
+
+  // Guarda un subconjunto de preferencias en localStorage (inmediato) y backend (debounced 1.5 s)
+  const savePrefsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savePrefs = useCallback((patch: { bgKey?: string; bgOverlay?: number; containerAlpha?: number; containerBlur?: number }) => {
+    if (!user?.id) return;
+    if (patch.bgKey          !== undefined) localStorage.setItem(prefKey(BG_STORAGE_KEY),      patch.bgKey);
+    if (patch.bgOverlay      !== undefined) localStorage.setItem(prefKey(BG_OVERLAY_KEY),      String(patch.bgOverlay));
+    if (patch.containerAlpha !== undefined) localStorage.setItem(prefKey(CONTAINER_ALPHA_KEY), String(patch.containerAlpha));
+    if (patch.containerBlur  !== undefined) localStorage.setItem(prefKey(CONTAINER_BLUR_KEY),  String(patch.containerBlur));
+    if (savePrefsTimer.current) clearTimeout(savePrefsTimer.current);
+    savePrefsTimer.current = setTimeout(() => {
+      apiFetch('/auth/preferences', { method: 'PATCH', body: JSON.stringify(patch) }).catch(() => {});
+    }, 1500);
+  }, [user?.id, prefKey]);
+
+  // Carga preferencias cuando el usuario cambia (login/logout/cambio de cuenta)
+  useEffect(() => {
+    if (!user?.id) {
+      setSelectedBgKey("default");
+      setBgOverlay(30);
+      setContainerAlpha(90);
+      setContainerBlur(0);
+      return;
+    }
+    // Rápido: caché local del usuario (evita flash mientras llega la API)
+    setSelectedBgKey(localStorage.getItem(prefKey(BG_STORAGE_KEY))      ?? "default");
+    setBgOverlay(    Number(localStorage.getItem(prefKey(BG_OVERLAY_KEY))      ?? "30"));
+    setContainerAlpha(Number(localStorage.getItem(prefKey(CONTAINER_ALPHA_KEY)) ?? "90"));
+    setContainerBlur( Number(localStorage.getItem(prefKey(CONTAINER_BLUR_KEY))  ?? "0"));
+    // Autoritativo: backend — sincroniza entre dispositivos
+    apiFetch('/auth/preferences')
+      .then(r => r.json())
+      .then(data => {
+        const p = data?.preferences;
+        if (!p || typeof p !== 'object') return;
+        if (p.bgKey          !== undefined) { setSelectedBgKey(p.bgKey);         localStorage.setItem(prefKey(BG_STORAGE_KEY),      p.bgKey); }
+        if (p.bgOverlay      !== undefined) { setBgOverlay(p.bgOverlay);          localStorage.setItem(prefKey(BG_OVERLAY_KEY),      String(p.bgOverlay)); }
+        if (p.containerAlpha !== undefined) { setContainerAlpha(p.containerAlpha); localStorage.setItem(prefKey(CONTAINER_ALPHA_KEY), String(p.containerAlpha)); }
+        if (p.containerBlur  !== undefined) { setContainerBlur(p.containerBlur);  localStorage.setItem(prefKey(CONTAINER_BLUR_KEY),  String(p.containerBlur)); }
+      })
+      .catch(() => {});
+  }, [user?.id, prefKey]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--ui-card-alpha", String(containerAlpha));
+    const pct = containerAlpha;
+    const blur = containerBlur;
+    const styleId = "utslrc-ui-alpha";
+    let el = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (!el) { el = document.createElement("style"); el.id = styleId; document.head.appendChild(el); }
+    el.textContent = `
+      /* ══ TRANSPARENCIA ══
+         El injection sobreescribe TANTO las clases hardcodeadas (bg-white, bg-slate-*)
+         COMO las que usan CSS variables (bg-card, bg-secondary, bg-muted).
+         Así la transparencia y el blur son 100 % independientes entre sí. */
+
+      /* ── Modo claro: contenedores blancos/card ──
+         :not([class*="rounded-full"]) excluye solo botones circulares pequeños (floating toolbar).
+         Botones grandes como "Cerrar Sesión" y el área de perfil SÍ quedan incluidos. */
+      html:not(.dark) [class~="bg-card"]:not([class*="rounded-full"]),
+      html:not(.dark) [class~="bg-background"]:not([class*="rounded-full"]),
+      html:not(.dark) [class~="bg-white"]:not([class*="rounded-full"]),
+      html:not(.dark) [class*="bg-white/7"]:not([class*="rounded-full"]),
+      html:not(.dark) [class*="bg-white/8"]:not([class*="rounded-full"]),
+      html:not(.dark) [class*="bg-white/9"]:not([class*="rounded-full"]) {
+        background-color: oklch(1 0 0 / calc(${pct} / 100)) !important;
+      }
+      html:not(.dark) [class~="bg-secondary"]:not([class*="rounded-full"]),
+      html:not(.dark) [class~="bg-muted"]:not([class*="rounded-full"]) {
+        background-color: oklch(0.984 0.003 247.858 / calc(${pct} / 100)) !important;
+      }
+      /* bg-gradient-to-* cubre todas las direcciones (to-br, to-r, to-b, to-tr, etc.) */
+      html:not(.dark) [class*="bg-gradient-to-"]:not([class*="rounded-full"]) {
+        background-image: none !important;
+        background-color: oklch(1 0 0 / calc(${pct} / 100)) !important;
+      }
+
+      /* ── Modo oscuro: contenedores oscuros/card ── */
+      .dark [class~="bg-card"]:not([class*="rounded-full"]),
+      .dark [class~="bg-background"]:not([class*="rounded-full"]) {
+        background-color: oklch(0.145 0 0 / calc(${pct} / 100)) !important;
+      }
+      /* slate-9* = slate-900..950 — contenedores oscuros principales.
+         NO incluir slate-7* ni slate-8* porque esos son usados por iconos/badges pequeños. */
+      .dark [class~="bg-secondary"]:not([class*="rounded-full"]),
+      .dark [class~="bg-muted"]:not([class*="rounded-full"]),
+      .dark [class*="dark:bg-slate-9"],
+      .dark [class*="bg-slate-9"] {
+        background-color: oklch(0.145 0 0 / calc(${pct} / 100)) !important;
+      }
+      .dark [class*="dark:from-slate-"] {
+        background-image: none !important;
+        background-color: oklch(0.145 0 0 / calc(${pct} / 100)) !important;
+      }
+
+      /* ══ DESENFOQUE (slider independiente — controla backdrop-filter por separado) ══ */
+      html:not(.dark) [class~="bg-card"]:not([class*="rounded-full"]),
+      html:not(.dark) [class~="bg-background"]:not([class*="rounded-full"]),
+      html:not(.dark) [class~="bg-white"]:not([class*="rounded-full"]),
+      html:not(.dark) [class*="bg-white/7"]:not([class*="rounded-full"]),
+      html:not(.dark) [class*="bg-white/8"]:not([class*="rounded-full"]),
+      html:not(.dark) [class*="bg-white/9"]:not([class*="rounded-full"]),
+      html:not(.dark) [class~="bg-secondary"]:not([class*="rounded-full"]),
+      html:not(.dark) [class~="bg-muted"]:not([class*="rounded-full"]),
+      html:not(.dark) [class*="bg-gradient-to-"]:not([class*="rounded-full"]),
+      .dark [class~="bg-card"]:not([class*="rounded-full"]),
+      .dark [class~="bg-background"]:not([class*="rounded-full"]),
+      .dark [class~="bg-secondary"]:not([class*="rounded-full"]),
+      .dark [class~="bg-muted"]:not([class*="rounded-full"]),
+      .dark [class*="dark:bg-slate-9"],
+      .dark [class*="bg-slate-9"],
+      .dark [class*="dark:from-slate-"],
+      .dark [class*="backdrop-blur"] {
+        backdrop-filter: blur(${blur}px) !important;
+      }
+    `;
+  }, [containerAlpha, containerBlur]);
+
+  const toggleToolbar = () => {
+    setIsToolbarExpanded(prev => {
+      if (prev) setIsBgPanelOpen(false);
+      return !prev;
+    });
+  };
   const noticeBanner = notice ? (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4 sm:top-6">
       <Alert
@@ -589,8 +738,8 @@ function AppContent() {
           className={`fixed inset-0 overflow-hidden${isSplashExiting ? " z-[9999] tv-iris-reveal" : " z-0"}`}
           style={{
             backgroundImage: theme === "dark"
-              ? "url('/src/assets/elementos/ut_imagen14.webp')"
-              : "linear-gradient(rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.10)), url('/src/assets/elementos/ut_imagen14.webp')",
+              ? `url('${activeBgSrc}')`
+              : `linear-gradient(rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.10)), url('${activeBgSrc}')`,
             backgroundColor: theme === "dark" ? "#000000" : "transparent",
             backgroundBlendMode: theme === "dark" ? "normal" : "screen",
             backgroundPosition: "center",
@@ -599,7 +748,12 @@ function AppContent() {
             backgroundAttachment: "fixed",
           }}
         >
-          <div className={`flex h-screen overflow-hidden ${isLoggingOut ? "animate-page-exit" : ""} motion-reduce:animate-none`}>
+          {/* Capa de oscurecimiento del fondo — ajustable por el usuario */}
+          <div
+            className="pointer-events-none absolute inset-0 transition-[background-color] duration-300"
+            style={{ backgroundColor: `rgba(0,0,0,${bgOverlay / 100})`, zIndex: 1 }}
+          />
+          <div className={`relative flex h-screen overflow-hidden ${isLoggingOut ? "animate-page-exit" : ""} motion-reduce:animate-none`} style={{ zIndex: 2 }}>
             <Sidebar
               currentView={currentView}
               onNavigate={safeNavigate}
@@ -649,34 +803,6 @@ function AppContent() {
               </div>
             </main>
 
-            {isAdmin && !isAdminTourOpen && (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => setShowTourConfirm("admin")}
-                aria-label="Iniciar tutorial del sistema"
-                title="Iniciar tutorial del sistema"
-                className="fixed bottom-16 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900"
-              >
-                <HelpCircle className="h-4 w-4" />
-              </Button>
-            )}
-
-            {isDocente && !isDocenteTourOpen && (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => setShowTourConfirm("docente")}
-                aria-label="Iniciar tutorial del sistema"
-                title="Iniciar tutorial del sistema"
-                className="fixed bottom-16 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900"
-              >
-                <HelpCircle className="h-4 w-4" />
-              </Button>
-            )}
-
             <AlertDialog open={showTourConfirm !== null} onOpenChange={(open) => { if (!open) setShowTourConfirm(null); }}>
               <AlertDialogContent>
                 <AlertDialogHeader>
@@ -700,17 +826,157 @@ function AppContent() {
               </AlertDialogContent>
             </AlertDialog>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={toggleTheme}
-              aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-              title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-              className="fixed bottom-4 right-4 z-50 h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
+            {/* Panel selector de fondo */}
+            {isBgPanelOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsBgPanelOpen(false)} />
+                <div className="fixed bottom-4 right-[3.5rem] z-50 w-72 rounded-2xl border border-border/60 bg-background/95 p-4 shadow-2xl backdrop-blur-xl">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Fondo de pantalla</span>
+                    <button
+                      onClick={() => setIsBgPanelOpen(false)}
+                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="mb-4 grid grid-cols-2 gap-2">
+                    {BG_OPTIONS.map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => { setSelectedBgKey(opt.key); savePrefs({ bgKey: opt.key }); }}
+                        className={`relative aspect-video overflow-hidden rounded-xl border-2 transition-all ${
+                          selectedBgKey === opt.key
+                            ? "border-emerald-500 ring-2 ring-emerald-500/30"
+                            : "border-transparent hover:border-slate-300 dark:hover:border-slate-600"
+                        }`}
+                      >
+                        <img src={opt.src} alt={opt.label} className="h-full w-full object-cover" />
+                        <div className="absolute inset-0 bg-black/25" />
+                        <span className="absolute bottom-1 left-0 right-0 text-center text-[10px] font-semibold text-white drop-shadow">{opt.label}</span>
+                        {selectedBgKey === opt.key && (
+                          <div className="absolute right-1 top-1 rounded-full bg-emerald-500 p-0.5">
+                            <Check className="h-2.5 w-2.5 text-white" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mb-4">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Oscurecer fondo</span>
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{bgOverlay}%</span>
+                    </div>
+                    <input
+                      type="range" min={0} max={80} value={bgOverlay}
+                      onChange={(e) => { const val = Number(e.target.value); setBgOverlay(val); savePrefs({ bgOverlay: val }); }}
+                      className="w-full accent-emerald-500"
+                    />
+                    <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+                      <span>Sin oscurecer</span>
+                      <span>Máximo</span>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border/40 pt-3">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Transparencia de paneles</span>
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{100 - containerAlpha}%</span>
+                    </div>
+                    <input
+                      type="range" min={0} max={100} value={containerAlpha}
+                      onChange={(e) => { const val = Number(e.target.value); setContainerAlpha(val); savePrefs({ containerAlpha: val }); }}
+                      className="w-full accent-emerald-500"
+                    />
+                    <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+                      <span>Transparente</span>
+                      <span>Sólido</span>
+                    </div>
+                  </div>
+
+                  {/* Slider 3: Desenfoque (efecto cristal esmerilado) */}
+                  <div className="border-t border-border/40 pt-3">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Desenfoque de paneles</span>
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{containerBlur === 0 ? "Sin efecto" : `${containerBlur}px`}</span>
+                    </div>
+                    <input
+                      type="range" min={0} max={20} value={containerBlur}
+                      onChange={(e) => { const val = Number(e.target.value); setContainerBlur(val); savePrefs({ containerBlur: val }); }}
+                      className="w-full accent-emerald-500"
+                    />
+                    <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+                      <span>Sin efecto</span>
+                      <span>Cristal esmerilado</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Barra flotante de herramientas — colapsa con la ^ */}
+            <div className="fixed bottom-4 right-4 z-50 flex flex-col-reverse items-center gap-3">
+              {/* Tema (siempre visible, queda abajo por flex-col-reverse) */}
+              <Button
+                type="button" variant="outline" size="icon"
+                onClick={toggleTheme}
+                aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                className="h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
+              >
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+
+              {/* Flecha colapso / expansión */}
+              <button
+                onClick={toggleToolbar}
+                aria-label={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
+                title={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
+                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+              >
+                <ChevronUp className={`h-4 w-4 transition-transform duration-200 ${isToolbarExpanded ? "rotate-180" : ""}`} />
+              </button>
+
+              {/* Botones colapsables */}
+              {isToolbarExpanded && (
+                <>
+                  {/* Fondo de pantalla */}
+                  <Button
+                    type="button" variant="outline" size="icon"
+                    onClick={() => setIsBgPanelOpen(p => !p)}
+                    aria-label="Cambiar fondo de pantalla"
+                    title="Cambiar fondo de pantalla"
+                    className={`h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:hover:bg-slate-900 animate-in fade-in slide-in-from-bottom-2 duration-150 ${isBgPanelOpen ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"}`}
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+
+                  {/* Tutorial */}
+                  {isAdmin && !isAdminTourOpen && (
+                    <Button
+                      type="button" variant="outline" size="icon"
+                      onClick={() => setShowTourConfirm("admin")}
+                      aria-label="Iniciar tutorial del sistema"
+                      title="Iniciar tutorial del sistema"
+                      className="h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                    >
+                      <HelpCircle className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {isDocente && !isDocenteTourOpen && (
+                    <Button
+                      type="button" variant="outline" size="icon"
+                      onClick={() => setShowTourConfirm("docente")}
+                      aria-label="Iniciar tutorial del sistema"
+                      title="Iniciar tutorial del sistema"
+                      className="h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                    >
+                      <HelpCircle className="h-4 w-4" />
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
 
             <Toaster />
 
