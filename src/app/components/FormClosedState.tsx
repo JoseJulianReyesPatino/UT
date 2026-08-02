@@ -18,7 +18,7 @@ export function FormClosedState({ title, message }: FormClosedStateProps) {
           width={288}
           height={288}
           loading="eager"
-          fetchPriority="high"
+          fetchpriority="high"
           className="h-60 w-60 select-none object-contain translate-x-2 sm:h-72 sm:w-72 sm:translate-x-45"
           draggable={false}
         />

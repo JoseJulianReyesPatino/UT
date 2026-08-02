@@ -379,7 +379,7 @@ const ActivityList = React.memo(function ActivityList({ items, onOpen }: { items
           }}
           className="w-full text-left flex items-start gap-3 rounded-2xl p-3 border border-transparent hover:border-slate-200/70 hover:bg-slate-100/90 transition-colors cursor-pointer dark:hover:border-slate-800/70 dark:hover:bg-slate-900/50"
         >
-          <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 mt-2 shadow-[0_0_0_4px_rgba(16,185,129,0.12)] dark:shadow-[0_0_0_4px_rgba(16,185,129,0.06)]" />
+          <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 mt-2 shadow-[0_0_0_4px_color-mix(in_oklch,var(--color-emerald-500)_12%,transparent)] dark:shadow-[0_0_0_4px_color-mix(in_oklch,var(--color-emerald-500)_6%,transparent)]" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground">{activity.title}</p>
             <p className="text-xs text-muted-foreground truncate">{activity.description}</p>
@@ -620,8 +620,8 @@ export function AdminDashboard({ onNavigate, layoutStyle }: Readonly<AdminDashbo
           </div>
         </div>
       ) : (
-        <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+        <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/30 p-5 shadow-[0_24px_90px_-35px_color-mix(in_oklch,var(--color-emerald-500)_35%,transparent)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_color-mix(in_oklch,var(--color-emerald-500)_16%,transparent),_transparent_42%)]" />
           <div className="relative space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Panel Administrativo</h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">Gestión y supervisión del sistema académico con acceso rápido a documentos y actividad.</p>

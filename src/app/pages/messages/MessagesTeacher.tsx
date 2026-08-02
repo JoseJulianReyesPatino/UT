@@ -264,7 +264,7 @@ const ConversationRow = React.memo(({
       className={cn(
         "group relative mx-2 my-1 w-[calc(100%-1rem)] overflow-hidden rounded-2xl border text-left transition-all duration-200",
         active
-          ? "border-emerald-300 bg-gradient-to-r from-emerald-50 via-white to-cyan-50 shadow-[0_8px_24px_rgba(16,185,129,0.12)] ring-1 ring-emerald-200/70 dark:border-emerald-800 dark:from-emerald-950/40 dark:via-slate-950 dark:to-cyan-950/30 dark:ring-emerald-900/60"
+          ? "border-emerald-300 bg-gradient-to-r from-emerald-50 via-white to-emerald-50/40 shadow-[0_8px_24px_color-mix(in_oklch,var(--color-emerald-500)_12%,transparent)] ring-1 ring-emerald-200/70 dark:border-emerald-800 dark:from-emerald-950/40 dark:via-slate-950 dark:to-emerald-950/30 dark:ring-emerald-900/60"
           : "border-transparent bg-transparent hover:border-emerald-100 hover:bg-white/90 dark:hover:border-slate-700 dark:hover:bg-slate-900/70"
       )}
     >
@@ -622,8 +622,9 @@ const groupMessagesByDate = (messages: ChatMessage[]) => {
 export function MessagesTeacher(props: Readonly<{
   initialOpen?: { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string; filePath?: string } } | null;
   onConsume?: () => void;
+  layoutStyle?: string;
 }> = {}) {
-  const { initialOpen, onConsume } = props;
+  const { initialOpen, onConsume, layoutStyle } = props;
   const { user, isReady } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -656,6 +657,7 @@ export function MessagesTeacher(props: Readonly<{
   const peerRoleLabel = "Administrador";
   const recipientRoleCode = "administrador";
   const isTeacher = true;
+  const isFormal = layoutStyle === "formal";
   const suppressionStorageKey = `ut-suppressed-chats:${user?.id ?? "anon"}`;
   const suppressionStorageKeyRef = useRef(suppressionStorageKey);
   suppressionStorageKeyRef.current = suppressionStorageKey;
@@ -1551,6 +1553,217 @@ export function MessagesTeacher(props: Readonly<{
   if (isTeacher) {
     const adminConversation = targetConversation;
     const messageGroups = adminConversation ? groupMessagesByDate(adminConversation.messages) : [];
+
+    if (isFormal) {
+      return (
+        <div className="flex h-[calc(100vh-64px)] flex-col overflow-hidden bg-card dark:bg-slate-950">
+          {/* Encabezado plano */}
+          <div className="shrink-0 flex items-center border-b border-border/60 px-6 py-3 dark:border-slate-800">
+            <div>
+              <h1 className="text-lg font-semibold text-foreground dark:text-white">Mensajes</h1>
+              <p className="text-xs text-muted-foreground dark:text-slate-400">Canal de comunicación interna con administración</p>
+            </div>
+          </div>
+
+          {/* Contenido: panel de contacto + chat */}
+          <div className="flex flex-1 min-h-0">
+            {/* Panel izquierdo — contacto (solo en escritorio) */}
+            <div className="hidden sm:flex w-72 shrink-0 flex-col border-r border-border/60 bg-muted/20 dark:border-slate-800 dark:bg-slate-900/30">
+              <div className="border-b border-border/50 px-4 py-2.5 dark:border-slate-800">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground dark:text-slate-500">Contacto asignado</p>
+              </div>
+              {adminConversation ? (
+                <div className="p-4 space-y-3">
+                  <div className="flex flex-col items-center gap-3 rounded border border-border/60 bg-card p-4 dark:border-slate-700 dark:bg-slate-950/60">
+                    <div className="relative">
+                      <Avatar className="h-16 w-16 ring-2 ring-border dark:ring-slate-700">
+                        {activeConversationAvatarUrl ? (
+                          <AvatarImage src={activeConversationAvatarUrl} alt={adminConversation.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-lg font-semibold">
+                            {adminConversation.avatarFallback || getInitials(adminConversation.name)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <span className={cn(
+                        "absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background",
+                        adminConversation.status === "online" ? "bg-emerald-500" :
+                        adminConversation.status === "away"   ? "bg-amber-500"   : "bg-slate-400"
+                      )} />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-semibold text-foreground dark:text-white">{adminConversation.name}</p>
+                      <p className="text-xs text-muted-foreground dark:text-slate-400">{adminConversation.role}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between rounded border border-border/50 px-3 py-2 text-xs dark:border-slate-700">
+                      <span className="text-muted-foreground dark:text-slate-400">Estado</span>
+                      <span className={cn(
+                        "font-medium",
+                        adminConversation.status === "online" ? "text-emerald-600 dark:text-emerald-400" :
+                        adminConversation.status === "away"   ? "text-amber-600 dark:text-amber-400" : "text-slate-500"
+                      )}>
+                        {adminConversation.status === "online" ? "En línea" :
+                         adminConversation.status === "away"   ? "Ausente"  : "Sin conexión"}
+                      </span>
+                    </div>
+                    {adminConversation.unread > 0 && (
+                      <div className="flex items-center justify-between rounded border border-border/50 px-3 py-2 text-xs dark:border-slate-700">
+                        <span className="text-muted-foreground dark:text-slate-400">No leídos</span>
+                        <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-[11px]">{adminConversation.unread}</Badge>
+                      </div>
+                    )}
+                    {adminConversation.timestamp && adminConversation.lastMessage && adminConversation.lastMessage !== 'Nuevo chat' && (
+                      <div className="rounded border border-border/50 px-3 py-2 text-xs dark:border-slate-700">
+                        <p className="text-muted-foreground dark:text-slate-400 mb-1">Último mensaje</p>
+                        <p className="text-foreground dark:text-slate-200 line-clamp-2">{adminConversation.lastMessage}</p>
+                        <p className="mt-1 text-muted-foreground/70 dark:text-slate-500">{formatConversationTimestamp(adminConversation.timestamp)}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-1 items-center justify-center p-4 text-center">
+                  <p className="text-sm text-muted-foreground dark:text-slate-400">Cargando contacto...</p>
+                </div>
+              )}
+            </div>
+
+            {/* Panel derecho — área de chat */}
+            <div className="flex flex-1 min-h-0 flex-col">
+              {/* Subencabezado del chat */}
+              <div className="shrink-0 border-b border-border/60 bg-card px-4 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                {adminConversation ? (
+                  <div className="flex items-center gap-2.5 sm:hidden">
+                    <Avatar className="h-7 w-7">
+                      {activeConversationAvatarUrl ? (
+                        <AvatarImage src={activeConversationAvatarUrl} alt={adminConversation.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-semibold">
+                          {adminConversation.avatarFallback || getInitials(adminConversation.name)}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground dark:text-white">{adminConversation.name}</p>
+                      <p className="text-[11px] text-muted-foreground dark:text-slate-400">{adminConversation.role}</p>
+                    </div>
+                  </div>
+                ) : null}
+                <p className="hidden sm:block text-xs text-muted-foreground dark:text-slate-400">
+                  {adminConversation
+                    ? `Conversación con ${adminConversation.name}`
+                    : 'Iniciando conversación con el administrador...'}
+                </p>
+              </div>
+
+              {/* Mensajes */}
+              <div ref={chatScrollAreaRef} className="relative min-h-0 flex-1 overflow-hidden">
+                <ScrollArea className="h-full bg-background dark:bg-slate-950">
+                  <div className="w-full min-w-0 overflow-x-hidden">
+                    {isInitialLoad && !adminConversation ? (
+                      <MessageListSkeleton />
+                    ) : adminConversation && (isLoadingMessages || confirmedLoadedChatId !== selectedChat) && !adminConversation.messages.length ? (
+                      <MessageListSkeleton />
+                    ) : adminConversation && adminConversation.messages.length > 0 ? (
+                      <div className="pb-2 pt-3 px-4">
+                        {messageGroups.map((group, groupIndex) => (
+                          <div key={groupIndex}>
+                            <DateSeparator date={group.date} />
+                            <div className="space-y-3">
+                              {group.messages.map((messageItem) => (
+                                <MessageBubble
+                                  key={messageItem.id}
+                                  message={messageItem}
+                                  onReply={setReplyingTo}
+                                  onDelete={handleDeleteMessage}
+                                  onEdit={handleEditMessage}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : adminConversation ? (
+                      <EmptyConversationState title="Sin mensajes aún" iconOnly />
+                    ) : (
+                      <EmptyConversationState
+                        title="Preparando tu chat..."
+                        description="Estamos conectando tu chat con el administrador, un momento por favor."
+                      />
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                </ScrollArea>
+                {showScrollBottom && adminConversation && (
+                  <button
+                    type="button"
+                    onClick={scrollToBottom}
+                    className="absolute bottom-4 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 transition-colors"
+                    aria-label="Ir al final de la conversación"
+                  >
+                    <ChevronDown className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Compositor */}
+              <div data-tour="docente-messages-composer" className="shrink-0 border-t border-border/60 bg-card px-4 py-3 dark:border-slate-800 dark:bg-slate-950/60">
+                {replyingTo && (
+                  <div className="mb-2.5 flex items-start justify-between gap-3 rounded border border-border/60 bg-muted/50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground dark:text-slate-200">Respondiendo a {replyingTo.sender}</p>
+                      <p className="truncate text-muted-foreground dark:text-slate-400">{replyingTo.content}</p>
+                    </div>
+                    <button type="button" onClick={() => setReplyingTo(null)} aria-label="Cancelar respuesta" className="rounded p-1 hover:bg-muted dark:hover:bg-slate-700">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+                {pendingAttachments.length > 0 && <PendingAttachmentsBar attachments={pendingAttachments} onRemove={handleRemoveAttachment} />}
+                <div className="flex gap-2 items-end">
+                  <Textarea
+                    placeholder="Escribir mensaje..."
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded border-border/70 bg-background px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                  />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 rounded dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Adjuntar archivo"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                    <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
+                    <Button
+                      variant="success"
+                      size="icon"
+                      className="h-9 w-9 rounded"
+                      onClick={handleSend}
+                      title="Enviar"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="flex h-[calc(100dvh-64px)] min-h-0 flex-col gap-5 overflow-hidden">

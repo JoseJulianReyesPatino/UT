@@ -28,7 +28,7 @@ import BgITIID from "../assets/Fondos/Fondo_ITIID.png";
 import BgMecatronica from "../assets/Fondos/Fondo_Mecatronica.png";
 import BgAlimentarios from "../assets/Fondos/Fondo_Procesos_Alimentarios.png";
 
-// Páginas cargadas bajo demanda — solo se descargan cuando el usuario las visita
+// Páginas cargadas bajo demanda
 const DocenteDashboard = React.lazy(() => import("./pages/docente/DocenteDashboard"));
 const AdminDashboard = React.lazy(() => import("./pages/admin/AdminDashboard"));
 const DocumentHistory = React.lazy(() => import("./pages/docente/DocumentHistory").then(m => ({ default: m.DocumentHistory })));
@@ -57,8 +57,6 @@ const ActaFinalPage = React.lazy(() => import("./pages/docente/ActaFinal"));
 const EstadiasPage = React.lazy(() => import("./pages/docente/Estadias"));
 const TutoriasPage = React.lazy(() => import("./pages/docente/Tutorias"));
 const TourOverlay = React.lazy(() => import("./components/tour/TourOverlay").then(m => ({ default: m.TourOverlay })));
-
-
 
 const BG_OPTIONS = [
   { key: "default",      label: "Universidad",  src: BgDefault },
@@ -103,7 +101,7 @@ function AppContent() {
   const [showTourConfirm, setShowTourConfirm] = useState<"admin" | "docente" | null>(null);
   const [selectedBgKey, setSelectedBgKey] = useState<string>("default");
   const [bgOverlay, setBgOverlay] = useState<number>(30);
-  const [containerAlpha, setContainerAlpha] = useState<number>(90);
+  const [containerAlpha, setContainerAlpha] = useState<number>(100);
   const [containerBlur, setContainerBlur] = useState<number>(0);
   const [bgCustomUrl, setBgCustomUrl] = useState<string | null>(null);
   const [isUploadingBg, setIsUploadingBg] = useState(false);
@@ -118,12 +116,8 @@ function AppContent() {
     ? bgCustomUrl
     : BG_OPTIONS.find(b => b.key === selectedBgKey)?.src ?? BgDefault;
 
-  // Clave de localStorage con user.id para aislar preferencias por usuario
   const prefKey = useCallback((base: string) => `${base}-${user?.id ?? "__guest__"}`, [user?.id]);
 
-  // Guarda preferencias en localStorage (inmediato) y backend (debounced 1.5 s).
-  // pendingPrefs acumula TODOS los cambios del período de debounce para que
-  // mover varios sliders seguidos no descarte los cambios anteriores.
   const savePrefsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPrefs = useRef<{ bgKey?: string; bgOverlay?: number; containerAlpha?: number; containerBlur?: number; appTheme?: AppThemeId; layoutStyle?: LayoutStyleId }>({});
   const savePrefs = useCallback((patch: { bgKey?: string; bgOverlay?: number; containerAlpha?: number; containerBlur?: number; appTheme?: AppThemeId; layoutStyle?: LayoutStyleId }) => {
@@ -180,12 +174,11 @@ function AppContent() {
     }
   };
 
-  // Carga preferencias cuando el usuario cambia (login/logout/cambio de cuenta)
   useEffect(() => {
     if (!user?.id) {
       setSelectedBgKey("default");
       setBgOverlay(30);
-      setContainerAlpha(90);
+      setContainerAlpha(100);
       setContainerBlur(0);
       setBgCustomUrl(null);
       setAppTheme("emerald");
@@ -194,10 +187,9 @@ function AppContent() {
       applyLayoutStyle("default");
       return;
     }
-    // Rápido: caché local del usuario (evita flash mientras llega la API)
     setSelectedBgKey(localStorage.getItem(prefKey(BG_STORAGE_KEY))      ?? "default");
     setBgOverlay(    Number(localStorage.getItem(prefKey(BG_OVERLAY_KEY))      ?? "30"));
-    setContainerAlpha(Number(localStorage.getItem(prefKey(CONTAINER_ALPHA_KEY)) ?? "90"));
+    setContainerAlpha(Number(localStorage.getItem(prefKey(CONTAINER_ALPHA_KEY)) ?? "100"));
     setContainerBlur( Number(localStorage.getItem(prefKey(CONTAINER_BLUR_KEY))  ?? "0"));
     setBgCustomUrl(resolveApiAssetUrl(localStorage.getItem(prefKey(BG_CUSTOM_URL_KEY))) ?? null);
     const storedTheme = (localStorage.getItem(prefKey(APP_THEME_KEY)) as AppThemeId) ?? "emerald";
@@ -206,7 +198,6 @@ function AppContent() {
     const storedLayout = (localStorage.getItem(prefKey(LAYOUT_STYLE_KEY)) as LayoutStyleId) ?? "default";
     setLayoutStyle(storedLayout);
     applyLayoutStyle(storedLayout);
-    // Autoritativo: backend — sincroniza entre dispositivos
     apiFetch('/auth/preferences')
       .then(data => {
         const p = data?.preferences;
@@ -225,24 +216,23 @@ function AppContent() {
   useEffect(() => { applyAppTheme(appTheme); }, [appTheme]);
   useEffect(() => { applyLayoutStyle(layoutStyle); }, [layoutStyle]);
 
-  useEffect(() => {
+useEffect(() => {
     document.documentElement.style.setProperty("--ui-card-alpha", String(containerAlpha));
     const pct = containerAlpha;
     const blur = containerBlur;
     const styleId = "utslrc-ui-alpha";
     let el = document.getElementById(styleId) as HTMLStyleElement | null;
     if (!el) { el = document.createElement("style"); el.id = styleId; document.head.appendChild(el); }
-    el.textContent = `
-      /* ══ TRANSPARENCIA ══
-         El injection sobreescribe TANTO las clases hardcodeadas (bg-white, bg-slate-*)
-         COMO las que usan CSS variables (bg-card, bg-secondary, bg-muted).
-         Así la transparencia y el blur son 100 % independientes entre sí. */
 
-      /* ── Modo claro: contenedores blancos/card ──
-         :not([class*="rounded-full"]) excluye solo botones circulares pequeños (floating toolbar).
-         Botones grandes como "Cerrar Sesión" y el área de perfil SÍ quedan incluidos. */
-      html:not(.dark) [class~="bg-card"]:not([class*="rounded-full"]),
-      html:not(.dark) [class~="bg-background"]:not([class*="rounded-full"]),
+    // Si el usuario no ha tocado ningún slider (valores por defecto), no se
+    // inyecta ninguna regla — se respeta el diseño original tal cual, incluyendo
+    // las opacidades ya incorporadas en clases como bg-slate-950/60.
+    if (pct === 100 && blur === 0) {
+      el.textContent = "";
+      return;
+    }
+
+    const colorRules = pct !== 100 ? `
       html:not(.dark) [class~="bg-white"]:not([class*="rounded-full"]),
       html:not(.dark) [class*="bg-white/7"]:not([class*="rounded-full"]),
       html:not(.dark) [class*="bg-white/8"]:not([class*="rounded-full"]),
@@ -250,62 +240,47 @@ function AppContent() {
         background-image: none !important;
         background-color: oklch(1 0 0 / calc(${pct} / 100)) !important;
       }
-      html:not(.dark) [class~="bg-secondary"]:not([class*="rounded-full"]),
-      html:not(.dark) [class~="bg-muted"]:not([class*="rounded-full"]) {
-        background-image: none !important;
-        background-color: oklch(0.984 0.003 247.858 / calc(${pct} / 100)) !important;
-      }
-      /* bg-gradient-to-* cubre todas las direcciones (to-br, to-r, to-b, to-tr, etc.)
-         :not(.login-page):not(.login-page *) excluye la página y sus hijos (ej. botón "Iniciar sesión")
-         :not([class*="from-emerald-"]) excluye items activos del sidebar y áreas de UI con gradiente sólido verde */
       html:not(.dark) [class*="bg-gradient-to-"]:not([class*="rounded-full"]):not(.login-page):not(.login-page *):not([class*="from-emerald-"]) {
         background-image: none !important;
         background-color: oklch(1 0 0 / calc(${pct} / 100)) !important;
       }
-
-      /* ── Modo oscuro: contenedores oscuros/card ──
-         background-image: none elimina gradientes decorativos (ej. from-emerald-950) que
-         de otro modo se muestran encima del background-color transparente. */
-      .dark [class~="bg-card"]:not([class*="rounded-full"]),
-      .dark [class~="bg-background"]:not([class*="rounded-full"]) {
+      /* slate-900 y slate-950 llevan su propio tono azul (hue≈265) en Tailwind —
+         se preserva ese tono, solo se ajusta la opacidad al valor del slider */
+      .dark [class*="dark:bg-slate-900"],
+      .dark [class*="bg-slate-900"] {
         background-image: none !important;
-        background-color: oklch(0.145 0 0 / calc(${pct} / 100)) !important;
+        background-color: color-mix(in oklch, oklch(0.208 0.042 265.755) ${pct}%, transparent) !important;
       }
-      /* slate-9* = slate-900..950 — contenedores oscuros principales.
-         NO incluir slate-7* ni slate-8* porque esos son usados por iconos/badges pequeños. */
-      .dark [class~="bg-secondary"]:not([class*="rounded-full"]),
-      .dark [class~="bg-muted"]:not([class*="rounded-full"]),
-      .dark [class*="dark:bg-slate-9"],
-      .dark [class*="bg-slate-9"] {
+      .dark [class*="dark:bg-slate-950"],
+      .dark [class*="bg-slate-950"] {
         background-image: none !important;
-        background-color: oklch(0.145 0 0 / calc(${pct} / 100)) !important;
+        background-color: color-mix(in oklch, oklch(0.129 0.042 264.695) ${pct}%, transparent) !important;
       }
       .dark [class*="dark:from-slate-"] {
         background-image: none !important;
-        background-color: oklch(0.145 0 0 / calc(${pct} / 100)) !important;
+        background-color: color-mix(in oklch, oklch(0.129 0.042 264.695) ${pct}%, transparent) !important;
       }
+    ` : "";
 
-      /* ══ DESENFOQUE (slider independiente — controla backdrop-filter por separado) ══ */
-      html:not(.dark) [class~="bg-card"]:not([class*="rounded-full"]),
-      html:not(.dark) [class~="bg-background"]:not([class*="rounded-full"]),
+    const blurRules = blur !== 0 ? `
       html:not(.dark) [class~="bg-white"]:not([class*="rounded-full"]),
       html:not(.dark) [class*="bg-white/7"]:not([class*="rounded-full"]),
       html:not(.dark) [class*="bg-white/8"]:not([class*="rounded-full"]),
       html:not(.dark) [class*="bg-white/9"]:not([class*="rounded-full"]),
-      html:not(.dark) [class~="bg-secondary"]:not([class*="rounded-full"]),
-      html:not(.dark) [class~="bg-muted"]:not([class*="rounded-full"]),
       html:not(.dark) [class*="bg-gradient-to-"]:not([class*="rounded-full"]):not(.login-page):not(.login-page *):not([class*="from-emerald-"]),
-      .dark [class~="bg-card"]:not([class*="rounded-full"]),
-      .dark [class~="bg-background"]:not([class*="rounded-full"]),
-      .dark [class~="bg-secondary"]:not([class*="rounded-full"]),
-      .dark [class~="bg-muted"]:not([class*="rounded-full"]),
+      [class~="bg-card"]:not([class*="rounded-full"]),
+      [class~="bg-background"]:not([class*="rounded-full"]),
+      [class~="bg-secondary"]:not([class*="rounded-full"]),
+      [class~="bg-muted"]:not([class*="rounded-full"]),
       .dark [class*="dark:bg-slate-9"],
       .dark [class*="bg-slate-9"],
       .dark [class*="dark:from-slate-"],
       .dark [class*="backdrop-blur"] {
         backdrop-filter: blur(${blur}px) !important;
       }
-    `;
+    ` : "";
+
+    el.textContent = colorRules + blurRules;
   }, [containerAlpha, containerBlur]);
 
   const toggleToolbar = () => {
@@ -314,6 +289,7 @@ function AppContent() {
       return !prev;
     });
   };
+
   const noticeBanner = notice ? (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4 sm:top-6">
       <Alert
@@ -323,14 +299,13 @@ function AppContent() {
           : "border-emerald-300/80 bg-emerald-50/95 text-emerald-950 dark:border-emerald-800/80 dark:bg-emerald-950/90 dark:text-emerald-50"
         }`}
       >
-        <AlertDescription className="text-center text-sm font-semibold tracking-wide">
+        <AlertDescription className="col-span-full w-full justify-items-center text-center text-base font-semibold tracking-wide">
           {notice.message}
         </AlertDescription>
       </Alert>
     </div>
   ) : null;
 
-  // Cubre el fondo sincrónicamente antes de que el browser pinte cuando hay logout
   useLayoutEffect(() => {
     if (prevIsAuthenticatedRef.current !== null && prevIsAuthenticatedRef.current !== isAuthenticated) {
       if (!isAuthenticated) {
@@ -340,7 +315,6 @@ function AppContent() {
     prevIsAuthenticatedRef.current = isAuthenticated;
   }, [isAuthenticated]);
 
-  // Quita la clase splashing después de que el login haya renderizado
   useEffect(() => {
     if (!isAuthenticated && isReady) {
       const timer = window.setTimeout(() => {
@@ -514,7 +488,6 @@ function AppContent() {
     };
   }, [isReady, isAuthenticated, currentView]);
 
-  // Efecto para manejar estado offline/online sin PWA
   useEffect(() => {
     const handleOnline = () => {
       if (!navigator.onLine || !isOffline) {
@@ -651,7 +624,6 @@ function AppContent() {
       )
     : null;
 
-
   const confirmLeaveAndLogout = () => {
     setLeaveDialogOpen(false);
     logout();
@@ -725,9 +697,9 @@ function AppContent() {
             { code: "ficha-tecnica",          label: "Ficha Técnica" },
           ]} />;
         case "perfil":
-          return <Profile onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          return <Profile onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} layoutStyle={layoutStyle} />;
         default:
-          return <Profile onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          return <Profile onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} layoutStyle={layoutStyle} />;
       }
     }
 
@@ -744,7 +716,7 @@ function AppContent() {
 
       switch (currentView) {
         case "dashboard":
-          return <DocenteDashboard onNavigate={setCurrentView} />;
+          return <DocenteDashboard onNavigate={setCurrentView} layoutStyle={layoutStyle} />;
         case "planeacion":
           return wrapForm("planeacion", "Planeación", <PlaneacionPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} isTourActive={isDocenteTourOpen} />);
         case "instrumento-30-normal":
@@ -768,25 +740,25 @@ function AppContent() {
         case "estadias":
           return <EstadiasPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
         case "tutorias":
-          return <TutoriasPage />;
+          return <TutoriasPage layoutStyle={layoutStyle} />;
         case "tutorias-carga-academica":
-          return wrapForm("carga-academica", "Carga Académica", <TutoriasPage initialType="carga-academica" onNavigateHome={() => setCurrentView("tutorias")} />);
+          return wrapForm("carga-academica", "Carga Académica", <TutoriasPage initialType="carga-academica" onNavigateHome={() => setCurrentView("tutorias")} layoutStyle={layoutStyle} />);
         case "tutorias-reporte-bajas":
-          return wrapForm("reporte-bajas", "Reporte de Bajas", <TutoriasPage initialType="reporte-bajas" onNavigateHome={() => setCurrentView("tutorias")} />);
+          return wrapForm("reporte-bajas", "Reporte de Bajas", <TutoriasPage initialType="reporte-bajas" onNavigateHome={() => setCurrentView("tutorias")} layoutStyle={layoutStyle} />);
         case "tutorias-concentrado-asesorias":
-          return wrapForm("concentrado-asesorias", "Concentrado de Asesorías", <TutoriasPage initialType="concentrado-asesorias" onNavigateHome={() => setCurrentView("tutorias")} />);
+          return wrapForm("concentrado-asesorias", "Concentrado de Asesorías", <TutoriasPage initialType="concentrado-asesorias" onNavigateHome={() => setCurrentView("tutorias")} layoutStyle={layoutStyle} />);
         case "tutorias-acta-asistencia-grupal":
-          return wrapForm("acta-asistencia-grupal", "Acta de Asistencia Grupal", <TutoriasPage initialType="acta-asistencia-grupal" onNavigateHome={() => setCurrentView("tutorias")} />);
+          return wrapForm("acta-asistencia-grupal", "Acta de Asistencia Grupal", <TutoriasPage initialType="acta-asistencia-grupal" onNavigateHome={() => setCurrentView("tutorias")} layoutStyle={layoutStyle} />);
         case "tutorias-ficha-tecnica":
-          return wrapForm("ficha-tecnica", "Ficha Técnica", <TutoriasPage initialType="ficha-tecnica" onNavigateHome={() => setCurrentView("tutorias")} />);
+          return wrapForm("ficha-tecnica", "Ficha Técnica", <TutoriasPage initialType="ficha-tecnica" onNavigateHome={() => setCurrentView("tutorias")} layoutStyle={layoutStyle} />);
         case "historial":
-          return <DocumentHistory isTourActive={isDocenteTourOpen} />;
+          return <DocumentHistory isTourActive={isDocenteTourOpen} layoutStyle={layoutStyle} />;
         case "mensajes":
-          return <Messages initialOpen={deferredMessageOpen} onConsume={() => setDeferredMessageOpen(null)} />;
+          return <Messages initialOpen={deferredMessageOpen} onConsume={() => setDeferredMessageOpen(null)} layoutStyle={layoutStyle} />;
         case "perfil":
-          return <Profile onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          return <Profile onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} layoutStyle={layoutStyle} />;
         default:
-          return <DocenteDashboard onNavigate={setCurrentView} />;
+          return <DocenteDashboard onNavigate={setCurrentView} layoutStyle={layoutStyle} />;
       }
     }
   };
@@ -833,7 +805,7 @@ function AppContent() {
             backgroundAttachment: "fixed",
           }}
         >
-          {/* Capa de oscurecimiento del fondo — ajustable por el usuario */}
+          {/* Capa de oscurecimiento del fondo */}
           <div
             className="pointer-events-none absolute inset-0 transition-[background-color] duration-300"
             style={{ backgroundColor: `rgba(0,0,0,${bgOverlay / 100})`, zIndex: 1 }}
@@ -850,7 +822,7 @@ function AppContent() {
             <main className="relative flex-1 overflow-y-auto bg-transparent">
               <div className="pointer-events-none absolute inset-0 overflow-hidden" />
 
-              {/* IMÁGENES DECORATIVAS - HIJAS DIRECTAS DE <main> */}
+              {/* IMÁGENES DECORATIVAS */}
               {["planeacion","instrumento-30-normal","instrumento-40-nuevo","instrumento-60-nuevo","instrumento-70-normal","remedial","lista-concentrada","asesoria","portafolio","estadias","acta-final","tutorias"].includes(currentView) && (
                 <img
                   src={SuperiorFormImg}
@@ -972,39 +944,28 @@ function AppContent() {
                     >
                       <div className="w-full overflow-hidden rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
                         <svg width="100%" viewBox="0 0 110 72" xmlns="http://www.w3.org/2000/svg">
-                          {/* Sidebar plano */}
                           <rect x="0" y="0" width="22" height="72" fill="#f8fafc"/>
                           <line x1="22" y1="0" x2="22" y2="72" stroke="#e2e8f0" strokeWidth="1"/>
-                          {/* Logo */}
                           <rect x="3" y="3" width="16" height="4" rx="0" fill="#e2e8f0"/>
-                          {/* Item activo con indicador lateral */}
                           <rect x="0" y="11" width="2.5" height="5" fill="#10b981"/>
                           <rect x="4" y="11" width="15" height="4" rx="0" fill="#dbeafe"/>
-                          {/* Etiqueta GESTIÓN */}
                           <rect x="4" y="18" width="9" height="1.5" rx="0" fill="#94a3b8"/>
                           <rect x="4" y="21" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
                           <rect x="4" y="25" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
-                          {/* Etiqueta ACADÉMICO */}
                           <rect x="4" y="30" width="9" height="1.5" rx="0" fill="#94a3b8"/>
                           <rect x="4" y="33" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
                           <rect x="4" y="37" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
                           <rect x="4" y="41" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
-                          {/* Etiqueta SISTEMA */}
                           <rect x="4" y="46" width="9" height="1.5" rx="0" fill="#94a3b8"/>
                           <rect x="4" y="49" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
                           <rect x="4" y="53" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
-
-                          {/* Encabezado plano: título + subtítulo + línea inferior */}
                           <rect x="25" y="4" width="32" height="3.5" rx="0" fill="#1e293b"/>
                           <rect x="25" y="9" width="44" height="2" rx="0" fill="#94a3b8"/>
                           <line x1="22" y1="14" x2="110" y2="14" stroke="#e2e8f0" strokeWidth="0.8"/>
-
-                          {/* Barra de stats: 4 celdas rectangulares unidas */}
                           <rect x="24" y="17" width="84" height="11" rx="0" fill="#ffffff" stroke="#e2e8f0" strokeWidth="0.5"/>
                           <line x1="45" y1="17" x2="45" y2="28" stroke="#e2e8f0" strokeWidth="0.5"/>
                           <line x1="66" y1="17" x2="66" y2="28" stroke="#e2e8f0" strokeWidth="0.5"/>
                           <line x1="87" y1="17" x2="87" y2="28" stroke="#e2e8f0" strokeWidth="0.5"/>
-                          {/* Valores de stats */}
                           <rect x="27" y="19" width="9" height="1.5" rx="0" fill="#94a3b8"/>
                           <rect x="27" y="22" width="7" height="3" rx="0" fill="#1e293b"/>
                           <rect x="48" y="19" width="9" height="1.5" rx="0" fill="#94a3b8"/>
@@ -1013,16 +974,12 @@ function AppContent() {
                           <rect x="69" y="22" width="7" height="3" rx="0" fill="#1e293b"/>
                           <rect x="90" y="19" width="9" height="1.5" rx="0" fill="#94a3b8"/>
                           <rect x="90" y="22" width="7" height="3" rx="0" fill="#10b981"/>
-
-                          {/* Tabla de documentos pendientes */}
                           <rect x="24" y="31" width="56" height="39" rx="0" fill="#ffffff" stroke="#e2e8f0" strokeWidth="0.5"/>
-                          {/* Cabecera de tabla */}
                           <rect x="24" y="31" width="56" height="6" rx="0" fill="#f8fafc"/>
                           <line x1="24" y1="37" x2="80" y2="37" stroke="#e2e8f0" strokeWidth="0.5"/>
                           <rect x="27" y="33" width="10" height="2" rx="0" fill="#94a3b8"/>
                           <rect x="40" y="33" width="9" height="2" rx="0" fill="#94a3b8"/>
                           <rect x="52" y="33" width="9" height="2" rx="0" fill="#94a3b8"/>
-                          {/* Filas de tabla */}
                           <rect x="27" y="40" width="10" height="2" rx="0" fill="#1e293b"/>
                           <rect x="40" y="40" width="8" height="2" rx="0" fill="#64748b"/>
                           <rect x="52" y="40" width="7" height="2" rx="0" fill="#10b981"/>
@@ -1042,8 +999,6 @@ function AppContent() {
                           <rect x="27" y="67" width="10" height="2" rx="0" fill="#1e293b"/>
                           <rect x="40" y="67" width="8" height="2" rx="0" fill="#64748b"/>
                           <rect x="52" y="67" width="7" height="2" rx="0" fill="#94a3b8"/>
-
-                          {/* Lista de actividad reciente */}
                           <rect x="82" y="31" width="26" height="39" rx="0" fill="#ffffff" stroke="#e2e8f0" strokeWidth="0.5"/>
                           <rect x="85" y="34" width="15" height="2" rx="0" fill="#1e293b"/>
                           <line x1="82" y1="38" x2="108" y2="38" stroke="#e2e8f0" strokeWidth="0.5"/>
@@ -1253,7 +1208,7 @@ function AppContent() {
                     </div>
                   </div>
 
-                  {/* Slider 3: Desenfoque (efecto cristal esmerilado) */}
+                  {/* Slider 3: Desenfoque */}
                   <div className="border-t border-border/40 pt-3">
                     <div className="mb-1.5 flex items-center justify-between">
                       <span className="text-xs text-slate-500 dark:text-slate-400">Desenfoque de paneles</span>
@@ -1270,16 +1225,16 @@ function AppContent() {
                     </div>
                   </div>
 
-                  {/* Botón restablecer valores predeterminados */}
+                  {/* ✅ Botón restablecer valores predeterminados con 100% de opacidad */}
                   <div className="border-t border-border/40 pt-3">
                     <button
-                      onClick={() => {
+                    onClick={() => {
                         setSelectedBgKey("default");
                         setBgOverlay(30);
-                        setContainerAlpha(90);
+                        setContainerAlpha(100);
                         setContainerBlur(0);
                         setAppTheme("emerald");
-                        savePrefs({ bgKey: "default", bgOverlay: 30, containerAlpha: 90, containerBlur: 0, appTheme: "emerald" });
+                        savePrefs({ bgKey: "default", bgOverlay: 30, containerAlpha: 100, containerBlur: 0, appTheme: "emerald" });
                       }}
                       className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 py-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                     >
@@ -1291,9 +1246,8 @@ function AppContent() {
               </>
             )}
 
-            {/* Barra flotante de herramientas — colapsa con la ^ */}
+            {/* Barra flotante de herramientas */}
             <div className="fixed bottom-4 right-4 z-50 flex flex-col-reverse items-center gap-3">
-              {/* Tema (siempre visible, queda abajo por flex-col-reverse) */}
               <Button
                 type="button" variant="outline" size="icon"
                 onClick={toggleTheme}
@@ -1304,7 +1258,6 @@ function AppContent() {
                 {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
 
-              {/* Flecha colapso / expansión */}
               <button
                 onClick={toggleToolbar}
                 aria-label={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
@@ -1314,10 +1267,8 @@ function AppContent() {
                 <ChevronUp className={`h-4 w-4 transition-transform duration-200 ${isToolbarExpanded ? "rotate-180" : ""}`} />
               </button>
 
-              {/* Botones colapsables */}
               {isToolbarExpanded && (
                 <>
-                  {/* Diseño / Estructura */}
                   <Button
                     type="button" variant="outline" size="icon"
                     onClick={() => { setIsBgPanelOpen(false); setIsThemePanelOpen(false); setIsLayoutPanelOpen(p => !p); }}
@@ -1328,7 +1279,6 @@ function AppContent() {
                     <LayoutGrid className="h-4 w-4" />
                   </Button>
 
-                  {/* Tema de color */}
                   <Button
                     type="button" variant="outline" size="icon"
                     onClick={() => { setIsBgPanelOpen(false); setIsLayoutPanelOpen(false); setIsThemePanelOpen(p => !p); }}
@@ -1339,7 +1289,6 @@ function AppContent() {
                     <Palette className="h-4 w-4" />
                   </Button>
 
-                  {/* Fondo de pantalla */}
                   <Button
                     type="button" variant="outline" size="icon"
                     onClick={() => { setIsThemePanelOpen(false); setIsLayoutPanelOpen(false); setIsBgPanelOpen(p => !p); }}
@@ -1350,7 +1299,6 @@ function AppContent() {
                     <ImageIcon className="h-4 w-4" />
                   </Button>
 
-                  {/* Tutorial */}
                   {isAdmin && !isAdminTourOpen && (
                     <Button
                       type="button" variant="outline" size="icon"
@@ -1422,7 +1370,7 @@ function AppContent() {
             </Suspense>
 
             <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
-              <DialogContent className="rounded-3xl border border-emerald-200/80 bg-white/95 px-6 py-6 shadow-2xl shadow-emerald-300/20 dark:border-slate-700 dark:bg-slate-950/95">
+              <DialogContent aria-describedby={undefined} className="rounded-3xl border border-emerald-200/80 bg-white/95 px-6 py-6 shadow-2xl shadow-emerald-300/20 dark:border-slate-700 dark:bg-slate-950/95">
                 <DialogHeader>
                   <DialogTitle>¿Estás seguro que quieres salir del sistema?</DialogTitle>
                 </DialogHeader>
@@ -1453,7 +1401,7 @@ function AppContent() {
             </Dialog>
 
             <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
-              <DialogContent className="rounded-3xl border border-emerald-200/80 bg-white/95 px-6 py-6 shadow-2xl shadow-emerald-300/20 dark:border-slate-700 dark:bg-slate-950/95">
+              <DialogContent aria-describedby={undefined} className="rounded-3xl border border-emerald-200/80 bg-white/95 px-6 py-6 shadow-2xl shadow-emerald-300/20 dark:border-slate-700 dark:bg-slate-950/95">
                 <DialogHeader>
                   <DialogTitle>¿Estás seguro que quieres salir del sistema?</DialogTitle>
                 </DialogHeader>

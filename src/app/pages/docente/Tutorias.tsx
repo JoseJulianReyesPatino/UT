@@ -17,6 +17,7 @@ import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { FormClosedState } from "../../components/FormClosedState";
+import gallosMascot from "../../../assets/elementos/Form_Not_Found.webp";
 import { preloadForms } from "../../components/FormAccessGuard";
 import { HistorySheetSkeleton } from "./DocumentHistory";
 
@@ -55,6 +56,7 @@ interface TutoriasPageProps {
   initialType?: DocumentoTutorias | null;
   onNavigateHome?: () => void;
   deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null;
+  layoutStyle?: string;
 }
 
 const documentTypes: DocumentoConfig[] = [
@@ -112,7 +114,8 @@ const initialFormData: TutoriasFormData = {
 };
 
 export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
-  const { initialType = null, onNavigateHome, deadlineInfo } = props;
+  const { initialType = null, onNavigateHome, deadlineInfo, layoutStyle } = props;
+  const isFormal = layoutStyle === "formal";
   const { user } = useAuth();
   const [selectedType, setSelectedType] = useState<DocumentoTutorias | null>(initialType);
   const [typeAccessClosed, setTypeAccessClosed] = useState(false);
@@ -140,6 +143,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
   const [resubmitPreviewUrl, setResubmitPreviewUrl] = useState<string | null>(null);
   const [showResubmitPreview, setShowResubmitPreview] = useState(false);
   const [isResubmitting, setIsResubmitting] = useState(false);
+  const [selectorDeadlines, setSelectorDeadlines] = useState<Record<string, { formattedDeadline: string; isUrgent: boolean; isClosed: boolean } | null>>({});
 
   const selectedConfig = useMemo(
     () => documentTypes.find((type) => type.id === selectedType) ?? null,
@@ -148,6 +152,28 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
 
   // Pre-cargar caché de formularios al montar
   useEffect(() => { preloadForms().catch(() => {}); }, []);
+
+  // Cargar fechas límite de todos los formularios para el selector (modo empresarial)
+  useEffect(() => {
+    if (!isFormal || !user) return;
+    preloadForms().then((forms) => {
+      const result: typeof selectorDeadlines = {};
+      for (const type of documentTypes) {
+        const formIdStr = TUTORIAS_FORM_ID_MAP[type.id];
+        const match = forms.find((f: any) => String(f.form_code).replace(/_/g, "-") === formIdStr);
+        if (!match?.due_at) { result[type.id] = null; continue; }
+        const deadline = new Date(match.due_at);
+        const isClosed = deadline.getTime() < Date.now();
+        const msLeft = deadline.getTime() - Date.now();
+        result[type.id] = {
+          formattedDeadline: deadline.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }),
+          isUrgent: !isClosed && msLeft / (1000 * 60 * 60) < 24,
+          isClosed,
+        };
+      }
+      setSelectorDeadlines(result);
+    }).catch(() => {});
+  }, [isFormal, user]);
 
   // Verificación de acceso por tipo
   useEffect(() => {
@@ -569,6 +595,444 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
     }
   };
 
+  /* ── Modo empresarial — selector de tipo ── */
+  if (isFormal && selectedConfig === null) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        {/* Header plano */}
+        <div className="border-b border-border bg-card px-6 py-4 dark:border-slate-800 dark:bg-slate-950/80">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Tutorías</h1>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Selecciona el formulario que deseas gestionar</p>
+        </div>
+
+        {/* Cabecera de tabla */}
+        <div className="grid grid-cols-[3rem_1fr_auto] sm:grid-cols-[3rem_1fr_auto_auto] gap-4 border-b border-border bg-muted/40 px-6 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-500">
+          <span>#</span>
+          <span>Formulario</span>
+          <span className="hidden sm:block">Fecha límite</span>
+          <span className="pr-1">Acción</span>
+        </div>
+
+        {/* Filas de formularios */}
+        <div className="divide-y divide-border dark:divide-slate-800">
+          {documentTypes.map((type, index) => {
+            const dl = selectorDeadlines[type.id];
+            return (
+              <button
+                key={type.id}
+                type="button"
+                onClick={() => handleSelectType(type.id)}
+                className="grid w-full grid-cols-[3rem_1fr_auto] sm:grid-cols-[3rem_1fr_auto_auto] items-center gap-4 px-6 py-4 text-left transition-colors hover:bg-muted/40 dark:hover:bg-slate-900/40"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded border border-border text-[11px] font-semibold tabular-nums text-slate-400 dark:border-slate-700 dark:text-slate-500">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">{type.boton}</p>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-500">{type.descripcion}</p>
+                  {/* Fecha límite visible solo en móvil */}
+                  {dl && (
+                    <span className={`mt-1 inline-flex items-center gap-1 text-[10px] font-medium sm:hidden ${
+                      dl.isClosed ? "text-red-600 dark:text-red-400" : dl.isUrgent ? "text-amber-600 dark:text-amber-400" : "text-slate-400 dark:text-slate-500"
+                    }`}>
+                      <CalendarClock className="h-3 w-3 shrink-0" />
+                      {dl.isClosed ? "Cerrado" : dl.formattedDeadline}
+                    </span>
+                  )}
+                </div>
+                {/* Fecha límite en desktop */}
+                <div className="hidden sm:flex shrink-0 items-center">
+                  {dl === undefined ? (
+                    <span className="h-3 w-24 animate-pulse rounded bg-muted" />
+                  ) : dl === null ? (
+                    <span className="text-xs text-slate-400 dark:text-slate-600">—</span>
+                  ) : (
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                      dl.isClosed
+                        ? "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400"
+                        : dl.isUrgent
+                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                        : "bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400"
+                    }`}>
+                      <CalendarClock className="h-3 w-3" />
+                      {dl.isClosed ? "Cerrado" : dl.formattedDeadline}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="hidden text-xs font-medium text-emerald-700 dark:text-emerald-400 sm:inline">Abrir</span>
+                  <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-600" />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Modo empresarial — formulario abierto ── */
+  if (isFormal && selectedConfig !== null) {
+    const di = initialType ? deadlineInfo : typeDeadlineInfo;
+
+    if (typeAccessClosed && initialType === null) {
+      return (
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          {/* Header con breadcrumb */}
+          <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-3 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => { setSelectedType(null); setTypeAccessClosed(false); }} className="flex items-center gap-1.5 text-xs text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Tutorías
+              </button>
+              <span className="text-slate-300 dark:text-slate-700">/</span>
+              <span className="text-xs font-semibold text-slate-900 dark:text-white">{selectedConfig.boton}</span>
+            </div>
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+              <SheetTrigger asChild>
+                <button type="button" className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-muted dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                  <History className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Historial</span>
+                </button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md" overlayClassName="bg-black/30 backdrop-blur-[2px]">
+                <SheetHeader>
+                  <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
+                  <SheetDescription className="dark:text-slate-400">Documentos enviados anteriormente para {selectedConfig.boton.toLowerCase()}.</SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-4">
+                  {isLoadingHistory ? <HistorySheetSkeleton /> : groupedHistory.length > 0 ? (
+                    <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
+                      <div className="grid gap-3 p-1">
+                        {groupedHistory.map((group) => {
+                          const main = group[0];
+                          return (
+                            <DocumentHistoryCard
+                              key={main.batch_id ?? main.id}
+                              documents={group.map((d: any) => ({ id: d.id, fileName: getUploadedFileName(d), status: d.status, returnedComment: d.returned_comment ?? undefined }))}
+                              nota={main.nota}
+                              submittedAt={new Date(main.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                              status={getBatchStatus(group)}
+                              returnedComment={getBatchStatus(group) === "devuelto" ? (group.find((d: any) => String(d.status ?? "").toLowerCase() === "devuelto")?.returned_comment ?? undefined) : undefined}
+                              onViewDocument={(docId) => { const doc = group.find((d: any) => d.id === docId); if (doc) openPreview(doc); }}
+                              onEdit={() => void populateFormForEditBatch(group)}
+                              onDelete={handleDeleteDocuments}
+                              onHide={handleHideDocuments}
+                              onResubmit={(docId, fileName, returnedComment) => { setResubmitTarget({ docId, fileName, returnedComment }); setResubmitFile(null); }}
+                              isDeleting={group.some((d: any) => deletingDocIds.includes(d.id))}
+                            />
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos en el historial.</p>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          {/* Layout dos columnas: mascota + info */}
+          <div className="flex flex-col sm:flex-row sm:divide-x divide-border dark:divide-slate-800">
+            {/* Columna izquierda: mascota */}
+            <div className="flex flex-col items-center justify-center gap-3 border-b border-border px-8 py-8 sm:border-b-0 sm:w-64 sm:shrink-0 dark:border-slate-800">
+              <img
+                src={gallosMascot}
+                alt=""
+                width={180}
+                height={180}
+                className="h-40 w-40 select-none object-contain"
+                draggable={false}
+              />
+              <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
+                Formulario cerrado
+              </span>
+            </div>
+
+            {/* Columna derecha: tabla de estado */}
+            <div className="flex flex-1 flex-col divide-y divide-border dark:divide-slate-800">
+              <div className="px-6 py-4">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">Estado del formulario</p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">El período de entrega para este formulario ha concluido</p>
+              </div>
+              <div className="grid grid-cols-[9rem_1fr] items-center gap-3 px-6 py-3.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Formulario</span>
+                <span className="text-sm font-medium text-slate-800 dark:text-white">{selectedConfig.boton}</span>
+              </div>
+              <div className="grid grid-cols-[9rem_1fr] items-center gap-3 px-6 py-3.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Estado</span>
+                <span className="inline-flex items-center gap-1.5 text-sm">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                  <span className="font-medium text-red-700 dark:text-red-400">No disponible</span>
+                </span>
+              </div>
+              <div className="grid grid-cols-[9rem_1fr] items-start gap-3 px-6 py-3.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Acción</span>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Contacta a administración si tienes dudas sobre tu entrega anterior</span>
+              </div>
+              <div className="grid grid-cols-[9rem_1fr] items-center gap-3 px-6 py-3.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Historial</span>
+                <button
+                  type="button"
+                  onClick={() => setSheetOpen(true)}
+                  className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                >
+                  <History className="h-3.5 w-3.5" />
+                  Ver documentos enviados
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm sm:h-[calc(100vh-64px)] dark:border-slate-800 dark:bg-slate-950">
+          {/* Header plano con breadcrumb y acciones */}
+          <div className="shrink-0 flex items-center justify-between gap-4 border-b border-border px-6 py-3 dark:border-slate-800">
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setSelectedType(null); setEditingDocumentId(null); }}
+                className="flex items-center gap-1.5 text-xs text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Tutorías
+              </button>
+              <span className="text-slate-300 dark:text-slate-700">/</span>
+              <span className="truncate text-xs font-semibold text-slate-900 dark:text-white">{selectedConfig.boton}</span>
+              {di && (
+                <span className={`hidden sm:inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${di.isUrgent ? "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"}`}>
+                  <CalendarClock className="h-3 w-3" />
+                  Cierra el {di.formattedDeadline}
+                </span>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button type="button" onClick={() => window.open(getCalendarFileUrl(), "_blank")} className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-muted dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                <Calendar className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Calendario</span>
+              </button>
+              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetTrigger asChild>
+                  <button type="button" className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-muted dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                    <History className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Historial</span>
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md" overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]">
+                  <SheetHeader>
+                    <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
+                    <SheetDescription className="dark:text-slate-400">Selecciona un documento para ver, descargar o editar.</SheetDescription>
+                  </SheetHeader>
+                  <div className="mt-4 space-y-4">
+                    {isLoadingHistory ? (
+                      <HistorySheetSkeleton />
+                    ) : groupedHistory.length > 0 ? (
+                      <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
+                        <div className="grid gap-3 p-1">
+                          {groupedHistory.map((group) => {
+                            const main = group[0];
+                            return (
+                              <DocumentHistoryCard
+                                key={main.batch_id ?? main.id}
+                                documents={group.map((d: any) => ({ id: d.id, fileName: getUploadedFileName(d), status: d.status, returnedComment: d.returned_comment ?? undefined }))}
+                                nota={main.nota}
+                                submittedAt={new Date(main.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                status={getBatchStatus(group)}
+                                returnedComment={getBatchStatus(group) === "devuelto" ? (group.find((d: any) => String(d.status ?? "").toLowerCase() === "devuelto")?.returned_comment ?? undefined) : undefined}
+                                onViewDocument={(docId) => { const doc = group.find((d: any) => d.id === docId); if (doc) openPreview(doc); }}
+                                onEdit={() => void populateFormForEditBatch(group)}
+                                onDelete={handleDeleteDocuments}
+                                onHide={handleHideDocuments}
+                                onResubmit={(docId, fileName, returnedComment) => { setResubmitTarget({ docId, fileName, returnedComment }); setResubmitFile(null); }}
+                                isDeleting={group.some((d: any) => deletingDocIds.includes(d.id))}
+                              />
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos en el historial.</p>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+          </div>
+
+          {/* Alertas de edición */}
+          {(editingDocumentId && !isMetadataOnlyEdit) && (
+            <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-6 py-2.5 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
+              Estás editando el documento. Ajusta los campos y selecciona el nuevo PDF para actualizar.
+              {isLoadingPdf && <span className="ml-2 inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Cargando...</span>}
+            </div>
+          )}
+          {isMetadataOnlyEdit && (
+            <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-6 py-2.5 text-xs text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-100">
+              <strong>Edición de datos.</strong> Este envío ya fue procesado — solo puedes editar los campos, no los archivos.
+            </div>
+          )}
+
+          {/* Contenido principal: columna única en móvil, dos columnas en desktop */}
+          <div className="flex flex-1 min-h-0 flex-col overflow-y-auto sm:flex-row sm:overflow-hidden sm:divide-x divide-border dark:divide-slate-800">
+            {/* Columna izquierda: subir archivo */}
+            <div className="flex flex-1 flex-col sm:overflow-y-auto p-5 border-b border-border sm:border-b-0 dark:border-slate-800">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Subir archivo *</p>
+              <p className="mb-3 text-xs text-muted-foreground dark:text-slate-400">
+                PDF, máx. 15 MB por archivo. Hasta 3 archivos simultáneos.
+              </p>
+              {isMetadataOnlyEdit ? (
+                <div className="space-y-1.5 rounded-xl border border-border/50 bg-muted/20 p-3 dark:border-slate-800/50 dark:bg-slate-900/20">
+                  {editingBatchFileNames.map((name, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/60 px-3 py-2 dark:border-slate-800/40 dark:bg-slate-900/40">
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground dark:text-slate-500" />
+                      <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground dark:text-slate-400">{name}</span>
+                      <Ban className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 dark:text-slate-600" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <input type="file" multiple className="hidden" id="tutorias-formal-upload" onChange={handleFileChange} disabled={formData.archivos.length >= 3 || isLoadingPdf} />
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    className={`flex-1 rounded-xl border-2 border-dashed transition-all ${
+                      formData.archivos.length === 0 ? "flex flex-col items-center justify-center text-center p-6" : "p-4"
+                    } ${isDragging ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30" : "border-border bg-background/60 hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40"} ${isLoadingPdf ? "pointer-events-none opacity-60" : ""}`}
+                  >
+                    {isLoadingPdf ? (
+                      <div className="flex flex-col items-center justify-center gap-3 py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                        <p className="text-sm text-muted-foreground dark:text-slate-400">Cargando documento...</p>
+                      </div>
+                    ) : formData.archivos.length === 0 ? (
+                      <label htmlFor="tutorias-formal-upload" className="block cursor-pointer space-y-3">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary dark:bg-emerald-500/10 dark:text-emerald-400">
+                          <Upload className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium dark:text-white">{getArchivosLabel()}</p>
+                          <p className="text-xs text-muted-foreground dark:text-slate-400">{isDragging ? "Suelta aquí para cargar" : `${getEspaciosLabel()} · arrastra o haz clic`}</p>
+                        </div>
+                      </label>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className={`grid gap-3 ${formData.archivos.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                          {formData.archivos.map((archivo, index) => (
+                            <PdfPreview
+                              key={`${archivo.name}-${archivo.size}-${index}`}
+                              file={archivo}
+                              title="Documento cargado"
+                              onRemove={() => removeFile(index)}
+                              onReplace={(newFile) => {
+                                if (newFile.size > 15 * 1024 * 1024) { toast.error(`${newFile.name} excede el límite de 15 MB`); return; }
+                                if (newFile.type !== "application/pdf") { toast.error(`${newFile.name} debe ser un archivo PDF`); return; }
+                                setFormData((current) => ({ ...current, archivos: current.archivos.map((f, i) => (i === index ? newFile : f)) }));
+                              }}
+                            />
+                          ))}
+                        </div>
+                        {formData.archivos.length < 3 && (
+                          <label htmlFor="tutorias-formal-upload" className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background/60 py-3 text-sm text-muted-foreground transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:hover:border-emerald-500/40">
+                            <FolderOpen className="h-4 w-4" />
+                            Agregar otro · {getEspaciosLabel()}
+                          </label>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Columna derecha: metadatos */}
+            <div className="flex flex-col sm:w-72 sm:shrink-0 sm:overflow-y-auto divide-y divide-border dark:divide-slate-800">
+              {/* Nota */}
+              <div className="p-5 space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nota para administración</p>
+                <Textarea
+                  value={formData.nota}
+                  onChange={(e) => setFormData((c) => ({ ...c, nota: e.target.value }))}
+                  placeholder="Opcional"
+                  className="min-h-[7rem] resize-none rounded-lg text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+                />
+              </div>
+              {/* Docente */}
+              <div className="p-5 space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nombre del docente *</p>
+                <div className="relative">
+                  <Input
+                    value={formData.docente}
+                    readOnly
+                    className="rounded-lg bg-muted/50 cursor-default select-none pr-8 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  />
+                  <Ban className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground dark:text-slate-500" />
+                </div>
+              </div>
+              {/* Declaración */}
+              <div className="p-5 space-y-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Declaración de autorización</p>
+                <p className="text-xs text-muted-foreground dark:text-slate-400 leading-relaxed">
+                  Autorizo el uso de estos datos con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer con acciones */}
+          <div className="shrink-0 flex items-center justify-between gap-3 border-t border-border px-6 py-3 dark:border-slate-800">
+            <p className="text-[10px] text-slate-400 dark:text-slate-500">* campos obligatorios</p>
+            <div className="flex items-center gap-2">
+              {(editingDocumentId !== null || editingBatchDocIds.length > 0) ? (
+                <Button variant="outline" size="sm" onClick={() => setCancelEditDialogOpen(true)} disabled={isSubmitting || isLoadingPdf} className="rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+                  Cancelar
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={resetForm} disabled={isSubmitting || isLoadingPdf} className="rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+                  Limpiar
+                </Button>
+              )}
+              <Button variant="success" size="sm" onClick={handleSubmit} disabled={!isValid || isSubmitting || isLoadingPdf} className="rounded-lg px-5">
+                {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar" : "Enviar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Diálogos compartidos */}
+        <Dialog open={previewItem !== null} onOpenChange={(open) => { if (!open) closePreview(); }}>
+          <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
+            <DialogHeader><DialogTitle>{previewItem?.nombre ?? "Documento"}</DialogTitle></DialogHeader>
+            <div className="flex-1 min-h-0">
+              {previewLoading ? <div className="flex h-[82vh] items-center justify-center text-sm text-muted-foreground">Cargando...</div>
+                : previewError ? <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{previewError}</div>
+                : previewBlobUrl ? <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border"><a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center text-sm text-primary underline">Abrir en nueva pestaña</a></object>
+                : null}
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={cancelEditDialogOpen} onOpenChange={setCancelEditDialogOpen}>
+          <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md dark:border-slate-800/70 dark:bg-slate-950/90">
+            <DialogHeader>
+              <DialogTitle className="dark:text-white">¿Cancelar edición?</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">Se perderán los cambios. El documento seguirá tal como estaba.</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-row justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCancelEditDialogOpen(false)} className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Seguir editando</Button>
+              <Button variant="destructive" onClick={() => { setCancelEditDialogOpen(false); resetForm(); }}>Sí, cancelar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-1">
       {/* Fila superior: fecha límite + acciones (solo cuando el formulario está abierto) */}
@@ -674,7 +1138,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
       )}
 
       {selectedConfig === null ? (
-        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
           <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
             <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Selecciona una opción para continuar</p>
 
@@ -818,7 +1282,7 @@ export default function TutoriasPage(props: Readonly<TutoriasPageProps> = {}) {
           </div>
         </div>
       ) : (
-        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
           <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
             <div className="flex items-start justify-between">
               <div>

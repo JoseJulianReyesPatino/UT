@@ -520,7 +520,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
             isCollapsedLocal ? "w-16" : "w-64"
           )
         : cn(
-            "mx-3 my-3 h-[calc(100dvh-1.5rem)] min-h-[calc(100dvh-1.5rem)] rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-background to-sky-50 shadow-[0_10px_30px_rgba(15,23,42,0.08),0_2px_10px_rgba(16,185,129,0.08)] dark:border-slate-800 dark:bg-gradient-to-br dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950",
+            "mx-3 my-3 h-[calc(100dvh-1.5rem)] min-h-[calc(100dvh-1.5rem)] rounded-[28px] border border-emerald-200/70 bg-card shadow-[0_10px_30px_rgba(15,23,42,0.08)] shadow-emerald-500/[0.06] dark:border-slate-800 dark:bg-slate-950",
             isCollapsedLocal ? "w-16" : "w-64"
           )
     );
@@ -665,7 +665,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               }}
               className={isFormal
                 ? "w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors text-left"
-                : "w-full flex items-center gap-3 px-3 py-3 rounded-2xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 to-cyan-50 shadow-sm transition-colors hover:bg-emerald-100/70 dark:border-slate-700 dark:from-slate-900 dark:to-slate-950 dark:hover:bg-slate-800 text-left"
+                : "w-full flex items-center gap-3 px-3 py-3 rounded-2xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 to-emerald-50/60 shadow-sm transition-colors hover:bg-emerald-100/70 dark:border-slate-700 dark:from-slate-900 dark:to-slate-950 dark:hover:bg-slate-800 text-left"
               }
             >
               <Avatar className="h-8 w-8 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">

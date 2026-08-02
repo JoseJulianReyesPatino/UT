@@ -7,7 +7,8 @@ import { SearchableSelect } from "../../components/SearchableSelect";
 import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { type DocRecord, getParcialNum, formatSentFecha } from "./supervisorShared";
-import { Eye, FileText, RefreshCw, Tag } from "lucide-react";
+import { Eye, FileText, Info, RefreshCw } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { toast } from "sonner";
 import { DocumentCardSkeleton } from "../admin/skeletons";
 import { cn } from "../../../lib/utils";
@@ -47,7 +48,6 @@ export default function SupervisorDocPage({
   const [docenteFilter, setDocenteFilter] = useState("all");
   const [grupoFilter, setGrupoFilter] = useState("all");
   const [apartadoFilter, setApartadoFilter] = useState("all");
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [previewDoc, setPreviewDoc] = useState<DocRecord | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -238,14 +238,6 @@ export default function SupervisorDocPage({
     </div>
   );
 
-  const toggleRow = (id: number) => {
-    setExpandedRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
   /* ── Fila formal ── */
   const renderFormalDocRow = (doc: DocRecord) => {
     const rawTitle = doc.title ?? "";
@@ -258,14 +250,18 @@ export default function SupervisorDocPage({
     const grupo = doc.grupo ?? doc.group_code;
     const parcialNum = getParcialNum(doc.parcial);
 
-    const hasTags = !!(
-      apartadoLabel ||
-      (doc.cuatrimestre != null && String(doc.cuatrimestre) !== "" && String(doc.cuatrimestre) !== "-") ||
-      (!hideColumns.includes("grupo") && grupo && grupo !== "-") ||
-      (!hideColumns.includes("parcial") && parcialNum) ||
-      (doc.materia && doc.materia !== "-" && doc.materia.toLowerCase() !== "sin materia")
-    );
-    const isExpanded = expandedRows.has(doc.id);
+    const infoFields: { label: string; value: string }[] = [
+      !hideColumns.includes("carrera") && doc.carrera_label ? { label: "Carrera", value: doc.carrera_label } : null,
+      doc.cuatrimestre != null && String(doc.cuatrimestre) !== "" && String(doc.cuatrimestre) !== "-"
+        ? { label: "Cuatrimestre", value: String(doc.cuatrimestre) } : null,
+      !hideColumns.includes("grupo") && grupo && grupo !== "-" ? { label: "Grupo", value: grupo } : null,
+      !hideColumns.includes("parcial") && parcialNum ? { label: "Parcial", value: `Parcial ${parcialNum}` } : null,
+      !hideColumns.includes("materia") && doc.materia && doc.materia !== "-" && doc.materia.toLowerCase() !== "sin materia"
+        ? { label: "Materia", value: doc.materia } : null,
+      apartadoLabel ? { label: "Apartado", value: apartadoLabel } : null,
+      (doc.submitted_at || doc.created_at)
+        ? { label: "Enviado", value: formatSentFecha(doc.submitted_at ?? doc.created_at) } : null,
+    ].filter((f): f is { label: string; value: string } => f !== null);
 
     return (
       <div
@@ -284,39 +280,26 @@ export default function SupervisorDocPage({
               {doc.uploaded_by_name ?? "Docente"}
               {!hideColumns.includes("carrera") && doc.carrera_label ? ` · ${doc.carrera_label}` : ""}
             </p>
-            {isExpanded && (
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {apartadoLabel && (
-                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">{apartadoLabel}</Badge>
-                )}
-                {doc.cuatrimestre != null && String(doc.cuatrimestre) !== "" && String(doc.cuatrimestre) !== "-" && (
-                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">{`Cuatrimestre ${doc.cuatrimestre}`}</Badge>
-                )}
-                {!hideColumns.includes("grupo") && grupo && grupo !== "-" && (
-                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">{`Grupo ${grupo}`}</Badge>
-                )}
-                {!hideColumns.includes("parcial") && parcialNum && (
-                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">{`Parcial ${parcialNum}`}</Badge>
-                )}
-                {doc.materia && doc.materia !== "-" && doc.materia.toLowerCase() !== "sin materia" && (
-                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">{doc.materia}</Badge>
-                )}
-              </div>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          {hasTags && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-7 w-7 text-xs", isExpanded && "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400")}
-              onClick={() => toggleRow(doc.id)}
-              title={isExpanded ? "Ocultar etiquetas" : "Mostrar etiquetas"}
-            >
-              <Tag className="h-3.5 w-3.5" />
-            </Button>
-          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300" aria-label="Ver detalles">
+                <Info className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="p-0">
+              <div className="px-3 py-2 space-y-1 min-w-[180px]">
+                {infoFields.map(({ label, value }) => (
+                  <div key={label} className="flex items-baseline gap-2 text-xs">
+                    <span className="text-muted-foreground shrink-0 w-[72px]">{label}:</span>
+                    <span className="font-medium break-words">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
           <Button variant="outline" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs" onClick={() => setPreviewDoc(doc)}>
             <Eye className="h-3.5 w-3.5" /><span className="hidden sm:inline">Ver</span>
           </Button>
@@ -548,8 +531,8 @@ export default function SupervisorDocPage({
   /* ── Modo clásico ── */
   return (
     <div className="relative space-y-6 overflow-hidden">
-      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/30 p-5 shadow-[0_24px_90px_-35px_color-mix(in_oklch,var(--color-emerald-500)_35%,transparent)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_color-mix(in_oklch,var(--color-emerald-500)_16%,transparent),_transparent_42%)]" />
         <div className="relative flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h1>

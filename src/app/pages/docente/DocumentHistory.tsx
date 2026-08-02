@@ -4,7 +4,7 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { FileText, Search, Download, Eye, Filter, Loader2, ChevronDown, Check, CheckCircle2, Clock2, Undo2, RefreshCw, StickyNote } from "lucide-react";
+import { FileText, Search, Download, Eye, Filter, Info, Loader2, ChevronDown, Check, CheckCircle2, Clock2, Undo2, RefreshCw, StickyNote } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
@@ -267,7 +267,8 @@ const MOCK_DOCUMENTS: ApiDocument[] = [
   },
 ];
 
-export function DocumentHistory({ isTourActive }: { isTourActive?: boolean }) {
+export function DocumentHistory({ isTourActive, layoutStyle }: { isTourActive?: boolean; layoutStyle?: string }) {
+  const isFormal = layoutStyle === "formal";
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(!isTourActive);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -484,14 +485,19 @@ export function DocumentHistory({ isTourActive }: { isTourActive?: boolean }) {
       try {
         const response = await apiFetch("/documents", {
           query: {
-            per_page: 100,
+            per_page: 500,
             include_hidden: 1,
           },
         }) as any;
 
         if (!isMounted) return;
 
-        const docsBackend = response?.data || [];
+        // La API puede devolver estructura paginada { data: { data: [...] } } o directa { data: [...] }
+        const docsBackend: any[] = Array.isArray(response?.data?.data)
+          ? response.data.data
+          : Array.isArray(response?.data)
+          ? response.data
+          : [];
 
         const transformedDocs: ApiDocument[] = docsBackend.map((doc: any) => {
           let tipo = "planeacion";
@@ -514,7 +520,7 @@ export function DocumentHistory({ isTourActive }: { isTourActive?: boolean }) {
             carrera: doc.carrera_label || "",
             plan: doc.plan || "",
             fecha: doc.submitted_at,
-            hora: doc.submitted_at ? new Date(doc.submitted_at).toLocaleTimeString() : null,
+            hora: doc.submitted_at ? new Date(doc.submitted_at).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }) : null,
             status: doc.status,
             observaciones: doc.returned_comment || doc.observations || doc.observaciones || doc.notes || doc.feedback || null,
             batch_id: doc.batch_id || null,
@@ -618,26 +624,37 @@ export function DocumentHistory({ isTourActive }: { isTourActive?: boolean }) {
   }, [filterTipo]);
 
   return (
-    <div className="relative space-y-6 overflow-hidden">
-      <div className="relative space-y-6">
-        <div>
-          <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
-            Historial de Documentos
-          </h1>
-          <p className="mt-2 text-white/90 drop-shadow-sm dark:text-slate-400">
-            Revisa todos los documentos que has enviado
-          </p>
-        </div>
+    <div className={isFormal ? "flex h-[calc(100vh-64px)] flex-col overflow-hidden bg-card dark:bg-slate-950" : "relative space-y-6 overflow-hidden"}>
+      <div className={isFormal ? "flex flex-1 flex-col min-h-0 overflow-hidden" : "relative space-y-6"}>
+        {isFormal ? (
+          <div className="shrink-0 border-b border-border bg-card px-6 py-4 dark:border-slate-800 dark:bg-slate-950/80">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Historial de Documentos</h1>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              {filteredDocuments.length} documento{filteredDocuments.length !== 1 ? "s" : ""} en {filteredGroups.length} envío{filteredGroups.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        ) : (
+          <div>
+            <h1 className="inline-block rounded-xl bg-emerald-600 px-4 py-1.5 text-2xl font-bold text-white shadow-sm dark:bg-emerald-700">
+              Historial de Documentos
+            </h1>
+            <p className="mt-2 text-white/90 drop-shadow-sm dark:text-slate-400">
+              Revisa todos los documentos que has enviado
+            </p>
+          </div>
+        )}
 
-        <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
-          <CardHeader>
+        <Card className={isFormal ? "flex flex-1 flex-col min-h-0 overflow-hidden rounded-none border-0 shadow-none bg-transparent" : "overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60"}>
+          <CardHeader className={isFormal ? "shrink-0 border-b border-border px-5 py-3 dark:border-slate-800" : ""}>
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div>
-                <CardTitle className="dark:text-white">Mis Documentos</CardTitle>
-                <CardDescription className="dark:text-slate-400">
-                  {filteredDocuments.length} documento{filteredDocuments.length !== 1 ? "s" : ""} en {filteredGroups.length} envío{filteredGroups.length !== 1 ? "s" : ""}
-                </CardDescription>
-              </div>
+              {!isFormal && (
+                <div>
+                  <CardTitle className="dark:text-white">Mis Documentos</CardTitle>
+                  <CardDescription className="dark:text-slate-400">
+                    {filteredDocuments.length} documento{filteredDocuments.length !== 1 ? "s" : ""} en {filteredGroups.length} envío{filteredGroups.length !== 1 ? "s" : ""}
+                  </CardDescription>
+                </div>
+              )}
               <div data-tour="historial-filters" className="grid w-full gap-2 sm:w-auto sm:flex sm:flex-row sm:items-center sm:gap-3">
                 <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -706,8 +723,8 @@ export function DocumentHistory({ isTourActive }: { isTourActive?: boolean }) {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div data-tour="historial-list" className="max-h-[34rem] space-y-3 overflow-y-auto pr-2">
+          <CardContent className={isFormal ? "flex flex-1 flex-col min-h-0 overflow-hidden p-4" : ""}>
+            <div data-tour="historial-list" className={isFormal ? "flex-1 space-y-3 overflow-y-auto pr-2" : "max-h-[34rem] space-y-3 overflow-y-auto pr-2"}>
               {isLoading && <DocumentHistorySkeleton />}
 
               {!isLoading && loadError && (
@@ -717,8 +734,19 @@ export function DocumentHistory({ isTourActive }: { isTourActive?: boolean }) {
               )}
 
               {!isLoading && !loadError && filteredGroups.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground dark:border-slate-700 dark:text-slate-400">
+                <div className={isFormal ? "flex items-center justify-center py-12 text-sm text-muted-foreground dark:text-slate-500" : "rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground dark:border-slate-700 dark:text-slate-400"}>
                   No hay documentos que coincidan con los filtros actuales.
+                </div>
+              )}
+
+              {/* Encabezado de tabla — solo modo empresarial en desktop */}
+              {isFormal && !isLoading && !loadError && filteredGroups.length > 0 && (
+                <div className="sticky top-0 z-10 hidden sm:grid grid-cols-[1fr_120px_88px_110px_108px] gap-2 border-b border-border bg-card px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Documento</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Estado</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Fecha</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 text-right">Acciones</span>
                 </div>
               )}
 
@@ -808,6 +836,236 @@ export function DocumentHistory({ isTourActive }: { isTourActive?: boolean }) {
                     )}
                   </div>
                 );
+
+                const statusColor = groupStatus === "revisado"
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : groupStatus === "devuelto"
+                  ? "text-red-600 dark:text-red-400"
+                  : groupStatus === "reenviado"
+                  ? "text-slate-500 dark:text-slate-400"
+                  : "text-amber-600 dark:text-amber-400";
+                const statusDot = groupStatus === "revisado"
+                  ? "bg-emerald-500"
+                  : groupStatus === "devuelto"
+                  ? "bg-red-500"
+                  : groupStatus === "reenviado"
+                  ? "bg-slate-400"
+                  : "bg-amber-500";
+                const statusLabel = groupStatus === "revisado" ? "Revisado"
+                  : groupStatus === "devuelto" ? "Devuelto"
+                  : groupStatus === "reenviado" ? "Reenviado"
+                  : "Pendiente";
+
+                /* ── Lote en modo empresarial: expandir en sub-filas por documento ── */
+                if (isFormal && isMulti) {
+                  return (
+                    <div key={batchKey} className="border-b border-border/60 last:border-0 dark:border-slate-800/50">
+                      {/* Encabezado del lote */}
+                      <div className="flex items-center gap-2 border-b border-border/40 bg-muted/20 px-3 py-2 dark:border-slate-800/40 dark:bg-slate-900/20">
+                        <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1 text-xs font-medium text-slate-600 dark:text-slate-400">
+                          <span className="font-semibold">{groupDocs.length} documentos</span>
+                          {" · "}{tipoDisplayLabel}{" · "}{dateStr}
+                        </span>
+                        <span className={`flex shrink-0 items-center gap-1 text-xs font-semibold ${statusColor}`}>
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot}`} />
+                          {statusLabel}
+                        </span>
+                      </div>
+                      {/* Sub-fila por cada documento del lote */}
+                      {groupDocs.map((doc) => {
+                        const _base = getFileNameOnly(doc.nombre);
+                        const docFileName = _base.toLowerCase().endsWith(".pdf") ? _base : `${_base}.pdf`;
+                        const docStatusColor = doc.status === "revisado" ? "text-emerald-700 dark:text-emerald-400"
+                          : doc.status === "devuelto" ? "text-red-600 dark:text-red-400"
+                          : doc.status === "reenviado" ? "text-slate-500 dark:text-slate-400"
+                          : "text-amber-600 dark:text-amber-400";
+                        const docStatusDot = doc.status === "revisado" ? "bg-emerald-500"
+                          : doc.status === "devuelto" ? "bg-red-500"
+                          : doc.status === "reenviado" ? "bg-slate-400"
+                          : "bg-amber-500";
+                        const docStatusLabel = doc.status === "revisado" ? "Revisado"
+                          : doc.status === "devuelto" ? "Devuelto"
+                          : doc.status === "reenviado" ? "Reenviado"
+                          : "Pendiente";
+                        const docMotivo = doc.observaciones && (doc.status === "devuelto" || doc.status === "reenviado") ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
+                                onClick={() => setMotivoDialog({ nombre: doc.nombre, obs: doc.observaciones! })}>
+                                <StickyNote className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Ver motivo de devolución</TooltipContent>
+                          </Tooltip>
+                        ) : null;
+                        return (
+                          <div key={doc.id} className="border-b border-border/40 last:border-0 transition-colors hover:bg-muted/30 dark:border-slate-800/30 dark:hover:bg-slate-900/40">
+                            {/* Móvil */}
+                            <div className="flex items-center gap-3 px-3 py-2.5 sm:hidden">
+                              <span className={`h-2 w-2 shrink-0 rounded-full ${docStatusDot}`} />
+                              <p className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-200">{docFileName}</p>
+                              <div className="flex shrink-0 items-center gap-0.5">
+                                {docMotivo}
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
+                                  onClick={() => openDocumentWithAuth(doc, "view")}
+                                  disabled={doc.has_file === false || loadingPdfId === Number(doc.id)}>
+                                  {loadingPdfId === Number(doc.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
+                                  onClick={() => openDocumentWithAuth(doc, "download")}
+                                  disabled={doc.has_file === false || loadingPdfId === Number(doc.id)}>
+                                  <Download className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                            {/* Desktop: fila en la misma cuadrícula de tabla */}
+                            <div className="hidden sm:grid sm:grid-cols-[1fr_120px_88px_110px_108px] items-center gap-2 px-3 py-2">
+                              <p className="truncate pl-4 text-sm text-slate-700 dark:text-slate-200">{docFileName}</p>
+                              <span />
+                              <span className={`flex items-center gap-1.5 text-xs font-semibold ${docStatusColor}`}>
+                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${docStatusDot}`} />
+                                {docStatusLabel}
+                              </span>
+                              <span />
+                              <div className="flex shrink-0 items-center justify-end gap-0.5">
+                                {docMotivo}
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
+                                      onClick={() => openDocumentWithAuth(doc, "view")}
+                                      disabled={doc.has_file === false || loadingPdfId === Number(doc.id)}>
+                                      {loadingPdfId === Number(doc.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{doc.has_file === false ? "Archivo no disponible" : "Ver documento"}</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
+                                      onClick={() => openDocumentWithAuth(doc, "download")}
+                                      disabled={doc.has_file === false || loadingPdfId === Number(doc.id)}>
+                                      <Download className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{doc.has_file === false ? "Archivo no disponible" : "Descargar"}</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+
+                /* ── Fila compacta para modo empresarial ── */
+                if (isFormal) {
+                  const formalDoc = isMulti ? null : groupDocs[0];
+                  const fileLabel = isMulti
+                    ? `${groupDocs.length} documentos — ${tipoDisplayLabel}`
+                    : getFileNameOnly(rep.nombre);
+                  const metaLine = [
+                    hasCarrera && rep.carrera,
+                    planLabel,
+                    !isTutoria && !isEstadias && hasMateria && rep.materia,
+                    hasGrupo && `Grupo ${rep.grupo}`,
+                    !isTutoria && !isEstadias && parcialLabel,
+                  ].filter(Boolean).join(" · ");
+                  const infoFields: { label: string; value: string }[] = [
+                    { label: "Tipo", value: tipoDisplayLabel },
+                    hasCarrera ? { label: "Carrera", value: rep.carrera } : null,
+                    planLabel ? { label: "Plan", value: planLabel } : null,
+                    !isTutoria && !isEstadias && hasMateria ? { label: "Materia", value: rep.materia } : null,
+                    hasGrupo ? { label: "Grupo", value: rep.grupo } : null,
+                    !isTutoria && !isEstadias && parcialLabel ? { label: "Parcial", value: parcialLabel } : null,
+                    rep.fecha ? { label: "Enviado", value: dateStr } : null,
+                  ].filter((f): f is { label: string; value: string } => f !== null);
+                  const actionButtons = (
+                    <div className="flex items-center justify-end gap-0.5 shrink-0">
+                      {motivoBtn}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300" aria-label="Ver detalles">
+                              <Info className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="p-0">
+                            <div className="px-3 py-2 space-y-1 min-w-[180px]">
+                              {infoFields.map(({ label, value }) => (
+                                <div key={label} className="flex items-baseline gap-2 text-xs">
+                                  <span className="text-muted-foreground shrink-0 w-[72px]">{label}:</span>
+                                  <span className="font-medium break-words">{value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
+                              onClick={() => openDocumentWithAuth(formalDoc ?? rep, "view")}
+                              disabled={rep.has_file === false || loadingPdfId === Number(rep.id)}
+                            >
+                              {loadingPdfId === Number(rep.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{rep.has_file === false ? "Archivo no disponible" : "Ver documento"}</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
+                              onClick={() => openDocumentWithAuth(formalDoc ?? rep, "download")}
+                              disabled={rep.has_file === false || loadingPdfId === Number(rep.id)}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{rep.has_file === false ? "Archivo no disponible" : "Descargar"}</TooltipContent>
+                        </Tooltip>
+                    </div>
+                  );
+                  return (
+                    <div
+                      key={batchKey}
+                      className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/30 dark:border-slate-800/50 dark:hover:bg-slate-900/40"
+                    >
+                      {/* Móvil: flex compacto — nombre + tipo/estado + fecha + acciones */}
+                      <div className="flex items-center gap-3 px-3 py-2.5 sm:hidden">
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-slate-800 dark:text-white">{fileLabel}</p>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                            <span className="text-[11px] text-muted-foreground dark:text-slate-500">{tipoDisplayLabel}</span>
+                            <span className={`text-[11px] font-semibold ${statusColor}`}>{statusLabel}</span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground dark:text-slate-500">{dateStr}</p>
+                        </div>
+                        {actionButtons}
+                      </div>
+                      {/* Desktop: tabla con columnas fijas */}
+                      <div className="hidden sm:grid sm:grid-cols-[1fr_120px_88px_110px_108px] items-center gap-2 px-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-800 dark:text-white">{fileLabel}</p>
+                          {metaLine && <p className="truncate text-[11px] text-muted-foreground dark:text-slate-500">{metaLine}</p>}
+                        </div>
+                        <span className="truncate text-xs text-muted-foreground dark:text-slate-400">{tipoDisplayLabel}</span>
+                        <span className={`flex items-center gap-1.5 text-xs font-semibold ${statusColor}`}>
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot}`} />
+                          {statusLabel}
+                        </span>
+                        <span className="text-xs text-muted-foreground dark:text-slate-500">{dateStr}</span>
+                        {actionButtons}
+                      </div>
+                    </div>
+                  );
+                }
 
                 if (isMulti) {
                   return (

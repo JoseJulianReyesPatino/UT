@@ -6,6 +6,7 @@ import { MessagesTeacher } from "./messages/MessagesTeacher";
 export function Messages(props: Readonly<{
   initialOpen?: { conversationId?: number; recipientName?: string; recipientRole?: string; document?: { id: number; title: string; filePath?: string } } | null;
   onConsume?: () => void;
+  layoutStyle?: string;
 }> = {}) {
   const { user, isReady } = useAuth();
 

@@ -127,6 +127,7 @@ function formatTiempoRestante(fecha: string): { valor: string; unidad: string } 
 
 interface DocenteDashboardProps {
   onNavigate?: (view: string) => void;
+  layoutStyle?: string;
 }
 
 type DocumentItem = {
@@ -282,7 +283,7 @@ function AutoFadeBannerCarousel({
       <div 
         className={`relative w-full overflow-hidden rounded-2xl transition-all duration-300 ease-in-out ${
           isMinimized
-            ? 'h-14 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 dark:from-emerald-950/40 dark:to-teal-950/40 border border-emerald-200/40 dark:border-emerald-800/40'
+            ? 'h-14 bg-gradient-to-r from-emerald-50/80 to-emerald-50/40 dark:from-emerald-950/40 dark:to-emerald-950/20 border border-emerald-200/40 dark:border-emerald-800/40'
             : 'aspect-[1852/849] sm:aspect-[5375/934]'
         }`}
       >
@@ -408,7 +409,8 @@ const FAKE_RECENT_DOCS: DocumentItem[] = [
 ];
 
 export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
-  const { onNavigate } = props;
+  const { onNavigate, layoutStyle } = props;
+  const isFormal = layoutStyle === "formal";
   const manualDocenteUrl = new URL("../../../assets/manuales/Manual de Usuario del Docente.pdf", import.meta.url).href;
   const nomenclaturaUrl = new URL("../../../assets/manuales/Nomenclatura.pdf", import.meta.url).href;
 
@@ -635,6 +637,209 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   });
   const fechaCapitalizada = fechaHoy.charAt(0).toUpperCase() + fechaHoy.slice(1);
 
+  /* ── Modo empresarial ── */
+  if (isFormal) {
+    return (
+      <>
+        <div className="flex h-[calc(100vh-64px)] flex-col overflow-hidden bg-card text-foreground dark:bg-slate-950">
+          {/* Header plano */}
+          <div className="shrink-0 border-b border-border bg-card px-6 py-4 dark:border-slate-800 dark:bg-slate-950/80">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Panel Docente</h1>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              Hola, {nombreUsuario} · {fechaCapitalizada}
+            </p>
+          </div>
+
+          {/* Carrusel */}
+          <div className="shrink-0 border-b border-border dark:border-slate-800">
+            <AutoFadeBannerCarousel
+              images={introBanners}
+              mobileImages={introBannersMobile}
+              links={bannerLinks}
+            />
+          </div>
+
+          {/* Fila de estadísticas */}
+          <div className="shrink-0 border-b border-border dark:border-slate-800">
+            <div className="grid grid-cols-3 divide-x divide-border dark:divide-slate-800">
+              {isLoadingStats ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="animate-pulse space-y-2 px-6 py-4">
+                    <div className="h-2.5 w-28 rounded bg-muted" />
+                    <div className="h-7 w-12 rounded bg-muted" />
+                    <div className="h-2 w-20 rounded bg-muted" />
+                  </div>
+                ))
+              ) : (
+                stats.map((stat) => {
+                  const a = ACCENT[stat.accent] ?? ACCENT.slate;
+                  return (
+                    <button
+                      key={stat.title}
+                      type="button"
+                      onClick={() => onNavigate && stat.action && onNavigate(stat.action)}
+                      className="flex flex-col gap-1 px-6 py-4 text-left transition-colors hover:bg-muted/40 dark:hover:bg-slate-900/40"
+                    >
+                      <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${a.dot}`} />
+                        {stat.title}
+                      </span>
+                      <span className={`text-2xl font-semibold tabular-nums leading-none ${a.value}`}>{stat.value}</span>
+                      <span className="text-[11px] text-muted-foreground dark:text-slate-500">{stat.description}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Contenido principal */}
+          <div className="flex flex-1 min-h-0 overflow-hidden divide-x divide-border dark:divide-slate-800">
+            {/* Columna izquierda: documentos recientes */}
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <div className="shrink-0 flex items-center justify-between border-b border-border px-5 py-3 dark:border-slate-800">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Documentos Recientes</p>
+                <button type="button" onClick={() => onNavigate?.("historial")} className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400">
+                  Ver todos
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto divide-y divide-border dark:divide-slate-800/50">
+                {isLoadingDocuments ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="flex animate-pulse items-center gap-4 px-5 py-3">
+                      <div className="h-2.5 w-2.5 rounded-full bg-muted" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-2 w-20 rounded bg-muted" />
+                        <div className="h-3 w-1/2 rounded bg-muted" />
+                      </div>
+                      <div className="h-2.5 w-16 rounded bg-muted" />
+                    </div>
+                  ))
+                ) : recentDocuments.length === 0 ? (
+                  <div className="flex items-center justify-center py-12 text-sm text-muted-foreground dark:text-slate-500">
+                    No tienes documentos enviados
+                  </div>
+                ) : (
+                  recentDocuments.map((doc) => {
+                    const s = (doc.status ?? '').toLowerCase();
+                    let dot = "bg-amber-500";
+                    let label = "Pendiente";
+                    if (doc.resubmittedAt) { dot = "bg-slate-400"; label = "Reenviado"; }
+                    else if (s === "aprobado" || s === "revisado") { dot = "bg-emerald-500"; label = "Revisado"; }
+                    else if (s === "devuelto") { dot = "bg-red-500"; label = "Devuelto"; }
+                    else if (s === "revision") { dot = "bg-slate-400"; label = "En revisión"; }
+                    const fileNameOnly = doc.nombre.includes(' - ') ? doc.nombre.split(' - ').slice(1).join(' - ') : doc.nombre;
+                    return (
+                      <button
+                        key={doc.id}
+                        type="button"
+                        onClick={() => openDocument(doc)}
+                        className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/30 dark:hover:bg-slate-900/40"
+                      >
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700/80 dark:text-emerald-400/80">{doc.tipo}</p>
+                          <p className="truncate text-sm font-medium text-slate-800 dark:text-white">{fileNameOnly}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-[11px] text-muted-foreground dark:text-slate-500">{doc.fecha ? formatDate(doc.fecha) : ""}</p>
+                          <p className="text-[10px] font-semibold text-muted-foreground dark:text-slate-400">{label}</p>
+                        </div>
+                        <Eye className="ml-1 h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-700" />
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Columna derecha: próximas entregas */}
+            <div className="flex w-64 shrink-0 flex-col overflow-hidden">
+              <div className="shrink-0 border-b border-border px-5 py-3 dark:border-slate-800">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Próximas Entregas</p>
+              </div>
+              <div className="flex-1 overflow-y-auto divide-y divide-border dark:divide-slate-800/50">
+                {isLoadingProximas ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex animate-pulse items-center gap-3 px-5 py-3">
+                      <div className="h-8 w-8 rounded bg-muted shrink-0" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-2.5 w-20 rounded bg-muted" />
+                        <div className="h-2 w-28 rounded bg-muted" />
+                      </div>
+                    </div>
+                  ))
+                ) : proximasEntregas.length === 0 || (proximasEntregas.length === 1 && proximasEntregas[0]?.isPlaceholder) ? (
+                  <div className="flex items-center justify-center py-12 text-center text-sm text-muted-foreground dark:text-slate-500 px-4">
+                    {proximasEntregas[0]?.titulo || "Sin entregas próximas"}
+                  </div>
+                ) : (
+                  proximasEntregas.filter((e) => !e.isPlaceholder).map((entrega, index) => {
+                    const fecha = new Date(entrega.fecha);
+                    const mes = fecha.toLocaleDateString("es-MX", { month: "short" }).replace(".", "");
+                    const dia = fecha.getDate();
+                    const diffMs = new Date(entrega.fecha).getTime() - Date.now();
+                    const diffHrs = diffMs / 3_600_000;
+                    const isUrgent = diffHrs < 24;
+                    const isWarning = diffHrs >= 24 && diffHrs < 7 * 24;
+                    const tiempoRestante = formatTiempoRestante(entrega.fecha);
+                    const isGenericTitle = entrega.titulo?.trim().toLowerCase() === "docentes";
+                    const tituloVisible = isGenericTitle ? entrega.detalle : entrega.titulo;
+                    const colorClass = isUrgent
+                      ? "text-red-600 dark:text-red-400"
+                      : isWarning
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-emerald-700 dark:text-emerald-400";
+                    return (
+                      <div key={`${entrega.titulo}-${index}`} className="flex items-center gap-3 px-5 py-3">
+                        <div className={`flex w-9 shrink-0 flex-col items-center text-center leading-none ${colorClass}`}>
+                          <span className="text-[9px] font-bold uppercase">{mes}</span>
+                          <span className="text-lg font-semibold">{dia}</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium text-slate-800 dark:text-white">{tituloVisible}</p>
+                          <p className={`text-[10px] font-medium ${colorClass}`}>{tiempoRestante.valor} {tiempoRestante.unidad}</p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Logos de carreras — fuera del contenedor de altura fija, se puede ver haciendo scroll */}
+        <div className="border-t border-border dark:border-slate-800">
+          <CarrerasLogoSlider />
+        </div>
+
+        {/* Diálogo de vista previa compartido */}
+        <Dialog open={Boolean(selectedDocument)} onOpenChange={(open) => { if (!open) closePreview(); }}>
+          <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col dark:bg-slate-950 dark:border-slate-800">
+            <DialogHeader>
+              <DialogTitle className="dark:text-white">{selectedDocument?.nombre || "Documento"}</DialogTitle>
+            </DialogHeader>
+            {selectedDocument && (
+              <div className="flex-1 min-h-0">
+                {previewLoading ? (
+                  <div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground dark:border-slate-700">Cargando...</div>
+                ) : previewError ? (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{previewError}</div>
+                ) : previewBlobUrl ? (
+                  <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border dark:border-slate-700">
+                    <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border text-sm text-primary underline dark:border-slate-700 dark:text-emerald-400">Abrir en nueva pestaña</a>
+                  </object>
+                ) : null}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
+  /* ── Modo clásico ── */
   return (
     <div className="space-y-5 sm:space-y-6">
       {/* Saludo y fecha */}
