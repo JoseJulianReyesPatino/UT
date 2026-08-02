@@ -684,6 +684,7 @@ export function MessagesAdmin(props: Readonly<{
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [confirmedLoadedChatId, setConfirmedLoadedChatId] = useState<number | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const chatScrollAreaRef = useRef<HTMLDivElement | null>(null);
   const prevScrollMsgLenRef = useRef<number>(0);
   const prevScrollChatRef = useRef<number | null>(null);
@@ -1626,7 +1627,7 @@ export function MessagesAdmin(props: Readonly<{
 
     return (
       <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-5 overflow-hidden">
-        <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div data-component="page-banner" className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
           <div className="relative">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Mensajes</h1>
@@ -1791,7 +1792,7 @@ export function MessagesAdmin(props: Readonly<{
   // ─────────────────────────────────────────────────────────────────────────────
  return (
     <div className="flex h-[calc(100dvh-64px)] min-h-0 flex-col gap-5 overflow-hidden">
-      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <div data-component="page-banner" className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
         <div className="relative">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Mensajes</h1>
@@ -1799,13 +1800,29 @@ export function MessagesAdmin(props: Readonly<{
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 sm:grid-cols-[300px_minmax(0,1fr)]">
+      <div
+        className="flex sm:grid min-h-0 flex-1 gap-4 transition-[grid-template-columns] duration-300 ease-in-out"
+        style={{ gridTemplateColumns: sidebarCollapsed ? "0px minmax(0,1fr)" : "300px minmax(0,1fr)" }}
+      >
         {/* ── Panel izquierdo: lista de conversaciones ── */}
-        <div className={cn("overflow-hidden rounded-[22px] border border-border bg-card shadow-sm min-h-0 flex-col dark:border-slate-800/70 dark:bg-slate-950/60", mobileView === 'list' ? "flex" : "hidden sm:flex")}>
+        <div className={cn(
+          "flex-1 overflow-hidden rounded-[22px] border border-border bg-card shadow-sm min-h-0 flex-col dark:border-slate-800/70 dark:bg-slate-950/60",
+          "transition-all duration-300 ease-in-out",
+          sidebarCollapsed ? "opacity-0 pointer-events-none" : "opacity-100",
+          mobileView === 'list' ? "flex" : "hidden sm:flex"
+        )}>
           {/* Cabecera */}
           <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3 space-y-3 dark:border-slate-700 dark:bg-slate-950/60">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  title="Ocultar panel de chats"
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="hidden sm:inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground dark:hover:bg-slate-800"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
                 <p className="text-base font-semibold text-foreground dark:text-white">Chats</p>
                 {filteredConversations.filter((c) => c.unread > 0).length > 0 && (
                   <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1.5 text-[11px]">
@@ -1958,7 +1975,7 @@ export function MessagesAdmin(props: Readonly<{
         </Dialog>
 
         {/* ── Panel derecho: vista del chat ── */}
-        <div className={cn("overflow-hidden rounded-[22px] border border-border bg-card shadow-sm min-h-0 flex-col dark:border-slate-800/70 dark:bg-slate-950/60", mobileView === 'chat' ? "flex" : "hidden sm:flex")}>
+        <div className={cn("flex-1 overflow-hidden rounded-[22px] border border-border bg-card shadow-sm min-h-0 flex-col dark:border-slate-800/70 dark:bg-slate-950/60", mobileView === 'chat' ? "flex" : "hidden sm:flex")}>
           {/* Cabecera del chat */}
           <div className="shrink-0 border-b border-border/60 bg-card px-4 pt-4 pb-3 dark:border-slate-700 dark:bg-slate-950/60">
             <button
@@ -1969,52 +1986,64 @@ export function MessagesAdmin(props: Readonly<{
               <ChevronLeft className="h-4 w-4" />
               Chats
             </button>
-            {targetConversation ? (
-              <div className="flex items-center gap-3">
-                <div className="relative shrink-0">
-                  <Avatar className="h-10 w-10 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
-                    <AvatarImage
-                      src={activeConversationAvatarUrl ?? DEFAULT_AVATAR_PATH}
-                      alt={targetConversation.name}
-                      className="h-full w-full object-cover"
-                    />
-                    <AvatarFallback className="bg-transparent p-0 overflow-hidden">
-                      <img src={DEFAULT_AVATAR_PATH} alt={targetConversation.name} className="h-full w-full object-cover" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className={cn(
-                    "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
-                    targetConversation.status === "online" ? "bg-emerald-500" :
-                    targetConversation.status === "away"   ? "bg-amber-500"   : "bg-slate-400"
-                  )} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-foreground leading-tight dark:text-white">{targetConversation.name}</p>
-                    {targetConversation.unread > 0 && (
-                      <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[11px]">
-                        {targetConversation.unread}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {targetConversation.role} &middot;{" "}
+            <div className="flex items-center gap-2">
+              {sidebarCollapsed && (
+                <button
+                  type="button"
+                  title="Mostrar panel de chats"
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="hidden sm:inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground shadow-sm transition hover:border-emerald-400 hover:text-emerald-700 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
+                >
+                  <ChevronDown className="h-4 w-4 -rotate-90" />
+                </button>
+              )}
+              {targetConversation ? (
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="relative shrink-0">
+                    <Avatar className="h-10 w-10 ring-2 ring-emerald-200/60 dark:ring-emerald-900/40">
+                      <AvatarImage
+                        src={activeConversationAvatarUrl ?? DEFAULT_AVATAR_PATH}
+                        alt={targetConversation.name}
+                        className="h-full w-full object-cover"
+                      />
+                      <AvatarFallback className="bg-transparent p-0 overflow-hidden">
+                        <img src={DEFAULT_AVATAR_PATH} alt={targetConversation.name} className="h-full w-full object-cover" />
+                      </AvatarFallback>
+                    </Avatar>
                     <span className={cn(
-                      targetConversation.status === "online" ? "text-emerald-500" :
-                      targetConversation.status === "away"   ? "text-amber-500"   : "text-slate-400"
-                    )}>
-                      {targetConversation.status === "online" ? "En línea" :
-                       targetConversation.status === "away"   ? "Ausente"  : "Sin conexión"}
-                    </span>
-                  </p>
+                      "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
+                      targetConversation.status === "online" ? "bg-emerald-500" :
+                      targetConversation.status === "away"   ? "bg-amber-500"   : "bg-slate-400"
+                    )} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground leading-tight dark:text-white">{targetConversation.name}</p>
+                      {targetConversation.unread > 0 && (
+                        <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[11px]">
+                          {targetConversation.unread}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {targetConversation.role} &middot;{" "}
+                      <span className={cn(
+                        targetConversation.status === "online" ? "text-emerald-500" :
+                        targetConversation.status === "away"   ? "text-amber-500"   : "text-slate-400"
+                      )}>
+                        {targetConversation.status === "online" ? "En línea" :
+                         targetConversation.status === "away"   ? "Ausente"  : "Sin conexión"}
+                      </span>
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div>
-                <p className="text-sm font-semibold text-foreground">Selecciona un chat</p>
-                <p className="text-xs text-muted-foreground">Elige una conversación para ver el historial y responder.</p>
-              </div>
-            )}
+              ) : (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Selecciona un chat</p>
+                  <p className="text-xs text-muted-foreground">Elige una conversación para ver el historial y responder.</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Área de mensajes */}

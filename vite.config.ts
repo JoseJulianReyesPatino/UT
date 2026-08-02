@@ -51,6 +51,8 @@ export default defineConfig({
       workbox: {
         // Solo cachea archivos estáticos del build
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Algunos fondos/carruseles superan el límite default de 2 MB
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // Excluye TODAS las rutas de la API para evitar errores de conexión
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [

@@ -7,7 +7,7 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { FileText, Eye, MessageCircleMore, MessageSquare, Check, RefreshCw, Undo2 } from "lucide-react";
+import { FileText, Eye, MessageCircleMore, MessageSquare, Check, RefreshCw, Undo2, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
@@ -15,6 +15,7 @@ import { Textarea } from "../../components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob, getDocumentDisplayFileName } from "../../lib/documents";
+import { cn } from "../../../lib/utils";
 import { carrieras } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
 import { useTourActive } from "../../context/TourContext";
@@ -197,7 +198,7 @@ function TourFakeTutorRow({ isFirst }: { isFirst: boolean }) {
 
 // no mock initial data — load from backend
 
-export default function Tutores() {
+export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) {
   const { isReady, isAuthenticated } = useAuth();
   const { isAdminTourActive } = useTourActive();
   const [pendingDocuments, setPendingDocuments] = useState<TutorDocument[]>([]);
@@ -570,6 +571,177 @@ export default function Tutores() {
     </div>
   );
 
+  const isFormal = layoutStyle === "formal";
+
+  const activeFiltersCount = [filterTutor, filterApartado, filterReturned].filter(v => v !== "all").length;
+
+  const clearAllFilters = () => {
+    setFilterTutor("all");
+    setFilterApartado("all");
+    setFilterReturned("all");
+  };
+
+  const formalFilterTriggerClassName = "h-8 w-full min-w-0 bg-transparent text-xs";
+
+  const formalFiltersBar = (
+    <div data-tour="admin-tutores-filters" className="space-y-3">
+      <div className="flex items-center justify-between border-b border-border pb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Filtros</span>
+          {activeFiltersCount > 0 && (
+            <span className="inline-flex items-center rounded-sm bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {activeFiltersCount} activo{activeFiltersCount !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+        {activeFiltersCount > 0 && (
+          <button type="button" className="text-[11px] text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200" onClick={clearAllFilters}>
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-3">
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tutor</p>
+          <SearchableSelect value={filterTutor} onValueChange={setFilterTutor} options={tutoresDisponibles.map((t) => ({ value: t, label: t }))} placeholder="Buscar tutor..." allLabel="Todos los tutores" triggerClassName={formalFilterTriggerClassName} />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Apartado</p>
+          <SearchableSelect value={filterApartado} onValueChange={setFilterApartado} options={apartadosDisponibles.map((a) => ({ value: a, label: getTutoriasApartadoLabel(a) }))} placeholder="Buscar apartado..." allLabel="Todos los apartados" triggerClassName={formalFilterTriggerClassName} />
+        </div>
+        <div className="col-span-2 sm:col-span-1 space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Estado</p>
+          <Select value={filterReturned} onValueChange={setFilterReturned}>
+            <SelectTrigger className={formalFilterTriggerClassName}><SelectValue placeholder="Todos" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="returned">Solo devueltos</SelectItem>
+              <SelectItem value="not-returned">No devueltos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderFormalDocRow = (doc: TutorDocumentItem, isFirstRow?: boolean) => {
+    const isReviewed = Boolean(doc.reviewedAt);
+    const isReturned = Boolean(doc.returned);
+    const isReenviado = doc.status === "reenviado";
+    const isHighlighted = highlightDocumentId === doc.id;
+
+    const borderColor = isReturned ? "border-l-rose-500"
+      : isReviewed   ? "border-l-emerald-500"
+      : isReenviado  ? "border-l-blue-500"
+      : "border-l-amber-500";
+
+    const infoFields: { label: string; value: string }[] = [
+      doc.plan ? { label: "Plan", value: doc.plan } : null,
+      doc.ciclo ? { label: "Ciclo", value: doc.ciclo } : null,
+      doc.cuatrimestre ? { label: "Cuatrimestre", value: doc.cuatrimestre } : null,
+      doc.carrera ? { label: "Carrera", value: doc.carrera } : null,
+      doc.apartado ? { label: "Apartado", value: getTutoriasApartadoLabel(doc.apartado) } : null,
+      doc.grupo && doc.grupo !== "-" ? { label: "Grupo", value: doc.grupo } : null,
+      doc.fecha ? { label: "Enviado", value: formatSentFecha(doc.fecha) } : null,
+      doc.reviewedAt ? { label: "Revisado", value: formatDateTimeFromIso(doc.reviewedAt) } : null,
+      doc.returnedAt ? { label: "Devuelto", value: formatDateTimeFromIso(doc.returnedAt) } : null,
+    ].filter((f): f is { label: string; value: string } => f !== null);
+
+    return (
+      <div
+        key={doc.id}
+        id={`doc-row-${doc.id}`}
+        data-tour={isFirstRow ? "admin-tutores-doc-row" : undefined}
+        className={cn(
+          "relative flex flex-col gap-2 border-l-4 px-3 py-2.5 transition-colors",
+          "sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3",
+          "bg-white hover:bg-slate-50 dark:bg-slate-950 dark:hover:bg-slate-900/60",
+          borderColor,
+          isHighlighted && "!bg-emerald-50 dark:!bg-emerald-950/20"
+        )}
+      >
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <FileText className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{extractPreviewFileName(doc.documento)}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{doc.tutor}</p>
+          </div>
+        </div>
+        <div
+          data-tour={isFirstRow ? "admin-tutores-doc-actions" : undefined}
+          className="flex items-center gap-1 shrink-0"
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300" aria-label="Ver detalles">
+                <Info className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="p-0">
+              <div className="px-3 py-2 space-y-1 min-w-[180px]">
+                {infoFields.map(({ label, value }) => (
+                  <div key={label} className="flex items-baseline gap-2 text-xs">
+                    <span className="text-muted-foreground shrink-0 w-[72px]">{label}:</span>
+                    <span className="font-medium break-words">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+          <Badge variant={isReturned ? "destructive" : isReviewed ? "success" : "warning"} className="text-[11px] px-2">
+            {isReturned ? "Devuelto" : isReenviado ? "Reenviado" : isReviewed ? "Revisado" : "Pendiente"}
+          </Badge>
+          <Button variant="outline" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs" onClick={(e) => { e.stopPropagation(); setPreviewDocument(doc); }} aria-label="Ver PDF">
+            <Eye className="h-3.5 w-3.5" /><span className="hidden sm:inline">Ver</span>
+          </Button>
+          {doc.nota && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" className="h-7 w-7 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, tutor: doc.tutor }); }} aria-label="Ver nota">
+                  <MessageCircleMore className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Nota del tutor</TooltipContent>
+            </Tooltip>
+          )}
+          {!isReviewed && (
+            <Button variant="outline" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs" onClick={(e) => { e.stopPropagation(); setReviewConfirmation(doc); }} aria-label="Revisar">
+              <Check className="h-3.5 w-3.5" /><span className="hidden sm:inline">Revisar</span>
+            </Button>
+          )}
+          {doc.returned ? (
+            <Button variant="outline" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }} aria-label="Cancelar devolución">
+              <Undo2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Cancelar</span>
+            </Button>
+          ) : (
+            <Button variant="destructive" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }} aria-label="Devolver">
+              <Undo2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Devolver</span>
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderFormalBatch = (group: TutorDocumentItem[], isFirstGroup: boolean) => {
+    if (group.length === 1) return renderFormalDocRow(group[0], isFirstGroup);
+    return (
+      <div key={group[0].batch_id ?? group[0].id}>
+        <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 border-b border-border dark:bg-slate-900/50">
+          <FileText className="h-3 w-3 shrink-0 text-slate-400" />
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-slate-600 dark:text-slate-300">{group.length} archivos</span>
+            {" del mismo envío · "}{group[0].tutor}
+            {group[0].apartado ? ` · ${getTutoriasApartadoLabel(group[0].apartado)}` : ""}
+          </span>
+        </div>
+        <div className="divide-y divide-border">
+          {group.map((doc, i) => renderFormalDocRow(doc, isFirstGroup && i === 0))}
+        </div>
+      </div>
+    );
+  };
+
   const groupDocsByBatch = (docs: TutorDocumentItem[]): TutorDocumentItem[][] => {
     const groups = new Map<string, TutorDocumentItem[]>();
     for (const doc of docs) {
@@ -601,7 +773,7 @@ export default function Tutores() {
 
   return (
     <div className="relative space-y-6 overflow-hidden">
-      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <div data-component="page-banner" className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
         <div className="relative space-y-3">
           <div className="flex items-start justify-between gap-3">
@@ -638,7 +810,7 @@ export default function Tutores() {
               </SelectContent>
             </Select>
           </div>
-          <TabsList data-tour="admin-tutores-tabs" className="hidden sm:grid w-full grid-cols-6 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
+          <TabsList data-tour="admin-tutores-tabs" data-component="page-tabs" className="hidden sm:grid w-full grid-cols-6 gap-2 p-1 bg-slate-100/90 dark:bg-slate-950/90 rounded-full shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-hidden">
             <TabsTrigger value="all" className="inline-flex items-center justify-center rounded-full px-4 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 transition duration-200 hover:bg-white/90 dark:hover:bg-slate-800 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:shadow-sm">
               Todos
               <Badge variant="outline" className="ml-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-950/90 dark:text-slate-200">{countAll}</Badge>
@@ -669,7 +841,7 @@ export default function Tutores() {
         <TabsContent value="all" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              {filtersBar}
+              {isFormal ? formalFiltersBar : filtersBar}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -682,7 +854,12 @@ export default function Tutores() {
                 )}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && filteredAll.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && groupDocsByBatch(filteredAll).map((group, groupIdx) => {
+                {!isAdminTourActive && !isLoading && filteredAll.length > 0 && isFormal && (
+                  <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
+                    {groupDocsByBatch(filteredAll).map((group, i) => renderFormalBatch(group, i === 0))}
+                  </div>
+                )}
+                {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredAll).map((group, groupIdx) => {
                   const renderRow = (doc: TutorDocumentItem, isFirstRow?: boolean) => {
                   const isReviewed = Boolean(doc.reviewedAt);
                   const isReturned = Boolean(doc.returned);
@@ -802,14 +979,19 @@ export default function Tutores() {
         <TabsContent value="pendientes" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              {filtersBar}
+              {isFormal ? formalFiltersBar : filtersBar}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && filteredPending.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && groupDocsByBatch(filteredPending).map((group) => {
+                {!isAdminTourActive && !isLoading && filteredPending.length > 0 && isFormal && (
+                  <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
+                    {groupDocsByBatch(filteredPending).map((group, i) => renderFormalBatch(group, i === 0))}
+                  </div>
+                )}
+                {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredPending).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => {
                   const isReturned = Boolean(doc.returned);
                   return (
@@ -926,14 +1108,19 @@ export default function Tutores() {
         <TabsContent value="devueltos" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              {filtersBar}
+              {isFormal ? formalFiltersBar : filtersBar}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && filteredDevueltos.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && groupDocsByBatch(filteredDevueltos).map((group) => {
+                {!isAdminTourActive && !isLoading && filteredDevueltos.length > 0 && isFormal && (
+                  <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
+                    {groupDocsByBatch(filteredDevueltos).map((group, i) => renderFormalBatch(group, i === 0))}
+                  </div>
+                )}
+                {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredDevueltos).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => (
                   <div key={doc.id} className={getDocumentRowClassName(true)}>
                     <button
@@ -1016,14 +1203,19 @@ export default function Tutores() {
         <TabsContent value="reenviados" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              {filtersBar}
+              {isFormal ? formalFiltersBar : filtersBar}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && filteredReenviados.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && groupDocsByBatch(filteredReenviados).map((group) => {
+                {!isAdminTourActive && !isLoading && filteredReenviados.length > 0 && isFormal && (
+                  <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
+                    {groupDocsByBatch(filteredReenviados).map((group, i) => renderFormalBatch(group, i === 0))}
+                  </div>
+                )}
+                {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredReenviados).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => (
                   <div key={doc.id} className={getDocumentRowClassName(false)}>
                     <button
@@ -1114,13 +1306,17 @@ export default function Tutores() {
         <TabsContent value="revisados" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              {filtersBar}
+              {isFormal ? formalFiltersBar : filtersBar}
             </CardHeader>
             <CardContent>
               {isAdminTourActive ? (
                 <div className="space-y-3"><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></div>
               ) : isLoading ? <DocumentCardSkeleton /> : Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
                 <EmptyState text={emptyStateLegend} />
+              ) : isFormal ? (
+                <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
+                  {groupDocsByBatch(filteredReviewed).map((group, i) => renderFormalBatch(group, i === 0))}
+                </div>
               ) : (
                 <div className="space-y-6">
                   {Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => (
@@ -1204,14 +1400,19 @@ export default function Tutores() {
         <TabsContent value="hoy" className="space-y-4 mt-6">
           <Card className={sectionCardClassName}>
             <CardHeader className="pb-4">
-              {filtersBar}
+              {isFormal ? formalFiltersBar : filtersBar}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && reviewedToday.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && groupDocsByBatch(reviewedToday).map((group) => {
+                {!isAdminTourActive && !isLoading && reviewedToday.length > 0 && isFormal && (
+                  <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
+                    {groupDocsByBatch(reviewedToday).map((group, i) => renderFormalBatch(group, i === 0))}
+                  </div>
+                )}
+                {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(reviewedToday).map((group) => {
                     const renderTodayRow = (doc: TutorDocumentItem) => {
                     const isReturned = Boolean(doc.returned);
                     return (

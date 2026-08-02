@@ -1,17 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { UserCardSkeleton } from "./skeletons";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Checkbox } from "../../components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
-import { UserPlus, Search, Edit, Key, UserCheck, UserX, Mail, SlidersHorizontal } from "lucide-react";
+import { UserPlus, Search, Edit, Key, UserCheck, UserX, Mail, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
@@ -74,18 +71,6 @@ const normalizeRole = (role: ApiUserRole): UserRole | null => {
   return null;
 };
 
-const getInitials = (fullName: string) => {
-  const initials = fullName
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-
-  return initials || "ND";
-};
-
 const splitFullName = (fullName: string) => {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 1) {
@@ -131,6 +116,7 @@ const mapApiUser = (user: ApiUser): Docente => {
     id: Number(user.id),
     nombre: user.full_name,
     area: user.area ?? undefined,
+    apellidos: user.full_name.split(/\s+/).filter(Boolean).slice(-1).join(" ") || undefined,
     telefono: user.phone ?? undefined,
     email: user.email,
     roles,
@@ -174,7 +160,6 @@ function StatusConfirmationDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden gap-0">
-        {/* Banda de encabezado con color según acción */}
         <div className={`px-6 pt-6 pb-5 ${isDeactivating ? "bg-destructive/10" : "bg-success/10"}`}>
           <div className="flex items-center gap-3 mb-1.5">
             <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${isDeactivating ? "bg-destructive/20 text-destructive" : "bg-success/20 text-success"}`}>
@@ -191,7 +176,6 @@ function StatusConfirmationDialog({
           </DialogDescription>
         </div>
 
-        {/* Tarjeta del docente */}
         {selectedDocente && (
           <div className="px-6 py-5 border-y border-border/60">
             <div className="flex items-center gap-3.5">
@@ -230,7 +214,6 @@ function StatusConfirmationDialog({
           </div>
         )}
 
-        {/* Pie del diálogo */}
         <div className="px-6 py-4 flex items-center justify-end gap-2.5">
           <Button variant="ghost" onClick={onCancel} disabled={isChangingStatus} className="h-9 px-4 text-sm">
             Cancelar
@@ -249,9 +232,7 @@ function StatusConfirmationDialog({
   );
 }
 
-
-const initialDocentes: Docente[] = [
-];
+const initialDocentes: Docente[] = [];
 
 const initialForm: NuevoUsuarioForm = {
   nombres: "",
@@ -261,11 +242,12 @@ const initialForm: NuevoUsuarioForm = {
   roles: { docente: true, tutor: false, administrador: false, supervisor: false },
 };
 
-export function DocenteManagement() {
+export function DocenteManagement({ layoutStyle }: { layoutStyle?: string } = {}) {
+  const isFormal = layoutStyle === "formal";
   const { user: currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [roleFilter, setRoleFilter] = useState<"all" | "docente" | "tutor" | "supervisor">("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 8;
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
@@ -275,6 +257,9 @@ export function DocenteManagement() {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [statusConfirmationEmail, setStatusConfirmationEmail] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   const [docentes, setDocentes] = useState(initialDocentes);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [usersError, setUsersError] = useState<string | null>(null);
@@ -282,16 +267,34 @@ export function DocenteManagement() {
   const [selectedDocente, setSelectedDocente] = useState<Docente | null>(null);
   const [editDocente, setEditDocente] = useState({ nombres: "", apellidos: "", telefono: "", email: "", roles: { docente: true, tutor: false, administrador: false, supervisor: false } });
 
+  // Placeholder animado
+  const searchPlaceholders = [
+    "Buscar por nombre...",
+    "Buscar por correo...",
+    "Buscar por rol: docente, tutor, supervisor...",
+    "Buscar por estado: activo, inactivo...",
+  ];
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+  useEffect(() => {
+    if (searchTerm) return;
+    const interval = setInterval(() => {
+      setPlaceholderIndex((i) => (i + 1) % searchPlaceholders.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [searchTerm]);
+
   const loadUsers = async () => {
     setIsLoadingUsers(true);
     setUsersError(null);
 
     try {
       const payload = (await apiFetch("/users", { method: "GET" })) as UsersResponse;
-      // Exclude administrator users from the general management list
       const filtered = (payload.data ?? []).filter((u) => {
         const roles = u.roles ?? [];
-        return !roles.map(normalizeRole).includes("administrador");
+        const isAdmin = roles.map(normalizeRole).includes("administrador");
+        const isDeleted = (u.full_name ?? "").startsWith("Usuario eliminado");
+        return !isAdmin && !isDeleted;
       });
 
       setDocentes(filtered.map(mapApiUser));
@@ -308,6 +311,10 @@ export function DocenteManagement() {
     void loadUsers();
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const resetForm = () => {
     setNewDocente(initialForm);
   };
@@ -320,28 +327,39 @@ export function DocenteManagement() {
   };
 
   const filteredDocentes = useMemo(() => {
-    const term = searchTerm.toLowerCase();
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return docentes;
+
     return docentes.filter((doc) => {
-      const matchesSearch =
+      const statusLabel = doc.status === "activo" ? "activo" : "inactivo";
+      return (
         doc.nombre.toLowerCase().includes(term) ||
         doc.email.toLowerCase().includes(term) ||
-        (doc.roles ?? []).join(", ").toLowerCase().includes(term);
-      const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
-      const matchesRole = roleFilter === "all" || (doc.roles ?? []).includes(roleFilter as UserRole);
-      return matchesSearch && matchesStatus && matchesRole;
+        (doc.roles ?? []).join(" ").toLowerCase().includes(term) ||
+        statusLabel.includes(term)
+      );
     });
-  }, [docentes, searchTerm, statusFilter, roleFilter]);
+  }, [docentes, searchTerm]);
 
-  const statusFilterLabelMap: Record<StatusFilter, string> = {
-    all: "Todos",
-    activo: "Activos",
-    inactivo: "Inactivos",
-  };
+  const totalPages = Math.max(1, Math.ceil(filteredDocentes.length / ITEMS_PER_PAGE));
 
-  const handleStatusFilterChange = (value: string) => {
-    if (value === "all" || value === "activo" || value === "inactivo") {
-      setStatusFilter(value);
+  const paginatedDocentes = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredDocentes.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredDocentes, currentPage]);
+
+  const getPageNumbers = (): (number | "ellipsis")[] => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
+    const pages: (number | "ellipsis")[] = [1];
+    if (currentPage > 3) pages.push("ellipsis");
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (currentPage < totalPages - 2) pages.push("ellipsis");
+    pages.push(totalPages);
+    return pages;
   };
 
   let usersListContent: React.ReactNode;
@@ -355,72 +373,261 @@ export function DocenteManagement() {
       </div>
     );
   } else if (filteredDocentes.length === 0) {
-    const roleLabels: Record<string, string> = { docente: "docentes", tutor: "tutores", supervisor: "supervisores" };
-    let emptyMessage = "No hay usuarios que coincidan con los filtros seleccionados.";
-    if (roleFilter !== "all") {
-      emptyMessage = `No hay ${roleLabels[roleFilter] ?? roleFilter} que coincidan con la búsqueda actual.`;
-    } else if (statusFilter === "activo") {
-      emptyMessage = "No hay usuarios activos que coincidan con la búsqueda actual.";
-    }
-
     usersListContent = (
       <div className="rounded-xl border border-dashed border-border bg-background/80 p-8 text-center text-sm text-muted-foreground">
-        {emptyMessage}
+        No hay usuarios que coincidan con "{searchTerm}".
       </div>
     );
   } else {
-    usersListContent = filteredDocentes.map((docente) => {
+    usersListContent = paginatedDocentes.map((docente) => {
       const isActive = docente.status === "activo";
       const statusBadgeVariant = isActive ? "success" : "outline";
       const statusLabel = isActive ? "Activo" : "Inactivo";
       const statusActionLabel = isActive ? "Dar baja" : "Dar alta";
       const statusActionIcon = isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />;
+      const roleLabel = (docente.roles || []).join(", ") || "Sin rol";
+      const isSelf = String(docente.id) === currentUser?.id;
+
+      const actionButtons = (
+        <div className="flex flex-shrink-0 items-center gap-1 sm:justify-end">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => openEditDialog(docente)}
+                disabled={isSelf}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Editar</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => openResetDialog(docente)}
+                disabled={isSelf}
+              >
+                <Key className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Restablecer contraseña</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-8 w-8 text-muted-foreground ${isActive ? "hover:text-destructive" : "hover:text-success"}`}
+                onClick={() => openStatusDialog(docente)}
+                disabled={isSelf}
+              >
+                {statusActionIcon}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{statusActionLabel}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                onClick={() => openDeleteDialog(docente)}
+                disabled={isSelf}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Eliminar usuario</TooltipContent>
+          </Tooltip>
+        </div>
+      );
 
       return (
         <div
           key={docente.id}
-          data-tour={docente.id === filteredDocentes[0]?.id ? "admin-docentes-user-card" : undefined}
-          className="flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-white p-4 transition-colors hover:bg-slate-50 dark:bg-slate-900/90 dark:hover:bg-slate-800/90 sm:flex-row sm:items-center sm:justify-between"
+          data-tour={docente.id === paginatedDocentes[0]?.id ? "admin-docentes-user-card" : undefined}
+          data-component="user-row"
+          className="grid grid-cols-1 items-center gap-2 bg-white px-4 py-2.5 transition-colors hover:bg-slate-50 dark:bg-slate-950/40 dark:hover:bg-slate-900/60 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_100px_120px_90px_148px] sm:gap-4"
         >
-          <div className="flex min-w-0 flex-1 items-center gap-4">
-            <DocenteAvatar name={docente.nombre} avatar={docente.avatar} className="h-12 w-12 flex-shrink-0" />
+          <div className="flex min-w-0 items-center gap-3">
+            <DocenteAvatar name={docente.nombre} avatar={docente.avatar} className="h-9 w-9 flex-shrink-0" />
             <div className="min-w-0">
-              <p className="break-words font-medium sm:truncate">{docente.nombre}</p>
-              <p className="break-words text-sm text-muted-foreground sm:truncate">{docente.email}</p>
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span className="truncate">{docente.documentos} documentos enviados</span>
-                <span className="truncate">{(docente.roles || []).join(", ")}</span>
+              <p className="truncate text-sm font-medium text-foreground">{docente.nombre}</p>
+              <p className="truncate text-xs text-muted-foreground sm:hidden">{docente.email}</p>
+            </div>
+          </div>
+
+          <div className="hidden truncate text-sm text-muted-foreground sm:block">
+            {docente.email}
+          </div>
+
+          <div className="hidden text-sm text-muted-foreground sm:block">
+            {docente.documentos} {docente.documentos === 1 ? "documento" : "documentos"}
+          </div>
+
+          <div className="hidden sm:block">
+            <span className="inline-flex max-w-full items-center truncate rounded-md bg-slate-100 px-2 py-1 text-xs font-medium capitalize text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {roleLabel}
+            </span>
+          </div>
+
+          <div className="hidden sm:flex">
+            <Badge variant={statusBadgeVariant} className="shrink-0">{statusLabel}</Badge>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:hidden">
+            <Badge variant={statusBadgeVariant} className="shrink-0">{statusLabel}</Badge>
+            <span className="capitalize">{roleLabel}</span>
+            <span>·</span>
+            <span>{docente.documentos} {docente.documentos === 1 ? "documento" : "documentos"}</span>
+          </div>
+
+          {actionButtons}
+        </div>
+      );
+    });
+  }
+
+  let formalListContent: React.ReactNode;
+  if (isLoadingUsers) {
+    formalListContent = Array.from({ length: 6 }).map((_, i) => (
+      <div key={i} className="flex items-center gap-4 px-4 py-3">
+        <div className="animate-pulse h-3 w-36 rounded bg-muted" />
+        <div className="animate-pulse h-3 w-44 rounded bg-muted" />
+        <div className="animate-pulse h-3 w-12 rounded bg-muted" />
+        <div className="animate-pulse h-3 w-16 rounded bg-muted" />
+        <div className="animate-pulse h-3 w-12 rounded bg-muted" />
+      </div>
+    ));
+  } else if (usersError) {
+    formalListContent = (
+      <div className="p-6 text-sm text-destructive">{usersError}</div>
+    );
+  } else if (filteredDocentes.length === 0) {
+    formalListContent = (
+      <div className="p-8 text-center text-sm text-muted-foreground">
+        No hay usuarios que coincidan con &ldquo;{searchTerm}&rdquo;.
+      </div>
+    );
+  } else {
+    formalListContent = paginatedDocentes.map((docente) => {
+      const isActive = docente.status === "activo";
+      const roleLabel = (docente.roles || []).join(", ") || "Sin rol";
+      const isSelf = String(docente.id) === currentUser?.id;
+      return (
+        <div key={docente.id} className="transition-colors hover:bg-muted/30 dark:hover:bg-slate-900/40">
+          {/* Vista móvil */}
+          <div className="flex items-center gap-3 px-3 py-2.5 sm:hidden">
+            <span className={`h-10 w-1 shrink-0 self-stretch rounded-full ${isActive ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />
+            <DocenteAvatar name={docente.nombre} avatar={docente.avatar} className="h-8 w-8 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate text-sm font-medium text-foreground">{docente.nombre}</p>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-muted-foreground hover:text-foreground" onClick={() => openEditDialog(docente)} disabled={isSelf}>
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Editar</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-muted-foreground hover:text-foreground" onClick={() => openResetDialog(docente)} disabled={isSelf}>
+                        <Key className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Restablecer contraseña</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className={`h-7 w-7 rounded-sm text-muted-foreground ${isActive ? "hover:text-destructive" : "hover:text-success"}`} onClick={() => openStatusDialog(docente)} disabled={isSelf}>
+                        {isActive ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{isActive ? "Dar baja" : "Dar alta"}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-muted-foreground hover:text-destructive" onClick={() => openDeleteDialog(docente)} disabled={isSelf}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Eliminar usuario</TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                <span className="max-w-[140px] truncate text-xs text-muted-foreground">{docente.email}</span>
+                <span className="text-xs text-muted-foreground">·</span>
+                <span className="inline-flex items-center rounded-sm bg-slate-100 px-1 py-0.5 text-[10px] font-semibold capitalize text-slate-600 dark:bg-slate-800 dark:text-slate-300">{roleLabel}</span>
+                <span className={`inline-flex items-center rounded-sm px-1 py-0.5 text-[10px] font-semibold ${isActive ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>
+                  {isActive ? "Activo" : "Inactivo"}
+                </span>
               </div>
             </div>
           </div>
-          <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-            <Badge variant={statusBadgeVariant} className="shrink-0">
-              {statusLabel}
-            </Badge>
-            <ResponsiveActionButton
-              variant="ghost"
-              label="Editar"
-              title="Editar"
-              onClick={() => openEditDialog(docente)}
-              disabled={String(docente.id) === currentUser?.id}
-              icon={<Edit className="h-4 w-4" />}
-            />
-            <ResponsiveActionButton
-              variant="ghost"
-              label="Restablecer"
-              title="Restablecer contraseña"
-              onClick={() => openResetDialog(docente)}
-              disabled={String(docente.id) === currentUser?.id}
-              icon={<Key className="h-4 w-4" />}
-            />
-            <ResponsiveActionButton
-              variant="ghost"
-              label={statusActionLabel}
-              title="Cambiar estado"
-              onClick={() => openStatusDialog(docente)}
-              disabled={String(docente.id) === currentUser?.id}
-              icon={statusActionIcon}
-            />
+          {/* Vista desktop */}
+          <div className="hidden sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_90px_110px_80px_120px] sm:items-center sm:gap-4 sm:px-4 sm:py-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className={`h-5 w-1 shrink-0 rounded-full ${isActive ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />
+              <DocenteAvatar name={docente.nombre} avatar={docente.avatar} className="h-7 w-7 shrink-0" />
+              <p className="truncate text-sm font-medium text-foreground">{docente.nombre}</p>
+            </div>
+            <div className="truncate text-sm text-muted-foreground">{docente.email}</div>
+            <div className="text-sm text-muted-foreground">{docente.documentos} {docente.documentos === 1 ? "doc." : "docs."}</div>
+            <div>
+              <span className="inline-flex items-center rounded-sm bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold capitalize text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                {roleLabel}
+              </span>
+            </div>
+            <div>
+              <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold ${isActive ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>
+                {isActive ? "Activo" : "Inactivo"}
+              </span>
+            </div>
+            <div className="flex items-center justify-end gap-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-muted-foreground hover:text-foreground" onClick={() => openEditDialog(docente)} disabled={isSelf}>
+                    <Edit className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Editar</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-muted-foreground hover:text-foreground" onClick={() => openResetDialog(docente)} disabled={isSelf}>
+                    <Key className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Restablecer contraseña</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className={`h-7 w-7 rounded-sm text-muted-foreground ${isActive ? "hover:text-destructive" : "hover:text-success"}`} onClick={() => openStatusDialog(docente)} disabled={isSelf}>
+                    {isActive ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isActive ? "Dar baja" : "Dar alta"}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-muted-foreground hover:text-destructive" onClick={() => openDeleteDialog(docente)} disabled={isSelf}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Eliminar usuario</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </div>
       );
@@ -453,6 +660,34 @@ export function DocenteManagement() {
     setSelectedDocente(docente);
     setStatusConfirmationEmail("");
     setShowStatusDialog(true);
+  };
+
+  const openDeleteDialog = (docente: Docente) => {
+    setSelectedDocente(docente);
+    setDeleteConfirmEmail("");
+    setShowDeleteDialog(true);
+  };
+
+  const handleForceDelete = async () => {
+    if (!selectedDocente) return;
+    if (deleteConfirmEmail.trim().toLowerCase() !== selectedDocente.email.trim().toLowerCase()) {
+      toast.error("Debes escribir el correo exacto para confirmar la eliminación");
+      return;
+    }
+    setIsDeleting(true);
+    const toastId = toast.loading("Eliminando usuario...");
+    try {
+      await apiFetch(`/users/${selectedDocente.id}/force-delete`, { method: "DELETE" });
+      toast.success("Usuario eliminado", { id: toastId, description: `${selectedDocente.nombre} fue eliminado del sistema. Sus documentos permanecen.` });
+      await loadUsers();
+      setShowDeleteDialog(false);
+      setSelectedDocente(null);
+      setDeleteConfirmEmail("");
+    } catch (error: any) {
+      toast.error(error instanceof Error ? error.message : "No fue posible eliminar el usuario", { id: toastId });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const confirmToggleStatus = async () => {
@@ -620,73 +855,172 @@ export function DocenteManagement() {
   };
 
   return (
-    <div className="relative space-y-6 overflow-hidden">
-      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
-        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Gestión de Usuarios</h1>
-            <p className="text-sm text-slate-600 dark:text-slate-400">Administra usuarios y permisos del sistema.</p>
-          </div>
-          <Button data-tour="admin-docentes-new-btn" variant="success" onClick={() => setShowNewDialog(true)} className="self-start sm:self-auto shadow-md shadow-emerald-500/20">
-            <UserPlus className="h-4 w-4 mr-2" />
-            Nuevo Usuario
-          </Button>
-        </div>
-      </div>
-
-      <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-emerald-900/50 dark:bg-slate-950/60 dark:backdrop-blur-md">
-        <CardHeader>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <CardTitle>Usuarios Registrados</CardTitle>
-            <div data-tour="admin-docentes-filters" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-              <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/75 px-3 py-2 dark:bg-slate-900/65">
-                <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Rol:</span>
-                <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as typeof roleFilter)}>
-                  <SelectTrigger className="h-8 w-[130px] border-0 bg-transparent px-2 text-sm shadow-none focus:ring-0">
-                    <SelectValue placeholder="Filtrar rol" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="docente">Docente</SelectItem>
-                    <SelectItem value="tutor">Tutor</SelectItem>
-                    <SelectItem value="supervisor">Supervisor</SelectItem>
-                  </SelectContent>
-                </Select>
+    <>
+      {isFormal ? (
+        /* ── Modo empresarial ── */
+        <div className="flex h-[calc(100vh-64px)] flex-col overflow-hidden bg-card text-foreground dark:bg-slate-950">
+          {/* Encabezado plano */}
+          <div className="shrink-0 border-b border-border bg-card px-6 py-4 dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Gestión de Usuarios</h1>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Administra usuarios y permisos del sistema.</p>
               </div>
-              <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/75 px-3 py-2 dark:bg-slate-900/65">
-                <span className="text-sm text-muted-foreground">Estado:</span>
-                <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-                  <SelectTrigger className="h-8 w-[120px] border-0 bg-transparent px-2 text-sm shadow-none focus:ring-0">
-                    <SelectValue placeholder="Filtrar estado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="activo">Activos</SelectItem>
-                    <SelectItem value="inactivo">Inactivos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar usuario..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 bg-background/90 dark:bg-slate-900/85"
-                />
+              <div className="flex w-full items-center gap-2 sm:w-auto">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-800 dark:text-slate-300" strokeWidth={2.25} />
+                  <Input
+                    placeholder={searchPlaceholders[placeholderIndex]}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="rounded-sm pl-9 text-sm dark:border-slate-700 dark:bg-slate-900"
+                  />
+                </div>
+                <Button
+                  data-tour="admin-docentes-new-btn"
+                  variant="success"
+                  size="sm"
+                  onClick={() => setShowNewDialog(true)}
+                  className="shrink-0 gap-1.5 rounded-sm text-xs"
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Nuevo Usuario
+                </Button>
               </div>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="overflow-x-hidden">
-          <div className="min-w-0 space-y-3">
-            {usersListContent}
-          </div>
-        </CardContent>
-      </Card>
 
+          {/* Tabla */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5">
+            <div className="border border-border/70 dark:border-slate-800">
+              {!isLoadingUsers && !usersError && filteredDocentes.length > 0 && (
+                <div className="hidden sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_90px_110px_80px_120px] sm:gap-4 border-b border-border/70 bg-muted/40 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400">
+                  <span>Usuario</span>
+                  <span>Correo</span>
+                  <span>Documentos</span>
+                  <span>Rol</span>
+                  <span>Estado</span>
+                  <span className="text-right">Acciones</span>
+                </div>
+              )}
+              <div className="divide-y divide-border/50 bg-card dark:divide-slate-800 dark:bg-slate-950">
+                {formalListContent}
+              </div>
+            </div>
+
+            {!isLoadingUsers && !usersError && filteredDocentes.length > 0 && totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredDocentes.length)} de {filteredDocentes.length}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {getPageNumbers().map((page, idx) =>
+                    page === "ellipsis" ? (
+                      <span key={`ellipsis-${idx}`} className="px-1.5 text-sm text-muted-foreground">…</span>
+                    ) : (
+                      <Button key={page} variant={page === currentPage ? "success" : "ghost"} size="icon" className="h-7 w-7 rounded-sm text-sm" onClick={() => setCurrentPage(page)}>
+                        {page}
+                      </Button>
+                    )
+                  )}
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* ── Modo clásico ── */
+        <div className="relative space-y-4 overflow-hidden">
+          {/* Header con título y búsqueda integrada */}
+          <div data-component="page-banner" className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+                  Gestión de Usuarios
+                </h1>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Administra usuarios y permisos del sistema.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-800 dark:text-slate-300" strokeWidth={2.25} />
+                  <Input
+                    placeholder={searchPlaceholders[placeholderIndex]}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="bg-white/95 pl-9 shadow-sm transition-all duration-300 dark:bg-slate-900/90"
+                  />
+                </div>
+                <Button
+                  data-tour="admin-docentes-new-btn"
+                  variant="success"
+                  onClick={() => setShowNewDialog(true)}
+                  className="shrink-0 shadow-sm shadow-emerald-500/20"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Nuevo Usuario
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Contenedor de tabla */}
+          <div className="rounded-2xl border border-border/60 bg-card p-4 dark:border-slate-800 dark:bg-slate-950/60 sm:p-5">
+            <div className="overflow-hidden rounded-lg border border-border/60 dark:border-slate-800">
+              {!isLoadingUsers && !usersError && filteredDocentes.length > 0 && (
+                <div className="hidden bg-slate-50/80 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground dark:bg-slate-900/60 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_100px_120px_90px_148px] sm:gap-4">
+                  <span>Usuario</span>
+                  <span>Correo</span>
+                  <span>Documentos</span>
+                  <span>Rol</span>
+                  <span>Estado</span>
+                  <span className="text-right">Acciones</span>
+                </div>
+              )}
+              <div data-component="user-list" className="min-w-0 divide-y divide-border/60 bg-white dark:divide-slate-800 dark:bg-slate-950/40">
+                {usersListContent}
+              </div>
+            </div>
+
+            {/* Paginación centrada */}
+            {!isLoadingUsers && !usersError && filteredDocentes.length > 0 && totalPages > 1 && (
+              <div className="mt-3 flex flex-col items-center gap-2 sm:relative sm:flex-row sm:items-center">
+                <p className="order-2 text-xs text-muted-foreground sm:order-1">
+                  Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1}-
+                  {Math.min(currentPage * ITEMS_PER_PAGE, filteredDocentes.length)} de {filteredDocentes.length}
+                </p>
+                <div className="order-1 flex items-center gap-1 sm:absolute sm:left-1/2 sm:order-2 sm:-translate-x-1/2">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {getPageNumbers().map((page, idx) =>
+                    page === "ellipsis" ? (
+                      <span key={`ellipsis-${idx}`} className="px-1.5 text-sm text-muted-foreground">…</span>
+                    ) : (
+                      <Button key={page} variant={page === currentPage ? "success" : "ghost"} size="icon" className="h-7 w-7 text-sm" onClick={() => setCurrentPage(page)}>
+                        {page}
+                      </Button>
+                    )
+                  )}
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Diálogos compartidos */}
       <Dialog open={showEditDialog} onOpenChange={(open) => {
         setShowEditDialog(open);
         if (!open) {
@@ -815,7 +1149,6 @@ export function DocenteManagement() {
                   : "Selecciona al menos un rol para el usuario."}
               </p>
             </div>
-
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isSavingEdit}>
@@ -879,6 +1212,74 @@ export function DocenteManagement() {
         onConfirm={confirmToggleStatus}
         isChangingStatus={isChangingStatus}
       />
+
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => {
+        setShowDeleteDialog(open);
+        if (!open) { setSelectedDocente(null); setDeleteConfirmEmail(""); }
+      }}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden gap-0">
+          <div className="px-6 pt-6 pb-5 bg-destructive/10">
+            <div className="flex items-center gap-3 mb-1.5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/20 text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </div>
+              <DialogTitle className="text-base font-semibold leading-tight">Eliminar usuario permanentemente</DialogTitle>
+            </div>
+            <DialogDescription className="text-sm text-muted-foreground pl-12 leading-relaxed">
+              Esta acción no se puede deshacer. El usuario perderá acceso al sistema, pero sus documentos permanecerán en el sistema y mostrarán "Usuario eliminado".
+            </DialogDescription>
+          </div>
+
+          {selectedDocente && (
+            <div className="px-6 py-5 border-y border-border/60">
+              <div className="flex items-center gap-3.5">
+                <DocenteAvatar name={selectedDocente.nombre} avatar={selectedDocente.avatar} className="h-11 w-11 shrink-0 ring-2 ring-border/40" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sm text-foreground truncate">{selectedDocente.nombre}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5 text-muted-foreground">
+                    <Mail className="h-3 w-3 shrink-0" />
+                    <span className="text-xs truncate">{selectedDocente.email}</span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {selectedDocente.documentos} {selectedDocente.documentos === 1 ? "documento" : "documentos"} subidos
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <Label className="text-xs font-medium text-foreground/80">
+                  Escribe el correo exacto para confirmar la eliminación
+                </Label>
+                <Input
+                  type="email"
+                  value={deleteConfirmEmail}
+                  onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+                  placeholder={selectedDocente.email}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="h-9 bg-background text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Debe coincidir carácter por carácter con el correo mostrado arriba.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="px-6 py-4 flex items-center justify-end gap-2.5">
+            <Button variant="ghost" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting} className="h-9 px-4 text-sm">
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleForceDelete}
+              className="h-9 px-5 text-sm min-w-40"
+              disabled={isDeleting || deleteConfirmEmail.trim().toLowerCase() !== (selectedDocente?.email.trim().toLowerCase() ?? "")}
+            >
+              {isDeleting ? "Eliminando..." : "Eliminar permanentemente"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
         <DialogContent>
@@ -1004,7 +1405,6 @@ export function DocenteManagement() {
                   : "Selecciona al menos un rol para el usuario."}
               </p>
             </div>
-            
           </div>
           <DialogFooter>
             <Button
@@ -1027,7 +1427,7 @@ export function DocenteManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
 

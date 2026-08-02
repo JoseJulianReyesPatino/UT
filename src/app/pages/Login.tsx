@@ -162,7 +162,7 @@ export function Login() {
   };
 
   return (
-    <div className={`${pageBackground} min-h-screen overflow-hidden relative`}>
+    <div className={`login-page ${pageBackground} min-h-screen overflow-hidden relative`}>
       {/* BACKGROUND - Gradientes y decoraciones mejoradas */}
       <div className="absolute inset-0">
         <img

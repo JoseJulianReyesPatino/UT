@@ -2,11 +2,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import apiFetch from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { useTourActive } from "../../context/TourContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { getDocumentDisplayFileName, fetchDocumentBlob, getDocumentFileUrl } from "../../lib/documents";
+import { fetchDocumentBlob } from "../../lib/documents";
 import {
   FileText,
   Clock,
@@ -14,13 +11,8 @@ import {
   AlertCircle,
   Calendar,
   Eye,
-  RefreshCw,
-  Clock2,
-  Undo2,
 } from "lucide-react";
 
-// --- Importar las imágenes desde assets ---
-// Imágenes para desktop
 import banner1 from "../../../assets/carrusel_web/carruselPC1.webp";
 import banner2 from "../../../assets/carrusel_web/carruselPC2.webp";
 import banner3 from "../../../assets/carrusel_web/carruselPC3.webp";
@@ -28,9 +20,6 @@ import banner4 from "../../../assets/carrusel_web/carruselPC4.webp";
 import banner5 from "../../../assets/carrusel_web/carruselPC5.webp";
 import banner6 from "../../../assets/carrusel_web/carruselPC6.webp";
 
-
-// Imágenes para móvil (versiones optimizadas)
-// Si no tienes versiones específicas para móvil, usa las mismas
 import banner1Mobile from "../../../assets/carrusel_movil/carrusel1.webp";
 import banner2Mobile from "../../../assets/carrusel_movil/carrusel2.webp";
 import banner3Mobile from "../../../assets/carrusel_movil/carrusel3.webp";
@@ -38,47 +27,62 @@ import banner4Mobile from "../../../assets/carrusel_movil/carrusel4.webp";
 import banner5Mobile from "../../../assets/carrusel_movil/carrusel5.webp";
 import banner6Mobile from "../../../assets/carrusel_movil/carrusel6.png";
 
-// --- Importar logos para el slider ---
 import { CarrerasLogoSlider } from "../../components/CarrerasLogoSlider";
-// Agrega más logos aquí si tienes otros
-// import logoOtro from "../../../assets/OtroLogo.png";
 
-// --- Caché en memoria compartida ---
+// NUEVA VERSIÓN DE CACHÉ - esto resuelve el problema de raíz
+const SESSION_KEY = 'docente-dashboard-cache-v2';
+
+// Invalidar caché viejo automáticamente
+try {
+  const existing = sessionStorage.getItem(SESSION_KEY);
+  if (existing) {
+    const parsed = JSON.parse(existing);
+    // Invalidar si falta icon o accent (shape anterior)
+    if (parsed?.stats?.[0]?.icon !== undefined || !parsed?.stats?.[0]?.accent) {
+      sessionStorage.removeItem(SESSION_KEY);
+    }
+  }
+} catch { 
+  sessionStorage.removeItem(SESSION_KEY); 
+}
+
+// Limpiar también cualquier caché de versión anterior
+try {
+  const oldKeys = ['docente-dashboard-cache'];
+  oldKeys.forEach(key => {
+    if (sessionStorage.getItem(key)) {
+      sessionStorage.removeItem(key);
+    }
+  });
+} catch {}
+
 let dashboardCache: {
   stats: {
     title: string;
     value: string;
     description: string;
     icon: any;
-    trend?: string;
-    color?: string;
-    bgColor?: string;
-    cardClass?: string;
-    accentClass?: string;
     action?: string;
+    accent: 'amber' | 'emerald' | 'slate';
   }[];
   recentDocuments: DocumentItem[];
   proximasEntregas: any[];
   timestamp: number;
 } | null = null;
 
-// --- Caché en sessionStorage (sobrevive recarga de página) ---
-const SESSION_KEY = 'docente-dashboard-cache';
+// Forzar limpieza de caché en memoria al recargar el módulo
+// Esto solo afecta en desarrollo con HMR
+if (import.meta.hot) {
+  dashboardCache = null;
+}
 
-// Limpiar entradas corruptas de versiones anteriores (iconos serializados como {})
-try {
-  const existing = sessionStorage.getItem(SESSION_KEY);
-  if (existing) {
-    const parsed = JSON.parse(existing);
-    if (parsed?.stats?.[0]?.icon !== undefined) {
-      sessionStorage.removeItem(SESSION_KEY);
-    }
-  }
-} catch { sessionStorage.removeItem(SESSION_KEY); }
-
-// Los iconos de Lucide son objetos forwardRef y no son serializables a JSON.
-// Los guardamos por índice y los re-adjuntamos al leer de sessionStorage.
 const STAT_ICONS = [Clock, CheckCircle2, AlertCircle];
+
+const ACCENT = {
+  amber:   { dot: "bg-amber-500",   value: "text-amber-700 dark:text-amber-400" },
+  emerald: { dot: "bg-emerald-500", value: "text-emerald-700 dark:text-emerald-400" },
+  slate:   { dot: "bg-slate-400",   value: "text-slate-600 dark:text-slate-300" },
+} as const;
 
 const readSessionCache = (): typeof dashboardCache => {
   try {
@@ -94,10 +98,10 @@ const readSessionCache = (): typeof dashboardCache => {
     return parsed;
   } catch { return null; }
 };
+
 const writeSessionCache = (data: typeof dashboardCache) => {
   try {
     if (!data) return;
-    // Guardar sin los iconos (funciones/objetos no serializables)
     const serializable = {
       ...data,
       stats: data.stats.map(({ icon: _icon, ...rest }) => rest),
@@ -148,27 +152,17 @@ type FormItem = {
   access_roles?: string[];
 };
 
-// --- Arreglo de banners ---
 const introBanners = [banner1, banner2, banner3, banner4, banner5, banner6];
 const introBannersMobile = [banner1Mobile, banner2Mobile, banner3Mobile, banner4Mobile, banner5Mobile, banner6Mobile];
 
-// --- Arreglo de logos para el slider (duplicados para efecto continuo) ---
-
-// --- Skeletons de carga ---
 function StatCardSkeleton() {
   return (
     <>
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="animate-pulse overflow-hidden rounded-2xl border border-slate-200/70 bg-white/70 shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
-          <div className="h-1 bg-muted" />
-          <div className="flex flex-col items-start gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="h-4 w-36 rounded-full bg-muted" />
-            <div className="h-9 w-9 rounded-xl bg-muted sm:h-10 sm:w-10" />
-          </div>
-          <div className="space-y-2 px-4 pb-4 pt-0">
-            <div className="h-8 w-10 rounded-lg bg-muted" />
-            <div className="h-3 w-32 rounded-full bg-muted" />
-          </div>
+        <div key={i} className="animate-pulse space-y-3 p-5">
+          <div className="h-3 w-28 rounded-full bg-muted" />
+          <div className="h-8 w-16 rounded-lg bg-muted" />
+          <div className="h-3 w-32 rounded-full bg-muted" />
         </div>
       ))}
     </>
@@ -177,20 +171,13 @@ function StatCardSkeleton() {
 
 function RecentDocsSkeleton() {
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="animate-pulse flex flex-col gap-2 rounded-2xl border border-border/70 bg-card/70 p-3 dark:border-slate-700 dark:bg-slate-900/70 sm:flex-row sm:items-center sm:gap-3">
-          <div className="flex items-start gap-3 sm:min-w-0 sm:flex-1">
-            <div className="h-11 w-11 shrink-0 rounded-2xl bg-muted" />
-            <div className="min-w-0 flex-1 space-y-2 pt-1">
-              <div className="h-3 w-20 rounded-full bg-muted" />
-              <div className="h-4 w-2/3 rounded-full bg-muted" />
-              <div className="h-3 w-28 rounded-full bg-muted" />
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
-            <div className="h-6 w-24 rounded-full bg-muted" />
-            <div className="h-9 w-9 rounded-xl bg-muted" />
+        <div key={i} className="flex animate-pulse gap-4">
+          <div className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full bg-muted" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-20 rounded-full bg-muted" />
+            <div className="h-4 w-2/3 rounded-full bg-muted" />
           </div>
         </div>
       ))}
@@ -202,14 +189,11 @@ function ProximasSkeleton() {
   return (
     <div className="space-y-3">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="animate-pulse flex items-center justify-between rounded-2xl border border-border/70 bg-card/70 p-3 dark:border-slate-700 dark:bg-slate-900/70">
-          <div className="space-y-2">
-            <div className="h-4 w-28 rounded-full bg-muted" />
-            <div className="h-3 w-44 rounded-full bg-muted" />
-          </div>
-          <div className="space-y-2">
-            <div className="h-4 w-14 rounded-full bg-muted ml-auto" />
-            <div className="h-3 w-12 rounded-full bg-muted ml-auto" />
+        <div key={i} className="flex animate-pulse items-center gap-3">
+          <div className="h-10 w-10 shrink-0 rounded-lg bg-muted" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-28 rounded-full bg-muted" />
+            <div className="h-3 w-40 rounded-full bg-muted" />
           </div>
         </div>
       ))}
@@ -217,7 +201,6 @@ function ProximasSkeleton() {
   );
 }
 
-// --- Componente del carrusel con imágenes responsive ---
 function AutoFadeBannerCarousel({ 
   images, 
   mobileImages, 
@@ -304,7 +287,6 @@ function AutoFadeBannerCarousel({
         }`}
       >
         <div className="group relative block h-full w-full">
-          {/* Todas las imágenes son puramente visuales: nunca reciben clics directamente. */}
           {currentImages.map((src, index) => {
             const isActive = index === activeIndex;
             return (
@@ -320,7 +302,6 @@ function AutoFadeBannerCarousel({
             );
           })}
 
-          {/* Único elemento clickeable del carrusel: solo existe si la imagen ACTIVA tiene link asignado. */}
           {!isMinimized && links?.[activeIndex] && (
             <a
               href={links[activeIndex]}
@@ -328,13 +309,10 @@ function AutoFadeBannerCarousel({
               rel="noreferrer"
               aria-label="Abrir documento"
               className="absolute inset-0 z-[6] block"
-              // IMPORTANTE: No usar aria-hidden en el elemento que puede recibir foco
-              // Si necesitas ocultarlo, usa inert o condicionalmente no renderizarlo
             />
           )}
         </div>
 
-        {/* Botón de minimizar/expandir */}
         <button
           type="button"
           onClick={toggleMinimize}
@@ -362,7 +340,6 @@ function AutoFadeBannerCarousel({
           )}
         </button>
 
-        {/* Flechas de navegación */}
         {currentImages.length > 1 && !isMinimized && (
           <>
             <button
@@ -385,14 +362,31 @@ function AutoFadeBannerCarousel({
                 <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
+            
+            {/* Dots / indicadores de paginación */}
+            <div className="absolute inset-x-0 bottom-3 z-10 flex items-center justify-center gap-1.5">
+              {currentImages.map((_, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveIndex(index); }}
+                  aria-label={`Ir a la imagen ${index + 1}`}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    index === activeIndex
+                      ? "w-6 bg-emerald-400"
+                      : "w-1.5 bg-white/50 hover:bg-white/70"
+                  }`}
+                />
+              ))}
+            </div>
           </>
         )}
-        {/* Estado minimizado - texto con fondo propio, legible sin depender de la imagen */}
+        
         {isMinimized && (
-          <div className="absolute inset-0 flex items-center justify-center bg-emerald-950/70 px-4">
-            <p className="text-center text-xs sm:text-sm font-medium text-white/90">
-              Carrusel minimizado — haz clic en{" "}
-              <span className="font-semibold text-white">Expandir</span> para ver las imágenes
+          <div className="absolute inset-0 flex items-center gap-3 border-l-4 border-emerald-600 bg-slate-900/85 px-4 dark:bg-slate-950/90">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+            <p className="text-xs sm:text-sm font-medium text-white/90">
+              Carrusel minimizado — clic en <span className="font-semibold text-white">Expandir</span> para verlo
             </p>
           </div>
         )}
@@ -402,33 +396,9 @@ function AutoFadeBannerCarousel({
 }
 
 const FAKE_STATS = [
-  {
-    title: "Documentos Pendientes",
-    value: "2",
-    description: "Pendientes de revisión",
-    icon: Clock,
-    action: "historial",
-    cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70",
-    accentClass: "from-slate-400/35 via-slate-300/20 to-transparent",
-  },
-  {
-    title: "Documentos Aprobados",
-    value: "5",
-    description: "Este cuatrimestre",
-    icon: CheckCircle2,
-    action: "historial",
-    cardClass: "bg-gradient-to-br from-emerald-50 via-white to-emerald-50/80 border-emerald-200/70 dark:from-emerald-950/20 dark:via-slate-950 dark:to-emerald-950/25 dark:border-emerald-800/60",
-    accentClass: "from-emerald-400/35 via-emerald-300/20 to-transparent",
-  },
-  {
-    title: "En Revisión",
-    value: "1",
-    description: "Actualmente en proceso",
-    icon: AlertCircle,
-    action: "historial",
-    cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70",
-    accentClass: "from-slate-400/35 via-slate-300/20 to-transparent",
-  },
+  { title: "Documentos Pendientes", value: "2", description: "Pendientes de revisión", icon: Clock, action: "historial", accent: "amber" as const },
+  { title: "Documentos Aprobados", value: "5", description: "Este cuatrimestre", icon: CheckCircle2, action: "historial", accent: "emerald" as const },
+  { title: "En Revisión", value: "1", description: "Actualmente en proceso", icon: AlertCircle, action: "historial", accent: "slate" as const },
 ];
 
 const FAKE_RECENT_DOCS: DocumentItem[] = [
@@ -437,41 +407,30 @@ const FAKE_RECENT_DOCS: DocumentItem[] = [
   { id: 9803, nombre: "Lista Concentrada — Cuatrimestre 2", tipo: "Lista Concentrada", fecha: "2026-07-05", status: "devuelto" },
 ];
 
-// --- Componente del slider infinito de logos ---
-
 export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const { onNavigate } = props;
   const manualDocenteUrl = new URL("../../../assets/manuales/Manual de Usuario del Docente.pdf", import.meta.url).href;
   const nomenclaturaUrl = new URL("../../../assets/manuales/Nomenclatura.pdf", import.meta.url).href;
 
-  // Solo el banner 1 (índice 0) y el banner 2 (índice 1) tienen un CTA dibujado.
-  // El resto son puramente informativos/decorativos y no deben ser clickeables.
   const bannerLinks: (string | undefined)[] = [manualDocenteUrl, nomenclaturaUrl];
 
   const { isReady, user } = useAuth();
   const { isDocenteTourActive } = useTourActive();
 
-  // --- Estado para el diálogo de vista previa ---
   const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState<boolean>(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
-  // --- Estado para errores de carga ---
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Combina caché de memoria (navegación) y sessionStorage (recarga de página)
   const [stats, setStats] = useState<{
     title: string;
     value: string;
     description: string;
     icon: any;
-    trend?: string;
-    color?: string;
-    bgColor?: string;
-    cardClass?: string;
-    accentClass?: string;
     action?: string;
+    accent: 'amber' | 'emerald' | 'slate';
   }[]>(() => (dashboardCache ?? readSessionCache())?.stats ?? []);
   const [isLoadingStats, setIsLoadingStats] = useState(() => !(dashboardCache ?? readSessionCache()));
 
@@ -481,7 +440,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const [proximasEntregas, setProximasEntregas] = useState<any[]>(() => (dashboardCache ?? readSessionCache())?.proximasEntregas ?? []);
   const [isLoadingProximas, setIsLoadingProximas] = useState(() => !(dashboardCache ?? readSessionCache()));
 
-  // --- Función para formatear fecha ---
   const formatDate = useCallback((dateStr?: string | null) => {
     if (!dateStr) return "N/A";
     try {
@@ -499,7 +457,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     }
   }, []);
 
-  // --- Función para cargar la vista previa del documento ---
   const loadDocumentPreview = useCallback(async (doc: DocumentItem) => {
     if (!doc) return;
     
@@ -519,8 +476,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     }
   }, []);
 
-  // --- Función para recargar los datos manualmente ---
-  // showLoading=false cuando ya hay datos en caché: refresca en silencio sin mostrar skeletons
   const refreshData = useCallback(async (showLoading = true) => {
     if (!isReady || !user) return;
 
@@ -546,8 +501,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           description: 'Pendientes de revisión',
           icon: Clock,
           action: 'historial',
-          cardClass: 'bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70',
-          accentClass: 'from-slate-400/35 via-slate-300/20 to-transparent',
+          accent: 'amber' as const,
         },
         {
           title: 'Documentos Aprobados',
@@ -555,8 +509,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           description: 'Este cuatrimestre',
           icon: CheckCircle2,
           action: 'historial',
-          cardClass: 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50/80 border-emerald-200/70 dark:from-emerald-950/20 dark:via-slate-950 dark:to-emerald-950/25 dark:border-emerald-800/60',
-          accentClass: 'from-emerald-400/35 via-emerald-300/20 to-transparent',
+          accent: 'emerald' as const,
         },
         {
           title: 'En Revisión',
@@ -564,8 +517,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           description: 'Actualmente en proceso',
           icon: AlertCircle,
           action: 'historial',
-          cardClass: 'bg-gradient-to-br from-slate-50 via-white to-slate-50/70 border-slate-200/70 dark:from-slate-900/55 dark:via-slate-950 dark:to-slate-950/20 dark:border-slate-700/70',
-          accentClass: 'from-slate-400/35 via-slate-300/20 to-transparent',
+          accent: 'slate' as const,
         },
       ];
       setStats(statsArr);
@@ -668,269 +620,393 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
   useEffect(() => {
     if (!isReady || !user) return;
-    // Si ya hay datos (memoria o sessionStorage), refresca en silencio sin skeletons
     const hasCache = Boolean(dashboardCache ?? readSessionCache());
     refreshData(!hasCache);
   }, [isReady, user]);
 
+  // Obtener nombre del usuario
+  const nombreUsuario = (user?.name ?? (user as any)?.nombre ?? (user as any)?.first_name ?? 'Docente').toString().split(' ')[0];
+
+  // Formatear fecha
+  const fechaHoy = new Date().toLocaleDateString('es-MX', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  const fechaCapitalizada = fechaHoy.charAt(0).toUpperCase() + fechaHoy.slice(1);
+
   return (
-    <div className="relative z-0 space-y-6 overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -right-12 top-8 h-40 w-40 rounded-full bg-emerald-100/20 blur-3xl dark:bg-emerald-500/5" />
-        <div className="absolute -left-10 bottom-0 h-52 w-52 rounded-full bg-sky-100/10 blur-3xl dark:bg-sky-500/5" />
+    <div className="space-y-5 sm:space-y-6">
+      {/* Saludo y fecha */}
+      <div className="px-1">
+        <h1 className="text-xl font-semibold text-slate-800 dark:text-white sm:text-2xl">
+          Hola, {nombreUsuario}
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Hoy es {fechaCapitalizada}
+        </p>
       </div>
 
-      <div className="relative z-10">
-        {/* Carrusel con imágenes responsive */}
-       <AutoFadeBannerCarousel 
-          images={introBanners} 
-          mobileImages={introBannersMobile}
-          links={bannerLinks}
-        />
+      {/* Carrusel con imágenes responsive */}
+      <AutoFadeBannerCarousel 
+        images={introBanners} 
+        mobileImages={introBannersMobile}
+        links={bannerLinks}
+      />
 
-        {/* Mensaje de error de carga */}
-        {loadError && (
-          <div className="mt-3 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-            <p>{loadError}</p>
+      {/* Mensaje de error de carga */}
+      {loadError && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+          <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <p>{loadError}</p>
+        </div>
+      )}
+
+      {/* ============ VERSIÓN MOBILE — una sola superficie, contenido en texto ============ */}
+      <div className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60 sm:hidden">
+        <div className="h-[3px] bg-emerald-600 dark:bg-emerald-500" />
+
+        <div className="p-4">
+          {/* Stats en línea de texto */}
+          <div data-tour="docente-dashboard-stats" className="flex items-stretch divide-x divide-emerald-600/15 dark:divide-emerald-400/20">
+            {!isDocenteTourActive && isLoadingStats ? (
+              <div className="flex w-full animate-pulse justify-between gap-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex-1 space-y-2">
+                    <div className="h-2.5 w-14 rounded-full bg-muted" />
+                    <div className="h-6 w-8 rounded-lg bg-muted" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              (isDocenteTourActive ? FAKE_STATS : stats).map((stat, i) => {
+                const a = ACCENT[stat.accent] ?? ACCENT.slate;
+                return (
+                  <button
+                    key={stat.title}
+                    type="button"
+                    onClick={() => onNavigate && stat.action && onNavigate(stat.action)}
+                    className={`min-w-0 flex-1 text-left ${i > 0 ? "pl-2.5" : ""} ${i < 2 ? "pr-2.5" : ""}`}
+                  >
+                    <p className="flex items-center gap-1 text-[8px] font-semibold uppercase leading-tight tracking-wide text-muted-foreground">
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${a.dot}`} />
+                      <span className="truncate">{stat.title}</span>
+                    </p>
+                    <p className={`mt-1 text-xl font-semibold tabular-nums leading-none ${a.value}`}>
+                      {stat.value}
+                    </p>
+                  </button>
+                );
+              })
+            )}
           </div>
-        )}
 
-        {/* Stats cards */}
-        <div data-tour="docente-dashboard-stats" className="relative z-10 mt-3 grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {/* Documentos recientes — lista de texto */}
+          <div className="mt-5 border-t border-emerald-600/15 pt-4 dark:border-emerald-400/20">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-white">Documentos Recientes</h3>
+              <button
+                type="button"
+                onClick={() => onNavigate?.("historial")}
+                className="text-xs font-medium text-emerald-700 dark:text-emerald-400"
+              >
+                Ver todos
+              </button>
+            </div>
+
+            <div className="mt-1 divide-y divide-emerald-600/15 dark:divide-emerald-400/20">
+              {(!isDocenteTourActive && isLoadingDocuments) ? (
+                <RecentDocsSkeleton />
+              ) : (!isDocenteTourActive && recentDocuments.length === 0) ? (
+                <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">No tienes documentos enviados</p>
+              ) : (
+                (isDocenteTourActive ? FAKE_RECENT_DOCS : recentDocuments).slice(0, 6).map((doc) => {
+                  const s = (doc.status ?? '').toLowerCase();
+                  let dot = "bg-amber-500";
+                  let label = "Pendiente";
+                  if (doc.resubmittedAt) { dot = "bg-slate-400"; label = "Reenviado"; }
+                  else if (s === "aprobado" || s === "revisado") { dot = "bg-emerald-500"; label = "Revisado"; }
+                  else if (s === "devuelto") { dot = "bg-red-500"; label = "Devuelto"; }
+                  else if (s === "revision") { dot = "bg-slate-400"; label = "En revisión"; }
+
+                  const fileNameOnly = doc.nombre.includes(' - ')
+                    ? doc.nombre.split(' - ').slice(1).join(' - ')
+                    : doc.nombre;
+
+                  return (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      onClick={() => openDocument(doc)}
+                      className="flex w-full items-center gap-3 py-3 text-left"
+                    >
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700/80 dark:text-emerald-400/80">
+                          {doc.tipo}
+                        </p>
+                        <p className="truncate text-sm font-medium text-slate-800 dark:text-white">
+                          {fileNameOnly}
+                        </p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-500">
+                          {doc.fecha ? formatDate(doc.fecha) : ""}{doc.fecha ? " · " : ""}{label}
+                        </p>
+                      </div>
+                      <Eye className="h-4 w-4 shrink-0 text-emerald-700/70 dark:text-emerald-400/70" />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Próximas entregas — lista de texto */}
+          <div className="mt-1 border-t border-emerald-600/15 pt-4 dark:border-emerald-400/20">
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-white">Próximas Entregas</h3>
+
+            <div className="mt-1 divide-y divide-emerald-600/15 dark:divide-emerald-400/20">
+              {isLoadingProximas ? (
+                <ProximasSkeleton />
+              ) : proximasEntregas.length === 0 || (proximasEntregas.length === 1 && proximasEntregas[0]?.isPlaceholder) ? (
+                <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                  {proximasEntregas[0]?.titulo || "No hay entregas programadas"}
+                </p>
+              ) : (
+                proximasEntregas.filter((e) => !e.isPlaceholder).map((entrega, index) => {
+                  const fecha = new Date(entrega.fecha);
+                  const mes = fecha.toLocaleDateString("es-MX", { month: "short" }).replace(".", "");
+                  const dia = fecha.getDate();
+                  const diffMs = new Date(entrega.fecha).getTime() - Date.now();
+                  const diffHrs = diffMs / 3_600_000;
+                  const isUrgent = diffHrs < 24;
+                  const isWarning = diffHrs >= 24 && diffHrs < 7 * 24;
+                  const tiempoRestante = formatTiempoRestante(entrega.fecha);
+                  const isGenericTitle = entrega.titulo?.trim().toLowerCase() === "docentes";
+                  const tituloVisible = isGenericTitle ? entrega.detalle : entrega.titulo;
+
+                  return (
+                    <div key={`${entrega.titulo}-${index}`} className="flex items-center gap-3 py-3">
+                      <span className={`shrink-0 text-xs font-semibold uppercase ${
+                        isUrgent ? "text-red-600 dark:text-red-400" : isWarning ? "text-amber-600 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"
+                      }`}>
+                        {mes} {dia}
+                      </span>
+                      <p className="min-w-0 flex-1 truncate text-sm text-slate-800 dark:text-slate-200">
+                        {tituloVisible}
+                      </p>
+                      <span className={`shrink-0 text-xs font-medium ${
+                        isUrgent ? "text-red-600 dark:text-red-400" :
+                        isWarning ? "text-amber-600 dark:text-amber-400" :
+                        "text-emerald-700 dark:text-emerald-300"
+                      }`}>
+                        {tiempoRestante.valor} {tiempoRestante.unidad}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ============ VERSIÓN DESKTOP/TABLET — panel con cajas (sin cambios) ============ */}
+      <div className="hidden overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60 sm:mt-5 sm:block">
+        <div className="h-[3px] bg-emerald-600 dark:bg-emerald-500" />
+
+        <div
+          data-tour="docente-dashboard-stats"
+          className="grid grid-cols-1 divide-y divide-emerald-600/15 dark:divide-emerald-400/20 sm:grid-cols-3 sm:divide-y-0 sm:divide-x"
+        >
           {!isDocenteTourActive && isLoadingStats ? (
             <StatCardSkeleton />
           ) : (
             (isDocenteTourActive ? FAKE_STATS : stats).map((stat) => {
-              const Icon = stat.icon;
-              const handleClick = () => {
-                if (onNavigate && stat.action) onNavigate(stat.action);
-              };
-
+              const a = ACCENT[stat.accent] ?? ACCENT.slate;
               return (
                 <button
                   key={stat.title}
                   type="button"
-                  onClick={handleClick}
-                  className="cursor-pointer text-left transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                  onClick={() => onNavigate && stat.action && onNavigate(stat.action)}
+                  className="flex flex-col gap-2 p-5 text-left transition-colors hover:bg-accent/30 dark:hover:bg-slate-900/60"
                 >
-                  <Card className={`h-full overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60 hover:shadow-md transition ${stat.cardClass}`}>
-                    <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
-                    <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
-                      <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm dark:text-white">{stat.title}</CardTitle>
-                      <div className="h-9 w-9 rounded-xl bg-emerald-100/80 dark:bg-emerald-950/40 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5 sm:h-10 sm:w-10">
-                        {Icon ? <Icon className="h-4 w-4 text-emerald-700 dark:text-emerald-300" aria-hidden /> : null}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="text-2xl leading-none font-bold text-foreground dark:text-white sm:text-2xl">{stat.value}</div>
-                      <p className="mt-1 text-[11px] leading-snug text-foreground/70 sm:text-xs dark:text-slate-400">{stat.description}</p>
-                    </CardContent>
-                  </Card>
+                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground dark:text-slate-500">
+                    <span className={`h-1.5 w-1.5 rounded-full ${a.dot}`} />
+                    {stat.title}
+                  </span>
+                  <span className={`text-3xl font-semibold tabular-nums leading-none ${a.value}`}>
+                    {stat.value}
+                  </span>
+                  <p className="text-[11px] leading-snug text-muted-foreground dark:text-slate-500">
+                    {stat.description}
+                  </p>
                 </button>
               );
             })
           )}
         </div>
 
-        {/* Documentos Recientes y Próximas Entregas */}
-        <div className="relative z-10 mt-3 grid gap-6 xl:grid-cols-2">
-          {/* Card de Documentos Recientes */}
-          <Card data-tour="docente-dashboard-recent" className="overflow-hidden rounded-3xl border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
-            <CardHeader className="pb-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Documentos Recientes</CardTitle>
-                  <CardDescription className="mt-1 text-slate-500 dark:text-slate-400">Últimos documentos enviados</CardDescription>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => onNavigate?.("historial")} className="rounded-xl text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30">
-                  Ver todos
-                </Button>
+        <div className="grid divide-y divide-emerald-600/15 border-t border-emerald-600/15 dark:divide-emerald-400/20 dark:border-emerald-400/20 lg:grid-cols-[1fr_320px] lg:divide-y-0 lg:divide-x">
+          <div data-tour="docente-dashboard-recent" className="p-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-slate-800 dark:text-white">Documentos Recientes</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Últimos documentos enviados</p>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="max-h-[60vh] space-y-3 overflow-x-hidden overflow-y-auto pr-2 sm:max-h-[24rem]">
-                {(!isDocenteTourActive && isLoadingDocuments) ? (
-                  <RecentDocsSkeleton />
-                ) : (!isDocenteTourActive && recentDocuments.length === 0) ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600" />
-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">No tienes documentos enviados</p>
-                  </div>
-                ) : (
-                  (isDocenteTourActive ? FAKE_RECENT_DOCS : recentDocuments).map((doc) => {
-                    const s = (doc.status ?? '').toLowerCase();
-                    let docStatusVariant: "success" | "warning" | "outline" | "destructive" = "warning";
-                    let docStatusLabel = "Pendiente";
-                    let DocStatusIcon: React.ComponentType<{ className?: string }> = Clock2;
+              <button
+                type="button"
+                onClick={() => onNavigate?.("historial")}
+                className="shrink-0 text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+              >
+                Ver todos
+              </button>
+            </div>
 
-                    if (doc.resubmittedAt) {
-                      docStatusVariant = "outline";
-                      docStatusLabel = "Reenviado";
-                      DocStatusIcon = RefreshCw;
-                    } else if (s === "aprobado" || s === "revisado") {
-                      docStatusVariant = "success";
-                      docStatusLabel = "Revisado";
-                      DocStatusIcon = CheckCircle2;
-                    } else if (s === "devuelto") {
-                      docStatusVariant = "destructive";
-                      docStatusLabel = "Devuelto";
-                      DocStatusIcon = Undo2;
-                    } else if (s === "revision") {
-                      docStatusVariant = "outline";
-                      docStatusLabel = "En revisión";
-                      DocStatusIcon = Clock2;
-                    }
+            <div className="thin-scroll mt-4 max-h-[60vh] overflow-x-hidden overflow-y-auto pr-1 sm:max-h-[22rem]">
+              {(!isDocenteTourActive && isLoadingDocuments) ? (
+                <RecentDocsSkeleton />
+              ) : (!isDocenteTourActive && recentDocuments.length === 0) ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <FileText className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">No tienes documentos enviados</p>
+                </div>
+              ) : (
+                (isDocenteTourActive ? FAKE_RECENT_DOCS : recentDocuments).map((doc, i, arr) => {
+                  const s = (doc.status ?? '').toLowerCase();
+                  let dot = "bg-amber-500";
+                  let label = "Pendiente";
+                  if (doc.resubmittedAt) { dot = "bg-slate-400"; label = "Reenviado"; }
+                  else if (s === "aprobado" || s === "revisado") { dot = "bg-emerald-500"; label = "Revisado"; }
+                  else if (s === "devuelto") { dot = "bg-red-500"; label = "Devuelto"; }
+                  else if (s === "revision") { dot = "bg-slate-400"; label = "En revisión"; }
 
-                    const fileNameOnly = doc.nombre.includes(' - ')
-                      ? doc.nombre.split(' - ').slice(1).join(' - ')
-                      : doc.nombre;
+                  const fileNameOnly = doc.nombre.includes(' - ')
+                    ? doc.nombre.split(' - ').slice(1).join(' - ')
+                    : doc.nombre;
+                  const isLast = i === arr.length - 1;
 
-                    return (
-                      <div
-                        key={doc.id}
-                        className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-card/70 p-3 transition-colors hover:bg-accent/50 dark:border-slate-700 dark:bg-slate-900/70 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:gap-3"
-                      >
-                        <div className="flex items-start gap-3 sm:min-w-0 sm:flex-1">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                            <FileText className="h-5 w-5" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                  return (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      onClick={() => openDocument(doc)}
+                      className="group relative flex w-full gap-4 pb-5 text-left last:pb-0"
+                    >
+                      {!isLast && (
+                        <span className="absolute left-[6.5px] top-4 bottom-0 w-px bg-emerald-600/20 dark:bg-emerald-400/25" />
+                      )}
+                      <span className={`relative z-10 mt-1.5 h-3.5 w-3.5 shrink-0 rounded-full ring-4 ring-card dark:ring-slate-950 ${dot}`} />
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-700/80 dark:text-emerald-400/80">
                               {doc.tipo}
                             </p>
-                            <p className="break-words text-sm font-semibold text-slate-800 dark:text-white sm:truncate">
+                            <p className="mt-0.5 truncate text-sm font-medium text-slate-800 dark:text-white">
                               {fileNameOnly}
                             </p>
-                            {doc.fecha && (
-                              <p className="text-[11px] text-slate-500 dark:text-slate-500">
-                                {formatDate(doc.fecha)}
-                              </p>
-                            )}
+                            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-500">
+                              {doc.fecha ? formatDate(doc.fecha) : ""}
+                              {doc.fecha ? " · " : ""}{label}
+                            </p>
                           </div>
-                        </div>
-                        <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
-                          <Badge variant={docStatusVariant} className="inline-flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-xs rounded-full dark:border-slate-700">
-                            <DocStatusIcon className="h-3.5 w-3.5" />
-                            {docStatusLabel}
-                          </Badge>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-9 w-9 shrink-0 rounded-xl hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
-                            onClick={() => openDocument(doc)}
-                            aria-label="Ver documento"
-                          >
-                            <Eye className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-                          </Button>
+                          <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700 opacity-70 transition-opacity group-hover:opacity-100 dark:bg-emerald-950/40 dark:text-emerald-400">
+                            <Eye className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Ver</span>
+                          </span>
                         </div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
-          {/* Card de Próximas Entregas */}
-          <Card data-tour="docente-dashboard-upcoming" className="overflow-hidden rounded-3xl border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
-            <CardHeader className="pb-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Próximas Entregas</CardTitle>
-                  <CardDescription className="mt-1 text-slate-500 dark:text-slate-400">Fechas límite importantes</CardDescription>
-                </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-muted-foreground dark:bg-slate-800 dark:text-slate-300">
-                  <Calendar className="h-5 w-5" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="max-h-[60vh] space-y-3 overflow-x-hidden overflow-y-auto pr-2 sm:max-h-[24rem]">
-                {isLoadingProximas ? (
-                  <ProximasSkeleton />
-                ) : proximasEntregas.length === 0 || (proximasEntregas.length === 1 && proximasEntregas[0]?.isPlaceholder) ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Calendar className="h-12 w-12 text-slate-300 dark:text-slate-600" />
-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                      {proximasEntregas[0]?.titulo || "No hay entregas programadas"}
-                    </p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
-                      {proximasEntregas[0]?.fecha || "Sin fecha límite"}
-                    </p>
-                  </div>
-                ) : (
-                  proximasEntregas.map((entrega, index) => {
-                    if (entrega.isPlaceholder) {
-                      return (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between rounded-2xl border border-border/70 bg-card/70 p-3 dark:border-slate-700 dark:bg-slate-900/70"
-                        >
-                          <div>
-                            <p className="text-sm font-semibold text-slate-800 dark:text-white">{entrega.titulo}</p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400">{entrega.fecha}</p>
-                          </div>
-                        </div>
-                      );
-                    }
+          <div data-tour="docente-dashboard-upcoming" className="p-5 sm:p-6">
+            <h3 className="text-base font-semibold text-slate-800 dark:text-white">Próximas Entregas</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Fechas límite importantes</p>
 
-                    const diffMs = new Date(entrega.fecha).getTime() - Date.now();
-                    const diffHrs = diffMs / 3_600_000;
-                    const isUrgent = diffHrs < 24;
-                    const isWarning = diffHrs >= 24 && diffHrs < 7 * 24;
-                    const tiempoRestante = formatTiempoRestante(entrega.fecha);
-                    const detalle = entrega.detalle ?? entrega.titulo;
-                    const isGenericTitle = entrega.titulo?.trim().toLowerCase() === "docentes";
-                    const tituloVisible = isGenericTitle ? "" : entrega.titulo;
-                    
+            <div className="thin-scroll mt-4 max-h-[60vh] overflow-x-hidden overflow-y-auto pr-1 sm:max-h-[22rem]">
+              {isLoadingProximas ? (
+                <ProximasSkeleton />
+              ) : proximasEntregas.length === 0 || (proximasEntregas.length === 1 && proximasEntregas[0]?.isPlaceholder) ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Calendar className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    {proximasEntregas[0]?.titulo || "No hay entregas programadas"}
+                  </p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
+                    {proximasEntregas[0]?.fecha || "Sin fecha límite"}
+                  </p>
+                </div>
+              ) : (
+                proximasEntregas.map((entrega, index) => {
+                  if (entrega.isPlaceholder) {
                     return (
-                      <div
-                        key={`${entrega.titulo}-${index}`}
-                        className="flex items-center justify-between rounded-2xl border border-border/70 bg-card/70 p-3 dark:border-slate-700 dark:bg-slate-900/70"
-                      >
-                        <div>
-                          {tituloVisible && (
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold capitalize text-emerald-700 dark:text-emerald-400">{tituloVisible}</p>
-                            </div>
-                          )}
-                          {detalle !== tituloVisible && (
-                            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{detalle}</p>
-                          )}
-                          <p className="text-xs text-slate-600 dark:text-slate-400">
-                            {new Date(entrega.fecha).toLocaleDateString("es-MX", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className={`text-sm font-semibold ${
-                            isUrgent ? "text-red-600 dark:text-red-400" :
-                            isWarning ? "text-yellow-600 dark:text-yellow-400" :
-                            "text-emerald-700 dark:text-emerald-300"
-                          }`}>
-                            {tiempoRestante.valor} {tiempoRestante.unidad}
-                          </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400">restantes</p>
-                        </div>
+                      <div key={index} className="border-b border-emerald-600/15 pb-3 last:border-0 last:pb-0 dark:border-emerald-400/20">
+                        <p className="text-sm font-semibold text-slate-800 dark:text-white">{entrega.titulo}</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400">{entrega.fecha}</p>
                       </div>
                     );
-                  })
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                  }
 
-        {/* Slider infinito de logos institucionales */}
-        <div data-tour="docente-dashboard-carreras">
-          <CarrerasLogoSlider />
+                  const fecha = new Date(entrega.fecha);
+                  const mes = fecha.toLocaleDateString("es-MX", { month: "short" }).replace(".", "");
+                  const dia = fecha.getDate();
+
+                  const diffMs = new Date(entrega.fecha).getTime() - Date.now();
+                  const diffHrs = diffMs / 3_600_000;
+                  const isUrgent = diffHrs < 24;
+                  const isWarning = diffHrs >= 24 && diffHrs < 7 * 24;
+                  const tiempoRestante = formatTiempoRestante(entrega.fecha);
+                  const detalle = entrega.detalle ?? entrega.titulo;
+                  const isGenericTitle = entrega.titulo?.trim().toLowerCase() === "docentes";
+                  const tituloVisible = isGenericTitle ? "" : entrega.titulo;
+
+                  return (
+                    <div
+                      key={`${entrega.titulo}-${index}`}
+                      className="flex items-center gap-3 border-b border-emerald-600/15 py-3 first:pt-0 last:border-0 last:pb-0 dark:border-emerald-400/20"
+                    >
+                      <div className="flex shrink-0 flex-col items-center leading-none">
+                        <span className={`text-[10px] font-semibold uppercase tracking-wide ${
+                          isUrgent ? "text-red-600 dark:text-red-400" : isWarning ? "text-amber-600 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"
+                        }`}>
+                          {mes}
+                        </span>
+                        <span className="text-lg font-semibold text-slate-800 dark:text-white">{dia}</span>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        {tituloVisible && (
+                          <p className="truncate text-sm font-medium capitalize text-slate-800 dark:text-slate-200">{tituloVisible}</p>
+                        )}
+                        {detalle !== tituloVisible && (
+                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{detalle}</p>
+                        )}
+                      </div>
+
+                      <p className={`shrink-0 text-xs font-medium ${
+                        isUrgent ? "text-red-600 dark:text-red-400" :
+                        isWarning ? "text-amber-600 dark:text-amber-400" :
+                        "text-emerald-700 dark:text-emerald-300"
+                      }`}>
+                        {tiempoRestante.valor} {tiempoRestante.unidad}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
+      </div>
+
+      {/* Slider infinito de logos institucionales */}
+      <div data-tour="docente-dashboard-carreras">
+        <CarrerasLogoSlider />
       </div>
 
       {/* Diálogo de vista previa del documento */}

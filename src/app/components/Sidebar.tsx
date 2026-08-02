@@ -27,7 +27,6 @@ import {
   FileArchive,
   ChevronDown,
   ChevronRight,
-  Shield,
   Download,
 } from "lucide-react";
 
@@ -39,6 +38,7 @@ interface SidebarProps {
   mobileOpen?: boolean;
   onMobileOpenChange?: (open: boolean) => void;
   onLogoutRequest?: () => void;
+  layoutStyle?: string;
 }
 
 type SidebarMenuItem = { id: string; label: string; icon: React.ElementType };
@@ -242,7 +242,7 @@ const LOGO_LIGHT = "/src/assets/elementos/LogotipoUTSLRC.webp";
 const LOGO_DARK = "/src/assets/elementos/LogotipoUTSLRC-BLANCO.webp";
 
 export function Sidebar(props: Readonly<SidebarProps>) {
-  const { currentView, onNavigate, mobileOpen, onMobileOpenChange, onLogoutRequest } = props;
+  const { currentView, onNavigate, mobileOpen, onMobileOpenChange, onLogoutRequest, layoutStyle } = props;
   const { user, logout } = useAuth();
   const { theme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
@@ -510,14 +510,27 @@ export function Sidebar(props: Readonly<SidebarProps>) {
 
   const renderContent = (isMobile: boolean = false) => {
     const isCollapsedLocal = isMobile ? false : collapsed;
+    const isFormal = layoutStyle === "formal";
+
     const containerClass = cn(
-      "relative mx-3 my-3 flex h-[calc(100dvh-1.5rem)] min-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-background to-sky-50 text-sidebar-foreground shadow-[0_10px_30px_rgba(15,23,42,0.08),0_2px_10px_rgba(16,185,129,0.08)] transition-all duration-300 dark:border-slate-800 dark:bg-gradient-to-br dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950",
-      isCollapsedLocal ? "w-16" : "w-64"
+      "relative flex flex-col overflow-hidden text-sidebar-foreground transition-all duration-300",
+      isFormal
+        ? cn(
+            "h-screen min-h-screen border-r border-slate-200 bg-white shadow-none dark:border-slate-800 dark:bg-slate-950",
+            isCollapsedLocal ? "w-16" : "w-64"
+          )
+        : cn(
+            "mx-3 my-3 h-[calc(100dvh-1.5rem)] min-h-[calc(100dvh-1.5rem)] rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-background to-sky-50 shadow-[0_10px_30px_rgba(15,23,42,0.08),0_2px_10px_rgba(16,185,129,0.08)] dark:border-slate-800 dark:bg-gradient-to-br dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950",
+            isCollapsedLocal ? "w-16" : "w-64"
+          )
     );
 
     return (
       <div className={containerClass}>
-        <div className="border-b border-sidebar-border/70 bg-transparent p-4">
+        <div className={isFormal
+          ? "border-b border-slate-200 dark:border-slate-800 bg-transparent p-4"
+          : "border-b border-sidebar-border/70 bg-transparent p-4"
+        }>
           <div className="relative flex items-center justify-end">
             {!isCollapsedLocal && (
               <div className="absolute left-1/2 -translate-x-1/2">
@@ -546,7 +559,10 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               }}
               aria-label={isMobile ? "Cerrar menú" : isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
               title={isMobile ? "Cerrar menú" : isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
-              className="h-8 w-8 rounded-full border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
+              className={isFormal
+                ? "h-8 w-8 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
+                : "h-8 w-8 rounded-full border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
+              }
             >
               <ChevronLeft className={cn("h-4 w-4 transition-transform", !isMobile && isCollapsedLocal && "rotate-180")} />
             </Button>
@@ -555,24 +571,56 @@ export function Sidebar(props: Readonly<SidebarProps>) {
 
         <div className="min-h-0 flex-1 overflow-y-auto bg-transparent py-4">
           <nav className="space-y-1 px-2">
-            {menuItems.map((item) => {
+            {menuItems.map((item, index) => {
               const Icon = item.icon;
               const isActive = isMenuItemActive(item.id);
+
+              const isAdmin = user?.role === "administrador";
+              const showGroupLabels = isFormal && isAdmin && !isCollapsedLocal;
+              const formalGroupOf: Record<string, string> = {
+                "dashboard": "PANEL",
+                "docentes": "GESTIÓN", "tutores": "GESTIÓN", "estadias-admin": "GESTIÓN",
+                "calendario": "ACADÉMICO", "remediales": "ACADÉMICO", "documentos": "ACADÉMICO", "ciclos": "ACADÉMICO",
+                "mensajes": "SISTEMA", "configuracion": "SISTEMA",
+              };
+              const thisGroup = showGroupLabels ? (formalGroupOf[item.id] ?? null) : null;
+              const prevGroup = showGroupLabels && index > 0 ? (formalGroupOf[menuItems[index - 1].id] ?? null) : null;
+              const showLabel = thisGroup !== null && thisGroup !== prevGroup;
+
               return (
                 <div key={item.id} className="space-y-1">
+                  {showLabel && (
+                    <p className={cn(
+                      "px-3 pb-0.5 text-[9px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-600",
+                      index === 0 ? "pt-1" : "pt-3",
+                    )}>
+                      {thisGroup}
+                    </p>
+                  )}
                   <button
                     type="button"
                     data-tour={`nav-${item.id}`}
                     onClick={() => handleMenuItemClick(item.id, isMobile)}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
-                      isActive
-                        ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
-                        : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300",
+                      "w-full flex items-center gap-3 py-2.5 transition-all text-left",
+                      isFormal
+                        ? isActive
+                          ? "border-l-[3px] border-emerald-500 bg-emerald-100 text-emerald-900 font-semibold pl-[calc(0.75rem-3px)] pr-3 dark:border-emerald-400 dark:bg-emerald-500/20 dark:text-emerald-200"
+                          : "px-3 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100"
+                        : cn(
+                            "px-3 rounded-xl",
+                            isActive
+                              ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25"
+                              : "text-slate-700 hover:bg-emerald-100/70 hover:text-emerald-800 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-emerald-300"
+                          )
                     )}
                   >
                     <span className="relative flex shrink-0 items-center justify-center">
-                      <Icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300")} />
+                      <Icon className={cn("h-5 w-5 shrink-0",
+                        isFormal
+                          ? isActive ? "text-emerald-600 dark:text-emerald-300" : "text-slate-400 dark:text-slate-500"
+                          : isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300"
+                      )} />
                       {item.id === "mensajes" && <MessageBadge count={unreadMessagesCount} collapsed={isCollapsedLocal} />}
                     </span>
                     {!isCollapsedLocal && <span className="font-medium">{item.label}</span>}
@@ -603,7 +651,10 @@ export function Sidebar(props: Readonly<SidebarProps>) {
           </nav>
         </div>
 
-        <div className="space-y-3 border-t border-sidebar-border/70 bg-transparent p-4">
+        <div className={isFormal
+          ? "space-y-2 border-t border-slate-200 dark:border-slate-800 bg-transparent p-3"
+          : "space-y-3 border-t border-sidebar-border/70 bg-transparent p-4"
+        }>
           {!isCollapsedLocal && (
             <button
               type="button"
@@ -612,7 +663,10 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                 onNavigate(targetView);
                 if (isMobile && onMobileOpenChange) onMobileOpenChange(false);
               }}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 to-cyan-50 shadow-sm transition-colors hover:bg-emerald-100/70 dark:border-slate-700 dark:from-slate-900 dark:to-slate-950 dark:hover:bg-slate-800 text-left"
+              className={isFormal
+                ? "w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors text-left"
+                : "w-full flex items-center gap-3 px-3 py-3 rounded-2xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 to-cyan-50 shadow-sm transition-colors hover:bg-emerald-100/70 dark:border-slate-700 dark:from-slate-900 dark:to-slate-950 dark:hover:bg-slate-800 text-left"
+              }
             >
               <Avatar className="h-8 w-8 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40">
                 <AvatarImage
@@ -645,7 +699,10 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               onClick={install}
               aria-label="Abrir en la app"
               title="Abrir en la app"
-              className="w-full shrink-0 justify-start rounded-xl border border-emerald-300/70 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+              className={isFormal
+                ? "w-full shrink-0 justify-start rounded-md border border-slate-200 bg-transparent text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/60"
+                : "w-full shrink-0 justify-start rounded-xl border border-emerald-300/70 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+              }
             >
               <Download className="h-5 w-5" />
               {!isCollapsedLocal && <span className="ml-3">Abrir en la app</span>}
@@ -656,7 +713,10 @@ export function Sidebar(props: Readonly<SidebarProps>) {
             size={isCollapsedLocal ? "icon" : "default"}
             onClick={handleLogoutClick}
             aria-label="Cerrar sesión"
-            className="w-full shrink-0 justify-start rounded-xl border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
+            className={isFormal
+              ? "w-full shrink-0 justify-start rounded-md border border-slate-200 bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+              : "w-full shrink-0 justify-start rounded-xl border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
+            }
           >
             <LogOut className="h-5 w-5" />
             {!isCollapsedLocal && <span className="ml-3">Cerrar Sesión</span>}

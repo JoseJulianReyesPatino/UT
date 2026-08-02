@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SupervisorRowSkeleton } from "./skeletons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -31,6 +31,7 @@ type ConfigTab = "formularios" | "grupos" | "cuenta" | "supervisores";
 interface ConfigurationProps {
   initialTab?: ConfigTab;
   onDirtyChange?: (dirty: boolean) => void;
+  layoutStyle?: string;
 }
 
 type SupervisorPermission = { user_id: number; user_name: string; email: string; sections: string[]; avatar?: string | null };
@@ -185,7 +186,8 @@ function DeadlineDatePicker({ value, disabled, onChange }: { value: string; disa
 }
 
 export function Configuration(props: Readonly<ConfigurationProps>) {
-  const { initialTab = "formularios", onDirtyChange } = props;
+  const { initialTab = "formularios", onDirtyChange, layoutStyle } = props;
+  const isFormal = layoutStyle === "formal";
   const { user, updateProfile, refreshUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
@@ -265,9 +267,12 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const [bulkCareerPopoverOpen, setBulkCareerPopoverOpen] = useState(false);
   const [isBulkCreating, setIsBulkCreating] = useState(false);
   const [groupSearch, setGroupSearch] = useState("");
+  const [groupSearchPlaceholderIdx, setGroupSearchPlaceholderIdx] = useState(0);
   const [groupViewPlan, setGroupViewPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
   const [openFormSection, setOpenFormSection] = useState<FormSectionId | null>(null);
   const [openFormItems, setOpenFormItems] = useState<Record<FormId, boolean>>({} as Record<FormId, boolean>);
+  const [formalFormSection, setFormalFormSection] = useState<FormSectionId>("docentes");
+  const [mobileFormalFormsView, setMobileFormalFormsView] = useState<'sections' | 'forms'>('sections');
   const loadedProfileUserId = useRef<string | null>(null);
 
   const toggleFormItem = (id: FormId) => {
@@ -408,14 +413,36 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
       editingGroupOriginal.groupNumber !== Number(editingGroupNumber)
     )
   );
+  const groupSearchPlaceholders = [
+    "Buscar por grupo: DSM1-2...",
+    "Buscar por carrera: Desarrollo de Software...",
+    "Buscar por cuatrimestre: Cuatrimestre 3...",
+    "Buscar por código: AUT, MI, DSM...",
+  ];
+
+  const careerNameByCode = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const plan of ["nuevo-modelo", "plan-normal"] as const) {
+      for (const career of getCareerOptions(plan)) {
+        map[career.codigo] = career.nombre;
+      }
+    }
+    return map;
+  }, []);
+
+  const normalize = (str: string) =>
+    str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
   const filteredGroups = useMemo(
     () => groups.filter((group) => {
-      const query = groupSearch.trim().toLowerCase();
+      const query = normalize(groupSearch.trim());
       if (!query) return true;
-      return [group.name, String(group.cuatrimestre), String(group.groupNumber), group.careerCode]
-        .some((value) => value.toLowerCase().includes(query));
+      const careerName = careerNameByCode[group.careerCode] ?? "";
+      const cuatLabel = cuatrimestresLabel(group.cuatrimestre);
+      return [group.name, String(group.cuatrimestre), String(group.groupNumber), group.careerCode, careerName, cuatLabel]
+        .some((value) => normalize(value).includes(query));
     }),
-    [groups, groupSearch]
+    [groups, groupSearch, careerNameByCode]
   );
   const selectedPlanGroups = useMemo(
     () => filteredGroups.filter((group) => group.plan === groupViewPlan),
@@ -462,6 +489,14 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     setOpenCuatrimestres(new Set());
     setGroupSearch("");
   }, [groupViewPlan]);
+
+  useEffect(() => {
+    if (groupSearch) return;
+    const interval = setInterval(() => {
+      setGroupSearchPlaceholderIdx((i) => (i + 1) % groupSearchPlaceholders.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [groupSearch, groupSearchPlaceholders.length]);
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -1164,402 +1199,621 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   );
 
   return (
-    <div className={`flex h-[calc(100vh-64px)] flex-col gap-4 sm:gap-6 overflow-hidden ${shellClass}`}>
-      {/* Header */}
-      <div className="relative shrink-0 overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
-        <div className="relative">
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Configuración del Sistema</h1>
-          <p className="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">Ajustes globales y parámetros del sistema.</p>
-        </div>
-      </div>
+    <div className={`flex h-[calc(100vh-64px)] flex-col overflow-hidden ${shellClass} ${isFormal ? "gap-0" : "gap-4 sm:gap-6"}`}>
 
-      {/* Layout principal - Cambia a columna en móvil */}
-      <div className="grid min-h-0 flex-1 gap-4 sm:gap-6 lg:grid-cols-[280px_minmax(0,1fr)] items-start overflow-hidden">
-        {/* Sidebar - Mejorado para móvil */}
-        <div className={`flex flex-col gap-4 self-start ${mobileSectionOpen ? "hidden lg:flex" : "flex"}`}>
-        <Card className={`${sidebarClass} rounded-[22px] overflow-hidden`}>
-          <CardHeader className={`${sidebarCardClass} p-3 sm:p-6`}>
-            <CardTitle className="text-base sm:text-lg">Secciones</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Navega por la configuración</CardDescription>
-          </CardHeader>
-          <CardContent data-tour="admin-config-nav" className="space-y-1 sm:space-y-2 p-2 sm:p-3">
+      {/* ── Header ── */}
+      {isFormal ? (
+        <div data-component="page-banner" className="shrink-0 border-b border-border bg-card px-6 py-4 dark:border-slate-800 dark:bg-slate-950/80">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Configuración del Sistema</h1>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Ajustes globales y parámetros del sistema.</p>
+        </div>
+      ) : (
+        <div data-component="page-banner" className="relative shrink-0 overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+          <div className="relative">
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Configuración del Sistema</h1>
+            <p className="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">Ajustes globales y parámetros del sistema.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tabs horizontales (solo modo formal) ── */}
+      {isFormal && (
+        <div className="shrink-0 border-b border-border bg-card dark:border-slate-800 dark:bg-slate-950/60">
+          <div data-tour="admin-config-nav" className="flex overflow-x-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.value;
-
               return (
                 <button
                   key={item.value}
                   type="button"
                   disabled={Boolean(editingGroupId && item.value !== activeTab)}
-                  onClick={() => {
-                    setActiveTab(item.value);
-                    setMobileSectionOpen(true);
-                  }}
-                  className={`flex w-full items-center gap-2 sm:gap-3 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 text-left transition-all ${
+                  onClick={() => setActiveTab(item.value)}
+                  className={`relative flex shrink-0 items-center gap-2 px-3 py-3 sm:px-5 sm:py-3.5 text-sm font-medium transition-colors focus-visible:outline-none ${
                     isActive
-                      ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-400/15 dark:text-emerald-300 dark:ring-emerald-400/30"
-                      : "text-slate-600 hover:bg-muted hover:text-foreground dark:text-slate-300"
+                      ? "text-emerald-700 dark:text-emerald-300 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-emerald-600 dark:after:bg-emerald-400"
+                      : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                   }`}
                 >
-                  <span className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl ${isActive ? "bg-emerald-100 dark:bg-emerald-400/15" : "bg-muted"}`}>
-                    <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${isActive ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`} />
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-xs sm:text-sm font-semibold truncate">{item.label}</span>
-                    <span className="hidden sm:block text-xs text-muted-foreground">{item.description}</span>
-                  </span>
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline">{item.label}</span>
                 </button>
               );
             })}
-          </CardContent>
-        </Card>
-
+          </div>
         </div>
+      )}
 
-        {/* Contenido principal */}
-        <div className={`h-full min-h-0 flex flex-col overflow-hidden ${mobileSectionOpen ? "flex" : "hidden lg:flex"}`}>
-          <button
-            type="button"
-            onClick={() => setMobileSectionOpen(false)}
-            className="mb-2 inline-flex items-center gap-1.5 self-start rounded-lg bg-white/90 px-2.5 py-1.5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200 transition hover:bg-white dark:bg-slate-900/85 dark:text-emerald-300 dark:ring-slate-700 lg:hidden"
-          >
-            <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className="truncate">Volver a secciones</span>
-          </button>
-          {activeTab === "cuenta" && (
-            <Card data-tour="admin-config-cuenta" className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
-              <CardHeader className={`${sectionHeaderClass} shrink-0 p-4 sm:p-6`}>
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                  <Settings2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                  Configuración de tu Cuenta
-                </CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Gestiona tu foto, datos básicos y preferencias visuales.</CardDescription>
+      {/* ── Área de contenido ── */}
+      {/* ── Área principal: layout condicional ── */}
+      <div className={isFormal
+        ? "flex flex-col min-h-0 flex-1 overflow-hidden p-4 sm:p-5"
+        : "grid min-h-0 flex-1 gap-4 sm:gap-6 lg:grid-cols-[280px_minmax(0,1fr)] items-start overflow-hidden"
+      }>
+        {/* Sidebar – solo modo clásico */}
+        {!isFormal && (
+          <div className={`flex flex-col gap-4 self-start ${mobileSectionOpen ? "hidden lg:flex" : "flex"}`}>
+            <Card className={`${sidebarClass} rounded-[22px] overflow-hidden`}>
+              <CardHeader className={`${sidebarCardClass} p-3 sm:p-6`}>
+                <CardTitle className="text-base sm:text-lg">Secciones</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Navega por la configuración</CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 p-4 sm:p-6 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
-                {/* Avatar - Mejorado para móvil */}
-                <div className="flex flex-col sm:flex-row gap-4 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 sm:p-4 sm:items-center dark:border-slate-800 dark:bg-slate-900/60">
-                  <Avatar className="h-16 w-16 sm:h-20 sm:w-20 ring-2 ring-emerald-200/70 dark:ring-emerald-900/40 overflow-hidden">
-                    <AvatarImage
-                      src={selectedAvatarFile ? profileAvatar : (savedAvatarPreview ?? resolvedCurrentAvatar)}
-                      alt={profileFirstNames || "Usuario"}
-                      className="cursor-pointer object-cover"
-                      onClick={() => setIsAvatarOpen(true)}
-                    />
-                    <AvatarFallback
-                      className="p-0 overflow-hidden cursor-pointer"
-                      onClick={() => setIsAvatarOpen(true)}
+              <CardContent data-tour="admin-config-nav" className="space-y-1 sm:space-y-2 p-2 sm:p-3">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.value;
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      disabled={Boolean(editingGroupId && item.value !== activeTab)}
+                      onClick={() => { setActiveTab(item.value); setMobileSectionOpen(true); }}
+                      className={`flex w-full items-center gap-2 sm:gap-3 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 text-left transition-all ${
+                        isActive
+                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-400/15 dark:text-emerald-300 dark:ring-emerald-400/30"
+                          : "text-slate-600 hover:bg-muted hover:text-foreground dark:text-slate-300"
+                      }`}
                     >
-                      <img src={defaultAvatar} alt="Avatar por defecto" className="h-full w-full object-cover" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isRemovingAvatar || isSavingProfile}
-                        className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Cambiar foto
-                      </Button>
-                      {(selectedAvatarFile || hasServerAvatar) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          type="button"
-                          onClick={handleRemoveAvatar}
-                          disabled={isRemovingAvatar || isSavingProfile}
-                          className="rounded-2xl dark:hover:bg-slate-800 dark:text-slate-300"
-                        >
-                          {isRemovingAvatar ? "Quitando..." : "Quitar foto"}
-                        </Button>
-                      )}
-                    </div>
-                    <Input
-                      ref={fileInputRef}
-                      id="avatar"
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      onChange={handleAvatarChange}
-                      className="hidden"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Formatos: PNG/JPG/WEBP. Tamaño máximo: 4MB.</p>
-                  </div>
-                </div>
-
-                <Dialog open={isAvatarOpen} onOpenChange={setIsAvatarOpen}>
-                  <DialogContent className="max-w-[95vw] sm:max-w-lg">
-                    <DialogHeader>
-                      <DialogTitle>Foto de perfil</DialogTitle>
-                      <DialogDescription>Vista previa de tu imagen de perfil</DialogDescription>
-                    </DialogHeader>
-                    <div className="mt-4 flex justify-center">
-                      {profileAvatar ? (
-                        <img src={profileAvatar} alt={profileFirstNames || "Usuario"} className="max-h-[50vh] sm:max-h-[70vh] max-w-full rounded-lg object-contain" />
-                      ) : (
-                        <div className="h-32 w-32 sm:h-40 sm:w-40 rounded-lg bg-emerald-100 flex items-center justify-center text-2xl">
-                          {(profileFirstNames || profileLastNames || user?.name || "U").split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                        </div>
-                      )}
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog
-                  open={isPasswordOpen}
-                  onOpenChange={(open) => { setIsPasswordOpen(open); if (!open) resetPasswordDialog(); }}
-                  key={isPasswordOpen ? "open" : "closed"}
-                >
-                  <DialogContent className="max-w-[95vw] sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Cambiar contraseña</DialogTitle>
-                      <DialogDescription>
-                        {passwordStep === "current" && "Confirma tu contraseña actual para continuar."}
-                        {passwordStep === "new" && "Crea una contraseña segura para tu cuenta."}
-                        {passwordStep === "confirm" && "Confirma tu nueva contraseña para guardar los cambios."}
-                      </DialogDescription>
-                    </DialogHeader>
-
-                    {/* Indicador de 3 pasos */}
-                    <div className="flex items-center gap-2 mt-1">
-                      {(["current", "new", "confirm"] as const).map((step, i) => {
-                        const stepIndex = ["current", "new", "confirm"].indexOf(passwordStep);
-                        const isDone = i < stepIndex;
-                        const isActive = passwordStep === step;
-                        return (
-                          <React.Fragment key={step}>
-                            <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                              isActive ? "bg-emerald-500 text-white" : isDone ? "bg-emerald-200 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" : "bg-muted text-muted-foreground"
-                            }`}>
-                              {isDone ? <Check className="h-3 w-3" /> : i + 1}
-                            </div>
-                            {i < 2 && <div className={`h-px flex-1 transition-colors ${isDone ? "bg-emerald-400" : "bg-border"}`} />}
-                          </React.Fragment>
-                        );
-                      })}
-                      <span className="ml-1 text-xs text-muted-foreground">
-                        {passwordStep === "current" && "Contraseña actual"}
-                        {passwordStep === "new" && "Nueva contraseña"}
-                        {passwordStep === "confirm" && "Confirmar contraseña"}
+                      <span className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl ${isActive ? "bg-emerald-100 dark:bg-emerald-400/15" : "bg-muted"}`}>
+                        <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${isActive ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`} />
                       </span>
-                    </div>
-
-                    <div className="mt-1 space-y-4">
-                      {/* Paso 1: Contraseña actual */}
-                      {passwordStep === "current" && (
-                        <div className="space-y-2">
-                          <Label className="text-sm">Contraseña actual</Label>
-                          <div className="relative">
-                            <Input
-                              type={showPwCurrent ? "text" : "password"}
-                              value={pwCurrentPassword}
-                              onChange={(e) => setPwCurrentPassword(e.target.value)}
-                              placeholder="Ingresa tu contraseña actual"
-                              className="pr-10 text-sm"
-                              autoComplete="new-password"
-                              readOnly
-                              onFocus={(e) => e.currentTarget.removeAttribute("readOnly")}
-                              autoFocus
-                              onKeyDown={(e) => e.key === "Enter" && handleNextStep1()}
-                            />
-                            <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwCurrent((v) => !v)} aria-label={showPwCurrent ? "Ocultar" : "Mostrar"}>
-                              {showPwCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </Button>
-                          </div>
-                          {pwError && <p className="text-xs text-destructive font-medium">{pwError}</p>}
-                        </div>
-                      )}
-
-                      {/* Paso 2: Nueva contraseña con guía */}
-                      {passwordStep === "new" && (
-                        <div className="space-y-3">
-                          <div className="space-y-2">
-                            <Label className="text-sm">Nueva contraseña</Label>
-                            <div className="relative">
-                              <Input
-                                type={showPwNew ? "text" : "password"}
-                                value={pwNewPassword}
-                                onChange={(e) => setPwNewPassword(e.target.value)}
-                                placeholder="Crea una contraseña segura"
-                                className="pr-10 text-sm"
-                                autoComplete="new-password"
-                                autoFocus
-                                onKeyDown={(e) => e.key === "Enter" && handleNextStep2()}
-                              />
-                              <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwNew((v) => !v)} aria-label={showPwNew ? "Ocultar" : "Mostrar"}>
-                                {showPwNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </Button>
-                            </div>
-                          </div>
-                          {pwNewPassword.length > 0 && (() => {
-                            const strength = getPasswordStrength(pwNewPassword);
-                            return (
-                              <div className="space-y-1.5">
-                                <div className="flex gap-1">
-                                  {[1, 2, 3, 4, 5].map((s) => (
-                                    <div key={s} className={`h-1.5 flex-1 rounded-full transition-colors ${s <= strength.score ? strength.color : "bg-muted"}`} />
-                                  ))}
-                                </div>
-                                <p className={`text-xs font-medium ${strength.score < 5 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                                  {strength.label}
-                                </p>
-                              </div>
-                            );
-                          })()}
-                          {/* Criterios de contraseña segura */}
-                          <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-1.5">
-                            <p className="text-xs font-semibold text-muted-foreground mb-2">Tu contraseña debe incluir:</p>
-                            {[
-                              { label: "Mínimo 8 caracteres", met: pwNewPassword.length >= 8 },
-                              { label: "Letra mayúscula (A-Z)", met: /[A-Z]/.test(pwNewPassword) },
-                              { label: "Letra minúscula (a-z)", met: /[a-z]/.test(pwNewPassword) },
-                              { label: "Número (0-9)", met: /[0-9]/.test(pwNewPassword) },
-                              { label: "Carácter especial (!@#$%...)", met: /[^A-Za-z0-9]/.test(pwNewPassword) },
-                            ].map((criterion) => (
-                              <div key={criterion.label} className="flex items-center gap-2">
-                                <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors ${criterion.met ? "bg-emerald-500" : "bg-muted border border-border"}`}>
-                                  {criterion.met && <Check className="h-2.5 w-2.5 text-white" />}
-                                </div>
-                                <span className={`text-xs transition-colors ${criterion.met ? "text-foreground font-medium" : "text-muted-foreground"}`}>{criterion.label}</span>
-                              </div>
-                            ))}
-                          </div>
-                          {pwError && <p className="text-xs text-destructive font-medium">{pwError}</p>}
-                        </div>
-                      )}
-
-                      {/* Paso 3: Confirmar nueva contraseña */}
-                      {passwordStep === "confirm" && (
-                        <div className="space-y-3">
-                          <div className="space-y-2">
-                            <Label className="text-sm">Confirmar nueva contraseña</Label>
-                            <div className="relative">
-                              <Input
-                                type={showPwConfirm ? "text" : "password"}
-                                value={pwConfirmPassword}
-                                onChange={(e) => setPwConfirmPassword(e.target.value)}
-                                placeholder="Repite tu nueva contraseña"
-                                className="pr-10 text-sm"
-                                autoComplete="new-password"
-                                autoFocus
-                                onKeyDown={(e) => e.key === "Enter" && !pwLoading && handleSubmitPassword()}
-                              />
-                              <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwConfirm((v) => !v)} aria-label={showPwConfirm ? "Ocultar" : "Mostrar"}>
-                                {showPwConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </Button>
-                            </div>
-                            {pwConfirmPassword.length > 0 && (
-                              <p className={`text-xs font-medium ${pwNewPassword === pwConfirmPassword ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
-                                {pwNewPassword === pwConfirmPassword ? "Las contraseñas coinciden ✓" : "Las contraseñas no coinciden"}
-                              </p>
-                            )}
-                          </div>
-                          {pwError && <p className="text-xs text-destructive font-medium">{pwError}</p>}
-                        </div>
-                      )}
-                    </div>
-
-                    <DialogFooter className="mt-2 flex-col sm:flex-row gap-2">
-                      <Button variant="outline" type="button" onClick={() => { setIsPasswordOpen(false); resetPasswordDialog(); }} disabled={pwLoading} className="w-full sm:w-auto text-sm">
-                        Cancelar
-                      </Button>
-                      {passwordStep === "current" && (
-                        <Button type="button" variant="success" onClick={handleNextStep1} disabled={pwLoading} className="w-full sm:w-auto text-sm">
-                          {pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verificando...</> : "Continuar"}
-                        </Button>
-                      )}
-                      {passwordStep === "new" && (
-                        <Button type="button" variant="success" onClick={handleNextStep2} className="w-full sm:w-auto text-sm">
-                          Continuar
-                        </Button>
-                      )}
-                      {passwordStep === "confirm" && (
-                        <Button type="button" variant="success" onClick={handleSubmitPassword} disabled={pwLoading} className="w-full sm:w-auto text-sm">
-                          {pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</> : "Guardar contraseña"}
-                        </Button>
-                      )}
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
-                {/* Campos de perfil - Mejorado para móvil */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="cfg-nombres" className="text-sm">Nombres</Label>
-                    <Input id="cfg-nombres" value={profileFirstNames} onChange={(e) => setProfileFirstNames(e.target.value)} placeholder="Ej. María Fernanda" className="text-sm" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cfg-apellidos" className="text-sm">Apellidos</Label>
-                    <Input id="cfg-apellidos" value={profileLastNames} onChange={(e) => setProfileLastNames(e.target.value)} placeholder="Ej. González López" className="text-sm" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cfg-correo" className="text-sm">Correo electrónico</Label>
-                    <Input id="cfg-correo" value={user?.email ?? ""} disabled className="text-sm" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cfg-telefono" className="text-sm">Teléfono</Label>
-                    <Input
-                      id="cfg-telefono"
-                      value={profilePhone}
-                      onChange={(e) => setProfilePhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                      inputMode="numeric"
-                      maxLength={10}
-                      placeholder="Ej. 6531234567"
-                      className="text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Seguridad */}
-                <div className="rounded-2xl border border-border bg-muted/30 p-4">
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm font-semibold">Seguridad</p>
-                      <p className="text-xs text-muted-foreground">Gestiona el acceso a tu cuenta.</p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      type="button"
-                      className="w-full justify-start text-sm"
-                      onClick={() => setIsPasswordOpen(true)}
-                    >
-                      <Key className="h-4 w-4 mr-2" />
-                      Cambiar contraseña
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Tema - Mejorado para móvil */}
-                <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-                  <div className="space-y-3">
-                    <Label className="block text-sm">Tema de la aplicación</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={toggleTheme}
-                      className="w-full sm:w-fit gap-2 border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 text-sm"
-                    >
-                      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                      {theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button variant="success" onClick={handleSaveProfile} disabled={!isProfileDirty || isSavingProfile} className="w-full sm:w-auto text-sm">
-                    {isSavingProfile ? "Guardando..." : "Guardar cambios"}
-                  </Button>
-                </div>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-xs sm:text-sm font-semibold truncate">{item.label}</span>
+                        <span className="hidden sm:block text-xs text-muted-foreground">{item.description}</span>
+                      </span>
+                    </button>
+                  );
+                })}
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {/* Panel de contenido */}
+        <div className={`h-full min-h-0 flex flex-col overflow-hidden ${!isFormal ? (mobileSectionOpen ? "flex" : "hidden lg:flex") : ""}`}>
+          {/* Botón volver – solo modo clásico en móvil */}
+          {!isFormal && (
+            <button
+              type="button"
+              onClick={() => setMobileSectionOpen(false)}
+              className="mb-2 inline-flex items-center gap-1.5 self-start rounded-lg bg-white/90 px-2.5 py-1.5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200 transition hover:bg-white dark:bg-slate-900/85 dark:text-emerald-300 dark:ring-slate-700 lg:hidden"
+            >
+              <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">Volver a secciones</span>
+            </button>
+          )}
+          {activeTab === "cuenta" && (
+            <div data-tour="admin-config-cuenta" className="flex flex-col gap-4 min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent pb-2">
+              {/* Diálogos (modales, fuera del grid) */}
+              <Dialog open={isAvatarOpen} onOpenChange={setIsAvatarOpen}>
+                <DialogContent className="max-w-[95vw] sm:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Foto de perfil</DialogTitle>
+                    <DialogDescription>Vista previa de tu imagen de perfil</DialogDescription>
+                  </DialogHeader>
+                  <div className="mt-4 flex justify-center">
+                    {profileAvatar ? (
+                      <img src={profileAvatar} alt={profileFirstNames || "Usuario"} className="max-h-[50vh] sm:max-h-[70vh] max-w-full rounded-lg object-contain" />
+                    ) : (
+                      <div className="h-32 w-32 sm:h-40 sm:w-40 rounded-lg bg-emerald-100 flex items-center justify-center text-2xl">
+                        {(profileFirstNames || profileLastNames || user?.name || "U").split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      </div>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog
+                open={isPasswordOpen}
+                onOpenChange={(open) => { setIsPasswordOpen(open); if (!open) resetPasswordDialog(); }}
+                key={isPasswordOpen ? "open" : "closed"}
+              >
+                <DialogContent className="max-w-[95vw] sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Cambiar contraseña</DialogTitle>
+                    <DialogDescription>
+                      {passwordStep === "current" && "Confirma tu contraseña actual para continuar."}
+                      {passwordStep === "new" && "Crea una contraseña segura para tu cuenta."}
+                      {passwordStep === "confirm" && "Confirma tu nueva contraseña para guardar los cambios."}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex items-center gap-2 mt-1">
+                    {(["current", "new", "confirm"] as const).map((step, i) => {
+                      const stepIndex = ["current", "new", "confirm"].indexOf(passwordStep);
+                      const isDone = i < stepIndex;
+                      const isActive = passwordStep === step;
+                      return (
+                        <React.Fragment key={step}>
+                          <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                            isActive ? "bg-emerald-500 text-white" : isDone ? "bg-emerald-200 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" : "bg-muted text-muted-foreground"
+                          }`}>
+                            {isDone ? <Check className="h-3 w-3" /> : i + 1}
+                          </div>
+                          {i < 2 && <div className={`h-px flex-1 transition-colors ${isDone ? "bg-emerald-400" : "bg-border"}`} />}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-1 space-y-4">
+                    {passwordStep === "current" && (
+                      <div className="space-y-2">
+                        <Label className="text-sm">Contraseña actual</Label>
+                        <div className="relative">
+                          <Input type={showPwCurrent ? "text" : "password"} value={pwCurrentPassword} onChange={(e) => setPwCurrentPassword(e.target.value)} placeholder="Ingresa tu contraseña actual" className="pr-10 text-sm" autoComplete="new-password" readOnly onFocus={(e) => e.currentTarget.removeAttribute("readOnly")} autoFocus onKeyDown={(e) => e.key === "Enter" && handleNextStep1()} />
+                          <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwCurrent((v) => !v)} aria-label={showPwCurrent ? "Ocultar" : "Mostrar"}>{showPwCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button>
+                        </div>
+                        {pwError && <p className="text-xs text-destructive font-medium">{pwError}</p>}
+                      </div>
+                    )}
+                    {passwordStep === "new" && (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label className="text-sm">Nueva contraseña</Label>
+                          <div className="relative">
+                            <Input type={showPwNew ? "text" : "password"} value={pwNewPassword} onChange={(e) => setPwNewPassword(e.target.value)} placeholder="Crea una contraseña segura" className="pr-10 text-sm" autoComplete="new-password" autoFocus onKeyDown={(e) => e.key === "Enter" && handleNextStep2()} />
+                            <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwNew((v) => !v)} aria-label={showPwNew ? "Ocultar" : "Mostrar"}>{showPwNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button>
+                          </div>
+                        </div>
+                        {pwNewPassword.length > 0 && (() => {
+                          const strength = getPasswordStrength(pwNewPassword);
+                          return (
+                            <div className="space-y-1.5">
+                              <div className="flex gap-1">{[1,2,3,4,5].map((s) => <div key={s} className={`h-1.5 flex-1 rounded-full transition-colors ${s <= strength.score ? strength.color : "bg-muted"}`} />)}</div>
+                              <p className={`text-xs font-medium ${strength.score < 5 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>{strength.label}</p>
+                            </div>
+                          );
+                        })()}
+                        <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-1.5">
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">Tu contraseña debe incluir:</p>
+                          {[
+                            { label: "Mínimo 8 caracteres", met: pwNewPassword.length >= 8 },
+                            { label: "Letra mayúscula (A-Z)", met: /[A-Z]/.test(pwNewPassword) },
+                            { label: "Letra minúscula (a-z)", met: /[a-z]/.test(pwNewPassword) },
+                            { label: "Número (0-9)", met: /[0-9]/.test(pwNewPassword) },
+                            { label: "Carácter especial (!@#$%...)", met: /[^A-Za-z0-9]/.test(pwNewPassword) },
+                          ].map((criterion) => (
+                            <div key={criterion.label} className="flex items-center gap-2">
+                              <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors ${criterion.met ? "bg-emerald-500" : "bg-muted border border-border"}`}>{criterion.met && <Check className="h-2.5 w-2.5 text-white" />}</div>
+                              <span className={`text-xs transition-colors ${criterion.met ? "text-foreground font-medium" : "text-muted-foreground"}`}>{criterion.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {pwError && <p className="text-xs text-destructive font-medium">{pwError}</p>}
+                      </div>
+                    )}
+                    {passwordStep === "confirm" && (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label className="text-sm">Confirmar nueva contraseña</Label>
+                          <div className="relative">
+                            <Input type={showPwConfirm ? "text" : "password"} value={pwConfirmPassword} onChange={(e) => setPwConfirmPassword(e.target.value)} placeholder="Repite tu nueva contraseña" className="pr-10 text-sm" autoComplete="new-password" autoFocus onKeyDown={(e) => e.key === "Enter" && !pwLoading && handleSubmitPassword()} />
+                            <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPwConfirm((v) => !v)} aria-label={showPwConfirm ? "Ocultar" : "Mostrar"}>{showPwConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button>
+                          </div>
+                          {pwConfirmPassword.length > 0 && (
+                            <p className={`text-xs font-medium ${pwNewPassword === pwConfirmPassword ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                              {pwNewPassword === pwConfirmPassword ? "Las contraseñas coinciden ✓" : "Las contraseñas no coinciden"}
+                            </p>
+                          )}
+                        </div>
+                        {pwError && <p className="text-xs text-destructive font-medium">{pwError}</p>}
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter className="mt-2 flex-col sm:flex-row gap-2">
+                    <Button variant="outline" type="button" onClick={() => { setIsPasswordOpen(false); resetPasswordDialog(); }} disabled={pwLoading} className="w-full sm:w-auto text-sm">Cancelar</Button>
+                    {passwordStep === "current" && <Button type="button" variant="success" onClick={handleNextStep1} disabled={pwLoading} className="w-full sm:w-auto text-sm">{pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verificando...</> : "Continuar"}</Button>}
+                    {passwordStep === "new" && <Button type="button" variant="success" onClick={handleNextStep2} className="w-full sm:w-auto text-sm">Continuar</Button>}
+                    {passwordStep === "confirm" && <Button type="button" variant="success" onClick={handleSubmitPassword} disabled={pwLoading} className="w-full sm:w-auto text-sm">{pwLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</> : "Guardar contraseña"}</Button>}
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {isFormal ? (
+                /* ── Layout empresarial: banner superior + dos columnas ── */
+                <div className="space-y-4">
+                  {/* Banner de perfil */}
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 rounded-sm border border-border bg-card px-6 py-5 dark:border-slate-800/70 dark:bg-slate-950/60">
+                    <div
+                      className="h-20 w-20 shrink-0 rounded-sm overflow-hidden cursor-pointer"
+                      onClick={() => setIsAvatarOpen(true)}
+                    >
+                      <Avatar className="h-full w-full rounded-none">
+                        <AvatarImage src={selectedAvatarFile ? profileAvatar : (savedAvatarPreview ?? resolvedCurrentAvatar)} alt={profileFirstNames || "Usuario"} className="h-full w-full object-cover rounded-none" />
+                        <AvatarFallback className="p-0 overflow-hidden h-full w-full rounded-none"><img src={defaultAvatar} alt="Avatar" className="h-full w-full object-cover" /></AvatarFallback>
+                      </Avatar>
+                    </div>
+                    <div className="flex-1 min-w-0 text-center sm:text-left">
+                      <p className="text-lg font-semibold text-slate-900 dark:text-white leading-tight">
+                        {[profileFirstNames, profileLastNames].filter(Boolean).join(" ") || user?.name || "—"}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-0.5">Administrador · {user?.email ?? ""}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Miembro desde{" "}
+                        <span className="font-medium text-foreground dark:text-slate-300">
+                          {user?.createdAt
+                            ? new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long", year: "numeric" }).format(new Date(user.createdAt))
+                            : "—"}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button variant="outline" size="sm" type="button" onClick={() => fileInputRef.current?.click()} disabled={isRemovingAvatar || isSavingProfile} className="h-8 text-xs rounded-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+                        <Upload className="mr-1.5 h-3.5 w-3.5" />Cambiar foto
+                      </Button>
+                      {(selectedAvatarFile || hasServerAvatar) && (
+                        <Button variant="ghost" size="sm" type="button" onClick={handleRemoveAvatar} disabled={isRemovingAvatar || isSavingProfile} className="h-8 text-xs rounded-sm dark:hover:bg-slate-800 dark:text-slate-400">
+                          {isRemovingAvatar ? "Quitando..." : "Quitar"}
+                        </Button>
+                      )}
+                    </div>
+                    <Input ref={fileInputRef} id="avatar-formal" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} className="hidden" />
+                  </div>
+
+                  {/* Dos columnas: datos + ajustes */}
+                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
+                    {/* Columna izquierda: campos del formulario */}
+                    <div className="rounded-sm border border-border bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+                      <div className="border-b border-border px-5 py-3 dark:border-slate-800">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Datos personales</p>
+                      </div>
+                      <div className="p-5 space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <Label htmlFor="cfg-f-nombres" className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nombres</Label>
+                            <Input id="cfg-f-nombres" value={profileFirstNames} onChange={(e) => setProfileFirstNames(e.target.value)} placeholder="Ej. María Fernanda" className="rounded-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-500" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="cfg-f-apellidos" className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Apellidos</Label>
+                            <Input id="cfg-f-apellidos" value={profileLastNames} onChange={(e) => setProfileLastNames(e.target.value)} placeholder="Ej. González López" className="rounded-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-500" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="cfg-f-correo" className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Correo electrónico</Label>
+                            <Input id="cfg-f-correo" value={user?.email ?? ""} disabled className="rounded-sm bg-muted/40 dark:bg-slate-900/50 dark:text-slate-500 dark:border-slate-700" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="cfg-f-telefono" className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Teléfono</Label>
+                            <Input id="cfg-f-telefono" value={profilePhone} onChange={(e) => setProfilePhone(e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" maxLength={10} placeholder="Ej. 6531234567" className="rounded-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-500" />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-2 pt-1 border-t border-border dark:border-slate-800">
+                          <Button variant="outline" size="sm" type="button" onClick={() => { setProfileFirstNames(user?.firstNames ?? ""); setProfileLastNames(user?.lastNames ?? ""); setProfilePhone(user?.phone ?? ""); setSelectedAvatarFile(null); setSavedAvatarPreview(undefined); if (fileInputRef.current) fileInputRef.current.value = ""; }} disabled={!isProfileDirty || isSavingProfile} className="rounded-sm text-xs dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Cancelar</Button>
+                          <Button variant="success" size="sm" onClick={handleSaveProfile} disabled={!isProfileDirty || isSavingProfile} className="rounded-sm text-xs">{isSavingProfile ? "Guardando..." : "Guardar cambios"}</Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Columna derecha: apariencia + seguridad */}
+                    <div className="space-y-4">
+                      <div className="rounded-sm border border-border bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+                        <div className="border-b border-border px-5 py-3 dark:border-slate-800">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Apariencia</p>
+                        </div>
+                        <div className="p-4">
+                          <Button type="button" variant="outline" onClick={toggleTheme} className="w-full justify-start gap-2 rounded-sm text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+                            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                            {theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="rounded-sm border border-border bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+                        <div className="border-b border-border px-5 py-3 dark:border-slate-800">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Seguridad</p>
+                        </div>
+                        <div className="p-4">
+                          <Button variant="outline" type="button" className="w-full justify-start gap-2 rounded-sm text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800" onClick={() => setIsPasswordOpen(true)}>
+                            <Key className="h-4 w-4" />Cambiar contraseña
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ── Layout clásico: 3 tarjetas en columnas ── */
+                <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_280px] gap-4">
+
+                  {/* Columna 1: Foto */}
+                  <Card className={`${sectionCardClass} w-full`}>
+                    <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center">
+                      <div
+                        className="h-36 w-36 shrink-0 rounded-full overflow-hidden ring-2 ring-emerald-200/60 dark:ring-emerald-900/40 cursor-pointer"
+                        onClick={() => setIsAvatarOpen(true)}
+                      >
+                        <Avatar className="h-full w-full">
+                          <AvatarImage src={selectedAvatarFile ? profileAvatar : (savedAvatarPreview ?? resolvedCurrentAvatar)} alt={profileFirstNames || "Usuario"} className="h-full w-full object-cover" />
+                          <AvatarFallback className="p-0 overflow-hidden h-full w-full"><img src={defaultAvatar} alt="Avatar por defecto" className="h-full w-full object-cover" /></AvatarFallback>
+                        </Avatar>
+                      </div>
+                      <div className="flex flex-col items-center gap-1.5 w-full">
+                        <Button variant="outline" size="sm" type="button" onClick={() => fileInputRef.current?.click()} disabled={isRemovingAvatar || isSavingProfile} className="w-full rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+                          <Upload className="mr-2 h-4 w-4" />Cambiar foto
+                        </Button>
+                        {(selectedAvatarFile || hasServerAvatar) && (
+                          <Button variant="ghost" size="sm" type="button" onClick={handleRemoveAvatar} disabled={isRemovingAvatar || isSavingProfile} className="w-full rounded-2xl dark:hover:bg-slate-800 dark:text-slate-300">
+                            {isRemovingAvatar ? "Quitando..." : "Quitar foto"}
+                          </Button>
+                        )}
+                      </div>
+                      <Input ref={fileInputRef} id="avatar" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} className="hidden" />
+                      <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 4MB</p>
+                    </div>
+                  </Card>
+
+                  {/* Columna 2: Datos personales */}
+                  <Card className={`${sectionCardClass} w-full`}>
+                    <div className="p-6 space-y-5">
+                      <div>
+                        <h2 className="text-base font-semibold dark:text-white">Información Personal</h2>
+                        <p className="text-sm text-muted-foreground">Actualiza tus datos de perfil</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="cfg-nombres" className="text-sm dark:text-white">Nombres</Label>
+                        <Input id="cfg-nombres" value={profileFirstNames} onChange={(e) => setProfileFirstNames(e.target.value)} placeholder="Ej. María Fernanda" className="rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="cfg-apellidos" className="text-sm dark:text-white">Apellidos</Label>
+                        <Input id="cfg-apellidos" value={profileLastNames} onChange={(e) => setProfileLastNames(e.target.value)} placeholder="Ej. González López" className="rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="cfg-correo" className="text-sm dark:text-white">Correo electrónico</Label>
+                        <Input id="cfg-correo" value={user?.email ?? ""} disabled className="rounded-2xl bg-muted/40 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-700" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="cfg-telefono" className="text-sm dark:text-white">Teléfono</Label>
+                        <Input id="cfg-telefono" value={profilePhone} onChange={(e) => setProfilePhone(e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" maxLength={10} placeholder="Ej. 6531234567" className="rounded-2xl dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400" />
+                      </div>
+                      <div className="pt-1 flex flex-col sm:flex-row gap-2">
+                        <Button variant="outline" type="button" onClick={() => { setProfileFirstNames(user?.firstNames ?? ""); setProfileLastNames(user?.lastNames ?? ""); setProfilePhone(user?.phone ?? ""); setSelectedAvatarFile(null); setSavedAvatarPreview(undefined); if (fileInputRef.current) fileInputRef.current.value = ""; }} disabled={!isProfileDirty || isSavingProfile} className="w-full sm:w-auto rounded-2xl dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Cancelar</Button>
+                        <Button variant="success" onClick={handleSaveProfile} disabled={!isProfileDirty || isSavingProfile} className="w-full sm:w-auto rounded-2xl">{isSavingProfile ? "Guardando..." : "Guardar cambios"}</Button>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Columna 3: Cuenta, apariencia y seguridad */}
+                  <Card className={`${sectionCardClass} w-full`}>
+                    <div className="flex h-full flex-col p-6 gap-6">
+                      <div>
+                        <h2 className="text-base font-semibold dark:text-white mb-3">Información de Cuenta</h2>
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Miembro desde</p>
+                            <p className="font-medium dark:text-white capitalize">
+                              {user?.createdAt
+                                ? new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long", year: "numeric" }).format(new Date(user.createdAt))
+                                : "Sin datos"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Rol</p>
+                            <p className="font-medium dark:text-white">Administrador</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <h2 className="text-base font-semibold dark:text-white mb-3">Apariencia</h2>
+                        <Button type="button" variant="outline" onClick={toggleTheme} className="w-full justify-start gap-2 rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+                          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                          {theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                        </Button>
+                      </div>
+                      <div className="mt-auto">
+                        <h2 className="text-base font-semibold dark:text-white mb-3">Seguridad</h2>
+                        <Button variant="outline" type="button" className="w-full justify-start rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800" onClick={() => setIsPasswordOpen(true)}>
+                          <Key className="h-4 w-4 mr-2" />Cambiar contraseña
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              )}
+            </div>
           )}
 
-          {activeTab === "formularios" && (
+          {activeTab === "formularios" && isFormal && (
+            <div className="flex flex-col flex-1 min-h-0 overflow-hidden border border-border/70 bg-card dark:border-slate-800 dark:bg-slate-950/60">
+              {/* Encabezado */}
+              <div className="shrink-0 flex items-center gap-3 border-b border-border bg-muted/30 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <FileText className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Formularios</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Configura el acceso y vencimiento de cada formulario del sistema.</p>
+                </div>
+              </div>
+              {/* Cuerpo: selector izquierdo + lista derecha */}
+              <div className="flex flex-1 min-h-0 overflow-hidden">
+                {/* Selector de sección */}
+                <div className={cn("border-r border-border/60 overflow-y-auto dark:border-slate-800 w-full sm:w-48 sm:shrink-0", mobileFormalFormsView === 'sections' ? "flex flex-col" : "hidden sm:flex sm:flex-col")}>
+                  {formSections.map((section) => (
+                    <button
+                      key={section.section}
+                      type="button"
+                      onClick={() => { setFormalFormSection(section.section); setMobileFormalFormsView('forms'); }}
+                      className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-left border-b border-border/40 transition-colors dark:border-slate-800/60 ${
+                        formalFormSection === section.section
+                          ? "border-l-[3px] border-l-emerald-600 bg-emerald-50/80 text-emerald-700 dark:border-l-emerald-500 dark:bg-emerald-950/30 dark:text-emerald-400"
+                          : "border-l-[3px] border-l-transparent text-slate-600 hover:bg-muted/50 dark:text-slate-400 dark:hover:bg-slate-800/30"
+                      }`}
+                    >
+                      <span className="text-xs font-semibold">{section.title}</span>
+                      <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground dark:bg-slate-800">
+                        {section.forms.length}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {/* Lista de formularios */}
+                <div className={cn("flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent", mobileFormalFormsView === 'forms' ? "block" : "hidden sm:block")}>
+                  <button
+                    type="button"
+                    onClick={() => setMobileFormalFormsView('sections')}
+                    className="sm:hidden flex items-center gap-1.5 w-full border-b border-border/50 px-4 py-2.5 text-xs font-medium text-slate-500 hover:bg-muted/40 dark:border-slate-800/60 dark:text-slate-400"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5 shrink-0" />
+                    Secciones
+                  </button>
+                  {formSections
+                    .filter((s) => s.section === formalFormSection)
+                    .map((section) => (
+                      <div key={section.section}>
+                        <div className="border-b border-border/50 bg-muted/20 px-5 py-2 dark:border-slate-800/50 dark:bg-slate-900/30">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">{section.description}</p>
+                        </div>
+                        <div className="divide-y divide-border/40 dark:divide-slate-800/50">
+                          {section.forms.map((form) => {
+                            const savedConfig = formConfig.formAccess[form.id];
+                            const draftConfig = formDrafts[form.id] ?? savedConfig;
+                            const isTutoriasForm = form.section === "tutorias";
+                            const dueAtDate = draftConfig.dueAt ? new Date(draftConfig.dueAt) : null;
+                            const isOpenItem = Boolean(openFormItems[form.id]);
+                            const isDraftChanged = JSON.stringify(draftConfig) !== JSON.stringify(savedConfig);
+                            const formUIMode = getFormUIMode(form.id);
+                            const isCerrado = formUIMode === "cerrado";
+                            const isFechaLimite = formUIMode === "fechaLimite";
+                            const allowedRoles = draftConfig.roles.map((role) => FORM_ROLE_LABELS[role]).join(" y ");
+                            const dueAtLabel = dueAtDate && isValid(dueAtDate)
+                              ? dueAtDate.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
+                              : null;
+                            return (
+                              <div key={form.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleFormItem(form.id)}
+                                  className="w-full flex items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-muted/30 dark:hover:bg-slate-800/20"
+                                  aria-expanded={isOpenItem}
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{form.title}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">{form.description}</p>
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    {isCerrado ? (
+                                      <span className="rounded-sm bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-400">Cerrado</span>
+                                    ) : isFechaLimite ? (
+                                      <span className="rounded-sm bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">Fecha límite</span>
+                                    ) : (
+                                      <span className="rounded-sm bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">Abierto</span>
+                                    )}
+                                    {dueAtLabel && !isCerrado && (
+                                      <span className="hidden md:inline text-[10px] text-muted-foreground">{dueAtLabel}</span>
+                                    )}
+                                    {allowedRoles && (
+                                      <span className="hidden md:inline rounded-sm border border-border px-2 py-0.5 text-[10px] text-slate-500 dark:border-slate-700 dark:text-slate-400">{allowedRoles}</span>
+                                    )}
+                                    {isDraftChanged && <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />}
+                                    <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-150 ${isOpenItem ? "rotate-180" : ""}`} />
+                                  </div>
+                                </button>
+                                {isOpenItem && (
+                                  <div className="border-t border-border/40 bg-muted/10 px-5 py-4 space-y-4 dark:border-slate-800/50 dark:bg-slate-900/20">
+                                    <div className="space-y-2">
+                                      {(() => {
+                                        const _isCerrado = formUIMode === "cerrado";
+                                        const _isFechaLimite = formUIMode === "fechaLimite";
+                                        const _dueDate = draftConfig.dueAt ? new Date(draftConfig.dueAt) : null;
+                                        const _dueDateValid = _dueDate !== null && isValid(_dueDate);
+                                        const _isPastDeadline = _isFechaLimite && _dueDateValid && _dueDate! <= new Date();
+                                        return (
+                                          <>
+                                            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                                              <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Fecha y hora de vencimiento</Label>
+                                              <div className="flex flex-wrap items-center gap-4 ml-auto">
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                  <Checkbox checked={formUIMode === "sinLimite"} onCheckedChange={(val) => { if (val) { setFormUIModes((prev) => ({ ...prev, [form.id]: "sinLimite" })); setFormDraftValue(form.id, (current) => ({ ...current, dueAt: null })); } }} />
+                                                  <span>Sin límite</span>
+                                                </label>
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                  <Checkbox checked={_isFechaLimite} onCheckedChange={(val) => { if (val) { setFormUIModes((prev) => ({ ...prev, [form.id]: "fechaLimite" })); setFormDraftValue(form.id, (current) => { const existingDate = current.dueAt && current.dueAt.slice(11, 16) ? new Date(current.dueAt) : null; const keepExisting = existingDate && isValid(existingDate) && existingDate > new Date(); return { ...current, dueAt: keepExisting ? current.dueAt : "" }; }); } }} />
+                                                  <span>Con fecha límite</span>
+                                                </label>
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                  <Checkbox checked={_isCerrado} onCheckedChange={(val) => { if (val) { const d = new Date(Date.now() - 60_000); const pad = (n: number) => String(n).padStart(2, "0"); setFormUIModes((prev) => ({ ...prev, [form.id]: "cerrado" })); setFormDraftValue(form.id, (current) => ({ ...current, dueAt: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}` })); } else { setFormUIModes((prev) => ({ ...prev, [form.id]: "sinLimite" })); setFormDraftValue(form.id, (current) => ({ ...current, dueAt: null })); } }} disabled={Boolean(savingFormIds[form.id])} />
+                                                  <span>Cerrar formulario</span>
+                                                </label>
+                                              </div>
+                                            </div>
+                                            {_isFechaLimite && (
+                                              <div className="flex gap-2">
+                                                <DeadlineDatePicker value={draftConfig.dueAt ? draftConfig.dueAt.slice(0, 10) : ""} disabled={false} onChange={(date) => { const timePart = draftConfig.dueAt?.slice(11, 16) || "23:59"; handleDeadlineChange(form.id, date ? `${date}T${timePart}` : ""); }} />
+                                                <Input type="time" value={draftConfig.dueAt ? draftConfig.dueAt.slice(11, 16) : ""} onChange={(event) => { const datePart = draftConfig.dueAt?.slice(0, 10) ?? ""; if (!event.target.value || !datePart) return; handleDeadlineChange(form.id, `${datePart}T${event.target.value}`); }} className="text-sm dark:[&::-webkit-calendar-picker-indicator]:invert w-28" />
+                                              </div>
+                                            )}
+                                            {_isPastDeadline && <p className="text-xs text-amber-600 dark:text-amber-400">⚠ La fecha y hora seleccionadas ya han pasado. Cámbiala antes de guardar.</p>}
+                                            {_isCerrado && (
+                                              <div className="flex items-center gap-2 rounded-sm border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+                                                <span className="shrink-0 font-bold">⊘</span>
+                                                <span>Formulario cerrado manualmente</span>
+                                              </div>
+                                            )}
+                                            {_isFechaLimite && _dueDateValid && _dueDate! > new Date() && (
+                                              <p className="text-xs text-muted-foreground">
+                                                Fecha límite: {_dueDate!.toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                              </p>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Roles permitidos</Label>
+                                      {isTutoriasForm ? (
+                                        <div className="flex items-center gap-2">
+                                          <span className="rounded-sm bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Tutor</span>
+                                          <span className="text-xs text-muted-foreground">Este formulario queda asignado sólo a tutores.</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex flex-wrap items-center gap-4">
+                                          <label className="flex items-center gap-2">
+                                            <Checkbox checked={draftConfig.roles.includes("docente")} onCheckedChange={() => toggleFormRole(form.id, "docente")} />
+                                            <span className="text-sm">Docente</span>
+                                          </label>
+                                          <label className="flex items-center gap-2">
+                                            <Checkbox checked={draftConfig.roles.includes("tutor")} onCheckedChange={() => toggleFormRole(form.id, "tutor")} />
+                                            <span className="text-sm">Tutor</span>
+                                          </label>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-2 justify-end">
+                                      <Button type="button" variant="outline" size="sm" onClick={() => handleResetForm(form.id)} disabled={!isDraftChanged || Boolean(savingFormIds[form.id])}>Cancelar</Button>
+                                      <Button type="button" size="sm" onClick={() => handleSaveForm(form.id)} disabled={!isDraftChanged || Boolean(savingFormIds[form.id]) || (draftConfig.dueAt !== null && !draftConfig.dueAt.slice(11, 16)) || (formUIModes[form.id] === "fechaLimite" && Boolean(draftConfig.dueAt) && isValid(new Date(draftConfig.dueAt!)) && new Date(draftConfig.dueAt!) <= new Date())}>
+                                        {savingFormIds[form.id] ? "Guardando..." : "Guardar"}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "formularios" && !isFormal && (
             <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
               <CardHeader className={`${sectionHeaderClass} shrink-0 p-4 sm:p-6`}>
                 <CardTitle className="text-base sm:text-lg flex items-center gap-2">
@@ -1816,7 +2070,184 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
             </Card>
           )}
 
-          {activeTab === "grupos" && (
+          {activeTab === "grupos" && isFormal && (
+            <div className="flex flex-col flex-1 min-h-0 overflow-hidden border border-border/70 bg-card dark:border-slate-800 dark:bg-slate-950/60">
+              {/* Encabezado */}
+              <div className="shrink-0 flex flex-col gap-3 border-b border-border bg-muted/30 px-4 sm:px-6 py-3 sm:py-4 dark:border-slate-800 dark:bg-slate-900/40 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <Users className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Grupos</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Crear y administrar grupos que aparecerán en los formularios</p>
+                  </div>
+                </div>
+                <div data-tour="admin-config-grupos-btns" className="flex gap-2 self-start sm:self-auto sm:shrink-0">
+                  <Button onClick={() => setIsBulkCreateOpen(true)} variant="outline" size="sm" className="gap-1.5 text-xs rounded-sm">
+                    <Layers className="h-3.5 w-3.5" aria-hidden="true" />
+                    Creación rápida
+                  </Button>
+                  <Button onClick={() => setIsCreateGroupOpen(true)} variant="success" size="sm" className="gap-1.5 text-xs rounded-sm">
+                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                    Crear grupo
+                  </Button>
+                </div>
+              </div>
+              {/* Barra de controles: plan tabs + búsqueda */}
+              <div className="shrink-0 flex flex-col gap-2 border-b border-border/60 bg-muted/10 px-4 sm:px-6 py-2.5 dark:border-slate-800/60 sm:flex-row sm:items-center sm:gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setGroupViewPlan("nuevo-modelo")}
+                      className={`px-2.5 py-1.5 text-xs font-semibold border transition-colors ${groupViewPlan === "nuevo-modelo" ? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-600" : "border-border text-slate-600 hover:bg-muted/50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/40"}`}
+                    >
+                      <span className="hidden sm:inline">Plan </span>Nuevo Modelo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGroupViewPlan("plan-normal")}
+                      className={`px-2.5 py-1.5 text-xs font-semibold border-t border-b border-r transition-colors ${groupViewPlan === "plan-normal" ? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-600" : "border-border text-slate-600 hover:bg-muted/50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/40"}`}
+                    >
+                      <span className="hidden sm:inline">Plan </span>Normal
+                    </button>
+                  </div>
+                  <span className="ml-auto text-[11px] text-muted-foreground sm:hidden">
+                    {selectedPlanGroups.length} {selectedPlanGroups.length === 1 ? "grupo" : "grupos"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 sm:flex-1">
+                  <div className="relative flex-1 sm:max-w-56">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <Input value={groupSearch} onChange={(e) => setGroupSearch(e.target.value)} placeholder={groupSearchPlaceholders[groupSearchPlaceholderIdx]} className="pl-8 text-xs h-8 rounded-sm transition-all duration-300" />
+                  </div>
+                  <span className="shrink-0 hidden sm:block text-[11px] text-muted-foreground sm:ml-auto">
+                    {selectedPlanGroups.length} {selectedPlanGroups.length === 1 ? "grupo" : "grupos"} · {selectedPlanCareerGroups.length} {selectedPlanCareerGroups.length === 1 ? "carrera" : "carreras"}
+                  </span>
+                </div>
+              </div>
+              {/* Lista de carreras y grupos en estilo tabla */}
+              <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
+                {selectedPlanCareerGroups.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+                    <Users className="h-8 w-8 text-muted-foreground/30" />
+                    <p className="text-sm text-muted-foreground">
+                      {groups.length === 0 ? "Aún no hay grupos creados." : groupSearch.trim() ? `No hay grupos ni carreras que coincidan con "${groupSearch}".` : "No hay grupos en este plan todavía."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/50 dark:divide-slate-800/50">
+                    {selectedPlanCareerGroups.map(({ career, groups: careerGroups }) => (
+                      <div key={career.codigo}>
+                        {/* Fila de carrera */}
+                        <button
+                          type="button"
+                          onClick={() => setOpenCareer(openCareer === career.codigo ? null : career.codigo)}
+                          className={`w-full flex items-center gap-3 px-5 py-2.5 text-left transition-colors hover:bg-muted/40 dark:hover:bg-slate-800/20 ${openCareer === career.codigo ? "bg-muted/30 dark:bg-slate-800/10" : ""}`}
+                          aria-expanded={openCareer === career.codigo}
+                        >
+                          <span className={`shrink-0 inline-flex items-center rounded-sm px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${career.tipo === "TSU" ? "bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400" : "bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-400"}`}>
+                            {career.tipo}
+                          </span>
+                          <span className="flex-1 truncate text-sm font-semibold text-slate-800 dark:text-slate-200">{career.nombre}</span>
+                          <span className="shrink-0 text-[11px] text-muted-foreground">{careerGroups.length} {careerGroups.length === 1 ? "grupo" : "grupos"}</span>
+                          <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${openCareer === career.codigo ? "rotate-180" : ""}`} />
+                        </button>
+                        {/* Cuatrimestres + grupos */}
+                        {openCareer === career.codigo && (() => {
+                          const byCuat = careerGroups.reduce<Record<number, typeof careerGroups>>(
+                            (acc, g) => { (acc[g.cuatrimestre] ??= []).push(g); return acc; },
+                            {}
+                          );
+                          const cuatNums = Object.keys(byCuat).map(Number).sort((a, b) => a - b);
+                          return (
+                            <div className="border-t border-border/40 dark:border-slate-800/40">
+                              {cuatNums.map((cuat) => {
+                                const key = `${career.codigo}-${cuat}`;
+                                const isOpen = openCuatrimestres.has(key);
+                                return (
+                                  <div key={key} className="border-b border-border/30 dark:border-slate-800/30 last:border-0">
+                                    {/* Sub-fila cuatrimestre */}
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleCuatrimestre(key)}
+                                      className="flex w-full items-center gap-3 bg-muted/20 px-8 py-1.5 text-left text-xs transition-colors hover:bg-muted/40 dark:bg-slate-800/10 dark:hover:bg-slate-800/25"
+                                    >
+                                      <span className="font-semibold text-slate-600 dark:text-slate-400">{cuatrimestresLabel(cuat)}</span>
+                                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400">{byCuat[cuat].length} grupos</span>
+                                      <ChevronDown className={`ml-auto h-3.5 w-3.5 text-slate-400 transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`} />
+                                    </button>
+                                    {/* Chips de grupos */}
+                                    {isOpen && (
+                                      <div className="px-8 py-2 bg-background/40 dark:bg-slate-950/20">
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {byCuat[cuat].map((g) => {
+                                            const isActive = g.is_active ?? true;
+                                            if (editingGroupId === g.id) {
+                                              return (
+                                                <div key={g.id} className="flex flex-wrap items-center gap-2 rounded-sm border border-emerald-300 bg-emerald-50/50 p-2 dark:border-emerald-800/50 dark:bg-emerald-950/20 w-full">
+                                                  <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Editando: {editingCurrentGroupName}</span>
+                                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <Select value={editingGroupPlan} onValueChange={(v) => setEditingGroupPlan(v as "nuevo-modelo" | "plan-normal")}>
+                                                      <SelectTrigger className="h-7 w-32 text-xs rounded-sm"><SelectValue /></SelectTrigger>
+                                                      <SelectContent>
+                                                        <SelectItem value="nuevo-modelo">Nuevo Modelo</SelectItem>
+                                                        <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                                                      </SelectContent>
+                                                    </Select>
+                                                    <Select value={editingGroupCareerCode} onValueChange={setEditingGroupCareerCode}>
+                                                      <SelectTrigger className="h-7 w-40 text-xs rounded-sm"><SelectValue placeholder="Carrera" /></SelectTrigger>
+                                                      <SelectContent>{editingCareerOptions.map((c) => (<SelectItem key={c.codigo} value={c.codigo}>{c.codigo} – {c.nombre}</SelectItem>))}</SelectContent>
+                                                    </Select>
+                                                    <Select value={editingGroupCuatrimestre} onValueChange={setEditingGroupCuatrimestre} disabled={!editingSelectedCareer}>
+                                                      <SelectTrigger className="h-7 w-28 text-xs rounded-sm"><SelectValue placeholder="Cuatrimestre" /></SelectTrigger>
+                                                      <SelectContent>{editingCuatrimestresDisponibles.map((c) => (<SelectItem key={c} value={String(c)}>{cuatrimestresLabel(c)}</SelectItem>))}</SelectContent>
+                                                    </Select>
+                                                    <Input type="number" min={1} max={99} value={editingGroupNumber} onChange={(e) => setEditingGroupNumber(Number(e.target.value))} className="h-7 w-16 text-xs rounded-sm" />
+                                                    <Button size="sm" variant="outline" onClick={() => { setEditingGroupId(null); setEditingGroupOriginal(null); }} className="h-7 rounded-sm text-xs">Cancelar</Button>
+                                                    <Button size="sm" onClick={() => void handleSaveGroupEdit()} disabled={!isEditingGroupDirty || isLoading} className="h-7 rounded-sm text-xs">Guardar</Button>
+                                                  </div>
+                                                </div>
+                                              );
+                                            }
+                                            return (
+                                              <div
+                                                key={g.id}
+                                                className={`group inline-flex items-center gap-1.5 rounded-sm border px-2.5 py-1.5 text-xs transition-all hover:shadow-sm ${isActive ? "border-border/60 bg-background hover:border-emerald-300/70 dark:border-slate-700/60 dark:bg-slate-900/60 dark:hover:border-emerald-800/50" : "border-border/30 bg-muted/30 opacity-60 dark:border-slate-800/30"}`}
+                                              >
+                                                <span className={`font-mono font-bold tracking-wide ${isActive ? "text-slate-800 dark:text-slate-100" : "text-slate-400 line-through dark:text-slate-500"}`}>{g.name}</span>
+                                                {!isActive && <span className="rounded-sm bg-slate-100 px-1 text-[9px] font-semibold uppercase text-slate-400 dark:bg-slate-800 dark:text-slate-500">Inactivo</span>}
+                                                <div className="flex items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                                                  <Button variant="ghost" size="icon" onClick={() => void handleToggleGroupActive(g)} disabled={Boolean(editingGroupId)} className={`h-5 w-5 rounded-sm ${isActive ? "text-amber-500 hover:text-amber-600" : "text-emerald-500 hover:text-emerald-600"}`} aria-label={isActive ? `Deshabilitar ${g.name}` : `Activar ${g.name}`}>
+                                                    <Power className="h-2.5 w-2.5" />
+                                                  </Button>
+                                                  <Button variant="ghost" size="icon" onClick={() => handleStartEditGroup(g)} disabled={Boolean(editingGroupId)} className="h-5 w-5 rounded-sm hover:text-emerald-700" aria-label={`Editar ${g.name}`}>
+                                                    <PencilLine className="h-2.5 w-2.5" />
+                                                  </Button>
+                                                  <Button variant="ghost" size="icon" onClick={() => handleRemoveGroup(g.id)} disabled={Boolean(editingGroupId)} className="h-5 w-5 rounded-sm text-rose-400 hover:text-rose-600" aria-label={`Eliminar ${g.name}`}>
+                                                    <Trash2 className="h-2.5 w-2.5" />
+                                                  </Button>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "grupos" && !isFormal && (
             <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
               <CardHeader className={`${sectionHeaderClass} shrink-0 p-4 sm:p-6`}>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1856,8 +2287,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                         <Input
                           value={groupSearch}
                           onChange={(event) => setGroupSearch(event.target.value)}
-                          placeholder="Buscar grupo"
-                          className="pl-8 text-sm h-9"
+                          placeholder={groupSearchPlaceholders[groupSearchPlaceholderIdx]}
+                          className="pl-8 text-sm h-9 transition-all duration-300"
                         />
                       </div>
                       <Select value={groupViewPlan} onValueChange={(value) => setGroupViewPlan(value as "nuevo-modelo" | "plan-normal")}>
@@ -1881,7 +2312,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                           {groups.length === 0
                             ? "Aún no hay grupos creados."
                             : groupSearch.trim()
-                            ? "No hay grupos que coincidan con la búsqueda."
+                            ? `No hay grupos ni carreras que coincidan con "${groupSearch}".`
                             : "No hay grupos en este plan todavía."}
                         </p>
                       </div>

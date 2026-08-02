@@ -5,12 +5,15 @@ import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { Alert, AlertDescription } from "./components/ui/alert";
 import { getFormConfig, saveFormConfig, getFormIdsForBackendCode, type FormId } from "../lib/formConfig";
 import { apiFetch } from "./lib/api";
+import { resolveApiAssetUrl } from "./lib/env";
 import { toast } from "sonner";
 import { Toaster } from "./components/ui/toast";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "./components/ui/alert-dialog";
-import { Check, ChevronUp, HelpCircle, ImageIcon, Loader2, Menu, Moon, Sun, X } from "lucide-react";
+import { Check, ChevronUp, HelpCircle, ImageIcon, LayoutGrid, Loader2, Menu, Moon, Palette, RotateCcw, Sun, Upload, X } from "lucide-react";
+import { APP_THEMES, type AppThemeId, applyAppTheme } from "./lib/themes";
+import { LAYOUT_STYLES, type LayoutStyleId, applyLayoutStyle } from "./lib/layoutStyles";
 import { adminTourSteps } from "./tours/adminTourSteps";
 import { getDocenteTourSteps } from "./tours/docenteTourSteps";
 import { TourContext } from "./context/TourContext";
@@ -67,6 +70,9 @@ const BG_STORAGE_KEY       = "utslrc-bg-key";
 const BG_OVERLAY_KEY       = "utslrc-bg-overlay";
 const CONTAINER_ALPHA_KEY  = "utslrc-container-alpha";
 const CONTAINER_BLUR_KEY   = "utslrc-container-blur";
+const BG_CUSTOM_URL_KEY    = "utslrc-bg-custom-url";
+const APP_THEME_KEY        = "utslrc-app-theme";
+const LAYOUT_STYLE_KEY     = "utslrc-layout-style";
 
 function AppContent() {
   const { isAuthenticated, isReady, user, notice, logout } = useAuth();
@@ -99,26 +105,80 @@ function AppContent() {
   const [bgOverlay, setBgOverlay] = useState<number>(30);
   const [containerAlpha, setContainerAlpha] = useState<number>(90);
   const [containerBlur, setContainerBlur] = useState<number>(0);
+  const [bgCustomUrl, setBgCustomUrl] = useState<string | null>(null);
+  const [isUploadingBg, setIsUploadingBg] = useState(false);
+  const bgFileInputRef = useRef<HTMLInputElement>(null);
   const [isBgPanelOpen, setIsBgPanelOpen] = useState(false);
+  const [isThemePanelOpen, setIsThemePanelOpen] = useState(false);
+  const [appTheme, setAppTheme] = useState<AppThemeId>("emerald");
+  const [isLayoutPanelOpen, setIsLayoutPanelOpen] = useState(false);
+  const [layoutStyle, setLayoutStyle] = useState<LayoutStyleId>("default");
   const [isToolbarExpanded, setIsToolbarExpanded] = useState(false);
-  const activeBgSrc = BG_OPTIONS.find(b => b.key === selectedBgKey)?.src ?? BgDefault;
+  const activeBgSrc = selectedBgKey === "custom" && bgCustomUrl
+    ? bgCustomUrl
+    : BG_OPTIONS.find(b => b.key === selectedBgKey)?.src ?? BgDefault;
 
   // Clave de localStorage con user.id para aislar preferencias por usuario
   const prefKey = useCallback((base: string) => `${base}-${user?.id ?? "__guest__"}`, [user?.id]);
 
-  // Guarda un subconjunto de preferencias en localStorage (inmediato) y backend (debounced 1.5 s)
+  // Guarda preferencias en localStorage (inmediato) y backend (debounced 1.5 s).
+  // pendingPrefs acumula TODOS los cambios del período de debounce para que
+  // mover varios sliders seguidos no descarte los cambios anteriores.
   const savePrefsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savePrefs = useCallback((patch: { bgKey?: string; bgOverlay?: number; containerAlpha?: number; containerBlur?: number }) => {
+  const pendingPrefs = useRef<{ bgKey?: string; bgOverlay?: number; containerAlpha?: number; containerBlur?: number; appTheme?: AppThemeId; layoutStyle?: LayoutStyleId }>({});
+  const savePrefs = useCallback((patch: { bgKey?: string; bgOverlay?: number; containerAlpha?: number; containerBlur?: number; appTheme?: AppThemeId; layoutStyle?: LayoutStyleId }) => {
     if (!user?.id) return;
     if (patch.bgKey          !== undefined) localStorage.setItem(prefKey(BG_STORAGE_KEY),      patch.bgKey);
     if (patch.bgOverlay      !== undefined) localStorage.setItem(prefKey(BG_OVERLAY_KEY),      String(patch.bgOverlay));
     if (patch.containerAlpha !== undefined) localStorage.setItem(prefKey(CONTAINER_ALPHA_KEY), String(patch.containerAlpha));
     if (patch.containerBlur  !== undefined) localStorage.setItem(prefKey(CONTAINER_BLUR_KEY),  String(patch.containerBlur));
+    if (patch.appTheme       !== undefined) localStorage.setItem(prefKey(APP_THEME_KEY),       patch.appTheme);
+    if (patch.layoutStyle    !== undefined) localStorage.setItem(prefKey(LAYOUT_STYLE_KEY),    patch.layoutStyle);
+    pendingPrefs.current = { ...pendingPrefs.current, ...patch };
     if (savePrefsTimer.current) clearTimeout(savePrefsTimer.current);
     savePrefsTimer.current = setTimeout(() => {
-      apiFetch('/auth/preferences', { method: 'PATCH', body: JSON.stringify(patch) }).catch(() => {});
+      const toSend = { ...pendingPrefs.current };
+      pendingPrefs.current = {};
+      apiFetch('/auth/preferences', { method: 'PATCH', body: JSON.stringify(toSend) }).catch(() => {});
     }, 1500);
   }, [user?.id, prefKey]);
+
+  const handleBgFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setIsUploadingBg(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const data = await apiFetch("/auth/preferences/background", { method: "POST", body: formData });
+      const rawPath = data?.bgCustomUrl as string;
+      setBgCustomUrl(resolveApiAssetUrl(rawPath) ?? null);
+      localStorage.setItem(prefKey(BG_CUSTOM_URL_KEY), rawPath);
+      setSelectedBgKey("custom");
+      savePrefs({ bgKey: "custom" });
+      toast.success("¡Fondo personalizado guardado!");
+    } catch {
+      toast.error("No se pudo subir la imagen. Inténtalo de nuevo.");
+    } finally {
+      setIsUploadingBg(false);
+    }
+  };
+
+  const handleBgDelete = async () => {
+    try {
+      await apiFetch("/auth/preferences/background", { method: "DELETE" });
+      setBgCustomUrl(null);
+      localStorage.removeItem(prefKey(BG_CUSTOM_URL_KEY));
+      if (selectedBgKey === "custom") {
+        setSelectedBgKey("default");
+        savePrefs({ bgKey: "default" });
+      }
+      toast.success("Fondo personalizado eliminado.");
+    } catch {
+      toast.error("No se pudo eliminar el fondo.");
+    }
+  };
 
   // Carga preferencias cuando el usuario cambia (login/logout/cambio de cuenta)
   useEffect(() => {
@@ -127,6 +187,11 @@ function AppContent() {
       setBgOverlay(30);
       setContainerAlpha(90);
       setContainerBlur(0);
+      setBgCustomUrl(null);
+      setAppTheme("emerald");
+      applyAppTheme("emerald");
+      setLayoutStyle("default");
+      applyLayoutStyle("default");
       return;
     }
     // Rápido: caché local del usuario (evita flash mientras llega la API)
@@ -134,19 +199,31 @@ function AppContent() {
     setBgOverlay(    Number(localStorage.getItem(prefKey(BG_OVERLAY_KEY))      ?? "30"));
     setContainerAlpha(Number(localStorage.getItem(prefKey(CONTAINER_ALPHA_KEY)) ?? "90"));
     setContainerBlur( Number(localStorage.getItem(prefKey(CONTAINER_BLUR_KEY))  ?? "0"));
+    setBgCustomUrl(resolveApiAssetUrl(localStorage.getItem(prefKey(BG_CUSTOM_URL_KEY))) ?? null);
+    const storedTheme = (localStorage.getItem(prefKey(APP_THEME_KEY)) as AppThemeId) ?? "emerald";
+    setAppTheme(storedTheme);
+    applyAppTheme(storedTheme);
+    const storedLayout = (localStorage.getItem(prefKey(LAYOUT_STYLE_KEY)) as LayoutStyleId) ?? "default";
+    setLayoutStyle(storedLayout);
+    applyLayoutStyle(storedLayout);
     // Autoritativo: backend — sincroniza entre dispositivos
     apiFetch('/auth/preferences')
-      .then(r => r.json())
       .then(data => {
         const p = data?.preferences;
         if (!p || typeof p !== 'object') return;
-        if (p.bgKey          !== undefined) { setSelectedBgKey(p.bgKey);         localStorage.setItem(prefKey(BG_STORAGE_KEY),      p.bgKey); }
-        if (p.bgOverlay      !== undefined) { setBgOverlay(p.bgOverlay);          localStorage.setItem(prefKey(BG_OVERLAY_KEY),      String(p.bgOverlay)); }
+        if (p.bgKey          !== undefined) { setSelectedBgKey(p.bgKey);          localStorage.setItem(prefKey(BG_STORAGE_KEY),      p.bgKey); }
+        if (p.bgOverlay      !== undefined) { setBgOverlay(p.bgOverlay);           localStorage.setItem(prefKey(BG_OVERLAY_KEY),      String(p.bgOverlay)); }
         if (p.containerAlpha !== undefined) { setContainerAlpha(p.containerAlpha); localStorage.setItem(prefKey(CONTAINER_ALPHA_KEY), String(p.containerAlpha)); }
-        if (p.containerBlur  !== undefined) { setContainerBlur(p.containerBlur);  localStorage.setItem(prefKey(CONTAINER_BLUR_KEY),  String(p.containerBlur)); }
+        if (p.containerBlur  !== undefined) { setContainerBlur(p.containerBlur);   localStorage.setItem(prefKey(CONTAINER_BLUR_KEY),  String(p.containerBlur)); }
+        if (p.bgCustomUrl    !== undefined) { setBgCustomUrl(resolveApiAssetUrl(p.bgCustomUrl) ?? null); localStorage.setItem(prefKey(BG_CUSTOM_URL_KEY), p.bgCustomUrl); }
+        if (p.appTheme       !== undefined) { setAppTheme(p.appTheme); applyAppTheme(p.appTheme); localStorage.setItem(prefKey(APP_THEME_KEY), p.appTheme); }
+        if (p.layoutStyle    !== undefined) { setLayoutStyle(p.layoutStyle); applyLayoutStyle(p.layoutStyle); localStorage.setItem(prefKey(LAYOUT_STYLE_KEY), p.layoutStyle); }
       })
       .catch(() => {});
   }, [user?.id, prefKey]);
+
+  useEffect(() => { applyAppTheme(appTheme); }, [appTheme]);
+  useEffect(() => { applyLayoutStyle(layoutStyle); }, [layoutStyle]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--ui-card-alpha", String(containerAlpha));
@@ -170,21 +247,28 @@ function AppContent() {
       html:not(.dark) [class*="bg-white/7"]:not([class*="rounded-full"]),
       html:not(.dark) [class*="bg-white/8"]:not([class*="rounded-full"]),
       html:not(.dark) [class*="bg-white/9"]:not([class*="rounded-full"]) {
+        background-image: none !important;
         background-color: oklch(1 0 0 / calc(${pct} / 100)) !important;
       }
       html:not(.dark) [class~="bg-secondary"]:not([class*="rounded-full"]),
       html:not(.dark) [class~="bg-muted"]:not([class*="rounded-full"]) {
+        background-image: none !important;
         background-color: oklch(0.984 0.003 247.858 / calc(${pct} / 100)) !important;
       }
-      /* bg-gradient-to-* cubre todas las direcciones (to-br, to-r, to-b, to-tr, etc.) */
-      html:not(.dark) [class*="bg-gradient-to-"]:not([class*="rounded-full"]) {
+      /* bg-gradient-to-* cubre todas las direcciones (to-br, to-r, to-b, to-tr, etc.)
+         :not(.login-page):not(.login-page *) excluye la página y sus hijos (ej. botón "Iniciar sesión")
+         :not([class*="from-emerald-"]) excluye items activos del sidebar y áreas de UI con gradiente sólido verde */
+      html:not(.dark) [class*="bg-gradient-to-"]:not([class*="rounded-full"]):not(.login-page):not(.login-page *):not([class*="from-emerald-"]) {
         background-image: none !important;
         background-color: oklch(1 0 0 / calc(${pct} / 100)) !important;
       }
 
-      /* ── Modo oscuro: contenedores oscuros/card ── */
+      /* ── Modo oscuro: contenedores oscuros/card ──
+         background-image: none elimina gradientes decorativos (ej. from-emerald-950) que
+         de otro modo se muestran encima del background-color transparente. */
       .dark [class~="bg-card"]:not([class*="rounded-full"]),
       .dark [class~="bg-background"]:not([class*="rounded-full"]) {
+        background-image: none !important;
         background-color: oklch(0.145 0 0 / calc(${pct} / 100)) !important;
       }
       /* slate-9* = slate-900..950 — contenedores oscuros principales.
@@ -193,6 +277,7 @@ function AppContent() {
       .dark [class~="bg-muted"]:not([class*="rounded-full"]),
       .dark [class*="dark:bg-slate-9"],
       .dark [class*="bg-slate-9"] {
+        background-image: none !important;
         background-color: oklch(0.145 0 0 / calc(${pct} / 100)) !important;
       }
       .dark [class*="dark:from-slate-"] {
@@ -209,7 +294,7 @@ function AppContent() {
       html:not(.dark) [class*="bg-white/9"]:not([class*="rounded-full"]),
       html:not(.dark) [class~="bg-secondary"]:not([class*="rounded-full"]),
       html:not(.dark) [class~="bg-muted"]:not([class*="rounded-full"]),
-      html:not(.dark) [class*="bg-gradient-to-"]:not([class*="rounded-full"]),
+      html:not(.dark) [class*="bg-gradient-to-"]:not([class*="rounded-full"]):not(.login-page):not(.login-page *):not([class*="from-emerald-"]),
       .dark [class~="bg-card"]:not([class*="rounded-full"]),
       .dark [class~="bg-background"]:not([class*="rounded-full"]),
       .dark [class~="bg-secondary"]:not([class*="rounded-full"]),
@@ -225,7 +310,7 @@ function AppContent() {
 
   const toggleToolbar = () => {
     setIsToolbarExpanded(prev => {
-      if (prev) setIsBgPanelOpen(false);
+      if (prev) { setIsBgPanelOpen(false); setIsThemePanelOpen(false); setIsLayoutPanelOpen(false); }
       return !prev;
     });
   };
@@ -576,33 +661,33 @@ function AppContent() {
     if (user?.role === "administrador") {
       switch (currentView) {
         case "dashboard":
-          return <AdminDashboard onNavigate={setCurrentView} />;
+          return <AdminDashboard onNavigate={setCurrentView} layoutStyle={layoutStyle} />;
         case "docentes":
-          return <DocenteManagement />;
+          return <DocenteManagement layoutStyle={layoutStyle} />;
         case "tutores":
-          return <Tutores />;
+          return <Tutores layoutStyle={layoutStyle} />;
         case "mensajes":
           return <Messages initialOpen={deferredMessageOpen} onConsume={() => setDeferredMessageOpen(null)} />;
         case "documentos":
-          return <DocumentReview initialSection="pendientes" />;
+          return <DocumentReview initialSection="pendientes" layoutStyle={layoutStyle} />;
         case "remediales":
-          return <DocumentReview initialSection="pendientes" initialForm="Remedial" />;
+          return <DocumentReview initialSection="pendientes" initialForm="Remedial" layoutStyle={layoutStyle} />;
         case "documentos-revisados":
-          return <DocumentReview initialSection="revisados" />;
+          return <DocumentReview initialSection="revisados" layoutStyle={layoutStyle} />;
         case "documentos-revisados-hoy":
-          return <DocumentReview initialSection="hoy" />;
+          return <DocumentReview initialSection="hoy" layoutStyle={layoutStyle} />;
         case "ciclos":
-          return <CiclosEscolares />;
+          return <CiclosEscolares layoutStyle={layoutStyle} />;
         case "estadias-admin":
-          return <EstadiasAdmin />;
+          return <EstadiasAdmin layoutStyle={layoutStyle} />;
         case "calendario":
-          return <CalendarioAdmin />;
+          return <CalendarioAdmin layoutStyle={layoutStyle} />;
         case "configuracion":
-          return <Configuration onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          return <Configuration onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} layoutStyle={layoutStyle} />;
         case "configuracion-cuenta":
-          return <Configuration initialTab="cuenta" onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          return <Configuration initialTab="cuenta" onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} layoutStyle={layoutStyle} />;
         default:
-          return <AdminDashboard onNavigate={setCurrentView} />;
+          return <AdminDashboard onNavigate={setCurrentView} layoutStyle={layoutStyle} />;
       }
     }
 
@@ -611,28 +696,28 @@ function AppContent() {
 
       switch (currentView) {
         case "supervisor-planeacion":
-          return <SupervisorPlaneacion />;
+          return <SupervisorPlaneacion layoutStyle={layoutStyle} />;
         case "supervisor-instrumentos":
-          return <SupervisorInstrumentos allowedSections={sections} />;
+          return <SupervisorInstrumentos allowedSections={sections} layoutStyle={layoutStyle} />;
         case "supervisor-remedial":
-          return <SupervisorDocPage title="Remedial" formCode="remedial" />;
+          return <SupervisorDocPage title="Remedial" formCode="remedial" layoutStyle={layoutStyle} />;
         case "supervisor-lista-concentrada":
-          return <SupervisorDocPage title="Lista Concentrada" formCode="lista-concentrada" />;
+          return <SupervisorDocPage title="Lista Concentrada" formCode="lista-concentrada" layoutStyle={layoutStyle} />;
         case "supervisor-asesoria":
-          return <SupervisorDocPage title="Asesoría" formCode="asesoria" />;
+          return <SupervisorDocPage title="Asesoría" formCode="asesoria" layoutStyle={layoutStyle} />;
         case "supervisor-portafolio":
-          return <SupervisorDocPage title="Portafolio Digital Final" formCode="portafolio-digital" hideColumns={['parcial']} />;
+          return <SupervisorDocPage title="Portafolio Digital Final" formCode="portafolio-digital" hideColumns={['parcial']} layoutStyle={layoutStyle} />;
         case "supervisor-acta-final":
-          return <SupervisorDocPage title="Acta Final" formCode="acta-final" hideColumns={['parcial']} />;
+          return <SupervisorDocPage title="Acta Final" formCode="acta-final" hideColumns={['parcial']} layoutStyle={layoutStyle} />;
         case "supervisor-estadias":
-          return <SupervisorDocPage title="Estadías" hideColumns={['materia', 'parcial']} formCodes={[
+          return <SupervisorDocPage title="Estadías" hideColumns={['materia', 'parcial']} layoutStyle={layoutStyle} formCodes={[
             { code: "estadias",           label: "Estadías" },
             { code: "carta-presentacion", label: "Carta de Presentación" },
             { code: "carta-aceptacion",   label: "Carta de Aceptación" },
             { code: "carta-terminacion",  label: "Carta de Terminación" },
           ]} />;
         case "supervisor-tutorias":
-          return <SupervisorDocPage title="Tutorías" hideColumns={['materia', 'carrera', 'grupo', 'parcial']} formCodes={[
+          return <SupervisorDocPage title="Tutorías" hideColumns={['materia', 'carrera', 'grupo', 'parcial']} layoutStyle={layoutStyle} formCodes={[
             { code: "carga-academica",        label: "Carga Académica" },
             { code: "reporte-bajas",          label: "Reporte de Bajas" },
             { code: "concentrado-asesorias",  label: "Concentrado de Asesorías" },
@@ -760,6 +845,7 @@ function AppContent() {
               mobileOpen={mobileSidebarOpen}
               onMobileOpenChange={setMobileSidebarOpen}
               onLogoutRequest={safeLogout}
+              layoutStyle={layoutStyle}
             />
             <main className="relative flex-1 overflow-y-auto bg-transparent">
               <div className="pointer-events-none absolute inset-0 overflow-hidden" />
@@ -826,6 +912,215 @@ function AppContent() {
               </AlertDialogContent>
             </AlertDialog>
 
+            {/* Panel selector de diseño / estructura */}
+            {isLayoutPanelOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsLayoutPanelOpen(false)} />
+                <div className="fixed bottom-4 right-[3.5rem] z-50 w-72 rounded-2xl border border-border/60 bg-background/95 p-4 shadow-2xl backdrop-blur-xl">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Diseño del sistema</span>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Vinculado a tu cuenta</p>
+                    </div>
+                    <button onClick={() => setIsLayoutPanelOpen(false)} className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <X className="h-3.5 w-3.5 text-slate-500" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Clásico */}
+                    <button
+                      onClick={() => { setLayoutStyle("default"); savePrefs({ layoutStyle: "default" }); }}
+                      className={`flex flex-col items-center gap-2 rounded-xl border-2 p-2 transition-all ${
+                        layoutStyle === "default"
+                          ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/30"
+                          : "border-transparent bg-slate-50 dark:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="w-full overflow-hidden rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                        <svg width="100%" viewBox="0 0 110 72" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="2" y="2" width="22" height="68" rx="8" fill="#d1fae5" stroke="#6ee7b7" strokeWidth="0.5"/>
+                          <rect x="5" y="11" width="16" height="5" rx="2.5" fill="#10b981"/>
+                          <rect x="5" y="20" width="16" height="3" rx="1.5" fill="#a7f3d0"/>
+                          <rect x="5" y="26" width="16" height="3" rx="1.5" fill="#a7f3d0"/>
+                          <rect x="5" y="32" width="16" height="3" rx="1.5" fill="#a7f3d0"/>
+                          <rect x="5" y="38" width="16" height="3" rx="1.5" fill="#a7f3d0"/>
+                          <rect x="28" y="2" width="80" height="16" rx="6" fill="#ecfdf5" stroke="#a7f3d0" strokeWidth="0.5"/>
+                          <rect x="32" y="6" width="40" height="4" rx="2" fill="#6ee7b7"/>
+                          <rect x="28" y="22" width="18" height="16" rx="4" fill="#f0fdf4" stroke="#d1fae5" strokeWidth="0.5"/>
+                          <rect x="49" y="22" width="18" height="16" rx="4" fill="#f0fdf4" stroke="#d1fae5" strokeWidth="0.5"/>
+                          <rect x="70" y="22" width="18" height="16" rx="4" fill="#f0fdf4" stroke="#d1fae5" strokeWidth="0.5"/>
+                          <rect x="91" y="22" width="17" height="16" rx="4" fill="#f0fdf4" stroke="#d1fae5" strokeWidth="0.5"/>
+                          <rect x="28" y="42" width="38" height="28" rx="6" fill="#f0fdf4" stroke="#d1fae5" strokeWidth="0.5"/>
+                          <rect x="70" y="42" width="38" height="28" rx="6" fill="#f0fdf4" stroke="#d1fae5" strokeWidth="0.5"/>
+                        </svg>
+                      </div>
+                      <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">Clásico</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">Predeterminado</span>
+                      {layoutStyle === "default" && (
+                        <div className="rounded-full bg-emerald-500 p-0.5"><Check className="h-2.5 w-2.5 text-white" /></div>
+                      )}
+                    </button>
+
+                    {/* Empresarial */}
+                    <button
+                      onClick={() => { setLayoutStyle("formal"); savePrefs({ layoutStyle: "formal" }); }}
+                      className={`flex flex-col items-center gap-2 rounded-xl border-2 p-2 transition-all ${
+                        layoutStyle === "formal"
+                          ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/30"
+                          : "border-transparent bg-slate-50 dark:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="w-full overflow-hidden rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                        <svg width="100%" viewBox="0 0 110 72" xmlns="http://www.w3.org/2000/svg">
+                          {/* Sidebar plano */}
+                          <rect x="0" y="0" width="22" height="72" fill="#f8fafc"/>
+                          <line x1="22" y1="0" x2="22" y2="72" stroke="#e2e8f0" strokeWidth="1"/>
+                          {/* Logo */}
+                          <rect x="3" y="3" width="16" height="4" rx="0" fill="#e2e8f0"/>
+                          {/* Item activo con indicador lateral */}
+                          <rect x="0" y="11" width="2.5" height="5" fill="#10b981"/>
+                          <rect x="4" y="11" width="15" height="4" rx="0" fill="#dbeafe"/>
+                          {/* Etiqueta GESTIÓN */}
+                          <rect x="4" y="18" width="9" height="1.5" rx="0" fill="#94a3b8"/>
+                          <rect x="4" y="21" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
+                          <rect x="4" y="25" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
+                          {/* Etiqueta ACADÉMICO */}
+                          <rect x="4" y="30" width="9" height="1.5" rx="0" fill="#94a3b8"/>
+                          <rect x="4" y="33" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
+                          <rect x="4" y="37" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
+                          <rect x="4" y="41" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
+                          {/* Etiqueta SISTEMA */}
+                          <rect x="4" y="46" width="9" height="1.5" rx="0" fill="#94a3b8"/>
+                          <rect x="4" y="49" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
+                          <rect x="4" y="53" width="15" height="2.5" rx="0" fill="#e2e8f0"/>
+
+                          {/* Encabezado plano: título + subtítulo + línea inferior */}
+                          <rect x="25" y="4" width="32" height="3.5" rx="0" fill="#1e293b"/>
+                          <rect x="25" y="9" width="44" height="2" rx="0" fill="#94a3b8"/>
+                          <line x1="22" y1="14" x2="110" y2="14" stroke="#e2e8f0" strokeWidth="0.8"/>
+
+                          {/* Barra de stats: 4 celdas rectangulares unidas */}
+                          <rect x="24" y="17" width="84" height="11" rx="0" fill="#ffffff" stroke="#e2e8f0" strokeWidth="0.5"/>
+                          <line x1="45" y1="17" x2="45" y2="28" stroke="#e2e8f0" strokeWidth="0.5"/>
+                          <line x1="66" y1="17" x2="66" y2="28" stroke="#e2e8f0" strokeWidth="0.5"/>
+                          <line x1="87" y1="17" x2="87" y2="28" stroke="#e2e8f0" strokeWidth="0.5"/>
+                          {/* Valores de stats */}
+                          <rect x="27" y="19" width="9" height="1.5" rx="0" fill="#94a3b8"/>
+                          <rect x="27" y="22" width="7" height="3" rx="0" fill="#1e293b"/>
+                          <rect x="48" y="19" width="9" height="1.5" rx="0" fill="#94a3b8"/>
+                          <rect x="48" y="22" width="7" height="3" rx="0" fill="#1e293b"/>
+                          <rect x="69" y="19" width="9" height="1.5" rx="0" fill="#94a3b8"/>
+                          <rect x="69" y="22" width="7" height="3" rx="0" fill="#1e293b"/>
+                          <rect x="90" y="19" width="9" height="1.5" rx="0" fill="#94a3b8"/>
+                          <rect x="90" y="22" width="7" height="3" rx="0" fill="#10b981"/>
+
+                          {/* Tabla de documentos pendientes */}
+                          <rect x="24" y="31" width="56" height="39" rx="0" fill="#ffffff" stroke="#e2e8f0" strokeWidth="0.5"/>
+                          {/* Cabecera de tabla */}
+                          <rect x="24" y="31" width="56" height="6" rx="0" fill="#f8fafc"/>
+                          <line x1="24" y1="37" x2="80" y2="37" stroke="#e2e8f0" strokeWidth="0.5"/>
+                          <rect x="27" y="33" width="10" height="2" rx="0" fill="#94a3b8"/>
+                          <rect x="40" y="33" width="9" height="2" rx="0" fill="#94a3b8"/>
+                          <rect x="52" y="33" width="9" height="2" rx="0" fill="#94a3b8"/>
+                          {/* Filas de tabla */}
+                          <rect x="27" y="40" width="10" height="2" rx="0" fill="#1e293b"/>
+                          <rect x="40" y="40" width="8" height="2" rx="0" fill="#64748b"/>
+                          <rect x="52" y="40" width="7" height="2" rx="0" fill="#10b981"/>
+                          <line x1="24" y1="44" x2="80" y2="44" stroke="#f1f5f9" strokeWidth="0.5"/>
+                          <rect x="27" y="47" width="10" height="2" rx="0" fill="#1e293b"/>
+                          <rect x="40" y="47" width="8" height="2" rx="0" fill="#64748b"/>
+                          <rect x="52" y="47" width="7" height="2" rx="0" fill="#f59e0b"/>
+                          <line x1="24" y1="51" x2="80" y2="51" stroke="#f1f5f9" strokeWidth="0.5"/>
+                          <rect x="27" y="54" width="10" height="2" rx="0" fill="#1e293b"/>
+                          <rect x="40" y="54" width="8" height="2" rx="0" fill="#64748b"/>
+                          <rect x="52" y="54" width="7" height="2" rx="0" fill="#94a3b8"/>
+                          <line x1="24" y1="58" x2="80" y2="58" stroke="#f1f5f9" strokeWidth="0.5"/>
+                          <rect x="27" y="61" width="10" height="2" rx="0" fill="#1e293b"/>
+                          <rect x="40" y="61" width="8" height="2" rx="0" fill="#64748b"/>
+                          <rect x="52" y="61" width="7" height="2" rx="0" fill="#94a3b8"/>
+                          <line x1="24" y1="65" x2="80" y2="65" stroke="#f1f5f9" strokeWidth="0.5"/>
+                          <rect x="27" y="67" width="10" height="2" rx="0" fill="#1e293b"/>
+                          <rect x="40" y="67" width="8" height="2" rx="0" fill="#64748b"/>
+                          <rect x="52" y="67" width="7" height="2" rx="0" fill="#94a3b8"/>
+
+                          {/* Lista de actividad reciente */}
+                          <rect x="82" y="31" width="26" height="39" rx="0" fill="#ffffff" stroke="#e2e8f0" strokeWidth="0.5"/>
+                          <rect x="85" y="34" width="15" height="2" rx="0" fill="#1e293b"/>
+                          <line x1="82" y1="38" x2="108" y2="38" stroke="#e2e8f0" strokeWidth="0.5"/>
+                          <circle cx="86" cy="42" r="1.5" fill="#10b981"/>
+                          <rect x="89" y="40" width="15" height="2" rx="0" fill="#1e293b"/>
+                          <rect x="89" y="43" width="11" height="1.5" rx="0" fill="#94a3b8"/>
+                          <line x1="82" y1="47" x2="108" y2="47" stroke="#e2e8f0" strokeWidth="0.5"/>
+                          <circle cx="86" cy="51" r="1.5" fill="#f59e0b"/>
+                          <rect x="89" y="49" width="15" height="2" rx="0" fill="#1e293b"/>
+                          <rect x="89" y="52" width="11" height="1.5" rx="0" fill="#94a3b8"/>
+                          <line x1="82" y1="56" x2="108" y2="56" stroke="#e2e8f0" strokeWidth="0.5"/>
+                          <circle cx="86" cy="60" r="1.5" fill="#3b82f6"/>
+                          <rect x="89" y="58" width="15" height="2" rx="0" fill="#1e293b"/>
+                          <rect x="89" y="61" width="11" height="1.5" rx="0" fill="#94a3b8"/>
+                          <line x1="82" y1="65" x2="108" y2="65" stroke="#e2e8f0" strokeWidth="0.5"/>
+                          <circle cx="86" cy="69" r="1.5" fill="#8b5cf6"/>
+                          <rect x="89" y="67" width="15" height="2" rx="0" fill="#1e293b"/>
+                        </svg>
+                      </div>
+                      <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">Empresarial</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">Formal y ordenado</span>
+                      {layoutStyle === "formal" && (
+                        <div className="rounded-full bg-emerald-500 p-0.5"><Check className="h-2.5 w-2.5 text-white" /></div>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Panel selector de tema */}
+            {isThemePanelOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsThemePanelOpen(false)} />
+                <div className="fixed bottom-4 right-[3.5rem] z-50 w-64 rounded-2xl border border-border/60 bg-background/95 p-4 shadow-2xl backdrop-blur-xl">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Tema de color</span>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Vinculado a tu cuenta</p>
+                    </div>
+                    <button
+                      onClick={() => setIsThemePanelOpen(false)}
+                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {APP_THEMES.map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => { setAppTheme(t.id); savePrefs({ appTheme: t.id }); }}
+                        className={`flex flex-col items-center gap-1.5 rounded-xl border-2 px-2 py-3 transition-all ${
+                          appTheme === t.id
+                            ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/30"
+                            : "border-transparent bg-slate-50 dark:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700"
+                        }`}
+                      >
+                        <div
+                          className="h-8 w-8 rounded-full shadow ring-2 ring-white dark:ring-slate-800"
+                          style={{ backgroundColor: t.preview }}
+                        />
+                        <span className="text-[10px] font-semibold leading-tight text-slate-700 dark:text-slate-200">{t.label}</span>
+                        <span className="text-[9px] leading-tight text-slate-400 dark:text-slate-500">{t.description}</span>
+                        {appTheme === t.id && (
+                          <div className="rounded-full bg-emerald-500 p-0.5">
+                            <Check className="h-2.5 w-2.5 text-white" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* Panel selector de fondo */}
             {isBgPanelOpen && (
               <>
@@ -861,7 +1156,71 @@ function AppContent() {
                         )}
                       </button>
                     ))}
+
+                    {/* Slot de imagen personalizada */}
+                    {bgCustomUrl ? (
+                      <div className="relative">
+                        <button
+                          onClick={() => { setSelectedBgKey("custom"); savePrefs({ bgKey: "custom" }); }}
+                          className={`relative aspect-video w-full overflow-hidden rounded-xl border-2 transition-all ${
+                            selectedBgKey === "custom"
+                              ? "border-emerald-500 ring-2 ring-emerald-500/30"
+                              : "border-transparent hover:border-slate-300 dark:hover:border-slate-600"
+                          }`}
+                        >
+                          <img src={bgCustomUrl ?? undefined} alt="Mi fondo" className="h-full w-full object-cover" />
+                          <div className="absolute inset-0 bg-black/25" />
+                          <span className="absolute bottom-1 left-0 right-0 text-center text-[10px] font-semibold text-white drop-shadow">Mi fondo</span>
+                          {selectedBgKey === "custom" && (
+                            <div className="absolute right-1 top-1 rounded-full bg-emerald-500 p-0.5">
+                              <Check className="h-2.5 w-2.5 text-white" />
+                            </div>
+                          )}
+                        </button>
+                        <button
+                          onClick={handleBgDelete}
+                          title="Eliminar fondo personalizado"
+                          className="absolute left-1 top-1 rounded-full bg-black/60 p-0.5 text-white hover:bg-rose-600 transition-colors"
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => bgFileInputRef.current?.click()}
+                        disabled={isUploadingBg}
+                        className="relative aspect-video overflow-hidden rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 flex flex-col items-center justify-center gap-1 text-slate-400 hover:border-emerald-400 hover:text-emerald-500 dark:hover:border-emerald-500 transition-all disabled:opacity-50"
+                      >
+                        {isUploadingBg
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <Upload className="h-4 w-4" />
+                        }
+                        <span className="text-[9px] font-semibold">{isUploadingBg ? "Subiendo..." : "Subir imagen"}</span>
+                      </button>
+                    )}
                   </div>
+
+                  {/* Input oculto para seleccionar archivo */}
+                  <input
+                    ref={bgFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleBgFileChange}
+                  />
+
+                  {/* Botón para cambiar imagen si ya existe una personalizada */}
+                  {bgCustomUrl && (
+                    <button
+                      onClick={() => bgFileInputRef.current?.click()}
+                      disabled={isUploadingBg}
+                      className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 py-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+                    >
+                      {isUploadingBg ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      {isUploadingBg ? "Subiendo..." : "Cambiar imagen personalizada"}
+                    </button>
+                  )}
+
                   <div className="mb-4">
                     <div className="mb-1.5 flex items-center justify-between">
                       <span className="text-xs text-slate-500 dark:text-slate-400">Oscurecer fondo</span>
@@ -910,6 +1269,24 @@ function AppContent() {
                       <span>Cristal esmerilado</span>
                     </div>
                   </div>
+
+                  {/* Botón restablecer valores predeterminados */}
+                  <div className="border-t border-border/40 pt-3">
+                    <button
+                      onClick={() => {
+                        setSelectedBgKey("default");
+                        setBgOverlay(30);
+                        setContainerAlpha(90);
+                        setContainerBlur(0);
+                        setAppTheme("emerald");
+                        savePrefs({ bgKey: "default", bgOverlay: 30, containerAlpha: 90, containerBlur: 0, appTheme: "emerald" });
+                      }}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 py-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      Restablecer predeterminado
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -932,7 +1309,7 @@ function AppContent() {
                 onClick={toggleToolbar}
                 aria-label={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
                 title={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
-                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#3BBF82]/50 bg-white/85 text-emerald-700 shadow-md backdrop-blur transition-colors hover:bg-white hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900"
               >
                 <ChevronUp className={`h-4 w-4 transition-transform duration-200 ${isToolbarExpanded ? "rotate-180" : ""}`} />
               </button>
@@ -940,10 +1317,32 @@ function AppContent() {
               {/* Botones colapsables */}
               {isToolbarExpanded && (
                 <>
+                  {/* Diseño / Estructura */}
+                  <Button
+                    type="button" variant="outline" size="icon"
+                    onClick={() => { setIsBgPanelOpen(false); setIsThemePanelOpen(false); setIsLayoutPanelOpen(p => !p); }}
+                    aria-label="Cambiar diseño del sistema"
+                    title="Cambiar diseño del sistema"
+                    className={`h-9 w-9 rounded-full border border-[#3BBF82]/60 bg-white/85 shadow-lg backdrop-blur hover:bg-white dark:border-emerald-700/60 dark:bg-slate-900/85 dark:hover:bg-slate-900 animate-in fade-in slide-in-from-bottom-2 duration-150 ${isLayoutPanelOpen ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"}`}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+
+                  {/* Tema de color */}
+                  <Button
+                    type="button" variant="outline" size="icon"
+                    onClick={() => { setIsBgPanelOpen(false); setIsLayoutPanelOpen(false); setIsThemePanelOpen(p => !p); }}
+                    aria-label="Cambiar tema de color"
+                    title="Cambiar tema de color"
+                    className={`h-9 w-9 rounded-full border border-[#3BBF82]/60 bg-white/85 shadow-lg backdrop-blur hover:bg-white dark:border-emerald-700/60 dark:bg-slate-900/85 dark:hover:bg-slate-900 animate-in fade-in slide-in-from-bottom-2 duration-150 ${isThemePanelOpen ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"}`}
+                  >
+                    <Palette className="h-4 w-4" />
+                  </Button>
+
                   {/* Fondo de pantalla */}
                   <Button
                     type="button" variant="outline" size="icon"
-                    onClick={() => setIsBgPanelOpen(p => !p)}
+                    onClick={() => { setIsThemePanelOpen(false); setIsLayoutPanelOpen(false); setIsBgPanelOpen(p => !p); }}
                     aria-label="Cambiar fondo de pantalla"
                     title="Cambiar fondo de pantalla"
                     className={`h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:hover:bg-slate-900 animate-in fade-in slide-in-from-bottom-2 duration-150 ${isBgPanelOpen ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"}`}
@@ -958,7 +1357,7 @@ function AppContent() {
                       onClick={() => setShowTourConfirm("admin")}
                       aria-label="Iniciar tutorial del sistema"
                       title="Iniciar tutorial del sistema"
-                      className="h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                      className="h-9 w-9 rounded-full border border-[#3BBF82]/60 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:border-emerald-700/60 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900 animate-in fade-in slide-in-from-bottom-2 duration-150"
                     >
                       <HelpCircle className="h-4 w-4" />
                     </Button>
@@ -969,7 +1368,7 @@ function AppContent() {
                       onClick={() => setShowTourConfirm("docente")}
                       aria-label="Iniciar tutorial del sistema"
                       title="Iniciar tutorial del sistema"
-                      className="h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                      className="h-9 w-9 rounded-full border border-[#3BBF82]/60 bg-white/85 text-emerald-600 shadow-lg backdrop-blur hover:bg-white hover:text-emerald-700 dark:border-emerald-700/60 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900 animate-in fade-in slide-in-from-bottom-2 duration-150"
                     >
                       <HelpCircle className="h-4 w-4" />
                     </Button>

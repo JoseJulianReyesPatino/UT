@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
+import { cn } from "../../../lib/utils";
 import { PendingDocumentSkeleton, ActivitySkeleton, StatsGridSkeleton } from "./skeletons";
 import FormNotFoundImg from "../../../assets/elementos/Form_Not_Found.webp";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
@@ -23,6 +24,7 @@ type AdminView = "dashboard" | "docentes" | "documentos" | "documentos-revisados
 
 interface AdminDashboardProps {
   onNavigate: (view: AdminView) => void;
+  layoutStyle?: string;
 }
 
 type PendingDocument = {
@@ -283,7 +285,7 @@ const StatsGrid = React.memo(function StatsGrid({ stats, onNavigate }: { stats: 
             className="text-left rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Card className={`h-full overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-sm transform-gpu transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer ${stat.cardClass}`}>
-              <div className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
+              <div data-component="stats-accent-bar" className={`h-1 bg-gradient-to-r ${stat.accentClass}`} />
               <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="text-xs font-semibold leading-tight text-foreground sm:text-sm">{stat.title}</CardTitle>
                 <div className={`h-9 w-9 rounded-xl ${stat.bgColor} flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5 sm:h-10 sm:w-10`}>
@@ -392,7 +394,7 @@ const ActivityList = React.memo(function ActivityList({ items, onOpen }: { items
   );
 });
 
-export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
+export function AdminDashboard({ onNavigate, layoutStyle }: Readonly<AdminDashboardProps>) {
   const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
   const [reviewedDocuments, setReviewedDocuments] = useState<ReviewedDocument[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
@@ -561,7 +563,7 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   const openActivity = useCallback((activity: ActivityItem) => {
     sessionStorage.setItem("adminHighlightDocumentId", String(activity.relatedDocumentId));
     const targetView = resolveAdminViewForDoc(activity.rawApartadoLabel, activity.type);
-    onNavigate(targetView);
+    onNavigate(targetView as AdminView);
   }, [onNavigate]);
 
   useEffect(() => {
@@ -609,53 +611,190 @@ export function AdminDashboard({ onNavigate }: Readonly<AdminDashboardProps>) {
   }, []);
 
   return (
-    <div className="relative space-y-6 overflow-hidden">
-      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
-        <div className="relative space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Panel Administrativo</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">Gestión y supervisión del sistema académico con acceso rápido a documentos y actividad.</p>
+    <div className={cn("relative overflow-hidden", layoutStyle === "formal" ? "space-y-4" : "space-y-6")}>
+      {layoutStyle === "formal" ? (
+        <div className="flex items-start justify-between border-b border-slate-200 bg-card p-5 dark:border-slate-800">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">Panel Administrativo</h1>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Gestión y supervisión del sistema académico</p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
+          <div className="relative space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Panel Administrativo</h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Gestión y supervisión del sistema académico con acceso rápido a documentos y actividad.</p>
+          </div>
+        </div>
+      )}
 
-      {isLoading ? <StatsGridSkeleton /> : <StatsGrid stats={stats} onNavigate={onNavigate} />}
+      {layoutStyle === "formal" ? (
+        <>
+          {/* Barra de métricas horizontal */}
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-slate-200 bg-slate-200 sm:grid-cols-4 dark:border-slate-800 dark:bg-slate-800">
+            {isLoading
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-[84px] animate-pulse bg-white dark:bg-slate-950" />
+                ))
+              : stats.map((stat) => {
+                  const Icon = stat.icon;
+                  return (
+                    <button
+                      key={stat.title}
+                      type="button"
+                      onClick={() => onNavigate(stat.action)}
+                      className="flex flex-col gap-0.5 bg-white px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:bg-slate-950 dark:hover:bg-slate-900/80"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">{stat.title}</p>
+                        <Icon className={`h-3.5 w-3.5 ${stat.color}`} aria-hidden />
+                      </div>
+                      <p className="mt-1 text-2xl font-bold leading-none text-slate-900 dark:text-slate-50">{stat.value}</p>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500">{stat.description}</p>
+                    </button>
+                  );
+                })}
+          </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card data-tour="admin-dashboard-pending" className="overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md">
-          <CardHeader>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="text-foreground">Documentos Pendientes de Revisión</CardTitle>
-              <Badge variant="warning" className="self-start sm:self-auto">{pendingDocuments.length}</Badge>
+          {/* Tabla de documentos pendientes */}
+          <div className="overflow-hidden rounded-sm border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-800">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Documentos Pendientes de Revisión</h2>
+                <p className="text-xs text-slate-400 dark:text-slate-500">Requieren tu aprobación</p>
+              </div>
+              {pendingDocuments.filter((d) => !d.revisado).length > 0 && (
+                <span className="rounded-sm bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+                  {pendingDocuments.filter((d) => !d.revisado).length} pendiente{pendingDocuments.filter((d) => !d.revisado).length !== 1 ? "s" : ""}
+                </span>
+              )}
             </div>
-            <CardDescription>Requieren tu aprobación</CardDescription>
-          </CardHeader>
-          <CardContent>
             {isLoading ? (
-              <PendingDocumentSkeleton />
-            ) : pendingDocuments.length === 0 ? (
-              <DashboardEmptyState text="No hay documentos pendientes por revisar." />
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-12 animate-pulse px-5 py-3">
+                    <div className="h-4 w-3/4 rounded bg-slate-100 dark:bg-slate-800" />
+                  </div>
+                ))}
+              </div>
+            ) : pendingDocuments.filter((d) => !d.revisado).length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-slate-400">No hay documentos pendientes de revisión.</p>
             ) : (
-              <PendingList items={pendingDocuments} onOpen={openDocument} />
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50 dark:border-slate-800/70 dark:bg-slate-900/50">
+                      <th className="px-5 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Documento</th>
+                      <th className="px-5 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Docente</th>
+                      <th className="hidden px-5 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500 md:table-cell">Carrera</th>
+                      <th className="hidden px-5 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:table-cell">Enviado</th>
+                      <th className="px-5 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                    {pendingDocuments.filter((d) => !d.revisado).map((doc) => (
+                      <tr key={doc.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40">
+                        <td className="max-w-[180px] truncate px-5 py-3 font-medium text-slate-800 dark:text-slate-200">{doc.documento}</td>
+                        <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{doc.docente}</td>
+                        <td className="hidden px-5 py-3 text-slate-400 dark:text-slate-500 md:table-cell">{doc.carrera || "—"}</td>
+                        <td className="hidden whitespace-nowrap px-5 py-3 text-slate-400 dark:text-slate-500 sm:table-cell">{formatDateTime(doc.submittedAt)}</td>
+                        <td className="px-5 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openDocument(doc)}
+                            className="text-xs font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                          >
+                            Revisar →
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card data-tour="admin-dashboard-activity" className="overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md">
-          <CardHeader>
-            <CardTitle className="text-foreground">Actividad Reciente</CardTitle>
-            <CardDescription>Últimas acciones en el sistema</CardDescription>
-          </CardHeader>
-          <CardContent>
+          {/* Lista compacta de actividad reciente */}
+          <div className="overflow-hidden rounded-sm border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="border-b border-slate-200 px-5 py-3 dark:border-slate-800">
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Actividad Reciente</h2>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Últimas acciones en el sistema</p>
+            </div>
             {isLoading ? (
-              <ActivitySkeleton />
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-10 animate-pulse px-5 py-3">
+                    <div className="h-3 w-1/2 rounded bg-slate-100 dark:bg-slate-800" />
+                  </div>
+                ))}
+              </div>
             ) : recentActivity.length === 0 ? (
-              <DashboardEmptyState text="Sin actividad reciente en el sistema." />
+              <p className="px-5 py-6 text-center text-sm text-slate-400">Sin actividad reciente en el sistema.</p>
             ) : (
-              <ActivityList items={recentActivity} onOpen={openActivity} />
+              <div className="grid grid-cols-1 divide-y divide-slate-100 dark:divide-slate-800/50 sm:grid-cols-2 sm:divide-y-0">
+                {recentActivity.slice(0, 8).map((activity) => (
+                  <button
+                    key={activity.id}
+                    type="button"
+                    onClick={() => openActivity(activity)}
+                    className="flex items-center gap-3 border-b border-slate-100 px-5 py-2.5 text-left transition-colors hover:bg-slate-50 dark:border-slate-800/50 dark:hover:bg-slate-900/40"
+                  >
+                    <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-slate-700 dark:text-slate-300">{activity.title}</p>
+                      <p className="truncate text-xs text-slate-400">{activity.description}</p>
+                    </div>
+                    <p className="shrink-0 text-xs text-slate-400">{formatRelativeTime(activity.timestamp)}</p>
+                  </button>
+                ))}
+              </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {isLoading ? <StatsGridSkeleton /> : <StatsGrid stats={stats} onNavigate={onNavigate} />}
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card data-tour="admin-dashboard-pending" className="overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md">
+              <CardHeader>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-foreground">Documentos Pendientes de Revisión</CardTitle>
+                  <Badge variant="warning" className="self-start sm:self-auto">{pendingDocuments.length}</Badge>
+                </div>
+                <CardDescription>Requieren tu aprobación</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <PendingDocumentSkeleton />
+                ) : pendingDocuments.length === 0 ? (
+                  <DashboardEmptyState text="No hay documentos pendientes por revisar." />
+                ) : (
+                  <PendingList items={pendingDocuments} onOpen={openDocument} />
+                )}
+              </CardContent>
+            </Card>
+
+            <Card data-tour="admin-dashboard-activity" className="overflow-hidden rounded-[22px] border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md">
+              <CardHeader>
+                <CardTitle className="text-foreground">Actividad Reciente</CardTitle>
+                <CardDescription>Últimas acciones en el sistema</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <ActivitySkeleton />
+                ) : recentActivity.length === 0 ? (
+                  <DashboardEmptyState text="Sin actividad reciente en el sistema." />
+                ) : (
+                  <ActivityList items={recentActivity} onOpen={openActivity} />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
 
       {/* Dialog de vista previa de documento pendiente */}
       <Dialog open={Boolean(selectedDocument)} onOpenChange={(open) => { if (!open) setSelectedDocument(null); }}>

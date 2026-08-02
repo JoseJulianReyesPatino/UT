@@ -106,6 +106,14 @@ const apiOrigin = (() => {
 
 export const AUTH_TOKEN_STORAGE_KEY = "utslrc-auth-token";
 
+// ngrok muestra una página de advertencia en el browser que bloquea imágenes cargadas via CSS.
+// El header "ngrok-skip-browser-warning" evita esto en fetch/XHR, pero no en <img src> ni backgroundImage.
+// El query param equivalente sí funciona para cualquier tipo de request del browser.
+const withNgrokBypass = (url: string): string => {
+  if (!url.includes("ngrok")) return url;
+  return url + (url.includes("?") ? "&" : "?") + "ngrok-skip-browser-warning=true";
+};
+
 export const resolveApiAssetUrl = (value?: string | null) => {
   if (!value) return undefined;
 
@@ -114,7 +122,7 @@ export const resolveApiAssetUrl = (value?: string | null) => {
     /^data:/i.test(value) ||
     /^blob:/i.test(value)
   ) {
-    return value;
+    return withNgrokBypass(value);
   }
 
   if (
@@ -134,8 +142,8 @@ export const resolveApiAssetUrl = (value?: string | null) => {
   }
 
   if (correctedValue.startsWith("/")) {
-    return `${apiOrigin}${correctedValue}`;
+    return withNgrokBypass(`${apiOrigin}${correctedValue}`);
   }
 
-  return `${apiOrigin}/${correctedValue}`;
+  return withNgrokBypass(`${apiOrigin}/${correctedValue}`);
 };

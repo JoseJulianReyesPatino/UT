@@ -7,8 +7,13 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Calendar as CalendarUI } from "../../components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { SearchableSelect } from "../../components/SearchableSelect";
-import { AlertTriangle, Calendar, Check, ChevronLeft, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
+import { AlertTriangle, Calendar, CalendarDays, Check, ChevronLeft, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
+import { format, isValid } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "../../components/ui/utils";
 import { toast } from "sonner";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { ResponsiveActionButton } from "../../components/ResponsiveActionButton";
@@ -17,6 +22,45 @@ import { apiFetch } from "../../lib/api";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { carrieras } from "../../data/curricula";
 import { useTourActive } from "../../context/TourContext";
+
+function CycleDatePicker({ value, onChange, placeholder }: { value: string; onChange: (date: string) => void; placeholder?: string }) {
+  const [open, setOpen] = useState(false);
+  const rawDate = value ? new Date(`${value}T00:00:00`) : undefined;
+  const selected = rawDate && isValid(rawDate) ? rawDate : undefined;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-normal h-9 px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100",
+            !selected && "text-muted-foreground",
+          )}
+        >
+          <CalendarDays className="mr-2 h-4 w-4 shrink-0 opacity-70" />
+          {selected ? format(selected, "dd/MM/yyyy", { locale: es }) : (placeholder ?? "Selecciona una fecha")}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <CalendarUI
+          mode="single"
+          selected={selected}
+          onSelect={(date) => {
+            if (date) {
+              const pad = (n: number) => String(n).padStart(2, "0");
+              onChange(`${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`);
+            } else {
+              onChange("");
+            }
+            setOpen(false);
+          }}
+          locale={es}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 type CycleStatus = "activo" | "cerrado";
 
@@ -322,7 +366,10 @@ function TourFakeCicloCard({ isFirst }: { isFirst: boolean }) {
   );
 }
 
-export function CiclosEscolares() {
+interface CiclosEscolaresProps { layoutStyle?: string; }
+
+export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
+  const isFormal = layoutStyle === "formal";
   const { isAdminTourActive } = useTourActive();
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -1533,8 +1580,202 @@ export function CiclosEscolares() {
   }, [ciclos]);
 
   return (
-    <div className="relative space-y-6 overflow-hidden">
-      <div className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <>
+      {isFormal ? (
+        <div className="flex h-[calc(100vh-64px)] flex-col overflow-hidden bg-card text-foreground dark:bg-slate-950">
+        {/* Encabezado plano */}
+        <div className="shrink-0 flex flex-col gap-3 border-b border-border bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-slate-800 dark:bg-slate-950">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Ciclos Escolares</h1>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Administra los períodos académicos del sistema.</p>
+          </div>
+          <Button data-tour="admin-ciclos-new-btn" variant="success" size="sm" onClick={() => setShowNewDialog(true)} className="self-start gap-1.5 rounded-sm text-xs sm:self-auto">
+            <Plus className="h-3.5 w-3.5" />Nuevo Ciclo
+          </Button>
+        </div>
+
+        {/* Contenido: tabla de ciclos */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
+          {!isAdminTourActive && isLoadingCycles && <CycleCardSkeleton />}
+          {!isAdminTourActive && cyclesLoadError && (
+            <div className="rounded-sm border border-destructive/40 bg-destructive/5 p-8 text-center text-sm text-destructive">{cyclesLoadError}</div>
+          )}
+          {!isAdminTourActive && !isLoadingCycles && !cyclesLoadError && ciclos.length === 0 && (
+            <div className="rounded-sm border border-dashed border-border bg-muted/30 p-10 text-center text-muted-foreground">
+              <p className="font-medium">No hay ciclos escolares registrados</p>
+              <p className="mt-1 text-sm">Crea el primer ciclo con el botón "Nuevo Ciclo".</p>
+            </div>
+          )}
+
+          {(!isAdminTourActive && !isLoadingCycles && !cyclesLoadError && ciclos.length > 0) && (
+            <>
+              {/* Vista móvil — cards compactos */}
+              <div data-tour="admin-ciclos-list" className="sm:hidden divide-y divide-border/40 border border-border/70 dark:divide-slate-800/60 dark:border-slate-800">
+                {ciclos.map((ciclo) => {
+                  const documentsCount = cycleDocumentCount(ciclo);
+                  const isActivo = ciclo.status === "activo";
+                  return (
+                    <div key={ciclo.id} className="flex items-center gap-3 px-3 py-3 cursor-pointer transition-colors hover:bg-muted/30 dark:hover:bg-slate-800/20" onClick={() => openDocsForCycle(ciclo)}>
+                      <div className={`h-10 w-1 shrink-0 self-stretch rounded-full ${isActivo ? "bg-emerald-500 dark:bg-emerald-400" : "bg-slate-300 dark:bg-slate-600"}`} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{ciclo.nombre}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{ciclo.anio} · {ciclo.periodo}</p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => openDocsForCycle(ciclo)}>
+                                  <FileText className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Ver documentos</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => openEditDialog(ciclo)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Editar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-rose-400 hover:text-rose-600" onClick={() => openDeleteDialog(ciclo)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Eliminar</TooltipContent>
+                            </Tooltip>
+                            {isActivo ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-slate-400 hover:text-slate-600" onClick={() => confirmAction("close", ciclo)}>
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Cerrar ciclo</TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-emerald-500 hover:text-emerald-700" onClick={() => confirmAction("activate", ciclo)}>
+                                    <Check className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Activar</TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">{ciclo.fechaInicio} — {ciclo.fechaFin}</span>
+                          <span className="text-xs text-slate-400">·</span>
+                          <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{documentsCount} docs</span>
+                          <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold ${isActivo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>
+                            {isActivo ? "Activo" : "Cerrado"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Vista desktop — tabla completa */}
+              <div className="hidden sm:block border border-border/70 dark:border-slate-800">
+                <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center border-b border-border/60 bg-muted/40 px-4 py-2 dark:border-slate-800 dark:bg-slate-900/50">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Ciclo</span>
+                  <span className="w-16 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Año</span>
+                  <span className="w-36 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Período</span>
+                  <span className="w-48 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Fechas</span>
+                  <span className="w-20 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Docs</span>
+                  <span className="w-28 text-right text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Acciones</span>
+                </div>
+                <div data-tour="admin-ciclos-list" data-component="cycle-list">
+                  {ciclos.map((ciclo, idx) => {
+                    const documentsCount = cycleDocumentCount(ciclo);
+                    const isActivo = ciclo.status === "activo";
+                    return (
+                      <div
+                        key={ciclo.id}
+                        className={`grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-2 cursor-pointer transition-colors hover:bg-muted/30 dark:hover:bg-slate-800/20 ${idx > 0 ? "border-t border-border/40 dark:border-slate-800/40" : ""}`}
+                        onClick={() => openDocsForCycle(ciclo)}
+                      >
+                        <div className="flex items-center gap-3 px-4 py-3 min-w-0">
+                          <div className={`h-5 w-1 shrink-0 rounded-full ${isActivo ? "bg-emerald-500 dark:bg-emerald-400" : "bg-slate-300 dark:bg-slate-600"}`} />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{ciclo.nombre}</p>
+                            <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold ${isActivo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>
+                              {isActivo ? "Activo" : "Cerrado"}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="w-16 text-center text-sm text-slate-700 dark:text-slate-300">{ciclo.anio}</span>
+                        <span className="w-36 text-center text-sm text-slate-700 dark:text-slate-300">{ciclo.periodo}</span>
+                        <span className="w-48 text-center text-xs text-slate-500 dark:text-slate-400">{ciclo.fechaInicio} — {ciclo.fechaFin}</span>
+                        <span className="w-20 text-center">
+                          <span className="rounded-sm bg-muted px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{documentsCount}</span>
+                        </span>
+                        <div data-tour="admin-ciclos-actions" className="w-28 flex justify-end gap-1 pr-3" onClick={(e) => e.stopPropagation()}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => openDocsForCycle(ciclo)} aria-label="Ver documentos">
+                                <FileText className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Ver documentos</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => openEditDialog(ciclo)} aria-label="Editar ciclo">
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Editar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-rose-400 hover:text-rose-600" onClick={() => openDeleteDialog(ciclo)} aria-label="Eliminar ciclo">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Eliminar</TooltipContent>
+                          </Tooltip>
+                          {isActivo ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-slate-400 hover:text-slate-600" onClick={() => confirmAction("close", ciclo)} aria-label="Cerrar ciclo">
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Cerrar ciclo</TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-emerald-500 hover:text-emerald-700" onClick={() => confirmAction("activate", ciclo)} aria-label="Activar ciclo">
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Activar</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+      </div>
+      ) : (
+        <div className="relative space-y-6 overflow-hidden">
+      <div data-component="page-banner" className="relative overflow-hidden rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_24px_90px_-35px_rgba(16,185,129,0.35)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_42%)]" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
@@ -1561,7 +1802,7 @@ export function CiclosEscolares() {
         </div>
       ) : null)}
 
-      <div data-tour="admin-ciclos-list" className="grid gap-4">
+      <div data-tour="admin-ciclos-list" data-component="cycle-list" className="grid gap-4">
         {isAdminTourActive && (
           <>
             <TourFakeCicloCard isFirst={true} />
@@ -1664,8 +1905,11 @@ export function CiclosEscolares() {
             </Card>
           );
         })}
-      </div>
+        </div>
+        </div>
+      )}
 
+      {/* ── Dialogs compartidos entre ambos modos ── */}
       <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
         <DialogContent className="border-emerald-200/70 bg-white dark:border-emerald-900/50 dark:bg-slate-950">
           <DialogHeader>
@@ -1730,11 +1974,11 @@ export function CiclosEscolares() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Fecha de Inicio</Label>
-                <Input type="date" value={newCycleForm.fechaInicio} onChange={(e) => setNewCycleForm((current) => ({ ...current, fechaInicio: e.target.value }))} />
+                <CycleDatePicker value={newCycleForm.fechaInicio} onChange={(date) => setNewCycleForm((current) => ({ ...current, fechaInicio: date }))} placeholder="dd/mm/aaaa" />
               </div>
               <div className="space-y-2">
                 <Label>Fecha de Fin</Label>
-                <Input type="date" value={newCycleForm.fechaFin} onChange={(e) => setNewCycleForm((current) => ({ ...current, fechaFin: e.target.value }))} />
+                <CycleDatePicker value={newCycleForm.fechaFin} onChange={(date) => setNewCycleForm((current) => ({ ...current, fechaFin: date }))} placeholder="dd/mm/aaaa" />
               </div>
             </div>
           </div>
@@ -1773,11 +2017,11 @@ export function CiclosEscolares() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Fecha de Inicio</Label>
-                <Input type="date" value={editCycleForm.fechaInicio} onChange={(e) => setEditCycleForm((current) => ({ ...current, fechaInicio: e.target.value }))} />
+                <CycleDatePicker value={editCycleForm.fechaInicio} onChange={(date) => setEditCycleForm((current) => ({ ...current, fechaInicio: date }))} placeholder="dd/mm/aaaa" />
               </div>
               <div className="space-y-2">
                 <Label>Fecha de Fin</Label>
-                <Input type="date" value={editCycleForm.fechaFin} onChange={(e) => setEditCycleForm((current) => ({ ...current, fechaFin: e.target.value }))} />
+                <CycleDatePicker value={editCycleForm.fechaFin} onChange={(date) => setEditCycleForm((current) => ({ ...current, fechaFin: date }))} placeholder="dd/mm/aaaa" />
               </div>
             </div>
           </div>
@@ -2356,7 +2600,7 @@ export function CiclosEscolares() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
 
