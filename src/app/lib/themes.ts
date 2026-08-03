@@ -3,7 +3,7 @@ export type AppThemeId =
   | "rose"    | "amber"   | "indigo"
   | "red"     | "orange"  | "cyan"
   | "lime"    | "teal"    | "fuchsia"
-  | "white"   | "black";
+  | "white"   | "black"   | "gray";
 
 export interface AppTheme {
   id: AppThemeId;
@@ -13,20 +13,9 @@ export interface AppTheme {
 }
 
 export const APP_THEMES: AppTheme[] = [
-  { id: "emerald", label: "Verde",    description: "Predeterminado", preview: "#10b981" },
-  { id: "ocean",   label: "Azul",     description: "",               preview: "#3b82f6" },
-  { id: "violet",  label: "Morado",   description: "",               preview: "#8b5cf6" },
-  { id: "rose",    label: "Rosa",     description: "",               preview: "#f43f5e" },
-  { id: "amber",   label: "Amarillo", description: "",               preview: "#f59e0b" },
-  { id: "indigo",  label: "Índigo",   description: "",               preview: "#6366f1" },
-  { id: "red",     label: "Rojo",     description: "",               preview: "#ef4444" },
-  { id: "orange",  label: "Naranja",  description: "",               preview: "#f97316" },
-  { id: "cyan",    label: "Cian",     description: "",               preview: "#06b6d4" },
-  { id: "lime",    label: "Lima",     description: "",               preview: "#84cc16" },
-  { id: "teal",    label: "Turquesa", description: "",               preview: "#14b8a6" },
-  { id: "fuchsia", label: "Fucsia",   description: "",               preview: "#d946ef" },
-  { id: "white",   label: "Blanco",   description: "",               preview: "#ffffff" },
-  { id: "black",   label: "Negro",    description: "",               preview: "#27272a" },
+  { id: "emerald", label: "Verde", description: "Predeterminado", preview: "#10b981" },
+  { id: "gray",    label: "Gris",  description: "",               preview: "#71717a" },
+  { id: "black",   label: "Negro", description: "",               preview: "#27272a" },
 ];
 
 // En Tailwind v4 los utilitarios bg-emerald-*, text-emerald-*, etc. referencian variables
@@ -186,19 +175,39 @@ const FUCHSIA_VARS: Record<string, string> = {
   "--color-emerald-950": "oklch(0.293 0.136 325.661)",
 };
 
-// Slate — cool blue-gray neutral; 500 = medium silver
+// Blanco — fondo blanco puro, texto negro en elementos de acento
 const WHITE_VARS: Record<string, string> = {
-  "--color-emerald-50":  "oklch(0.984 0.003 247.858)",
-  "--color-emerald-100": "oklch(0.968 0.007 247.896)",
-  "--color-emerald-200": "oklch(0.929 0.013 255.508)",
-  "--color-emerald-300": "oklch(0.869 0.022 252.894)",
-  "--color-emerald-400": "oklch(0.704 0.040 256.788)",
-  "--color-emerald-500": "oklch(0.554 0.046 257.417)",
-  "--color-emerald-600": "oklch(0.446 0.043 257.281)",
-  "--color-emerald-700": "oklch(0.372 0.044 257.287)",
-  "--color-emerald-800": "oklch(0.279 0.041 260.031)",
-  "--color-emerald-900": "oklch(0.208 0.042 265.755)",
-  "--color-emerald-950": "oklch(0.129 0.042 264.695)",
+  "--color-emerald-50":  "oklch(1 0 0)",
+  "--color-emerald-100": "oklch(0.990 0 0)",
+  "--color-emerald-200": "oklch(0.975 0 0)",
+  "--color-emerald-300": "oklch(0.950 0 0)",
+  "--color-emerald-400": "oklch(0.915 0 0)",
+  "--color-emerald-500": "oklch(0.965 0 0)",
+  "--color-emerald-600": "oklch(0.945 0 0)",
+  "--color-emerald-700": "oklch(0.700 0 0)",
+  "--color-emerald-800": "oklch(0.480 0 0)",
+  "--color-emerald-900": "oklch(0.300 0 0)",
+  "--color-emerald-950": "oklch(0.160 0 0)",
+  // Foreground negro sobre fondo blanco (variables CSS directas)
+  "--success-foreground":            "#0a0a0a",
+  "--sidebar-primary-foreground":    "#0a0a0a",
+  "--scrollbar-thumb":               "rgba(0, 0, 0, 0.25)",
+  "--scrollbar-thumb-hover":         "rgba(0, 0, 0, 0.45)",
+};
+
+// Neutral pure gray — 500 = medium gray (#71717a)
+const GRAY_VARS: Record<string, string> = {
+  "--color-emerald-50":  "oklch(0.985 0.002 247.839)",
+  "--color-emerald-100": "oklch(0.961 0.003 247.839)",
+  "--color-emerald-200": "oklch(0.908 0.004 258.338)",
+  "--color-emerald-300": "oklch(0.789 0.007 247.858)",
+  "--color-emerald-400": "oklch(0.631 0.010 260.031)",
+  "--color-emerald-500": "oklch(0.509 0.012 261.342)",
+  "--color-emerald-600": "oklch(0.408 0.010 261.342)",
+  "--color-emerald-700": "oklch(0.329 0.008 261.342)",
+  "--color-emerald-800": "oklch(0.260 0.006 261.342)",
+  "--color-emerald-900": "oklch(0.190 0.004 261.342)",
+  "--color-emerald-950": "oklch(0.130 0.003 261.342)",
 };
 
 // Zinc dark-shifted — 500 maps to zinc-800 so buttons appear near-black
@@ -231,6 +240,7 @@ const VARS_BY_THEME: Record<AppThemeId, Record<string, string>> = {
   fuchsia: FUCHSIA_VARS,
   white:   WHITE_VARS,
   black:   BLACK_VARS,
+  gray:    GRAY_VARS,
 };
 
 export function applyAppTheme(themeId: AppThemeId): void {
@@ -249,5 +259,6 @@ export function applyAppTheme(themeId: AppThemeId): void {
   }
 
   const declarations = Object.entries(vars).map(([k, v]) => `  ${k}: ${v};`).join("\n");
+
   el.textContent = `:root {\n${declarations}\n}`;
 }

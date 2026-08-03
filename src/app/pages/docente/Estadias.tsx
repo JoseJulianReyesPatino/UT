@@ -207,7 +207,7 @@ export default function EstadiasPage({ deadlineInfo, onDirtyChange, layoutStyle 
 
   const cuatrimestresOptions = useMemo(() => {
     if (formData.plan === "nuevo-modelo") return ["6", "10"];
-    if (formData.plan === "plan-normal") return ["6", "11"];
+    if (formData.plan === "plan-normal") return ["11"];
     return [];
   }, [formData.plan]);
 
@@ -216,10 +216,12 @@ export default function EstadiasPage({ deadlineInfo, onDirtyChange, layoutStyle 
     if (formData.plan === "nuevo-modelo") {
       const tsu = carrieras["nuevo-modelo"].tsu.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
       const ing = carrieras["nuevo-modelo"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
+      if (formData.cuatrimestre === "6") return tsu;
+      if (formData.cuatrimestre === "10") return ing;
       return [...tsu, ...ing];
     }
     return carrieras["plan-normal"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
-  }, [formData.plan]);
+  }, [formData.plan, formData.cuatrimestre]);
 
   // ✅ FIX: Ahora incluye plan en la consulta para filtrar correctamente
   useEffect(() => {
@@ -941,7 +943,7 @@ export default function EstadiasPage({ deadlineInfo, onDirtyChange, layoutStyle 
             </div>
             <div className="p-5 space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cuatrimestre *</p>
-              <Select value={formData.cuatrimestre} onValueChange={(v) => setFormData((c) => ({ ...c, cuatrimestre: v, grupo: "" }))} disabled={!formData.plan}>
+              <Select value={formData.cuatrimestre} onValueChange={(v) => setFormData((c) => ({ ...c, cuatrimestre: v, carrera: "", grupo: "" }))} disabled={!formData.plan}>
                 <SelectTrigger className="rounded-lg text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
                   <SelectValue placeholder={formData.plan ? "Selecciona" : "Elige plan primero"} />
                 </SelectTrigger>
@@ -1393,7 +1395,7 @@ export default function EstadiasPage({ deadlineInfo, onDirtyChange, layoutStyle 
                   <Label className="dark:text-white">Cuatrimestre *</Label>
                   <Select
                     value={formData.cuatrimestre}
-                    onValueChange={(v) => setFormData((c) => ({ ...c, cuatrimestre: v, grupo: "" }))}
+                    onValueChange={(v) => setFormData((c) => ({ ...c, cuatrimestre: v, carrera: "", grupo: "" }))}
                     disabled={!formData.plan}
                   >
                     <SelectTrigger className="rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
