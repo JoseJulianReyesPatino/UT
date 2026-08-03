@@ -24,9 +24,13 @@ import LogoUTSLRC from "../assets/elementos/LogotipoUTSLRC.webp";
 import LogoUTSLRCWhite from "../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
 import SuperiorFormImg from "../assets/elementos/superior_form.webp";
 import BgDefault from "../assets/Fondos/ut_imagen14.webp";
-import BgITIID from "../assets/Fondos/Fondo_ITIID.png";
-import BgMecatronica from "../assets/Fondos/Fondo_Mecatronica.png";
-import BgAlimentarios from "../assets/Fondos/Fondo_Procesos_Alimentarios.png";
+import BgITIID from "../assets/Fondos/Fondo_ITIID.webp";
+import BgMecatronica from "../assets/Fondos/Fondo_Mecatronica.webp";
+import BgAlimentarios from "../assets/Fondos/Fondo_Procesos_Alimentarios.webp";
+import BgElectromecanica from "../assets/Fondos/Fondo_Electromecanica.webp";
+import BgEnergias from "../assets/Fondos/Fondo_Energias.webp";
+import BgLogistica from "../assets/Fondos/Fondo_Logistica.webp";
+import BgNegocios from "../assets/Fondos/Fondo_Negocios.webp";
 
 // Páginas cargadas bajo demanda
 const DocenteDashboard = React.lazy(() => import("./pages/docente/DocenteDashboard"));
@@ -59,10 +63,14 @@ const TutoriasPage = React.lazy(() => import("./pages/docente/Tutorias"));
 const TourOverlay = React.lazy(() => import("./components/tour/TourOverlay").then(m => ({ default: m.TourOverlay })));
 
 const BG_OPTIONS = [
-  { key: "default",      label: "Universidad",  src: BgDefault },
-  { key: "itiid",        label: "ITIID",        src: BgITIID },
-  { key: "mecatronica",  label: "Mecatrónica",  src: BgMecatronica },
-  { key: "alimentarios", label: "Alimentos",    src: BgAlimentarios },
+  { key: "default",        label: "Universidad",    src: BgDefault },
+  { key: "itiid",          label: "ITIID",          src: BgITIID },
+  { key: "mecatronica",    label: "Mecatrónica",    src: BgMecatronica },
+  { key: "alimentarios",   label: "Alimentos",      src: BgAlimentarios },
+  { key: "electromecanica", label: "Electromecánica", src: BgElectromecanica },
+  { key: "energias",       label: "Energías",       src: BgEnergias },
+  { key: "logistica",      label: "Logística",      src: BgLogistica },
+  { key: "negocios",       label: "Negocios",       src: BgNegocios },
 ] as const;
 const BG_STORAGE_KEY       = "utslrc-bg-key";
 const BG_OVERLAY_KEY       = "utslrc-bg-overlay";
@@ -718,27 +726,57 @@ useEffect(() => {
         case "dashboard":
           return <DocenteDashboard onNavigate={setCurrentView} layoutStyle={layoutStyle} />;
         case "planeacion":
+          if (layoutStyle === "formal") {
+            return <PlaneacionPage layoutStyle={layoutStyle} onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} isTourActive={isDocenteTourOpen} />;
+          }
           return wrapForm("planeacion", "Planeación", <PlaneacionPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} isTourActive={isDocenteTourOpen} />);
         case "instrumento-30-normal":
+          if (layoutStyle === "formal") {
+            return <Instrumento30Page layoutStyle={layoutStyle} onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          }
           return wrapForm("instrumento-30-normal", "Instrumento 30%", <Instrumento30Page onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "instrumento-40-nuevo":
+          if (layoutStyle === "formal") {
+            return <Instrumento40Page layoutStyle={layoutStyle} onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          }
           return wrapForm("instrumento-40-nuevo", "Instrumento 40%", <Instrumento40Page onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "instrumento-60-nuevo":
+          if (layoutStyle === "formal") {
+            return <Instrumento60Page layoutStyle={layoutStyle} onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          }
           return wrapForm("instrumento-60-nuevo", "Instrumento 60%", <Instrumento60Page onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "instrumento-70-normal":
+          if (layoutStyle === "formal") {
+            return <Instrumento70Page layoutStyle={layoutStyle} onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          }
           return wrapForm("instrumento-70-normal", "Instrumento 70%", <Instrumento70Page onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "remedial":
+          if (layoutStyle === "formal") {
+            return <RemedialPage layoutStyle={layoutStyle} onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          }
           return wrapForm("remedial", "Remedial", <RemedialPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "lista-concentrada":
+          if (layoutStyle === "formal") {
+            return <ListaConcentradaPage layoutStyle={layoutStyle} onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          }
           return wrapForm("lista-concentrada", "Lista Concentrada", <ListaConcentradaPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "asesoria":
+          if (layoutStyle === "formal") {
+            return <AsesoriaPage layoutStyle={layoutStyle} onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          }
           return wrapForm("asesoria", "Asesoría", <AsesoriaPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "portafolio":
+          if (layoutStyle === "formal") {
+            return <PortafolioDigitalPage layoutStyle={layoutStyle} onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          }
           return wrapForm("portafolio-digital", "Portafolio Digital", <PortafolioDigitalPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "acta-final":
+          if (layoutStyle === "formal") {
+            return <ActaFinalPage layoutStyle={layoutStyle} onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          }
           return wrapForm("acta-final", "Acta Final", <ActaFinalPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />);
         case "estadias":
-          return <EstadiasPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} />;
+          return <EstadiasPage onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} layoutStyle={layoutStyle} />;
         case "tutorias":
           return <TutoriasPage layoutStyle={layoutStyle} />;
         case "tutorias-carga-academica":
@@ -1090,7 +1128,7 @@ useEffect(() => {
                       <X className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="mb-4 grid grid-cols-2 gap-2">
+                  <div className="mb-4 grid grid-cols-2 gap-2 max-h-[18rem] overflow-y-auto pr-0.5">
                     {BG_OPTIONS.map(opt => (
                       <button
                         key={opt.key}

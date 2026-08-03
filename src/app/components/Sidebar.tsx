@@ -560,7 +560,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               aria-label={isMobile ? "Cerrar menú" : isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
               title={isMobile ? "Cerrar menú" : isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
               className={isFormal
-                ? "h-8 w-8 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
+                ? "h-8 w-8 rounded-full border border-emerald-200/50 bg-white text-emerald-600/60 hover:bg-emerald-50 hover:text-emerald-700 dark:border-emerald-800/40 dark:bg-slate-900 dark:text-emerald-400/50 dark:hover:bg-slate-800"
                 : "h-8 w-8 rounded-full border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
               }
             >
@@ -606,7 +606,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                       isFormal
                         ? isActive
                           ? "border-l-[3px] border-emerald-500 bg-emerald-100 text-emerald-900 font-semibold pl-[calc(0.75rem-3px)] pr-3 dark:border-emerald-400 dark:bg-emerald-500/20 dark:text-emerald-200"
-                          : "px-3 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100"
+                          : "px-3 text-slate-600 hover:bg-emerald-50/70 hover:text-emerald-800 dark:text-slate-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
                         : cn(
                             "px-3 rounded-xl",
                             isActive
@@ -618,7 +618,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
                     <span className="relative flex shrink-0 items-center justify-center">
                       <Icon className={cn("h-5 w-5 shrink-0",
                         isFormal
-                          ? isActive ? "text-emerald-600 dark:text-emerald-300" : "text-slate-400 dark:text-slate-500"
+                          ? isActive ? "text-emerald-600 dark:text-emerald-300" : "text-emerald-600/50 dark:text-emerald-400/50"
                           : isActive ? "text-white" : "text-emerald-600 dark:text-emerald-300"
                       )} />
                       {item.id === "mensajes" && <MessageBadge count={unreadMessagesCount} collapsed={isCollapsedLocal} />}
@@ -700,7 +700,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               aria-label="Abrir en la app"
               title="Abrir en la app"
               className={isFormal
-                ? "w-full shrink-0 justify-start rounded-md border border-slate-200 bg-transparent text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/60"
+                ? "w-full shrink-0 justify-start rounded-md border border-emerald-200/50 bg-transparent text-emerald-700/70 hover:bg-emerald-50/70 hover:text-emerald-800 dark:border-emerald-800/40 dark:text-emerald-400/60 dark:hover:bg-emerald-900/20"
                 : "w-full shrink-0 justify-start rounded-xl border border-emerald-300/70 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
               }
             >
@@ -714,7 +714,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
             onClick={handleLogoutClick}
             aria-label="Cerrar sesión"
             className={isFormal
-              ? "w-full shrink-0 justify-start rounded-md border border-slate-200 bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+              ? "w-full shrink-0 justify-start rounded-md border border-emerald-200/50 bg-transparent text-emerald-700/70 hover:bg-emerald-50/70 hover:text-emerald-800 dark:border-emerald-800/40 dark:text-emerald-400/60 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
               : "w-full shrink-0 justify-start rounded-xl border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
             }
           >

@@ -855,23 +855,74 @@ export function DocumentHistory({ isTourActive, layoutStyle }: { isTourActive?: 
                   : groupStatus === "devuelto" ? "Devuelto"
                   : groupStatus === "reenviado" ? "Reenviado"
                   : "Pendiente";
+                const infoFields: { label: string; value: string }[] = [
+                  { label: "Tipo", value: tipoDisplayLabel },
+                  hasCarrera ? { label: "Carrera", value: rep.carrera } : null,
+                  planLabel ? { label: "Plan", value: planLabel } : null,
+                  !isTutoria && !isEstadias && hasMateria ? { label: "Materia", value: rep.materia } : null,
+                  hasGrupo ? { label: "Grupo", value: rep.grupo } : null,
+                  !isTutoria && !isEstadias && parcialLabel ? { label: "Parcial", value: parcialLabel } : null,
+                  rep.fecha ? { label: "Enviado", value: dateStr } : null,
+                ].filter((f): f is { label: string; value: string } => f !== null);
 
                 /* ── Lote en modo empresarial: expandir en sub-filas por documento ── */
                 if (isFormal && isMulti) {
                   return (
                     <div key={batchKey} className="border-b border-border/60 last:border-0 dark:border-slate-800/50">
                       {/* Encabezado del lote */}
-                      <div className="flex items-center gap-2 border-b border-border/40 bg-muted/20 px-3 py-2 dark:border-slate-800/40 dark:bg-slate-900/20">
-                        <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        <span className="min-w-0 flex-1 text-xs font-medium text-slate-600 dark:text-slate-400">
-                          <span className="font-semibold">{groupDocs.length} documentos</span>
-                          {" · "}{tipoDisplayLabel}{" · "}{dateStr}
-                        </span>
-                        <span className={`flex shrink-0 items-center gap-1 text-xs font-semibold ${statusColor}`}>
-                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot}`} />
-                          {statusLabel}
-                        </span>
-                      </div>
+                      {(() => {
+                        const sectionSuffix = isTutoria ? " — Tutorías" : isEstadias ? " — Estadías" : "";
+                        const batchLabel = `${groupDocs.length} documentos${sectionSuffix}`;
+                        const infoTooltip = (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300" aria-label="Ver detalles">
+                                <Info className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="p-0">
+                              <div className="px-3 py-2 space-y-1 min-w-[180px]">
+                                {infoFields.map(({ label, value }) => (
+                                  <div key={label} className="flex items-baseline gap-2 text-xs">
+                                    <span className="text-muted-foreground shrink-0 w-[72px]">{label}:</span>
+                                    <span className="font-medium break-words">{value}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                        return (
+                          <>
+                            {/* Móvil */}
+                            <div className="flex items-center gap-2 border-b border-border/40 bg-muted/20 px-3 py-2 sm:hidden dark:border-slate-800/40 dark:bg-slate-900/20">
+                              <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-700 dark:text-slate-300">{batchLabel}</span>
+                              <span className={`flex shrink-0 items-center gap-1 text-xs font-semibold ${statusColor}`}>
+                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot}`} />
+                                {statusLabel}
+                              </span>
+                              {infoTooltip}
+                            </div>
+                            {/* Desktop: mismo grid que las filas de la tabla */}
+                            <div className="hidden sm:grid sm:grid-cols-[1fr_120px_88px_110px_108px] items-center gap-2 border-b border-border/40 bg-muted/20 px-3 py-2 dark:border-slate-800/40 dark:bg-slate-900/20">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                <span className="truncate text-sm text-slate-600 dark:text-slate-400">{batchLabel}</span>
+                              </div>
+                              <span className="truncate text-xs text-muted-foreground dark:text-slate-400">{tipoDisplayLabel}</span>
+                              <span className={`flex items-center gap-1.5 text-xs font-semibold ${statusColor}`}>
+                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot}`} />
+                                {statusLabel}
+                              </span>
+                              <span className="text-xs text-muted-foreground dark:text-slate-500">{dateStr}</span>
+                              <div className="flex items-center justify-end">
+                                {infoTooltip}
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
                       {/* Sub-fila por cada documento del lote */}
                       {groupDocs.map((doc) => {
                         const _base = getFileNameOnly(doc.nombre);
@@ -904,7 +955,7 @@ export function DocumentHistory({ isTourActive, layoutStyle }: { isTourActive?: 
                             {/* Móvil */}
                             <div className="flex items-center gap-3 px-3 py-2.5 sm:hidden">
                               <span className={`h-2 w-2 shrink-0 rounded-full ${docStatusDot}`} />
-                              <p className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-200">{docFileName}</p>
+                              <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-white">{docFileName}</p>
                               <div className="flex shrink-0 items-center gap-0.5">
                                 {docMotivo}
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
@@ -921,7 +972,7 @@ export function DocumentHistory({ isTourActive, layoutStyle }: { isTourActive?: 
                             </div>
                             {/* Desktop: fila en la misma cuadrícula de tabla */}
                             <div className="hidden sm:grid sm:grid-cols-[1fr_120px_88px_110px_108px] items-center gap-2 px-3 py-2">
-                              <p className="truncate pl-4 text-sm text-slate-700 dark:text-slate-200">{docFileName}</p>
+                              <p className="truncate pl-4 text-sm font-medium text-slate-800 dark:text-white">{docFileName}</p>
                               <span />
                               <span className={`flex items-center gap-1.5 text-xs font-semibold ${docStatusColor}`}>
                                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${docStatusDot}`} />
@@ -962,9 +1013,10 @@ export function DocumentHistory({ isTourActive, layoutStyle }: { isTourActive?: 
                 /* ── Fila compacta para modo empresarial ── */
                 if (isFormal) {
                   const formalDoc = isMulti ? null : groupDocs[0];
+                  const _fileLabelBase = getFileNameOnly(rep.nombre);
                   const fileLabel = isMulti
                     ? `${groupDocs.length} documentos — ${tipoDisplayLabel}`
-                    : getFileNameOnly(rep.nombre);
+                    : _fileLabelBase.toLowerCase().endsWith(".pdf") ? _fileLabelBase : `${_fileLabelBase}.pdf`;
                   const metaLine = [
                     hasCarrera && rep.carrera,
                     planLabel,
@@ -972,15 +1024,6 @@ export function DocumentHistory({ isTourActive, layoutStyle }: { isTourActive?: 
                     hasGrupo && `Grupo ${rep.grupo}`,
                     !isTutoria && !isEstadias && parcialLabel,
                   ].filter(Boolean).join(" · ");
-                  const infoFields: { label: string; value: string }[] = [
-                    { label: "Tipo", value: tipoDisplayLabel },
-                    hasCarrera ? { label: "Carrera", value: rep.carrera } : null,
-                    planLabel ? { label: "Plan", value: planLabel } : null,
-                    !isTutoria && !isEstadias && hasMateria ? { label: "Materia", value: rep.materia } : null,
-                    hasGrupo ? { label: "Grupo", value: rep.grupo } : null,
-                    !isTutoria && !isEstadias && parcialLabel ? { label: "Parcial", value: parcialLabel } : null,
-                    rep.fecha ? { label: "Enviado", value: dateStr } : null,
-                  ].filter((f): f is { label: string; value: string } => f !== null);
                   const actionButtons = (
                     <div className="flex items-center justify-end gap-0.5 shrink-0">
                       {motivoBtn}
@@ -1053,7 +1096,6 @@ export function DocumentHistory({ isTourActive, layoutStyle }: { isTourActive?: 
                       <div className="hidden sm:grid sm:grid-cols-[1fr_120px_88px_110px_108px] items-center gap-2 px-3 py-2.5">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-slate-800 dark:text-white">{fileLabel}</p>
-                          {metaLine && <p className="truncate text-[11px] text-muted-foreground dark:text-slate-500">{metaLine}</p>}
                         </div>
                         <span className="truncate text-xs text-muted-foreground dark:text-slate-400">{tipoDisplayLabel}</span>
                         <span className={`flex items-center gap-1.5 text-xs font-semibold ${statusColor}`}>

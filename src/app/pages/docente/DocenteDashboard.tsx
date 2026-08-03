@@ -641,7 +641,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   if (isFormal) {
     return (
       <>
-        <div className="flex h-[calc(100vh-64px)] flex-col overflow-hidden bg-card text-foreground dark:bg-slate-950">
+        <div className="flex flex-col sm:h-[calc(100vh-64px)] sm:overflow-hidden bg-card text-foreground dark:bg-slate-950">
           {/* Header plano */}
           <div className="shrink-0 border-b border-border bg-card px-6 py-4 dark:border-slate-800 dark:bg-slate-950/80">
             <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Panel Docente</h1>
@@ -664,10 +664,10 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             <div className="grid grid-cols-3 divide-x divide-border dark:divide-slate-800">
               {isLoadingStats ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="animate-pulse space-y-2 px-6 py-4">
-                    <div className="h-2.5 w-28 rounded bg-muted" />
-                    <div className="h-7 w-12 rounded bg-muted" />
-                    <div className="h-2 w-20 rounded bg-muted" />
+                  <div key={i} className="animate-pulse space-y-2 px-3 py-3 sm:px-6 sm:py-4">
+                    <div className="h-2.5 w-20 rounded bg-muted sm:w-28" />
+                    <div className="h-7 w-10 rounded bg-muted sm:w-12" />
+                    <div className="h-2 w-16 rounded bg-muted sm:w-20" />
                   </div>
                 ))
               ) : (
@@ -678,14 +678,14 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                       key={stat.title}
                       type="button"
                       onClick={() => onNavigate && stat.action && onNavigate(stat.action)}
-                      className="flex flex-col gap-1 px-6 py-4 text-left transition-colors hover:bg-muted/40 dark:hover:bg-slate-900/40"
+                      className="flex flex-col gap-0.5 sm:gap-1 px-3 py-3 sm:px-6 sm:py-4 text-left transition-colors hover:bg-muted/40 dark:hover:bg-slate-900/40"
                     >
-                      <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      <span className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 sm:gap-1.5 sm:text-[10px] sm:tracking-wider">
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${a.dot}`} />
-                        {stat.title}
+                        <span className="truncate">{stat.title}</span>
                       </span>
-                      <span className={`text-2xl font-semibold tabular-nums leading-none ${a.value}`}>{stat.value}</span>
-                      <span className="text-[11px] text-muted-foreground dark:text-slate-500">{stat.description}</span>
+                      <span className={`text-xl font-semibold tabular-nums leading-none sm:text-2xl ${a.value}`}>{stat.value}</span>
+                      <span className="hidden text-[11px] text-muted-foreground dark:text-slate-500 sm:block">{stat.description}</span>
                     </button>
                   );
                 })
@@ -694,9 +694,9 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           </div>
 
           {/* Contenido principal */}
-          <div className="flex flex-1 min-h-0 overflow-hidden divide-x divide-border dark:divide-slate-800">
+          <div className="flex flex-1 min-h-0 flex-col overflow-y-auto sm:flex-row sm:overflow-hidden sm:divide-x divide-border dark:divide-slate-800">
             {/* Columna izquierda: documentos recientes */}
-            <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="flex flex-1 flex-col sm:overflow-hidden">
               <div className="shrink-0 flex items-center justify-between border-b border-border px-5 py-3 dark:border-slate-800">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Documentos Recientes</p>
                 <button type="button" onClick={() => onNavigate?.("historial")} className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400">
@@ -754,7 +754,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             </div>
 
             {/* Columna derecha: próximas entregas */}
-            <div className="flex w-64 shrink-0 flex-col overflow-hidden">
+            <div className="flex shrink-0 flex-col border-t border-border sm:border-t-0 sm:w-64 sm:overflow-hidden dark:border-slate-800">
               <div className="shrink-0 border-b border-border px-5 py-3 dark:border-slate-800">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Próximas Entregas</p>
               </div>

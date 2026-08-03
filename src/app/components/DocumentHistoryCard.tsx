@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { CheckCircle2, Clock2, Undo2, Eye, PencilLine, EyeOff, Trash2, StickyNote, RefreshCw, UploadCloud } from "lucide-react";
@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { HistorialReadOnlyContext } from "./FormalFormLayout";
 
 interface DocumentHistoryCardProps {
   documents: Array<{ id: number; fileName: string; status?: string; returnedComment?: string }>;
@@ -107,6 +108,7 @@ export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
   const [openMotivo, setOpenMotivo] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [isDeletingLocal, setIsDeletingLocal] = useState(false);
+  const isReadOnly = useContext(HistorialReadOnlyContext);
   const { text, variant, Icon } = getStatusInfo(status);
   const isDevuelto = String(status ?? "").trim().toLowerCase() === "devuelto";
   const devueltoDoc = devueltoDocForCard(documents);
@@ -194,7 +196,7 @@ export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
                         {isDocDevuelto && <Undo2 className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />}
                         {isDocRevisado && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
                         {isDocReenviado && <RefreshCw className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />}
-                        <Eye className="h-3.5 w-3.5 text-muted-foreground dark:text-slate-500" />
+                        <Eye className={`h-3.5 w-3.5 ${isReadOnly ? "text-emerald-500 dark:text-emerald-400" : "text-muted-foreground dark:text-slate-500"}`} />
                       </div>
                     </button>
                     {isDocDevuelto && onResubmit && (
@@ -239,18 +241,17 @@ export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
           ) : null}
 
           {/* Botones */}
-          <div className="flex gap-2 pt-1">
+          {!isReadOnly && <div className="flex flex-wrap gap-2 pt-1">
             {canEdit ? (
               <Button
                 size="sm"
                 variant="secondary"
-                className="flex-1 sm:flex-none sm:min-w-[5.5rem]"
+                className="flex-1"
                 onClick={onEdit}
                 disabled={isLoading}
-                title="Editar"
               >
-                <PencilLine className="h-3.5 w-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Editar</span>
+                <PencilLine className="mr-1.5 h-3.5 w-3.5" />
+                Editar
               </Button>
             ) : (
               <Tooltip>
@@ -258,13 +259,12 @@ export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
                   <Button
                     size="sm"
                     variant="secondary"
-                    className="flex-1 sm:flex-none sm:min-w-[5.5rem]"
+                    className="flex-1"
                     onClick={onEdit}
                     disabled={isLoading}
-                    title="Editar"
                   >
-                    <PencilLine className="h-3.5 w-3.5 sm:mr-1.5" />
-                    <span className="hidden sm:inline">Editar</span>
+                    <PencilLine className="mr-1.5 h-3.5 w-3.5" />
+                    Editar
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[220px] text-center text-xs">
@@ -276,13 +276,12 @@ export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
               <Button
                 size="sm"
                 variant="destructive"
-                className="flex-1 sm:flex-none sm:min-w-[5.5rem]"
+                className="flex-1"
                 onClick={() => setOpenDeleteDialog(true)}
                 disabled={isLoading}
-                title="Eliminar"
               >
-                <Trash2 className="h-3.5 w-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">{isLoading ? "Eliminando..." : "Eliminar"}</span>
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                {isLoading ? "Eliminando..." : "Eliminar"}
               </Button>
             ) : (
               <Tooltip>
@@ -290,13 +289,12 @@ export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1 sm:flex-none sm:min-w-[5.5rem] text-muted-foreground hover:text-foreground"
+                    className="flex-1 text-muted-foreground hover:text-foreground"
                     onClick={() => setOpenDeleteDialog(true)}
                     disabled={isLoading}
-                    title="Ocultar del historial"
                   >
-                    <EyeOff className="h-3.5 w-3.5 sm:mr-1.5" />
-                    <span className="hidden sm:inline">{isLoading ? "Ocultando..." : "Ocultar"}</span>
+                    <EyeOff className="mr-1.5 h-3.5 w-3.5" />
+                    {isLoading ? "Ocultando..." : "Ocultar"}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[220px] text-center text-xs">
@@ -308,16 +306,15 @@ export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
               <Button
                 size="sm"
                 variant="outline"
-                className="flex-1 sm:flex-none sm:min-w-[5.5rem]"
+                className="flex-1"
                 onClick={() => setOpenMotivo(true)}
                 disabled={isLoading}
-                title="Ver motivo de devolución"
               >
-                <StickyNote className="h-3.5 w-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Motivo</span>
+                <StickyNote className="mr-1.5 h-3.5 w-3.5" />
+                Motivo
               </Button>
             ) : null}
-          </div>
+          </div>}
         </div>
       </div>
 

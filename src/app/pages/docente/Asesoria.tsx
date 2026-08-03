@@ -20,6 +20,7 @@ import { useFormAccess } from "../../hooks/useFormAccess";
 import { fetchDocumentBlob } from "../../lib/documents";
 import { formatGroupCode } from "../../../lib/utils";
 import { HistorySheetSkeleton } from "./DocumentHistory";
+import { FormalFormLayout } from "../../components/FormalFormLayout";
 
 interface AsesoriaFormData {
   plan: Plan | "";
@@ -45,7 +46,8 @@ const initialFormData: AsesoriaFormData = {
   nota: "",
 };
 
-export default function AsesoriaPage({ deadlineInfo, onDirtyChange }: { deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null; onDirtyChange?: (dirty: boolean) => void }) {
+export default function AsesoriaPage({ deadlineInfo, onDirtyChange, layoutStyle }: { deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null; onDirtyChange?: (dirty: boolean) => void; layoutStyle?: string }) {
+  const isFormal = layoutStyle === "formal";
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const formAccess = useFormAccess(5);
@@ -615,6 +617,320 @@ export default function AsesoriaPage({ deadlineInfo, onDirtyChange }: { deadline
       setIsSubmitting(false);
     }
   };
+
+  const formalDeadlineInfo = isFormal && formAccess.dueAt
+    ? (() => {
+        const d = new Date(formAccess.dueAt!);
+        const msLeft = d.getTime() - Date.now();
+        return {
+          formattedDeadline: d.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }),
+          isUrgent: msLeft > 0 && msLeft / (1000 * 60 * 60) < 24,
+        };
+      })()
+    : null;
+
+  const historialSheetContent = (
+    <div className="mt-4 space-y-4">
+      {isLoadingHistory ? (
+        <HistorySheetSkeleton />
+      ) : groupedHistory.length > 0 ? (
+        <ScrollArea className="h-[min(78vh,44rem)] rounded-lg border border-border bg-background/40 pr-2 dark:border-slate-800/70 dark:bg-slate-900/30">
+          <div className="grid gap-3 p-1">
+            {groupedHistory.map((group) => {
+              const main = group[0];
+              return (
+                <DocumentHistoryCard
+                  key={main.batch_id ?? main.id}
+                  documents={group.map((d: any) => ({ id: d.id, fileName: getUploadedFileName(d), status: d.status, returnedComment: d.returned_comment ?? undefined }))}
+                  plan={main.plan}
+                  carrera={main.carrera_label}
+                  cuatrimestre={main.cuatrimestre ? cuatrimestresLabels[String(main.cuatrimestre) as keyof typeof cuatrimestresLabels] : undefined}
+                  subject={main.materia}
+                  parcial={main.parcial}
+                  grupo={main.group_code ? formatGroupCode(main.group_code) : undefined}
+                  nota={main.nota}
+                  submittedAt={new Date(main.submitted_at).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  status={getBatchStatus(group)}
+                  returnedComment={getBatchStatus(group) === "devuelto" ? (group.find((d: any) => String(d.status ?? "").toLowerCase() === "devuelto")?.returned_comment ?? undefined) : undefined}
+                  onViewDocument={(docId) => { const doc = group.find((d: any) => d.id === docId); if (doc) openPreview(doc); }}
+                  onEdit={() => void populateFormForEditBatch(group)}
+                  onDelete={handleDeleteDocuments}
+                  onHide={handleHideDocuments}
+                  onResubmit={(docId, fileName, returnedComment) => { setResubmitTarget({ docId, fileName, returnedComment }); setResubmitFile(null); }}
+                  isDeleting={isDeleting}
+                />
+              );
+            })}
+          </div>
+        </ScrollArea>
+      ) : (
+        <p className="text-sm text-muted-foreground dark:text-slate-400">No hay archivos en el historial.</p>
+      )}
+    </div>
+  );
+
+  if (isFormal) {
+    return (
+      <FormalFormLayout
+        title="Asesorías"
+        isLoading={formAccess.isLoading}
+        canSubmit={formAccess.canSubmit}
+        deadlineInfo={formalDeadlineInfo}
+        sheetOpen={sheetOpen}
+        onSheetOpenChange={setSheetOpen}
+        historialDescription="Documentos enviados anteriormente para Asesorías."
+        historialContent={historialSheetContent}
+        editingBanners={
+          <>
+            {editingDocumentId && !isMetadataOnlyEdit && (
+              <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-6 py-2.5 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
+                Estás editando la asesoría existente. Ajusta los campos y selecciona el nuevo PDF para actualizar.
+                {isLoadingPdf && <span className="ml-2 inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Cargando...</span>}
+              </div>
+            )}
+            {isMetadataOnlyEdit && (
+              <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-6 py-2.5 text-xs text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-100">
+                <strong>Edición de datos.</strong> Este envío ya fue procesado — solo puedes editar los campos, no los archivos.
+              </div>
+            )}
+          </>
+        }
+        leftColumn={
+          <div className="flex flex-1 flex-col sm:overflow-y-auto p-5 border-b border-border sm:border-b-0 dark:border-slate-800">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Subir archivo {!isMetadataOnlyEdit && "*"}</p>
+            <p className="mb-3 text-xs text-muted-foreground dark:text-slate-400">PDF, máx. 15 MB por archivo. Hasta 3 archivos simultáneos.</p>
+            {isMetadataOnlyEdit ? (
+              <div className="space-y-1.5 rounded-xl border border-border/50 bg-muted/20 p-3 dark:border-slate-800/50 dark:bg-slate-900/20">
+                {editingBatchFileNames.map((name, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/60 px-3 py-2 dark:border-slate-800/40 dark:bg-slate-900/40">
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground dark:text-slate-500" />
+                    <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground dark:text-slate-400">{name}</span>
+                    <Ban className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 dark:text-slate-600" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                <input type="file" accept=".pdf" multiple className="hidden" id="asesoria-formal-upload" onChange={handleFileChange} disabled={formData.archivos.length >= 3 || isLoadingPdf} />
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={`flex-1 rounded-xl border-2 border-dashed transition-all ${
+                    formData.archivos.length === 0 ? "flex flex-col items-center justify-center text-center p-6" : "p-4"
+                  } ${isDragging ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/30" : "border-border bg-background/60 hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-emerald-500/40"} ${isLoadingPdf ? "pointer-events-none opacity-60" : ""}`}
+                >
+                  {isLoadingPdf ? (
+                    <div className="flex flex-col items-center justify-center gap-3 py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                      <p className="text-sm text-muted-foreground dark:text-slate-400">Cargando documento...</p>
+                    </div>
+                  ) : formData.archivos.length === 0 ? (
+                    <label htmlFor="asesoria-formal-upload" className="block cursor-pointer space-y-3">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary dark:bg-emerald-500/10 dark:text-emerald-400">
+                        <Upload className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium dark:text-white">{getArchivosLabel()}</p>
+                        <p className="text-xs text-muted-foreground dark:text-slate-400">{isDragging ? "Suelta aquí para cargar" : `${getEspaciosLabel()} · arrastra o haz clic`}</p>
+                      </div>
+                    </label>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className={`grid gap-3 ${formData.archivos.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                        {formData.archivos.map((archivo, index) => (
+                          <PdfPreview
+                            key={`${archivo.name}-${archivo.size}-${index}`}
+                            file={archivo}
+                            title="Documento cargado"
+                            onRemove={() => removeFile(index)}
+                            onReplace={(newFile) => replaceFile(index, newFile)}
+                          />
+                        ))}
+                      </div>
+                      {formData.archivos.length < 3 && (
+                        <label htmlFor="asesoria-formal-upload" className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background/60 py-3 text-sm text-muted-foreground transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:hover:border-emerald-500/40">
+                          <FolderOpen className="h-4 w-4" />
+                          Agregar otro · {getEspaciosLabel()}
+                        </label>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        }
+        rightColumn={
+          <div className="flex flex-col sm:w-80 sm:shrink-0 sm:overflow-y-auto divide-y divide-border dark:divide-slate-800">
+            <div className="p-5 space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Plan *</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData((c) => ({ ...c, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                    formData.plan === "nuevo-modelo"
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-400 dark:bg-emerald-950/30 dark:text-emerald-300"
+                      : "border-border bg-background text-slate-600 hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-emerald-600"
+                  }`}
+                >
+                  Nuevo Modelo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData((c) => ({ ...c, plan: "plan-normal", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                    formData.plan === "plan-normal"
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-400 dark:bg-emerald-950/30 dark:text-emerald-300"
+                      : "border-border bg-background text-slate-600 hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-emerald-600"
+                  }`}
+                >
+                  Plan Normal
+                </button>
+              </div>
+            </div>
+            <div className="p-5 space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Carrera *</p>
+              <Select value={formData.carrera} onValueChange={(v) => setFormData((c) => ({ ...c, carrera: v, cuatrimestre: "", materia: "", parcial: "", grupo: "" }))} disabled={!formData.plan}>
+                <SelectTrigger className="rounded-lg text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                  <SelectValue placeholder="Selecciona la carrera" />
+                </SelectTrigger>
+                <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-1rem)] dark:border-slate-700 dark:bg-slate-900" position="popper" avoidCollisions={false}>
+                  {carrerasDisponibles.map((c) => (
+                    <SelectItem key={c.codigo} value={c.codigo} className="max-w-full truncate dark:text-white dark:hover:bg-slate-800">{c.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="p-5 space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cuatrimestre *</p>
+              <Select value={formData.cuatrimestre} onValueChange={(v) => setFormData((c) => ({ ...c, cuatrimestre: v as Cuatrimestre, materia: "", parcial: "", grupo: "" }))} disabled={!formData.carrera}>
+                <SelectTrigger className="rounded-lg text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                  <SelectValue placeholder={formData.carrera ? "Selecciona" : "Elige carrera primero"} />
+                </SelectTrigger>
+                <SelectContent className="dark:border-slate-700 dark:bg-slate-900" position="popper" avoidCollisions={false}>
+                  {cuatrimestresDisponibles.map((c) => (
+                    <SelectItem key={c} value={c} className="dark:text-white dark:hover:bg-slate-800">{getCuatrimestreLabel(c)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="p-5 space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Materia *</p>
+              <Select value={formData.materia} onValueChange={(v) => setFormData((c) => ({ ...c, materia: v, parcial: "", grupo: "" }))} disabled={!formData.cuatrimestre}>
+                <SelectTrigger className="rounded-lg text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                  <SelectValue placeholder={formData.cuatrimestre ? "Selecciona" : "Elige cuatrimestre primero"} />
+                </SelectTrigger>
+                <SelectContent className="dark:border-slate-700 dark:bg-slate-900" position="popper" avoidCollisions={false}>
+                  {materiasDisponibles.map((m, i) => (
+                    <SelectItem key={`${m.nombre}-${i}`} value={m.nombre} className="dark:text-white dark:hover:bg-slate-800">{m.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="p-5 space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Parcial *</p>
+              <Select value={formData.parcial} onValueChange={(v) => setFormData((c) => ({ ...c, parcial: v }))} disabled={!formData.materia}>
+                <SelectTrigger className="rounded-lg text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                  <SelectValue placeholder={formData.materia ? "Selecciona" : "Elige materia primero"} />
+                </SelectTrigger>
+                <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
+                  {parciales.map((p) => (
+                    <SelectItem key={p} value={p} className="dark:text-white dark:hover:bg-slate-800">{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="p-5 space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Grupo *</p>
+              <Select value={formData.grupo} onValueChange={(v) => setFormData((c) => ({ ...c, grupo: v }))} disabled={!formData.parcial}>
+                <SelectTrigger className="rounded-lg text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                  <SelectValue placeholder={formData.parcial ? "Selecciona" : "Elige parcial primero"} />
+                </SelectTrigger>
+                <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
+                  {groupsOptions.length > 0 ? (
+                    groupsOptions.map((g) => (
+                      <SelectItem key={g.id} value={formatGroupCode(g.group_code)} className="dark:text-white dark:hover:bg-slate-800">
+                        {formatGroupCode(g.group_code)}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-3 py-4 text-center text-sm text-amber-700 dark:text-amber-300">No hay grupos disponibles.</div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="p-5 space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nota para administración</p>
+              <Textarea
+                value={formData.nota}
+                onChange={(e) => setFormData((c) => ({ ...c, nota: e.target.value }))}
+                placeholder="Opcional"
+                className="min-h-[6rem] resize-none rounded-lg text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+              />
+            </div>
+            <div className="p-5 space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nombre del docente</p>
+              <div className="relative">
+                <Input value={formData.docente} readOnly className="rounded-lg bg-muted/50 cursor-default select-none pr-8 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
+                <Ban className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground dark:text-slate-500" />
+              </div>
+            </div>
+            <div className="p-5 space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Declaración de autorización</p>
+              <p className="text-xs text-muted-foreground dark:text-slate-400 leading-relaxed">
+                Autorizo el uso de estos datos con fines exclusivamente escolares y confirmo la veracidad de la información proporcionada.
+              </p>
+            </div>
+          </div>
+        }
+        footerActions={
+          <>
+            {(editingDocumentId !== null || editingBatchDocIds.length > 0) ? (
+              <Button variant="outline" size="sm" onClick={() => setCancelEditDialogOpen(true)} disabled={isSubmitting || isLoadingPdf} className="rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+                Cancelar
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={resetForm} disabled={isSubmitting || isLoadingPdf} className="rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800">
+                Limpiar
+              </Button>
+            )}
+            <Button variant="success" size="sm" onClick={handleSubmit} disabled={!isValid || isSubmitting || !formAccess.canSubmit || isLoadingPdf} className="rounded-lg px-5">
+              {isSubmitting ? "Enviando..." : editingDocumentId ? "Actualizar" : "Enviar asesoría"}
+            </Button>
+          </>
+        }
+        dialogs={
+          <>
+            <Dialog open={previewItem !== null} onOpenChange={(open) => { if (!open) closePreview(); }}>
+              <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
+                <DialogHeader><DialogTitle>{previewItem?.nombre ?? "Documento"}</DialogTitle></DialogHeader>
+                <div className="flex-1 min-h-0">
+                  {previewLoading ? <div className="flex h-[82vh] items-center justify-center text-sm text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mr-2" />Cargando...</div>
+                    : previewError ? <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{previewError}</div>
+                    : previewBlobUrl ? <object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border"><a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center text-sm text-primary underline">Abrir en nueva pestaña</a></object>
+                    : null}
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={cancelEditDialogOpen} onOpenChange={setCancelEditDialogOpen}>
+              <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
+                <DialogHeader>
+                  <DialogTitle className="dark:text-white">¿Cancelar edición?</DialogTitle>
+                  <DialogDescription className="dark:text-slate-400">Se perderán los cambios. El documento seguirá tal como estaba.</DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="flex-row justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setCancelEditDialogOpen(false)} className="dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Seguir editando</Button>
+                  <Button variant="destructive" onClick={() => { setCancelEditDialogOpen(false); resetForm(); }}>Sí, cancelar</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
+      />
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-1" ref={formRef}>
