@@ -25,7 +25,7 @@ import banner2Mobile from "../../../assets/carrusel_movil/carrusel2.webp";
 import banner3Mobile from "../../../assets/carrusel_movil/carrusel3.webp";
 import banner4Mobile from "../../../assets/carrusel_movil/carrusel4.webp";
 import banner5Mobile from "../../../assets/carrusel_movil/carrusel5.webp";
-import banner6Mobile from "../../../assets/carrusel_movil/carrusel6.png";
+import banner6Mobile from "../../../assets/carrusel_movil/carrusel6.webp";
 
 import { CarrerasLogoSlider } from "../../components/CarrerasLogoSlider";
 
@@ -287,21 +287,28 @@ function AutoFadeBannerCarousel({
             : 'aspect-[1852/849] sm:aspect-[5375/934]'
         }`}
       >
-        <div className="group relative block h-full w-full">
-          {currentImages.map((src, index) => {
-            const isActive = index === activeIndex;
-            return (
-              <img
-                key={src}
-                src={src}
-                alt="Banner institucional"
-                className={`absolute inset-0 h-full w-full object-cover transition-all duration-1000 ease-in-out ${
-                  isActive ? "opacity-100 group-hover:scale-[1.01]" : "opacity-0"
-                } ${isMinimized ? "opacity-0" : ""}`}
-                style={{ pointerEvents: "none" }}
-              />
-            );
-          })}
+       <div className="group relative block h-full w-full">
+         {currentImages.map((src, index) => {
+  const isActive = index === activeIndex;
+  const isNext = index === (activeIndex + 1) % currentImages.length;
+  if (!isActive && !isNext) return null;
+
+  return (
+    <img
+      key={src}
+      src={src}
+      alt="Banner institucional"
+      width={2200}
+      height={isMobile ? 1008 : 382}
+      loading={isActive ? "eager" : "lazy"}
+      fetchPriority={isActive ? "high" : "auto"}
+      className={`absolute inset-0 h-full w-full object-cover transition-all duration-1000 ease-in-out ${
+        isActive ? "opacity-100 group-hover:scale-[1.01]" : "opacity-0"
+      } ${isMinimized ? "opacity-0" : ""}`}
+      style={{ pointerEvents: "none" }}
+    />
+  );
+})}
 
           {!isMinimized && links?.[activeIndex] && (
             <a
@@ -366,19 +373,23 @@ function AutoFadeBannerCarousel({
             
             {/* Dots / indicadores de paginación */}
             <div className="absolute inset-x-0 bottom-3 z-10 flex items-center justify-center gap-1.5">
-              {currentImages.map((_, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveIndex(index); }}
-                  aria-label={`Ir a la imagen ${index + 1}`}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    index === activeIndex
-                      ? "w-6 bg-emerald-400"
-                      : "w-1.5 bg-white/50 hover:bg-white/70"
-                  }`}
-                />
-              ))}
+            {currentImages.map((_, index) => (
+  <button
+    key={index}
+    type="button"
+    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveIndex(index); }}
+    aria-label={`Ir a la imagen ${index + 1}`}
+    className="flex h-6 w-6 items-center justify-center"
+  >
+    <span
+      className={`block h-1.5 rounded-full transition-all duration-300 ${
+        index === activeIndex
+          ? "w-6 bg-emerald-400"
+          : "w-1.5 bg-white/50 hover:bg-white/70"
+      }`}
+    />
+  </button>
+))}
             </div>
           </>
         )}
@@ -698,7 +709,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             {/* Columna izquierda: documentos recientes */}
             <div className="flex flex-1 flex-col sm:overflow-hidden">
               <div className="shrink-0 flex items-center justify-between border-b border-border px-5 py-3 dark:border-slate-800">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Documentos Recientes</p>
+                {/* ✅ h3 → h2 - Desktop Documentos Recientes */}
+                <h2 className="text-base font-semibold text-slate-800 dark:text-white">Documentos Recientes</h2>
                 <button type="button" onClick={() => onNavigate?.("historial")} className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400">
                   Ver todos
                 </button>
@@ -756,7 +768,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             {/* Columna derecha: próximas entregas */}
             <div className="flex shrink-0 flex-col border-t border-border sm:border-t-0 sm:w-64 sm:overflow-hidden dark:border-slate-800">
               <div className="shrink-0 border-b border-border px-5 py-3 dark:border-slate-800">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Próximas Entregas</p>
+                {/* ✅ h3 → h2 - Desktop Próximas Entregas */}
+                <h2 className="text-base font-semibold text-slate-800 dark:text-white">Próximas Entregas</h2>
               </div>
               <div className="flex-1 overflow-y-auto divide-y divide-border dark:divide-slate-800/50">
                 {isLoadingProximas ? (
@@ -909,7 +922,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           {/* Documentos recientes — lista de texto */}
           <div className="mt-5 border-t border-emerald-600/15 pt-4 dark:border-emerald-400/20">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-white">Documentos Recientes</h3>
+              {/* ✅ h3 → h2 - Mobile Documentos Recientes */}
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-white">Documentos Recientes</h2>
               <button
                 type="button"
                 onClick={() => onNavigate?.("historial")}
@@ -967,7 +981,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
           {/* Próximas entregas — lista de texto */}
           <div className="mt-1 border-t border-emerald-600/15 pt-4 dark:border-emerald-400/20">
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-white">Próximas Entregas</h3>
+            {/* ✅ h3 → h2 - Mobile Próximas Entregas */}
+            <h2 className="text-sm font-semibold text-slate-800 dark:text-white">Próximas Entregas</h2>
 
             <div className="mt-1 divide-y divide-emerald-600/15 dark:divide-emerald-400/20">
               {isLoadingProximas ? (
@@ -1055,7 +1070,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           <div data-tour="docente-dashboard-recent" className="p-5 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-semibold text-slate-800 dark:text-white">Documentos Recientes</h3>
+                {/* ✅ h3 → h2 - Desktop Documentos Recientes (dentro de la sección) */}
+                <h2 className="text-base font-semibold text-slate-800 dark:text-white">Documentos Recientes</h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Últimos documentos enviados</p>
               </div>
               <button
@@ -1130,7 +1146,8 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           </div>
 
           <div data-tour="docente-dashboard-upcoming" className="p-5 sm:p-6">
-            <h3 className="text-base font-semibold text-slate-800 dark:text-white">Próximas Entregas</h3>
+            {/* ✅ h3 → h2 - Desktop Próximas Entregas (dentro de la sección) */}
+            <h2 className="text-base font-semibold text-slate-800 dark:text-white">Próximas Entregas</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">Fechas límite importantes</p>
 
             <div className="thin-scroll mt-4 max-h-[60vh] overflow-x-hidden overflow-y-auto pr-1 sm:max-h-[22rem]">

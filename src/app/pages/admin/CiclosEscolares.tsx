@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/pop
 import { SearchableSelect } from "../../components/SearchableSelect";
 import { AlertTriangle, Calendar, CalendarDays, Check, ChevronLeft, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
 import { format, isValid } from "date-fns";
-import { es } from "date-fns/locale";
+import { es } from "date-fns/locale/es";
 import { cn } from "../../components/ui/utils";
 import { toast } from "sonner";
 import { ScrollArea } from "../../components/ui/scroll-area";

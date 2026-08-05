@@ -12,7 +12,7 @@ import { Calendar } from "../../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { cn } from "../../components/ui/utils";
 import { format, isValid } from "date-fns";
-import { es } from "date-fns/locale";
+import { es } from "date-fns/locale/es";
 import { getDefaultFormConfig, getBackendFormCode, type FormId, type FormRole, type Group } from "../../../lib/formConfig";
 import { updateFormsCache } from "../../components/FormAccessGuard";
 import { useAuth } from "../../context/AuthContext";

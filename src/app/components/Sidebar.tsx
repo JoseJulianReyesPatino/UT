@@ -559,9 +559,9 @@ export function Sidebar(props: Readonly<SidebarProps>) {
               }}
               aria-label={isMobile ? "Cerrar menú" : isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
               title={isMobile ? "Cerrar menú" : isCollapsedLocal ? "Expandir sidebar" : "Colapsar sidebar"}
-              className={isFormal
-                ? "h-8 w-8 rounded-full border border-emerald-200/50 bg-white text-emerald-600/60 hover:bg-emerald-50 hover:text-emerald-700 dark:border-emerald-800/40 dark:bg-slate-900 dark:text-emerald-400/50 dark:hover:bg-slate-800"
-                : "h-8 w-8 rounded-full border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
+            className={isFormal
+                ? "h-10 w-10 rounded-full border border-emerald-200/50 bg-white text-emerald-600/60 hover:bg-emerald-50 hover:text-emerald-700 dark:border-emerald-800/40 dark:bg-slate-900 dark:text-emerald-400/50 dark:hover:bg-slate-800"
+                : "h-10 w-10 rounded-full border border-emerald-200/70 bg-white/80 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-emerald-300 dark:hover:bg-slate-800"
               }
             >
               <ChevronLeft className={cn("h-4 w-4 transition-transform", !isMobile && isCollapsedLocal && "rotate-180")} />

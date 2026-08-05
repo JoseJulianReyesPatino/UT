@@ -24,13 +24,7 @@ import LogoUTSLRC from "../assets/elementos/LogotipoUTSLRC.webp";
 import LogoUTSLRCWhite from "../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
 import SuperiorFormImg from "../assets/elementos/superior_form.webp";
 import BgDefault from "../assets/Fondos/ut_imagen14.webp";
-import BgITIID from "../assets/Fondos/Fondo_ITIID.webp";
-import BgMecatronica from "../assets/Fondos/Fondo_Mecatronica.webp";
-import BgAlimentarios from "../assets/Fondos/Fondo_Procesos_Alimentarios.webp";
-import BgElectromecanica from "../assets/Fondos/Fondo_Electromecanica.webp";
-import BgEnergias from "../assets/Fondos/Fondo_Energias.webp";
-import BgLogistica from "../assets/Fondos/Fondo_Logistica.webp";
-import BgNegocios from "../assets/Fondos/Fondo_Negocios.webp";
+
 
 // Páginas cargadas bajo demanda
 const DocenteDashboard = React.lazy(() => import("./pages/docente/DocenteDashboard"));
@@ -64,14 +58,8 @@ const TourOverlay = React.lazy(() => import("./components/tour/TourOverlay").the
 
 const BG_OPTIONS = [
   { key: "default",        label: "Universidad",    src: BgDefault },
-  { key: "itiid",          label: "ITIID",          src: BgITIID },
-  { key: "mecatronica",    label: "Mecatrónica",    src: BgMecatronica },
-  { key: "alimentarios",   label: "Alimentos",      src: BgAlimentarios },
-  { key: "electromecanica", label: "Electromecánica", src: BgElectromecanica },
-  { key: "energias",       label: "Energías",       src: BgEnergias },
-  { key: "logistica",      label: "Logística",      src: BgLogistica },
-  { key: "negocios",       label: "Negocios",       src: BgNegocios },
 ] as const;
+
 const BG_STORAGE_KEY       = "utslrc-bg-key";
 const BG_OVERLAY_KEY       = "utslrc-bg-overlay";
 const CONTAINER_ALPHA_KEY  = "utslrc-container-alpha";
@@ -932,8 +920,9 @@ useEffect(() => {
                       <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Diseño del sistema</span>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">Vinculado a tu cuenta</p>
                     </div>
-                    <button onClick={() => setIsLayoutPanelOpen(false)} className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
-                      <X className="h-3.5 w-3.5 text-slate-500" />
+                    {/* ✅ Botón Layout Panel - actualizado */}
+                    <button onClick={() => setIsLayoutPanelOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <X className="h-4 w-4 text-slate-500" />
                     </button>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -1077,9 +1066,10 @@ useEffect(() => {
                       <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Tema de color</span>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">Vinculado a tu cuenta</p>
                     </div>
+                    {/* ✅ Botón Theme Panel - actualizado */}
                     <button
                       onClick={() => setIsThemePanelOpen(false)}
-                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                      className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -1121,9 +1111,10 @@ useEffect(() => {
                 <div className="fixed bottom-4 right-[3.5rem] z-50 w-72 rounded-2xl border border-border/60 bg-background/95 p-4 shadow-2xl backdrop-blur-xl">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Fondo de pantalla</span>
+                    {/* ✅ Botón Bg Panel - actualizado */}
                     <button
                       onClick={() => setIsBgPanelOpen(false)}
-                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                      className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
                     >
                       <X className="h-4 w-4" />
                     </button>
