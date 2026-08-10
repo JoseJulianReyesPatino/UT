@@ -78,11 +78,12 @@ export function FormalFormLayout({
           <span className="hidden sm:inline">Historial</span>
         </button>
       </SheetTrigger>
-      <SheetContent
-        side="right"
-        className="w-full overflow-x-hidden overflow-y-auto sm:max-w-xl dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
-        overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
-      >
+  <SheetContent
+  side="right"
+  data-tour="docente-historial-panel"  // ← AGREGAR ESTO
+  className="w-full overflow-x-hidden overflow-y-auto sm:max-w-xl dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
+  overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
+>
         <SheetHeader>
           <SheetTitle className="dark:text-white">Historial de archivos</SheetTitle>
           <SheetDescription className="dark:text-slate-400">

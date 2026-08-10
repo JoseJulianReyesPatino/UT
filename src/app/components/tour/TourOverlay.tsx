@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface TourStep {
@@ -203,7 +204,7 @@ export function TourOverlay({
       }
     }
 
-    const delay = navigated ? 500
+   const delay = navigated ? 650
       : isNavTarget && mobileVp ? 350
       : prevWasNav && mobileVp ? 400
       : 120;
@@ -256,7 +257,8 @@ export function TourOverlay({
     return { left: ts.left + tw + 44, top: ts.top + tooltipH / 2 };
   })();
 
-  return (
+  // 🔥 PORTAL AL BODY - EL TOUR SIEMPRE ESTARÁ EN EL MISMO NIVEL QUE LOS SHEETS
+  return createPortal(
     <>
       <style>{`
         @keyframes _tour-content-in {
@@ -449,6 +451,7 @@ export function TourOverlay({
           />
         </div>
       )}
-    </>
+    </>,
+    document.body
   );
 }
