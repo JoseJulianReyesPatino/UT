@@ -920,7 +920,6 @@ useEffect(() => {
                       <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Diseño del sistema</span>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">Vinculado a tu cuenta</p>
                     </div>
-                    {/* ✅ Botón Layout Panel - actualizado */}
                     <button onClick={() => setIsLayoutPanelOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
                       <X className="h-4 w-4 text-slate-500" />
                     </button>
@@ -1066,7 +1065,6 @@ useEffect(() => {
                       <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Tema de color</span>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">Vinculado a tu cuenta</p>
                     </div>
-                    {/* ✅ Botón Theme Panel - actualizado */}
                     <button
                       onClick={() => setIsThemePanelOpen(false)}
                       className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
@@ -1111,7 +1109,6 @@ useEffect(() => {
                 <div className="fixed bottom-4 right-[3.5rem] z-50 w-72 rounded-2xl border border-border/60 bg-background/95 p-4 shadow-2xl backdrop-blur-xl">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Fondo de pantalla</span>
-                    {/* ✅ Botón Bg Panel - actualizado */}
                     <button
                       onClick={() => setIsBgPanelOpen(false)}
                       className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
@@ -1275,10 +1272,14 @@ useEffect(() => {
               </>
             )}
 
-            {/* Barra flotante de herramientas */}
+            {/* ── BARRA FLOTANTE DE HERRAMIENTAS ── */}
             <div className="fixed bottom-4 right-4 z-50 flex flex-col-reverse items-center gap-3">
+              {/* Botón de modo oscuro/claro */}
               <Button
-                type="button" variant="outline" size="icon"
+                type="button"
+                variant="outline"
+                size="icon"
+                data-tour="toolbar-theme-toggle"
                 onClick={toggleTheme}
                 aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
                 title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
@@ -1287,19 +1288,25 @@ useEffect(() => {
                 {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
 
-              <button
-                onClick={toggleToolbar}
-                aria-label={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
-                title={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#3BBF82]/50 bg-white/85 text-emerald-700 shadow-md backdrop-blur transition-colors hover:bg-white hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900"
-              >
-                <ChevronUp className={`h-4 w-4 transition-transform duration-200 ${isToolbarExpanded ? "rotate-180" : ""}`} />
-              </button>
+              {/* Botón de expandir/colapsar toolbar */}
+<button
+  data-tour="toolbar-toggle"  // ← ESTO DEBE ESTAR
+  onClick={toggleToolbar}
+  aria-label={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
+  title={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
+  className="flex h-8 w-8 items-center justify-center rounded-full border border-[#3BBF82]/50 bg-white/85 text-emerald-700 shadow-md backdrop-blur transition-colors hover:bg-white hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900"
+>
+  <ChevronUp className={`h-4 w-4 transition-transform duration-200 ${isToolbarExpanded ? "rotate-180" : ""}`} />
+</button>
 
               {isToolbarExpanded && (
                 <>
+                  {/* Botón de Diseño del sistema */}
                   <Button
-                    type="button" variant="outline" size="icon"
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    data-tour="toolbar-layout"
                     onClick={() => { setIsBgPanelOpen(false); setIsThemePanelOpen(false); setIsLayoutPanelOpen(p => !p); }}
                     aria-label="Cambiar diseño del sistema"
                     title="Cambiar diseño del sistema"
@@ -1308,8 +1315,12 @@ useEffect(() => {
                     <LayoutGrid className="h-4 w-4" />
                   </Button>
 
+                  {/* Botón de Tema de color */}
                   <Button
-                    type="button" variant="outline" size="icon"
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    data-tour="toolbar-themes"
                     onClick={() => { setIsBgPanelOpen(false); setIsLayoutPanelOpen(false); setIsThemePanelOpen(p => !p); }}
                     aria-label="Cambiar tema de color"
                     title="Cambiar tema de color"
@@ -1318,8 +1329,12 @@ useEffect(() => {
                     <Palette className="h-4 w-4" />
                   </Button>
 
+                  {/* Botón de Fondo de pantalla */}
                   <Button
-                    type="button" variant="outline" size="icon"
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    data-tour="toolbar-background"
                     onClick={() => { setIsThemePanelOpen(false); setIsLayoutPanelOpen(false); setIsBgPanelOpen(p => !p); }}
                     aria-label="Cambiar fondo de pantalla"
                     title="Cambiar fondo de pantalla"
@@ -1328,9 +1343,13 @@ useEffect(() => {
                     <ImageIcon className="h-4 w-4" />
                   </Button>
 
+                  {/* ── BOTONES DEL TOUR ── */}
+                  {/* Tour para Administrador */}
                   {isAdmin && !isAdminTourOpen && (
                     <Button
-                      type="button" variant="outline" size="icon"
+                      type="button"
+                      variant="outline"
+                      size="icon"
                       onClick={() => setShowTourConfirm("admin")}
                       aria-label="Iniciar tutorial del sistema"
                       title="Iniciar tutorial del sistema"
@@ -1339,9 +1358,13 @@ useEffect(() => {
                       <HelpCircle className="h-4 w-4" />
                     </Button>
                   )}
+                  
+                  {/* Tour para Docente */}
                   {isDocente && !isDocenteTourOpen && (
                     <Button
-                      type="button" variant="outline" size="icon"
+                      type="button"
+                      variant="outline"
+                      size="icon"
                       onClick={() => setShowTourConfirm("docente")}
                       aria-label="Iniciar tutorial del sistema"
                       title="Iniciar tutorial del sistema"
@@ -1376,26 +1399,33 @@ useEffect(() => {
                 />
               )}
 
-              {isDocente && (
-                <TourOverlay
-                  steps={getDocenteTourSteps(
-                    (user?.role === "docente" || (user?.roles?.includes("docente") ?? false)) && canAccessTutorias
-                  )}
-                  isOpen={isDocenteTourOpen}
-                  onClose={() => setIsDocenteTourOpen(false)}
-                  onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
-                  onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
-                  onNavigate={(view) => {
-                    const [mainView, subParam] = view.split(":");
-                    setCurrentView(mainView);
-                    if (subParam) {
-                      setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent("tour-sub-nav", { detail: subParam }));
-                      }, 200);
-                    }
-                  }}
-                />
-              )}
+         {/* ── TOUR PARA DOCENTE ── */}
+{isDocente && (
+  <TourOverlay
+    steps={getDocenteTourSteps(
+      (user?.role === "docente" || (user?.roles?.includes("docente") ?? false)) && canAccessTutorias
+    )}
+    isOpen={isDocenteTourOpen}
+    onClose={() => setIsDocenteTourOpen(false)}
+    onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+    onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
+    onNavigate={(view) => {
+      const [mainView, subParam] = view.split(":");
+      setCurrentView(mainView);
+      if (subParam) {
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("tour-sub-nav", { detail: subParam }));
+        }, 200);
+      }
+    }}
+    onStepChange={(step) => {
+      const toolbarTargets = ['toolbar-toggle', 'toolbar-theme-toggle', 'toolbar-themes', 'toolbar-layout', 'toolbar-background'];
+      if (step && toolbarTargets.includes(step.target)) {
+        setIsToolbarExpanded(true);
+      }
+    }}
+  />
+)}
             </Suspense>
 
             <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>

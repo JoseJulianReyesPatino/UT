@@ -17,6 +17,7 @@ interface Props {
   onNavigate?: (view: string) => void;
   onOpenMobileSidebar?: () => void;
   onCloseMobileSidebar?: () => void;
+  onStepChange?: (step: TourStep) => void;
 }
 
 const GAP = 12;
@@ -91,9 +92,6 @@ function spotlightRect(rect: DOMRect) {
   return { top: rect.top, left: rect.left, width: rect.width, height: h };
 }
 
-// When the sidebar renders twice (desktop + mobile drawer), both have the same
-// data-tour attribute. querySelector always picks the first (desktop, display:none).
-// This helper finds the first element that is actually visible (non-zero rect).
 function findTourElement(target: string): Element | null {
   const all = document.querySelectorAll(`[data-tour="${target}"]`);
   for (const el of Array.from(all)) {
@@ -103,17 +101,22 @@ function findTourElement(target: string): Element | null {
   return all[0] ?? null;
 }
 
-export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSidebar, onCloseMobileSidebar }: Props) {
+export function TourOverlay({ 
+  steps, 
+  isOpen, 
+  onClose, 
+  onNavigate, 
+  onOpenMobileSidebar, 
+  onCloseMobileSidebar,
+  onStepChange 
+}: Props) {
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_BP);
   const [tooltipH, setTooltipH] = useState(FALLBACK_H);
-  // Controls spotlight + tooltip visibility during navigation transitions
   const [spotReady, setSpotReady] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const prevViewRef = useRef<string | undefined>(undefined);
-  // Tracks whether the previous step was a nav step (sidebar was opened), so we
-  // know to wait longer for the sidebar close animation before looking up the element.
   const prevStepWasNavRef = useRef(false);
 
   useEffect(() => {
@@ -129,21 +132,23 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
       prevStepWasNavRef.current = false;
       setSpotReady(false);
     } else {
-      // Close the sidebar when the tour ends so it doesn't stay open on mobile
       if (window.innerWidth < MOBILE_BP) onCloseMobileSidebar?.();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, onCloseMobileSidebar]);
 
   useEffect(() => {
     if (!isOpen) return;
     const current = steps[step];
     if (!current) return;
 
+    if (onStepChange) {
+      onStepChange(current);
+    }
+
     const navigated = Boolean(current.view && current.view !== prevViewRef.current);
     if (navigated && onNavigate) {
       prevViewRef.current = current.view;
-      setSpotReady(false); // hide everything while view transitions
+      setSpotReady(false);
       onNavigate(current.view!);
     }
 
@@ -154,16 +159,12 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
 
     if (mobileVp) {
       if (isNavTarget) {
-        // Open sidebar so the nav item is visible and spotlight-able
         onOpenMobileSidebar?.();
       } else {
-        // Close sidebar so page content is visible for non-nav steps
         onCloseMobileSidebar?.();
       }
     }
 
-    // Give extra time when coming from a nav step — the sidebar close animation
-    // needs to finish before the target element becomes measurable.
     const delay = navigated ? 700
       : isNavTarget && mobileVp ? 400
       : prevWasNav && mobileVp ? 500
@@ -171,22 +172,71 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
 
     const t = setTimeout(() => {
       const el = findTourElement(current.target);
-      if (!el) { setRect(null); setSpotReady(false); return; }
-      el.scrollIntoView({ behavior: "instant" as ScrollBehavior, block: "nearest" });
-      setRect(el.getBoundingClientRect());
-      setSpotReady(true);
+      if (!el) { 
+        setRect(null); 
+        setSpotReady(false); 
+        return; 
+      }
+      
+      // ── 🔥 SCROLL MEJORADO: FORZAR EL CENTRADO ──
+      const rectElement = el.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const elementHeight = rectElement.height;
+      const headerOffset = 80; // Espacio para el header fijo
+      
+      // Calcular la posición donde debe quedar el elemento (centrado)
+      const targetScrollY = rectElement.top + window.scrollY - (viewportHeight / 2) + (elementHeight / 2) - headerOffset;
+      
+      // Hacer scroll suave a la posición calculada
+      window.scrollTo({
+        top: Math.max(0, targetScrollY),
+        behavior: "smooth"
+      });
+      
+      // ── 🔥 VERIFICAR QUE EL SCROLL FUNCIONÓ ──
+      // Esperar a que termine el scroll y verificar la posición
+      const checkScrollPosition = (attempts: number = 0) => {
+        const maxAttempts = 10;
+        const newRect = el.getBoundingClientRect();
+        
+        // Verificar si el elemento está visible y centrado
+        const isCentered = 
+          newRect.top >= -50 && 
+          newRect.bottom <= viewportHeight + 50 &&
+          Math.abs(newRect.top - (viewportHeight / 2 - newRect.height / 2)) < 100;
+        
+        if (isCentered || attempts >= maxAttempts) {
+          // El elemento está centrado o ya no hay más intentos
+          setRect(newRect);
+          setSpotReady(true);
+          return;
+        }
+        
+        // Si no está centrado, intentar de nuevo con un pequeño ajuste
+        const currentRect = el.getBoundingClientRect();
+        const adjustment = currentRect.top - (viewportHeight / 2 - currentRect.height / 2);
+        window.scrollBy({
+          top: adjustment,
+          behavior: "smooth"
+        });
+        
+        // Reintentar después de otro delay
+        setTimeout(() => checkScrollPosition(attempts + 1), 150);
+      };
+      
+      // Iniciar la verificación después del scroll inicial
+      setTimeout(() => checkScrollPosition(), 400);
+      
     }, delay);
+    
     return () => clearTimeout(t);
-  }, [step, isOpen, steps, onNavigate, onOpenMobileSidebar, onCloseMobileSidebar]);
+  }, [step, isOpen, steps, onNavigate, onOpenMobileSidebar, onCloseMobileSidebar, onStepChange]);
 
-  // Measure tooltip height only when step or open state changes — prevents per-render flicker.
-  // useLayoutEffect runs synchronously after DOM update so the new content is measurable.
   useLayoutEffect(() => {
     if (!tooltipRef.current || isMobile) return;
     const h = tooltipRef.current.offsetHeight;
     if (Math.abs(h - tooltipH) > 2) setTooltipH(h);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, isOpen]);
+  }, [step, isOpen, isMobile, tooltipH]);
 
   if (!isOpen) return null;
 
@@ -197,7 +247,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
   const isLast = step === steps.length - 1;
   const spot = rect ? spotlightRect(rect) : null;
 
-  // Reserve space to the right so the mascot image never exits the viewport
   const hasImage = !!current.image && !isMobile;
   const imageReserve = hasImage ? 128 : 0;
 
@@ -208,24 +257,17 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
     : { top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: tw };
 
   const borderRadius = isMobile ? "20px 20px 0 0" : "16px";
-
-  // Tooltip is hidden during navigation (when rect exists but spotReady is false)
-  // to avoid it briefly showing at the old position before the new one is measured.
   const tooltipOpacity = !rect || spotReady ? 1 : 0;
 
-  // Mascot position: fixed element to the right of the card, calculated from the card's position.
-  // Rendered as a sibling element (not inside the card) to avoid overflow/clipping issues.
   const mascotPos = (() => {
     if (!hasImage) return null;
     const ts = tooltipStyle as { top?: unknown; left?: unknown };
     if (typeof ts.top !== "number" || typeof ts.left !== "number") return null;
-    // Center of the circle: 44px to the right of card edge (circle straddles edge by ~20px)
     return { left: ts.left + tw + 44, top: ts.top + tooltipH / 2 };
   })();
 
   return (
     <>
-      {/* CSS keyframes — injected once per render tree, no external file needed */}
       <style>{`
         @keyframes _tour-content-in {
           from { opacity: 0; transform: scale(0.97); }
@@ -237,7 +279,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
         }
       `}</style>
 
-      {/* ── Spotlight (dark overlay + green ring) ───────────────────────────── */}
       {spot && (
         <div
           className="fixed pointer-events-none"
@@ -253,7 +294,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
               "0 0 0 9999px rgba(0,0,0,0.58)," +
               "0 0 0 2px #10b981," +
               "0 0 22px 6px rgba(16,185,129,0.4)",
-            // Smooth slide between steps; opacity fade for navigation transitions.
             transition:
               "top 370ms cubic-bezier(0.4,0,0.2,1)," +
               "left 370ms cubic-bezier(0.4,0,0.2,1)," +
@@ -264,10 +304,8 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
         />
       )}
 
-      {/* ── Click-away backdrop ─────────────────────────────────────────────── */}
       <div className="fixed inset-0" style={{ zIndex: 9997 }} onClick={onClose} />
 
-      {/* ── Tooltip card ────────────────────────────────────────────────────── */}
       <div
         ref={tooltipRef}
         className="fixed z-[10001] overflow-visible border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
@@ -275,7 +313,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
           ...tooltipStyle,
           borderRadius,
           opacity: tooltipOpacity,
-          // Slide tooltip to new position on same-view steps; fade during navigation.
           transition: rect
             ? "top 370ms cubic-bezier(0.4,0,0.2,1),left 370ms cubic-bezier(0.4,0,0.2,1),opacity 220ms ease"
             : "opacity 220ms ease",
@@ -283,12 +320,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/*
-          Inner content wrapper re-mounts on every step change (key={step}).
-          This triggers the fade+scale animation on new content without
-          re-mounting the outer positioned container (which would reset the
-          smooth position transition).
-        */}
         <div
           key={step}
           style={{
@@ -297,14 +328,12 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
               : "_tour-content-in 240ms cubic-bezier(0.4,0,0.2,1) both",
           }}
         >
-          {/* Mobile drag handle */}
           {isMobile && (
             <div className="flex justify-center pt-3 pb-0.5">
               <div className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" />
             </div>
           )}
 
-          {/* Header */}
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <span className="text-[11px] font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
               {step + 1} de {steps.length}
@@ -318,7 +347,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
             </button>
           </div>
 
-          {/* Content */}
           <div
             className="px-4 pb-3"
             style={hasImage ? { paddingRight: "2.75rem" } : undefined}
@@ -331,7 +359,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
             </div>
           </div>
 
-          {/* Progress bar */}
           <div className="mx-4 mb-3 h-1 rounded-full bg-slate-100 dark:bg-slate-800">
             <div
               className="h-1 rounded-full bg-emerald-500 transition-all duration-300"
@@ -339,7 +366,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
             />
           </div>
 
-          {/* Footer */}
           <div
             className="flex items-center justify-between px-4 pb-4"
             style={isMobile ? { paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" } : undefined}
@@ -371,7 +397,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
         </div>
       </div>
 
-      {/* ── Mascot — concentric semi-transparent rings behind the gallo ── */}
       {mascotPos && (
         <div
           key={`img-${step}`}
@@ -388,7 +413,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
             transition: "opacity 220ms ease",
           }}
         >
-          {/* Ring 1 — outermost, most transparent */}
           <div aria-hidden="true" style={{
             position: "absolute", top: "50%", left: "50%",
             transform: "translate(-50%, -50%)",
@@ -400,7 +424,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
             boxShadow: "0 0 22px 8px rgba(16,185,129,0.08)",
             zIndex: 1,
           }} />
-          {/* Ring 2 — middle */}
           <div aria-hidden="true" style={{
             position: "absolute", top: "50%", left: "50%",
             transform: "translate(-50%, -50%)",
@@ -411,7 +434,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
             border: "1.5px solid rgba(16,185,129,0.28)",
             zIndex: 2,
           }} />
-          {/* Ring 3 — innermost, most visible */}
           <div aria-hidden="true" style={{
             position: "absolute", top: "50%", left: "50%",
             transform: "translate(-50%, -50%)",
@@ -422,7 +444,6 @@ export function TourOverlay({ steps, isOpen, onClose, onNavigate, onOpenMobileSi
             border: "2px solid rgba(16,185,129,0.42)",
             zIndex: 3,
           }} />
-          {/* Gallo image — on top of all rings */}
           <img
             src={current.image}
             alt=""

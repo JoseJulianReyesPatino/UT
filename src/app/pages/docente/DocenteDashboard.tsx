@@ -322,31 +322,32 @@ function AutoFadeBannerCarousel({
         </div>
 
         <button
-          type="button"
-          onClick={toggleMinimize}
-          aria-label={isMinimized ? "Expandir carrusel" : "Minimizar carrusel"}
-          className={`absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-105 ${
-            isMinimized 
-              ? 'bg-emerald-600/90 hover:bg-emerald-700/90 dark:bg-emerald-500/90 dark:hover:bg-emerald-600/90' 
-              : 'bg-black/50 hover:bg-black/70'
-          }`}
-        >
-          {isMinimized ? (
-            <>
-              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-                <path d="M19 9l-7 7-7-7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="hidden sm:inline">Expandir</span>
-            </>
-          ) : (
-            <>
-              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-                <path d="M5 15l7-7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="hidden sm:inline">Minimizar</span>
-            </>
-          )}
-        </button>
+  type="button"
+  data-tour="docente-dashboard-carrusel-minimizar"
+  onClick={toggleMinimize}
+  aria-label={isMinimized ? "Expandir carrusel" : "Minimizar carrusel"}
+  className={`absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-105 ${
+    isMinimized 
+      ? 'bg-emerald-600/90 hover:bg-emerald-700/90 dark:bg-emerald-500/90 dark:hover:bg-emerald-600/90' 
+      : 'bg-black/50 hover:bg-black/70'
+  }`}
+>
+  {isMinimized ? (
+    <>
+      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+        <path d="M19 9l-7 7-7-7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span className="hidden sm:inline">Expandir</span>
+    </>
+  ) : (
+    <>
+      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+        <path d="M5 15l7-7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span className="hidden sm:inline">Minimizar</span>
+    </>
+  )}
+</button>
 
         {currentImages.length > 1 && !isMinimized && (
           <>
@@ -856,21 +857,23 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   return (
     <div className="space-y-5 sm:space-y-6">
       {/* Saludo y fecha */}
-      <div className="px-1">
-        <h1 className="text-xl font-semibold text-slate-800 dark:text-white sm:text-2xl">
-          Hola, {nombreUsuario}
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Hoy es {fechaCapitalizada}
-        </p>
-      </div>
+      <div className="px-1" data-tour="docente-dashboard-saludo">
+  <h1 className="text-xl font-semibold text-slate-800 dark:text-white sm:text-2xl">
+    Hola, {nombreUsuario}
+  </h1>
+  <p className="text-sm text-slate-500 dark:text-slate-400">
+    Hoy es {fechaCapitalizada}
+  </p>
+</div>
 
-      {/* Carrusel con imágenes responsive */}
-      <AutoFadeBannerCarousel 
-        images={introBanners} 
-        mobileImages={introBannersMobile}
-        links={bannerLinks}
-      />
+  {/* Carrusel con imágenes responsive */}
+<div data-tour="docente-dashboard-carrusel">
+  <AutoFadeBannerCarousel 
+    images={introBanners} 
+    mobileImages={introBannersMobile}
+    links={bannerLinks}
+  />
+</div>
 
       {/* Mensaje de error de carga */}
       {loadError && (
