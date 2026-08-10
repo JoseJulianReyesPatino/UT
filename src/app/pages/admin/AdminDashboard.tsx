@@ -632,7 +632,7 @@ export function AdminDashboard({ onNavigate, layoutStyle }: Readonly<AdminDashbo
       {layoutStyle === "formal" ? (
         <>
           {/* Barra de métricas horizontal */}
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-slate-200 bg-slate-200 sm:grid-cols-4 dark:border-slate-800 dark:bg-slate-800">
+          <div data-tour="admin-dashboard-stats" className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-slate-200 bg-slate-200 sm:grid-cols-4 dark:border-slate-800 dark:bg-slate-800">
             {isLoading
               ? Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="h-[84px] animate-pulse bg-white dark:bg-slate-950" />
@@ -658,7 +658,7 @@ export function AdminDashboard({ onNavigate, layoutStyle }: Readonly<AdminDashbo
           </div>
 
           {/* Tabla de documentos pendientes */}
-          <div className="overflow-hidden rounded-sm border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+          <div data-tour="admin-dashboard-pending" className="overflow-hidden rounded-sm border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-800">
               <div>
                 <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Documentos Pendientes de Revisión</h2>
@@ -717,7 +717,7 @@ export function AdminDashboard({ onNavigate, layoutStyle }: Readonly<AdminDashbo
           </div>
 
           {/* Lista compacta de actividad reciente */}
-          <div className="overflow-hidden rounded-sm border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+          <div data-tour="admin-dashboard-activity" className="overflow-hidden rounded-sm border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
             <div className="border-b border-slate-200 px-5 py-3 dark:border-slate-800">
               <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Actividad Reciente</h2>
               <p className="text-xs text-slate-400 dark:text-slate-500">Últimas acciones en el sistema</p>

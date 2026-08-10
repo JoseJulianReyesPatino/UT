@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Calendar,
   Eye,
+  Send,
 } from "lucide-react";
 
 import banner1 from "../../../assets/carrusel_web/carruselPC1.webp";
@@ -63,7 +64,7 @@ let dashboardCache: {
     description: string;
     icon: any;
     action?: string;
-    accent: 'amber' | 'emerald' | 'slate';
+    accent: 'amber' | 'emerald' | 'slate' | 'rose';
   }[];
   recentDocuments: DocumentItem[];
   proximasEntregas: any[];
@@ -76,12 +77,13 @@ if (import.meta.hot) {
   dashboardCache = null;
 }
 
-const STAT_ICONS = [Clock, CheckCircle2, AlertCircle];
+const STAT_ICONS = [Send, CheckCircle2, Clock, AlertCircle];
 
 const ACCENT = {
   amber:   { dot: "bg-amber-500",   value: "text-amber-700 dark:text-amber-400" },
   emerald: { dot: "bg-emerald-500", value: "text-emerald-700 dark:text-emerald-400" },
   slate:   { dot: "bg-slate-400",   value: "text-slate-600 dark:text-slate-300" },
+  rose:    { dot: "bg-rose-500",    value: "text-rose-700 dark:text-rose-400" },
 } as const;
 
 const readSessionCache = (): typeof dashboardCache => {
@@ -159,7 +161,7 @@ const introBannersMobile = [banner1Mobile, banner2Mobile, banner3Mobile, banner4
 function StatCardSkeleton() {
   return (
     <>
-      {Array.from({ length: 3 }).map((_, i) => (
+      {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="animate-pulse space-y-3 p-5">
           <div className="h-3 w-28 rounded-full bg-muted" />
           <div className="h-8 w-16 rounded-lg bg-muted" />
@@ -322,32 +324,32 @@ function AutoFadeBannerCarousel({
         </div>
 
         <button
-  type="button"
-  data-tour="docente-dashboard-carrusel-minimizar"
-  onClick={toggleMinimize}
-  aria-label={isMinimized ? "Expandir carrusel" : "Minimizar carrusel"}
-  className={`absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-105 ${
-    isMinimized 
-      ? 'bg-emerald-600/90 hover:bg-emerald-700/90 dark:bg-emerald-500/90 dark:hover:bg-emerald-600/90' 
-      : 'bg-black/50 hover:bg-black/70'
-  }`}
->
-  {isMinimized ? (
-    <>
-      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-        <path d="M19 9l-7 7-7-7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <span className="hidden sm:inline">Expandir</span>
-    </>
-  ) : (
-    <>
-      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-        <path d="M5 15l7-7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <span className="hidden sm:inline">Minimizar</span>
-    </>
-  )}
-</button>
+          type="button"
+          data-tour="docente-dashboard-carrusel-minimizar"
+          onClick={toggleMinimize}
+          aria-label={isMinimized ? "Expandir carrusel" : "Minimizar carrusel"}
+          className={`absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-105 ${
+            isMinimized 
+              ? 'bg-emerald-600/90 hover:bg-emerald-700/90 dark:bg-emerald-500/90 dark:hover:bg-emerald-600/90' 
+              : 'bg-black/50 hover:bg-black/70'
+          }`}
+        >
+          {isMinimized ? (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                <path d="M19 9l-7 7-7-7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="hidden sm:inline">Expandir</span>
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                <path d="M5 15l7-7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="hidden sm:inline">Minimizar</span>
+            </>
+          )}
+        </button>
 
         {currentImages.length > 1 && !isMinimized && (
           <>
@@ -409,9 +411,10 @@ function AutoFadeBannerCarousel({
 }
 
 const FAKE_STATS = [
-  { title: "Documentos Pendientes", value: "2", description: "Pendientes de revisión", icon: Clock, action: "historial", accent: "amber" as const },
-  { title: "Documentos Aprobados", value: "5", description: "Este cuatrimestre", icon: CheckCircle2, action: "historial", accent: "emerald" as const },
-  { title: "En Revisión", value: "1", description: "Actualmente en proceso", icon: AlertCircle, action: "historial", accent: "slate" as const },
+  { title: "Enviados", value: "8", description: "Total de documentos enviados", icon: Send, action: "historial", accent: "slate" as const },
+  { title: "Revisados", value: "5", description: "Este cuatrimestre", icon: CheckCircle2, action: "historial", accent: "emerald" as const },
+  { title: "En Revisión", value: "2", description: "Actualmente en proceso", icon: Clock, action: "historial", accent: "amber" as const },
+  { title: "Devueltos", value: "1", description: "Requieren corrección", icon: AlertCircle, action: "historial", accent: "rose" as const },
 ];
 
 const FAKE_RECENT_DOCS: DocumentItem[] = [
@@ -444,7 +447,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     description: string;
     icon: any;
     action?: string;
-    accent: 'amber' | 'emerald' | 'slate';
+    accent: 'amber' | 'emerald' | 'slate' | 'rose';
   }[]>(() => (dashboardCache ?? readSessionCache())?.stats ?? []);
   const [isLoadingStats, setIsLoadingStats] = useState(() => !(dashboardCache ?? readSessionCache()));
 
@@ -501,39 +504,27 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     setLoadError(null);
     
     try {
-      const [dashboardResult, docsPayloadResult, formsResult] = await Promise.allSettled([
-        apiFetch('/dashboard/stats', { method: 'GET' }) as Promise<any>,
+      const [statsResult, docsPayloadResult, formsResult] = await Promise.allSettled([
+        apiFetch('/auth/profile/stats', { method: 'GET' }) as Promise<any>,
         apiFetch('/documents?per_page=6', { method: 'GET' }) as Promise<any>,
         apiFetch('/forms', { method: 'GET' }) as Promise<any>,
       ]);
 
-      const dashboard = dashboardResult.status === 'fulfilled' ? dashboardResult.value : {};
+      const statsPayload = statsResult.status === 'fulfilled' ? statsResult.value : {};
+      const statsData = (statsPayload && (statsPayload.stats ?? statsPayload.data?.stats)) ?? statsPayload;
+
+      const documentsSent = statsData?.documents_sent ?? statsData?.documentsSent ?? 0;
+      const documentsReviewed = statsData?.documents_reviewed ?? statsData?.documentsReviewed ?? 0;
+      const documentsPending = statsData?.documents_pending ?? statsData?.documentsPending ?? 0;
+      const documentsReturned = statsData?.documents_returned ?? statsData?.documentsReturned ?? 0;
+
       const statsArr = [
-        {
-          title: 'Documentos Pendientes',
-          value: String(dashboard.documents_pending ?? 0),
-          description: 'Pendientes de revisión',
-          icon: Clock,
-          action: 'historial',
-          accent: 'amber' as const,
-        },
-        {
-          title: 'Documentos Aprobados',
-          value: String(dashboard.documents_reviewed ?? 0),
-          description: 'Este cuatrimestre',
-          icon: CheckCircle2,
-          action: 'historial',
-          accent: 'emerald' as const,
-        },
-        {
-          title: 'En Revisión',
-          value: String((dashboard.documents_total ?? 0) - (dashboard.documents_reviewed ?? 0) - (dashboard.documents_pending ?? 0)),
-          description: 'Actualmente en proceso',
-          icon: AlertCircle,
-          action: 'historial',
-          accent: 'slate' as const,
-        },
+        { title: 'Enviados', value: String(documentsSent), description: 'Total de documentos enviados', icon: Send, action: 'historial', accent: 'slate' as const },
+        { title: 'Revisados', value: String(documentsReviewed), description: 'Este cuatrimestre', icon: CheckCircle2, action: 'historial', accent: 'emerald' as const },
+        { title: 'En Revisión', value: String(documentsPending), description: 'Actualmente en proceso', icon: Clock, action: 'historial', accent: 'amber' as const },
+        { title: 'Devueltos', value: String(documentsReturned), description: 'Requieren corrección', icon: AlertCircle, action: 'historial', accent: 'rose' as const },
       ];
+      
       setStats(statsArr);
       setIsLoadingStats(false);
 
@@ -597,7 +588,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
       setProximasEntregas(nextProximas);
       setIsLoadingProximas(false);
 
-      const anyFailed = [dashboardResult, docsPayloadResult, formsResult].some((r) => r.status === 'rejected');
+      const anyFailed = [statsResult, docsPayloadResult, formsResult].some((r) => r.status === 'rejected');
       if (anyFailed) {
         setLoadError('Algunos datos no se pudieron actualizar. Mostrando la última información disponible.');
       }
@@ -673,9 +664,9 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
           {/* Fila de estadísticas */}
           <div className="shrink-0 border-b border-border dark:border-slate-800">
-            <div className="grid grid-cols-3 divide-x divide-border dark:divide-slate-800">
+            <div className="grid grid-cols-4 divide-x divide-border dark:divide-slate-800">
               {isLoadingStats ? (
-                Array.from({ length: 3 }).map((_, i) => (
+                Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="animate-pulse space-y-2 px-3 py-3 sm:px-6 sm:py-4">
                     <div className="h-2.5 w-20 rounded bg-muted sm:w-28" />
                     <div className="h-7 w-10 rounded bg-muted sm:w-12" />
@@ -710,7 +701,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             {/* Columna izquierda: documentos recientes */}
             <div className="flex flex-1 flex-col sm:overflow-hidden">
               <div className="shrink-0 flex items-center justify-between border-b border-border px-5 py-3 dark:border-slate-800">
-                {/* ✅ h3 → h2 - Desktop Documentos Recientes */}
                 <h2 className="text-base font-semibold text-slate-800 dark:text-white">Documentos Recientes</h2>
                 <button type="button" onClick={() => onNavigate?.("historial")} className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400">
                   Ver todos
@@ -769,7 +759,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
             {/* Columna derecha: próximas entregas */}
             <div className="flex shrink-0 flex-col border-t border-border sm:border-t-0 sm:w-64 sm:overflow-hidden dark:border-slate-800">
               <div className="shrink-0 border-b border-border px-5 py-3 dark:border-slate-800">
-                {/* ✅ h3 → h2 - Desktop Próximas Entregas */}
                 <h2 className="text-base font-semibold text-slate-800 dark:text-white">Próximas Entregas</h2>
               </div>
               <div className="flex-1 overflow-y-auto divide-y divide-border dark:divide-slate-800/50">
@@ -858,22 +847,22 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
     <div className="space-y-5 sm:space-y-6">
       {/* Saludo y fecha */}
       <div className="px-1" data-tour="docente-dashboard-saludo">
-  <h1 className="text-xl font-semibold text-slate-800 dark:text-white sm:text-2xl">
-    Hola, {nombreUsuario}
-  </h1>
-  <p className="text-sm text-slate-500 dark:text-slate-400">
-    Hoy es {fechaCapitalizada}
-  </p>
-</div>
+        <h1 className="text-xl font-semibold text-white drop-shadow-sm sm:text-2xl">
+          Hola, {nombreUsuario}
+        </h1>
+        <p className="text-sm text-white/80 drop-shadow-sm">
+          Hoy es {fechaCapitalizada}
+        </p>
+      </div>
 
-  {/* Carrusel con imágenes responsive */}
-<div data-tour="docente-dashboard-carrusel">
-  <AutoFadeBannerCarousel 
-    images={introBanners} 
-    mobileImages={introBannersMobile}
-    links={bannerLinks}
-  />
-</div>
+      {/* Carrusel con imágenes responsive */}
+      <div data-tour="docente-dashboard-carrusel">
+        <AutoFadeBannerCarousel 
+          images={introBanners} 
+          mobileImages={introBannersMobile}
+          links={bannerLinks}
+        />
+      </div>
 
       {/* Mensaje de error de carga */}
       {loadError && (
@@ -892,7 +881,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           <div data-tour="docente-dashboard-stats" className="flex items-stretch divide-x divide-emerald-600/15 dark:divide-emerald-400/20">
             {!isDocenteTourActive && isLoadingStats ? (
               <div className="flex w-full animate-pulse justify-between gap-4">
-                {Array.from({ length: 3 }).map((_, i) => (
+                {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="flex-1 space-y-2">
                     <div className="h-2.5 w-14 rounded-full bg-muted" />
                     <div className="h-6 w-8 rounded-lg bg-muted" />
@@ -907,7 +896,7 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
                     key={stat.title}
                     type="button"
                     onClick={() => onNavigate && stat.action && onNavigate(stat.action)}
-                    className={`min-w-0 flex-1 text-left ${i > 0 ? "pl-2.5" : ""} ${i < 2 ? "pr-2.5" : ""}`}
+                    className={`min-w-0 flex-1 text-left ${i > 0 ? "pl-2.5" : ""} ${i < 3 ? "pr-2.5" : ""}`}
                   >
                     <p className="flex items-center gap-1 text-[8px] font-semibold uppercase leading-tight tracking-wide text-muted-foreground">
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${a.dot}`} />
@@ -925,7 +914,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           {/* Documentos recientes — lista de texto */}
           <div className="mt-5 border-t border-emerald-600/15 pt-4 dark:border-emerald-400/20">
             <div className="flex items-center justify-between">
-              {/* ✅ h3 → h2 - Mobile Documentos Recientes */}
               <h2 className="text-sm font-semibold text-slate-800 dark:text-white">Documentos Recientes</h2>
               <button
                 type="button"
@@ -984,7 +972,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
 
           {/* Próximas entregas — lista de texto */}
           <div className="mt-1 border-t border-emerald-600/15 pt-4 dark:border-emerald-400/20">
-            {/* ✅ h3 → h2 - Mobile Próximas Entregas */}
             <h2 className="text-sm font-semibold text-slate-800 dark:text-white">Próximas Entregas</h2>
 
             <div className="mt-1 divide-y divide-emerald-600/15 dark:divide-emerald-400/20">
@@ -1033,13 +1020,13 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
         </div>
       </div>
 
-      {/* ============ VERSIÓN DESKTOP/TABLET — panel con cajas (sin cambios) ============ */}
+      {/* ============ VERSIÓN DESKTOP/TABLET — panel con cajas ============ */}
       <div className="hidden overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60 sm:mt-5 sm:block">
         <div className="h-[3px] bg-emerald-600 dark:bg-emerald-500" />
 
         <div
           data-tour="docente-dashboard-stats"
-          className="grid grid-cols-1 divide-y divide-emerald-600/15 dark:divide-emerald-400/20 sm:grid-cols-3 sm:divide-y-0 sm:divide-x"
+          className="grid grid-cols-1 divide-y divide-emerald-600/15 dark:divide-emerald-400/20 sm:grid-cols-4 sm:divide-y-0 sm:divide-x"
         >
           {!isDocenteTourActive && isLoadingStats ? (
             <StatCardSkeleton />
@@ -1073,7 +1060,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           <div data-tour="docente-dashboard-recent" className="p-5 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                {/* ✅ h3 → h2 - Desktop Documentos Recientes (dentro de la sección) */}
                 <h2 className="text-base font-semibold text-slate-800 dark:text-white">Documentos Recientes</h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Últimos documentos enviados</p>
               </div>
@@ -1149,7 +1135,6 @@ export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
           </div>
 
           <div data-tour="docente-dashboard-upcoming" className="p-5 sm:p-6">
-            {/* ✅ h3 → h2 - Desktop Próximas Entregas (dentro de la sección) */}
             <h2 className="text-base font-semibold text-slate-800 dark:text-white">Próximas Entregas</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">Fechas límite importantes</p>
 

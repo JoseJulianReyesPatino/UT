@@ -203,68 +203,17 @@ export function TourOverlay({
       }
     }
 
-    const delay = navigated ? 700
-      : isNavTarget && mobileVp ? 400
-      : prevWasNav && mobileVp ? 500
-      : 200;
+    const delay = navigated ? 500
+      : isNavTarget && mobileVp ? 350
+      : prevWasNav && mobileVp ? 400
+      : 120;
 
     const t = setTimeout(() => {
       const el = findTourElement(current.target);
-      if (!el) { 
-        setRect(null); 
-        setSpotReady(false); 
-        return; 
-      }
-      
-      // ── 🔥 SCROLL MEJORADO: FORZAR EL CENTRADO ──
-      const rectElement = el.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const elementHeight = rectElement.height;
-      const headerOffset = 80; // Espacio para el header fijo
-      
-      // Calcular la posición donde debe quedar el elemento (centrado)
-      const targetScrollY = rectElement.top + window.scrollY - (viewportHeight / 2) + (elementHeight / 2) - headerOffset;
-      
-      // Hacer scroll suave a la posición calculada
-      window.scrollTo({
-        top: Math.max(0, targetScrollY),
-        behavior: "smooth"
-      });
-      
-      // ── 🔥 VERIFICAR QUE EL SCROLL FUNCIONÓ ──
-      // Esperar a que termine el scroll y verificar la posición
-      const checkScrollPosition = (attempts: number = 0) => {
-        const maxAttempts = 10;
-        const newRect = el.getBoundingClientRect();
-        
-        // Verificar si el elemento está visible y centrado
-        const isCentered = 
-          newRect.top >= -50 && 
-          newRect.bottom <= viewportHeight + 50 &&
-          Math.abs(newRect.top - (viewportHeight / 2 - newRect.height / 2)) < 100;
-        
-        if (isCentered || attempts >= maxAttempts) {
-          // El elemento está centrado o ya no hay más intentos
-          setRect(newRect);
-          setSpotReady(true);
-          return;
-        }
-        
-        // Si no está centrado, intentar de nuevo con un pequeño ajuste
-        const currentRect = el.getBoundingClientRect();
-        const adjustment = currentRect.top - (viewportHeight / 2 - currentRect.height / 2);
-        window.scrollBy({
-          top: adjustment,
-          behavior: "smooth"
-        });
-        
-        // Reintentar después de otro delay
-        setTimeout(() => checkScrollPosition(attempts + 1), 150);
-      };
-      
-      // Iniciar la verificación después del scroll inicial
-      setTimeout(() => checkScrollPosition(), 400);
-      
+      if (!el) { setRect(null); setSpotReady(false); return; }
+      el.scrollIntoView({ behavior: "instant" as ScrollBehavior, block: "nearest" });
+      setRect(el.getBoundingClientRect());
+      setSpotReady(true);
     }, delay);
     
     return () => clearTimeout(t);

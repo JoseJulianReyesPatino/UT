@@ -366,6 +366,55 @@ function TourFakeCicloCard({ isFirst }: { isFirst: boolean }) {
   );
 }
 
+function TourFormalCicloSection() {
+  const fakeRow = (nombre: string, anio: number, periodo: string, fechas: string, docs: number, activo: boolean, isTourTarget?: boolean) => (
+    <div
+      className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-2 border-t border-border/40 dark:border-slate-800/40 first:border-t-0"
+    >
+      <div className="flex items-center gap-3 px-4 py-3 min-w-0">
+        <div className={`h-5 w-1 shrink-0 rounded-full ${activo ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{nombre}</p>
+          <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold ${activo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>
+            {activo ? "Activo" : "Cerrado"}
+          </span>
+        </div>
+      </div>
+      <span className="w-16 text-center text-sm text-slate-700 dark:text-slate-300">{anio}</span>
+      <span className="w-36 text-center text-sm text-slate-700 dark:text-slate-300">{periodo}</span>
+      <span className="w-48 text-center text-xs text-slate-500 dark:text-slate-400">{fechas}</span>
+      <span className="w-20 text-center">
+        <span className="rounded-sm bg-muted px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{docs}</span>
+      </span>
+      <div
+        data-tour={isTourTarget ? "admin-ciclos-actions" : undefined}
+        className="w-28 flex justify-end gap-1 pr-3 pointer-events-none opacity-80"
+      >
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-input bg-background"><FileText className="h-3.5 w-3.5" /></span>
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-input bg-background"><Pencil className="h-3.5 w-3.5" /></span>
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-input bg-background"><X className="h-3.5 w-3.5" /></span>
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-input bg-background"><Trash2 className="h-3.5 w-3.5" /></span>
+      </div>
+    </div>
+  );
+  return (
+    <div className="hidden sm:block border border-border/70 dark:border-slate-800">
+      <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center border-b border-border/60 bg-muted/40 px-4 py-2 dark:border-slate-800 dark:bg-slate-900/50">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Ciclo</span>
+        <span className="w-16 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Año</span>
+        <span className="w-36 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Período</span>
+        <span className="w-48 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Fechas</span>
+        <span className="w-20 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Docs</span>
+        <span className="w-28 text-right text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 pr-3">Acciones</span>
+      </div>
+      <div data-tour="admin-ciclos-list">
+        {fakeRow("Ciclo Enero–Junio 2026", 2026, "Ene–Jun", "13/ene/2026 — 30/jun/2026", 48, true, true)}
+        {fakeRow("Ciclo Agosto–Diciembre 2025", 2025, "Ago–Dic", "11/ago/2025 — 19/dic/2025", 132, false)}
+      </div>
+    </div>
+  );
+}
+
 interface CiclosEscolaresProps { layoutStyle?: string; }
 
 export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
@@ -1596,6 +1645,7 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
 
         {/* Contenido: tabla de ciclos */}
         <div className="flex-1 min-h-0 overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
+          {isAdminTourActive && <TourFormalCicloSection />}
           {!isAdminTourActive && isLoadingCycles && <CycleCardSkeleton />}
           {!isAdminTourActive && cyclesLoadError && (
             <div className="rounded-sm border border-destructive/40 bg-destructive/5 p-8 text-center text-sm text-destructive">{cyclesLoadError}</div>

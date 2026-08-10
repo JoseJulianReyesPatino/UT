@@ -1631,7 +1631,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
           )}
 
           {activeTab === "formularios" && isFormal && (
-            <div className="flex flex-col flex-1 min-h-0 overflow-hidden border border-border/70 bg-card dark:border-slate-800 dark:bg-slate-950/60">
+            <div data-tour="admin-config-formularios" className="flex flex-col flex-1 min-h-0 overflow-hidden border border-border/70 bg-card dark:border-slate-800 dark:bg-slate-950/60">
               {/* Encabezado */}
               <div className="shrink-0 flex items-center gap-3 border-b border-border bg-muted/30 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/40">
                 <FileText className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />

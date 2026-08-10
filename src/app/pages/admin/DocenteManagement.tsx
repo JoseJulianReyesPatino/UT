@@ -522,7 +522,7 @@ export function DocenteManagement({ layoutStyle }: { layoutStyle?: string } = {}
       const roleLabel = (docente.roles || []).join(", ") || "Sin rol";
       const isSelf = String(docente.id) === currentUser?.id;
       return (
-        <div key={docente.id} className="transition-colors hover:bg-muted/30 dark:hover:bg-slate-900/40">
+        <div key={docente.id} data-tour={docente.id === paginatedDocentes[0]?.id ? "admin-docentes-user-card" : undefined} className="transition-colors hover:bg-muted/30 dark:hover:bg-slate-900/40">
           {/* Vista móvil */}
           <div className="flex items-center gap-3 px-3 py-2.5 sm:hidden">
             <span className={`h-10 w-1 shrink-0 self-stretch rounded-full ${isActive ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />
