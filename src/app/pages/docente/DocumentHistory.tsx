@@ -1299,13 +1299,15 @@ export function DocumentHistory({ isTourActive, layoutStyle }: { isTourActive?: 
       </div>
 
       <Dialog open={motivoDialog !== null} onOpenChange={(open) => { if (!open) setMotivoDialog(null); }}>
-        <DialogContent className="max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
-          <DialogHeader>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
+          <DialogHeader className="min-w-0">
             <DialogTitle className="dark:text-white">Motivo de devolución</DialogTitle>
             {motivoDialog && (
-              <DialogDescription className="dark:text-slate-400 truncate">
-                {motivoDialog.nombre}
-              </DialogDescription>
+              <div className="min-w-0 overflow-hidden">
+                <DialogDescription className="dark:text-slate-400 truncate">
+                  {motivoDialog.nombre}
+                </DialogDescription>
+              </div>
             )}
           </DialogHeader>
           {motivoDialog && (

@@ -870,6 +870,7 @@ export function DocenteManagement({ layoutStyle }: { layoutStyle?: string } = {}
                 <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-800 dark:text-slate-300" strokeWidth={2.25} />
                   <Input
+                    data-tour="admin-docentes-search"
                     placeholder={searchPlaceholders[placeholderIndex]}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -953,6 +954,7 @@ export function DocenteManagement({ layoutStyle }: { layoutStyle?: string } = {}
                 <div className="relative w-full sm:w-72">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-800 dark:text-slate-300" strokeWidth={2.25} />
                   <Input
+                    data-tour="admin-docentes-search"
                     placeholder={searchPlaceholders[placeholderIndex]}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}

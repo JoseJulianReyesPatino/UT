@@ -358,13 +358,15 @@ export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
 
       {/* Diálogo de Motivo */}
       <Dialog open={openMotivo} onOpenChange={setOpenMotivo}>
-        <DialogContent className="max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
-          <DialogHeader>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md dark:border-slate-800/70 dark:bg-slate-950/90 dark:backdrop-blur-md">
+          <DialogHeader className="min-w-0">
             <DialogTitle className="dark:text-white">Motivo de devolución</DialogTitle>
             {devueltoDoc && (
-              <p className="mt-0.5 truncate text-sm font-medium text-muted-foreground dark:text-slate-400">
-                {devueltoDoc.fileName}
-              </p>
+              <div className="min-w-0 overflow-hidden">
+                <p className="mt-0.5 truncate text-sm font-medium text-muted-foreground dark:text-slate-400">
+                  {devueltoDoc.fileName}
+                </p>
+              </div>
             )}
           </DialogHeader>
           <div className="rounded-lg border border-border bg-muted/50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">

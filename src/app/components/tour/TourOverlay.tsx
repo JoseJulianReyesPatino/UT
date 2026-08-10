@@ -118,6 +118,40 @@ export function TourOverlay({
   const tooltipRef = useRef<HTMLDivElement>(null);
   const prevViewRef = useRef<string | undefined>(undefined);
   const prevStepWasNavRef = useRef(false);
+  // Refs to keep the latest prop/state values accessible inside effects without
+  // adding them as dependencies (avoids cancelling the spotlight timeout on every
+  // render caused by unstable prop references from the parent).
+  const stepRef = useRef(step);
+  const stepsRef = useRef(steps);
+  const onCloseRef = useRef(onClose);
+  const onNavigateRef = useRef(onNavigate);
+  const onOpenMobileSidebarRef = useRef(onOpenMobileSidebar);
+  const onCloseMobileSidebarRef = useRef(onCloseMobileSidebar);
+  // Sync all refs on every render (no dep array = runs before effects each render)
+  useEffect(() => {
+    stepRef.current = step;
+    stepsRef.current = steps;
+    onCloseRef.current = onClose;
+    onNavigateRef.current = onNavigate;
+    onOpenMobileSidebarRef.current = onOpenMobileSidebar;
+    onCloseMobileSidebarRef.current = onCloseMobileSidebar;
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === "ArrowRight") {
+        e.preventDefault();
+        if (stepRef.current >= stepsRef.current.length - 1) onCloseRef.current?.();
+        else setStep((s) => s + 1);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setStep((s) => Math.max(0, s - 1));
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isOpen]);
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < MOBILE_BP);
@@ -132,13 +166,15 @@ export function TourOverlay({
       prevStepWasNavRef.current = false;
       setSpotReady(false);
     } else {
-      if (window.innerWidth < MOBILE_BP) onCloseMobileSidebar?.();
+      // Close the sidebar when the tour ends so it doesn't stay open on mobile
+      if (window.innerWidth < MOBILE_BP) onCloseMobileSidebarRef.current?.();
     }
-  }, [isOpen, onCloseMobileSidebar]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    const current = steps[step];
+    const current = stepsRef.current[step];
     if (!current) return;
 
     if (onStepChange) {
@@ -146,10 +182,10 @@ export function TourOverlay({
     }
 
     const navigated = Boolean(current.view && current.view !== prevViewRef.current);
-    if (navigated && onNavigate) {
+    if (navigated && onNavigateRef.current) {
       prevViewRef.current = current.view;
-      setSpotReady(false);
-      onNavigate(current.view!);
+      setSpotReady(false); // hide everything while view transitions
+      onNavigateRef.current(current.view!);
     }
 
     const isNavTarget = current.target.startsWith("nav-");
@@ -159,9 +195,11 @@ export function TourOverlay({
 
     if (mobileVp) {
       if (isNavTarget) {
-        onOpenMobileSidebar?.();
+        // Open sidebar so the nav item is visible and spotlight-able
+        onOpenMobileSidebarRef.current?.();
       } else {
-        onCloseMobileSidebar?.();
+        // Close sidebar so page content is visible for non-nav steps
+        onCloseMobileSidebarRef.current?.();
       }
     }
 
@@ -230,7 +268,10 @@ export function TourOverlay({
     }, delay);
     
     return () => clearTimeout(t);
-  }, [step, isOpen, steps, onNavigate, onOpenMobileSidebar, onCloseMobileSidebar, onStepChange]);
+  // Only re-run when step or open state change — callbacks and steps are accessed
+  // via refs so their identity doesn't need to be a dependency.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, isOpen]);
 
   useLayoutEffect(() => {
     if (!tooltipRef.current || isMobile) return;

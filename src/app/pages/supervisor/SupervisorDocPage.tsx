@@ -310,11 +310,11 @@ export default function SupervisorDocPage({
 
   /* ── Batch formal ── */
   const renderFormalBatch = (group: DocRecord[]) => {
-    if (group.length === 1) return renderFormalDocRow(group[0]);
     const first = group[0];
+    if (group.length === 1) return renderFormalDocRow(first);
     return (
       <div key={first.batch_id ?? first.id}>
-        <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 border-b border-border dark:bg-slate-900/50">
+        <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border bg-slate-50 dark:bg-slate-900/50">
           <FileText className="h-3 w-3 shrink-0 text-slate-400" />
           <span className="text-xs text-slate-500 dark:text-slate-400">
             <span className="font-semibold text-slate-600 dark:text-slate-300">{group.length} archivos</span>
@@ -433,9 +433,20 @@ export default function SupervisorDocPage({
     if (isLoading) return <DocumentCardSkeleton />;
     if (docList.length === 0) return emptyState;
     if (isFormal) {
+      const groups = groupDocsByBatch(docList);
       return (
-        <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-          {groupDocsByBatch(docList).map((group) => renderFormalBatch(group))}
+        <div className="overflow-hidden rounded-sm border border-border">
+          {groups.map((group, i) => (
+            <React.Fragment key={group[0].batch_id ?? `s-${group[0].id}`}>
+              {group.length > 1 && i > 0 && groups[i - 1].length === 1 && (
+                <div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
+              )}
+              {renderFormalBatch(group)}
+              {group.length > 1 && i < groups.length - 1 && (
+                <div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
+              )}
+            </React.Fragment>
+          ))}
         </div>
       );
     }

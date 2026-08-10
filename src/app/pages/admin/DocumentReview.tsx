@@ -454,6 +454,49 @@ function TourFakeDocReviewRow({ isFirst }: { isFirst: boolean }) {
 	);
 }
 
+function TourFormalDocSection() {
+	const fakeRow = (fileName: string, docente: string, isTourTarget?: boolean) => (
+		<div
+			data-tour={isTourTarget ? "admin-docreview-doc-row" : undefined}
+			className="relative flex flex-col gap-2 border-l-4 border-l-amber-500 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3 bg-white dark:bg-slate-950"
+		>
+			<div className="flex items-center gap-2 flex-1 min-w-0">
+				<FileText className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+				<div className="flex-1 min-w-0">
+					<p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{fileName}</p>
+					<p className="text-xs text-slate-500 dark:text-slate-400 truncate">{docente}</p>
+				</div>
+			</div>
+			<div
+				data-tour={isTourTarget ? "admin-docreview-actions" : undefined}
+				className="flex items-center gap-1 shrink-0 pointer-events-none opacity-80"
+			>
+				<Badge variant="warning" className="text-[11px] px-2">Pendiente</Badge>
+				<span className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 h-7 text-xs font-medium text-foreground shadow-sm"><Eye className="h-3.5 w-3.5" /><span className="hidden sm:inline">Ver</span></span>
+				<span className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 h-7 text-xs font-medium text-foreground shadow-sm"><Check className="h-3.5 w-3.5" /><span className="hidden sm:inline">Revisar</span></span>
+				<span className="inline-flex items-center gap-1 rounded-md border border-destructive/60 bg-background px-2.5 h-7 text-xs font-medium text-destructive shadow-sm"><Undo2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Devolver</span></span>
+			</div>
+		</div>
+	);
+	return (
+		<div className="overflow-hidden rounded-sm border border-border">
+			<div data-tour="admin-docreview-batch" className="flex items-center gap-2 px-4 py-1.5 border-b border-border bg-slate-50 dark:bg-slate-900/50">
+				<FileText className="h-3 w-3 shrink-0 text-slate-400" />
+				<span className="text-xs text-slate-500 dark:text-slate-400">
+					<span className="font-semibold text-slate-600 dark:text-slate-300">2 archivos</span>
+					{" del mismo envío · "}Lic. Carlos Hernández Ruiz
+				</span>
+			</div>
+			<div className="divide-y divide-border">
+				{fakeRow("planeacion_didactica_1A.pdf", "Lic. Carlos Hernández Ruiz", true)}
+				{fakeRow("instrumento_evaluacion_2B.pdf", "Lic. Carlos Hernández Ruiz")}
+			</div>
+			<div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
+			{fakeRow("portafolio_digital.pdf", "Ing. María González Torres")}
+		</div>
+	);
+}
+
 export default function DocumentReview({ initialSection = "all", initialForm, layoutStyle }: DocumentReviewProps) {
 	const { isReady, isAuthenticated } = useAuth();
 	const { isAdminTourActive } = useTourActive();
@@ -1069,7 +1112,7 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 		if (group.length === 1) return renderFormalDocRow(group[0], isFirstGroup);
 		return (
 			<div key={group[0].batch_id ?? group[0].id}>
-				<div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 border-b border-border dark:bg-slate-900/50">
+				<div data-tour={isFirstGroup ? "admin-docreview-batch" : undefined} className="flex items-center gap-2 px-4 py-1.5 border-b border-border bg-slate-50 dark:bg-slate-900/50">
 					<FileText className="h-3 w-3 shrink-0 text-slate-400" />
 					<span className="text-xs text-slate-500 dark:text-slate-400">
 						<span className="font-semibold text-slate-600 dark:text-slate-300">{group.length} archivos</span>
@@ -1079,6 +1122,25 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 				<div className="divide-y divide-border">
 					{group.map((doc, i) => renderFormalDocRow(doc, isFirstGroup && i === 0))}
 				</div>
+			</div>
+		);
+	};
+
+	const renderFormalList = (docs: DocumentItem[]) => {
+		const groups = groupDocsByBatch(docs);
+		return (
+			<div className="overflow-hidden rounded-sm border border-border">
+				{groups.map((group, i) => (
+					<React.Fragment key={group[0].batch_id ?? `s-${group[0].id}`}>
+						{group.length > 1 && i > 0 && groups[i - 1].length === 1 && (
+							<div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
+						)}
+						{renderFormalBatch(group, i === 0)}
+						{group.length > 1 && i < groups.length - 1 && (
+							<div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
+						)}
+					</React.Fragment>
+				))}
 			</div>
 		);
 	};
@@ -1248,14 +1310,14 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 							<CardHeader className="pb-4">{isFormal ? renderFormalFilters() : renderFilters()}</CardHeader>
 							<CardContent>
 								{isAdminTourActive ? (
-									<div className="space-y-3">
-										<TourFakeDocReviewRow isFirst={true} />
-										<TourFakeDocReviewRow isFirst={false} />
-									</div>
+									isFormal ? <TourFormalDocSection /> : (
+										<div className="space-y-3">
+											<TourFakeDocReviewRow isFirst={true} />
+											<TourFakeDocReviewRow isFirst={false} />
+										</div>
+									)
 								) : !isLoading && filteredAllDocuments.length > 0 && isFormal ? (
-									<div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-										{groupDocsByBatch(filteredAllDocuments).map((group, i) => renderFormalBatch(group, i === 0))}
-									</div>
+									renderFormalList(filteredAllDocuments)
 								) : renderListState(<div className="space-y-3">{filteredAllDocuments.length === 0 ? <EmptyState text="No hay documentos en esta sección." /> : groupDocsByBatch(filteredAllDocuments).map((group) => renderBatchGroup(group))}</div>)}
 							</CardContent>
 						</Card>
@@ -1266,11 +1328,9 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 							<CardHeader className="pb-4">{isFormal ? renderFormalFilters() : renderFilters()}</CardHeader>
 							<CardContent>
 								{isAdminTourActive ? (
-									<div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
-								) : !isLoading && filteredPendienteOnlyDocuments.length > 0 && isFormal ? (
-									<div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-										{groupDocsByBatch(filteredPendienteOnlyDocuments).map((group, i) => renderFormalBatch(group, i === 0))}
-									</div>
+									isFormal ? <TourFormalDocSection /> : <div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
+								) :!isLoading && filteredPendienteOnlyDocuments.length > 0 && isFormal ? (
+									renderFormalList(filteredPendienteOnlyDocuments)
 								) : renderListState(<div className="space-y-3">{filteredPendienteOnlyDocuments.length === 0 ? <EmptyState text="No hay documentos pendientes." /> : groupDocsByBatch(filteredPendienteOnlyDocuments).map((group) => renderBatchGroup(group))}</div>)}
 							</CardContent>
 						</Card>
@@ -1281,11 +1341,9 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 							<CardHeader className="pb-4">{isFormal ? renderFormalFilters() : renderFilters()}</CardHeader>
 							<CardContent>
 								{isAdminTourActive ? (
-									<div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
-								) : !isLoading && filteredDevueltosDocuments.length > 0 && isFormal ? (
-									<div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-										{groupDocsByBatch(filteredDevueltosDocuments).map((group, i) => renderFormalBatch(group, i === 0))}
-									</div>
+									isFormal ? <TourFormalDocSection /> : <div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
+								) :!isLoading && filteredDevueltosDocuments.length > 0 && isFormal ? (
+									renderFormalList(filteredDevueltosDocuments)
 								) : renderListState(<div className="space-y-3">{filteredDevueltosDocuments.length === 0 ? <EmptyState text="No hay documentos devueltos." /> : groupDocsByBatch(filteredDevueltosDocuments).map((group) => renderBatchGroup(group))}</div>)}
 							</CardContent>
 						</Card>
@@ -1296,11 +1354,9 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 							<CardHeader className="pb-4">{isFormal ? renderFormalFilters() : renderFilters()}</CardHeader>
 							<CardContent>
 								{isAdminTourActive ? (
-									<div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
-								) : !isLoading && filteredReenviadosDocuments.length > 0 && isFormal ? (
-									<div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-										{groupDocsByBatch(filteredReenviadosDocuments).map((group, i) => renderFormalBatch(group, i === 0))}
-									</div>
+									isFormal ? <TourFormalDocSection /> : <div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
+								) :!isLoading && filteredReenviadosDocuments.length > 0 && isFormal ? (
+									renderFormalList(filteredReenviadosDocuments)
 								) : renderListState(<div className="space-y-3">{filteredReenviadosDocuments.length === 0 ? <EmptyState text="No hay documentos reenviados." /> : groupDocsByBatch(filteredReenviadosDocuments).map((group) => renderBatchGroup(group))}</div>)}
 							</CardContent>
 						</Card>
@@ -1311,11 +1367,9 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 							<CardHeader className="pb-4">{isFormal ? renderFormalFilters() : renderFilters()}</CardHeader>
 							<CardContent>
 								{isAdminTourActive ? (
-									<div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
-								) : !isLoading && filteredRevisadosDocuments.length > 0 && isFormal ? (
-									<div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-										{groupDocsByBatch(filteredRevisadosDocuments).map((group, i) => renderFormalBatch(group, i === 0))}
-									</div>
+									isFormal ? <TourFormalDocSection /> : <div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
+								) :!isLoading && filteredRevisadosDocuments.length > 0 && isFormal ? (
+									renderFormalList(filteredRevisadosDocuments)
 								) : renderListState(
 									Object.entries(reviewedByDate).length === 0
 										? <EmptyState text="No hay documentos revisados." />
@@ -1340,11 +1394,9 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 							<CardHeader className="pb-4">{isFormal ? renderFormalFilters() : renderFilters()}</CardHeader>
 							<CardContent>
 								{isAdminTourActive ? (
-									<div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
-								) : !isLoading && reviewedTodayDocuments.length > 0 && isFormal ? (
-									<div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-										{groupDocsByBatch(reviewedTodayDocuments).map((group, i) => renderFormalBatch(group, i === 0))}
-									</div>
+									isFormal ? <TourFormalDocSection /> : <div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
+								) :!isLoading && reviewedTodayDocuments.length > 0 && isFormal ? (
+									renderFormalList(reviewedTodayDocuments)
 								) : renderListState(<div className="space-y-3">{reviewedTodayDocuments.length === 0 ? <EmptyState text="No hay documentos revisados hoy." /> : groupDocsByBatch(reviewedTodayDocuments).map((group) => renderBatchGroup(group, { allowReturn: false }))}</div>)}
 							</CardContent>
 						</Card>

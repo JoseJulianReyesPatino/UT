@@ -2114,7 +2114,7 @@ export function MessagesAdmin(props: Readonly<{
             )}
             {pendingAttachments.length > 0 && <PendingAttachmentsBar attachments={pendingAttachments} onRemove={handleRemoveAttachment} />}
 
-            <div className="space-y-3">
+            <div data-tour="admin-messages-composer" className="space-y-3">
               <Textarea
                 placeholder="Escribe un mensaje..."
                 value={message}

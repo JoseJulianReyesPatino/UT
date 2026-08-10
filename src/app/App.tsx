@@ -1,4 +1,4 @@
-import React, { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Check, ChevronUp, HelpCircle, ImageIcon, LayoutGrid, Loader2, Menu, Moon, Palette, RotateCcw, Sun, Upload, X } from "lucide-react";
 import { APP_THEMES, type AppThemeId, applyAppTheme } from "./lib/themes";
 import { LAYOUT_STYLES, type LayoutStyleId, applyLayoutStyle } from "./lib/layoutStyles";
-import { adminTourSteps } from "./tours/adminTourSteps";
+import { getAdminTourSteps } from "./tours/adminTourSteps";
 import { getDocenteTourSteps } from "./tours/docenteTourSteps";
 import { TourContext } from "./context/TourContext";
 import { Login } from "./pages/Login";
@@ -107,6 +107,10 @@ function AppContent() {
   const [appTheme, setAppTheme] = useState<AppThemeId>("emerald");
   const [isLayoutPanelOpen, setIsLayoutPanelOpen] = useState(false);
   const [layoutStyle, setLayoutStyle] = useState<LayoutStyleId>("default");
+  const adminTourSteps = useMemo(() => getAdminTourSteps(layoutStyle === "formal"), [layoutStyle]);
+  const handleAdminTourClose = useCallback(() => setIsAdminTourOpen(false), []);
+  const handleOpenMobileSidebar = useCallback(() => setMobileSidebarOpen(true), []);
+  const handleCloseMobileSidebar = useCallback(() => setMobileSidebarOpen(false), []);
   const [isToolbarExpanded, setIsToolbarExpanded] = useState(false);
   const activeBgSrc = selectedBgKey === "custom" && bgCustomUrl
     ? bgCustomUrl
@@ -1274,33 +1278,33 @@ useEffect(() => {
 
             {/* ── BARRA FLOTANTE DE HERRAMIENTAS ── */}
             <div className="fixed bottom-4 right-4 z-50 flex flex-col-reverse items-center gap-3">
-              {/* Botón de modo oscuro/claro */}
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                data-tour="toolbar-theme-toggle"
-                onClick={toggleTheme}
-                aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-                title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-                className="h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900"
-              >
-                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </Button>
-
               {/* Botón de expandir/colapsar toolbar */}
-<button
-  data-tour="toolbar-toggle"  // ← ESTO DEBE ESTAR
-  onClick={toggleToolbar}
-  aria-label={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
-  title={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
-  className="flex h-8 w-8 items-center justify-center rounded-full border border-[#3BBF82]/50 bg-white/85 text-emerald-700 shadow-md backdrop-blur transition-colors hover:bg-white hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900"
->
-  <ChevronUp className={`h-4 w-4 transition-transform duration-200 ${isToolbarExpanded ? "rotate-180" : ""}`} />
-</button>
+              <button
+                data-tour="toolbar-toggle"
+                onClick={toggleToolbar}
+                aria-label={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
+                title={isToolbarExpanded ? "Ocultar opciones" : "Mostrar opciones"}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#3BBF82]/50 bg-white/85 text-emerald-700 shadow-md backdrop-blur transition-colors hover:bg-white hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900/85 dark:text-emerald-400 dark:hover:bg-slate-900"
+              >
+                <ChevronUp className={`h-4 w-4 transition-transform duration-200 ${isToolbarExpanded ? "rotate-180" : ""}`} />
+              </button>
 
               {isToolbarExpanded && (
                 <>
+                  {/* Botón de modo oscuro/claro */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    data-tour="toolbar-theme-toggle"
+                    onClick={toggleTheme}
+                    aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                    title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                    className="h-9 w-9 rounded-full border-[#3BBF82]/40 bg-white/85 text-slate-800 shadow-lg backdrop-blur hover:bg-white dark:bg-slate-900/85 dark:text-slate-100 dark:hover:bg-slate-900 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  >
+                    {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  </Button>
+
                   {/* Botón de Diseño del sistema */}
                   <Button
                     type="button"
@@ -1384,9 +1388,9 @@ useEffect(() => {
                 <TourOverlay
                   steps={adminTourSteps}
                   isOpen={isAdminTourOpen}
-                  onClose={() => setIsAdminTourOpen(false)}
-                  onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
-                  onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
+                  onClose={handleAdminTourClose}
+                  onOpenMobileSidebar={handleOpenMobileSidebar}
+                  onCloseMobileSidebar={handleCloseMobileSidebar}
                   onNavigate={(view) => {
                     const [mainView, subParam] = view.split(":");
                     setCurrentView(mainView);

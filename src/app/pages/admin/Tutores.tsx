@@ -198,6 +198,38 @@ function TourFakeTutorRow({ isFirst }: { isFirst: boolean }) {
 
 // no mock initial data — load from backend
 
+function TourFormalTutorSection() {
+  const fakeRow = (fileName: string, tutor: string, isTourTarget?: boolean) => (
+    <div
+      data-tour={isTourTarget ? "admin-tutores-doc-row" : undefined}
+      className="relative flex flex-col gap-2 border-l-4 border-l-amber-500 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3 bg-white dark:bg-slate-950"
+    >
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <FileText className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{fileName}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{tutor}</p>
+        </div>
+      </div>
+      <div
+        data-tour={isTourTarget ? "admin-tutores-doc-actions" : undefined}
+        className="flex items-center gap-1 shrink-0 pointer-events-none opacity-80"
+      >
+        <Badge variant="warning" className="text-[11px] px-2">Pendiente</Badge>
+        <span className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 h-7 text-xs font-medium text-foreground shadow-sm"><Eye className="h-3.5 w-3.5" /><span className="hidden sm:inline">Ver</span></span>
+        <span className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 h-7 text-xs font-medium text-foreground shadow-sm"><Check className="h-3.5 w-3.5" /><span className="hidden sm:inline">Revisar</span></span>
+        <span className="inline-flex items-center gap-1 rounded-md border border-destructive/60 bg-background px-2.5 h-7 text-xs font-medium text-destructive shadow-sm"><Undo2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Devolver</span></span>
+      </div>
+    </div>
+  );
+  return (
+    <div className="overflow-hidden rounded-sm border border-border">
+      {fakeRow("carga_academica_tutorias.pdf", "Lic. Carlos Hernández Ruiz", true)}
+      {fakeRow("reporte_bajas_2B.pdf", "Ing. María González Torres")}
+    </div>
+  );
+}
+
 export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) {
   const { isReady, isAuthenticated } = useAuth();
   const { isAdminTourActive } = useTourActive();
@@ -742,6 +774,25 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
     );
   };
 
+  const renderFormalList = (docs: TutorDocumentItem[]) => {
+    const groups = groupDocsByBatch(docs);
+    return (
+      <div className="overflow-hidden rounded-sm border border-border">
+        {groups.map((group, i) => (
+          <React.Fragment key={group[0].batch_id ?? `s-${group[0].id}`}>
+            {group.length > 1 && i > 0 && groups[i - 1].length === 1 && (
+              <div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
+            )}
+            {renderFormalBatch(group, i === 0)}
+            {group.length > 1 && i < groups.length - 1 && (
+              <div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  };
+
   const groupDocsByBatch = (docs: TutorDocumentItem[]): TutorDocumentItem[][] => {
     const groups = new Map<string, TutorDocumentItem[]>();
     for (const doc of docs) {
@@ -847,18 +898,16 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
               <div className="space-y-3">
                 {/* Filas decorativas del recorrido — siempre visibles cuando el tour está activo */}
                 {isAdminTourActive && (
-                  <>
-                    <TourFakeTutorRow isFirst={true} />
-                    <TourFakeTutorRow isFirst={false} />
-                  </>
+                  isFormal ? <TourFormalTutorSection /> : (
+                    <>
+                      <TourFakeTutorRow isFirst={true} />
+                      <TourFakeTutorRow isFirst={false} />
+                    </>
+                  )
                 )}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && filteredAll.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && filteredAll.length > 0 && isFormal && (
-                  <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-                    {groupDocsByBatch(filteredAll).map((group, i) => renderFormalBatch(group, i === 0))}
-                  </div>
-                )}
+                {!isAdminTourActive && !isLoading && filteredAll.length > 0 && isFormal && renderFormalList(filteredAll)}
                 {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredAll).map((group, groupIdx) => {
                   const renderRow = (doc: TutorDocumentItem, isFirstRow?: boolean) => {
                   const isReviewed = Boolean(doc.reviewedAt);
@@ -983,14 +1032,10 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
+                {isAdminTourActive && (isFormal ? <TourFormalTutorSection /> : <><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && filteredPending.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && filteredPending.length > 0 && isFormal && (
-                  <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-                    {groupDocsByBatch(filteredPending).map((group, i) => renderFormalBatch(group, i === 0))}
-                  </div>
-                )}
+                {!isAdminTourActive && !isLoading && filteredPending.length > 0 && isFormal && renderFormalList(filteredPending)}
                 {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredPending).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => {
                   const isReturned = Boolean(doc.returned);
@@ -1112,14 +1157,10 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
+                {isAdminTourActive && (isFormal ? <TourFormalTutorSection /> : <><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && filteredDevueltos.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && filteredDevueltos.length > 0 && isFormal && (
-                  <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-                    {groupDocsByBatch(filteredDevueltos).map((group, i) => renderFormalBatch(group, i === 0))}
-                  </div>
-                )}
+                {!isAdminTourActive && !isLoading && filteredDevueltos.length > 0 && isFormal && renderFormalList(filteredDevueltos)}
                 {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredDevueltos).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => (
                   <div key={doc.id} className={getDocumentRowClassName(true)}>
@@ -1207,14 +1248,10 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
+                {isAdminTourActive && (isFormal ? <TourFormalTutorSection /> : <><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && filteredReenviados.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && filteredReenviados.length > 0 && isFormal && (
-                  <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-                    {groupDocsByBatch(filteredReenviados).map((group, i) => renderFormalBatch(group, i === 0))}
-                  </div>
-                )}
+                {!isAdminTourActive && !isLoading && filteredReenviados.length > 0 && isFormal && renderFormalList(filteredReenviados)}
                 {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredReenviados).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => (
                   <div key={doc.id} className={getDocumentRowClassName(false)}>
@@ -1310,13 +1347,11 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
             </CardHeader>
             <CardContent>
               {isAdminTourActive ? (
-                <div className="space-y-3"><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></div>
+                isFormal ? <TourFormalTutorSection /> : <div className="space-y-3"><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></div>
               ) : isLoading ? <DocumentCardSkeleton /> : Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
                 <EmptyState text={emptyStateLegend} />
               ) : isFormal ? (
-                <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-                  {groupDocsByBatch(filteredReviewed).map((group, i) => renderFormalBatch(group, i === 0))}
-                </div>
+                renderFormalList(filteredReviewed)
               ) : (
                 <div className="space-y-6">
                   {Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => (
@@ -1404,14 +1439,10 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {isAdminTourActive && (<><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
+                {isAdminTourActive && (isFormal ? <TourFormalTutorSection /> : <><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && reviewedToday.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && reviewedToday.length > 0 && isFormal && (
-                  <div className="divide-y divide-border border border-border overflow-hidden rounded-sm">
-                    {groupDocsByBatch(reviewedToday).map((group, i) => renderFormalBatch(group, i === 0))}
-                  </div>
-                )}
+                {!isAdminTourActive && !isLoading && reviewedToday.length > 0 && isFormal && renderFormalList(reviewedToday)}
                 {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(reviewedToday).map((group) => {
                     const renderTodayRow = (doc: TutorDocumentItem) => {
                     const isReturned = Boolean(doc.returned);
