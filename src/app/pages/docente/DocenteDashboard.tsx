@@ -303,7 +303,7 @@ function AutoFadeBannerCarousel({
       width={2200}
       height={isMobile ? 1008 : 382}
       loading={isActive ? "eager" : "lazy"}
-      fetchPriority={isActive ? "high" : "auto"}
+      fetchpriority={isActive ? "high" : "auto"}
       className={`absolute inset-0 h-full w-full object-cover transition-all duration-1000 ease-in-out ${
         isActive ? "opacity-100 group-hover:scale-[1.01]" : "opacity-0"
       } ${isMinimized ? "opacity-0" : ""}`}

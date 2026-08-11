@@ -1,6 +1,4 @@
 import React, { createContext, useContext } from "react";
-
-/** Cuando es true, el DocumentHistoryCard oculta los botones de acción. */
 export const HistorialReadOnlyContext = createContext(false);
 import { ArrowLeft, Calendar, CalendarClock, History } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
@@ -8,25 +6,17 @@ import { getCalendarFileUrl } from "../lib/calendar";
 import gallosMascot from "../../assets/elementos/Form_Not_Found.webp";
 
 export interface FormalFormLayoutProps {
-  /** Nombre del formulario; se muestra en el header y en la fila "Formulario" del estado cerrado. */
   title: string;
-  /** Si se provee, el header muestra "<label> / {title}" con botón de regreso (para formularios multi-tipo). */
   backButton?: { label: string; onClick: () => void };
-
-  /* ── Estado de acceso ── */
   isLoading: boolean;
   canSubmit: boolean;
-
-  /* ── Fecha límite (estado abierto) ── */
   deadlineInfo?: { formattedDeadline: string; isUrgent: boolean } | null;
 
-  /* ── Sheet de historial ── */
   sheetOpen: boolean;
   onSheetOpenChange: (open: boolean) => void;
   historialDescription?: string;
   historialContent: React.ReactNode;
 
-  /* ── Slots de contenido (estado abierto) ── */
   editingBanners?: React.ReactNode;
   leftColumn: React.ReactNode;
   rightColumn: React.ReactNode;
@@ -80,7 +70,7 @@ export function FormalFormLayout({
       </SheetTrigger>
   <SheetContent
   side="right"
-  data-tour="docente-historial-panel"  // ← AGREGAR ESTO
+  data-tour="docente-historial-panel"  
   className="w-full overflow-x-hidden overflow-y-auto sm:max-w-xl dark:border-slate-800/70 dark:bg-slate-950/60 dark:backdrop-blur-md"
   overlayClassName="bg-black/30 dark:bg-black/20 backdrop-blur-[2px]"
 >
@@ -96,8 +86,6 @@ export function FormalFormLayout({
       </SheetContent>
     </Sheet>
   );
-
-  /* ── Formulario cerrado ── */
   if (!isLoading && !canSubmit) {
     return (
       <>
@@ -176,8 +164,6 @@ export function FormalFormLayout({
       </>
     );
   }
-
-  /* ── Formulario abierto ── */
   return (
     <>
       <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm sm:h-[calc(100vh-64px)] dark:border-slate-800 dark:bg-slate-950">

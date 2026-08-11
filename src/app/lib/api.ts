@@ -48,9 +48,14 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
 
   const headers: Record<string, string> = {
     Accept: "application/json",
-    "ngrok-skip-browser-warning": "true",
     ...(options.headers as Record<string, string>),
   };
+
+  // ✅ SOLO agregar ngrok-skip-browser-warning si estamos en ngrok
+  const isNgrok = typeof window !== 'undefined' && window.location.hostname.includes('ngrok');
+  if (isNgrok) {
+    headers["ngrok-skip-browser-warning"] = "true";
+  }
 
   // Solo agregar Content-Type si NO es FormData (el navegador lo setea automáticamente para FormData)
   if (!isFormData) {
@@ -59,8 +64,6 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
-  } else if (method !== "GET" || path.includes("/auth/login")) {
-    // For protected endpoints without token, still attempt the request (middleware will handle auth check)
   }
 
   const candidateBases = path.startsWith("http")

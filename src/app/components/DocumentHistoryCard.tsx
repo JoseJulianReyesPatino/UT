@@ -113,13 +113,12 @@ export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
   const isDevuelto = String(status ?? "").trim().toLowerCase() === "devuelto";
   const devueltoDoc = devueltoDocForCard(documents);
 
-  // Solo permite editar si todos los documentos están pendientes (ninguno ha sido procesado por el admin)
+
   const canEdit = documents.every((d) => {
     const s = String(d.status ?? "").trim().toLowerCase();
     return !s || s === "pendiente";
   });
 
-  // Puede eliminar permanentemente solo si TODOS los documentos del batch siguen pendientes
   const canPermanentDelete = canEdit;
 
   const planLabel = plan

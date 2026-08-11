@@ -200,19 +200,16 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     }, 2600);
   };
 
-  // Función para precargar forms después del login
   const preloadForms = useCallback(async (): Promise<any[]> => {
     try {
       const response = await apiFetch("/forms");
       const forms = response?.data ?? [];
       
-      // Guardar en caché global
       (window as any).__formsCache = {
         data: forms,
         timestamp: Date.now()
       };
       
-      // Disparar evento para notificar a los componentes
       window.dispatchEvent(new CustomEvent('ut-forms-loaded', { detail: { forms } }));
       
       formsPreloadedRef.current = true;
@@ -232,8 +229,6 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
         body: JSON.stringify({ email, password }),
       })) as ApiLoginResponse;
 
-      // CRITICAL: Save token to localStorage FIRST, before any state updates
-      // This ensures subsequent requests will have the token available
       if (!payload?.token) {
         throw new Error('No token received from login');
       }
@@ -243,12 +238,8 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       saveCachedProfile(apiUser);
       flashNotice('success', `¡Bienvenido(a) ${apiUser.name.split(' ')[0]}!`);
       
-      // Update user state to trigger UI re-render
       setUser(apiUser);
 
-      // PRECARGA DE FORMS INMEDIATA después del login
-      // Esto asegura que cuando el usuario navegue a cualquier formulario,
-      // los datos ya estén disponibles en caché
       await preloadForms();
       
     } catch (err: any) {
@@ -275,10 +266,8 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       setUser(apiUser);
       saveCachedProfile(apiUser);
       
-      // Disparar evento de actualización de usuario
       window.dispatchEvent(new CustomEvent('ut-user-updated', { detail: { user: apiUser } }));
-      
-      // Precargar forms también al refrescar usuario
+
       if (!formsPreloadedRef.current) {
         await preloadForms();
       }
@@ -306,7 +295,6 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
         setUser(apiUser);
         saveCachedProfile(apiUser);
         
-        // Precargar forms silenciosamente en background al cargar la app
         if (!formsPreloadedRef.current) {
           await preloadForms();
         }
@@ -327,7 +315,6 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     setUser(null);
     setNotice(null);
     clearAvatarCache();
-    // Limpiar caché de forms al cerrar sesión
     (window as any).__formsCache = null;
     formsPreloadedRef.current = false;
   };

@@ -12,12 +12,9 @@ import { fetchDocumentBlob } from "../lib/documents";
 import { getBackendFormCode, type FormId, type FormRole } from "../../lib/formConfig";
 import { getCalendarFileUrl } from "../lib/calendar";
 
-// Caché en memoria compartida entre todos los FormAccessGuard de la app.
-// Evita volver a pedir /forms cada vez que el usuario cambia de formulario,
-// que es lo que causaba el "flash" o retraso del chip de fecha límite.
 let formsCache: { data: any[]; timestamp: number } | null = null;
 let formsCachePromise: Promise<any[]> | null = null;
-const FORMS_CACHE_TTL = 2 * 60 * 1000; // 2 minutos
+const FORMS_CACHE_TTL = 2 * 60 * 1000; 
 
 function fetchFormsWithCache(): Promise<any[]> {
   if (formsCachePromise) return formsCachePromise;
@@ -26,7 +23,6 @@ function fetchFormsWithCache(): Promise<any[]> {
     .then((res) => {
       const forms = res?.data ?? [];
       formsCache = { data: forms, timestamp: Date.now() };
-      // Disparar evento para notificar que los forms están disponibles
       window.dispatchEvent(new CustomEvent('ut-forms-loaded', { detail: { forms } }));
       return forms;
     })
@@ -36,8 +32,6 @@ function fetchFormsWithCache(): Promise<any[]> {
 
   return formsCachePromise;
 }
-
-// Función para precargar forms desde AuthContext
 export function preloadForms(): Promise<any[]> {
   if (formsCache && Date.now() - formsCache.timestamp < FORMS_CACHE_TTL) {
     return Promise.resolve(formsCache.data);
@@ -45,8 +39,6 @@ export function preloadForms(): Promise<any[]> {
   return fetchFormsWithCache();
 }
 
-// Actualiza el caché en memoria cuando el admin guarda cambios de configuración,
-// sin esperar a que el TTL expire ni depender de que el consumidor esté montado.
 export function updateFormsCache(backendCode: string, update: { roles: string[]; dueAt: string | null }) {
   if (!formsCache) return;
   formsCache = {
@@ -103,9 +95,6 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
 
   const hasFreshCache = Boolean(formsCache && Date.now() - formsCache.timestamp < FORMS_CACHE_TTL);
 
-  // Nuevo estado para acceso desde API — si ya hay caché fresca, se usa de
-  // inmediato (síncrono) sin esperar red, así cambiar de formulario no
-  // muestra ningún retraso ni parpadeo.
   const [accessRule, setAccessRule] = useState<{ roles: FormRole[]; dueAt: string | null } | null>(
     () => (hasFreshCache ? resolveAccessRule(formsCache!.data, formId) : null)
   );
@@ -114,9 +103,6 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
 
   const hasRole = (role: "docente" | "tutor" | "administrador") => user?.role === role || user?.roles?.includes(role);
 
-  // Actualiza accessRule desde caché de forma SÍNCRONA antes de que el navegador pinte.
-  // Esto evita el flash donde el título ya cambió al nuevo formulario pero el estado
-  // "cerrado" del formulario anterior aún se muestra porque useEffect corre post-paint.
   useLayoutEffect(() => {
     const freshNow = Boolean(formsCache && Date.now() - formsCache.timestamp < FORMS_CACHE_TTL);
     if (freshNow) {
@@ -125,15 +111,11 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
     }
   }, [formId]);
 
-  // Carga asíncrona desde la API y refresca si el caché expiró
   useEffect(() => {
     let cancelled = false;
 
     const freshNow = Boolean(formsCache && Date.now() - formsCache.timestamp < FORMS_CACHE_TTL);
     if (!freshNow) {
-      // Si hay caché stale, usarla optimísticamente para evitar el flash de "cerrado"
-      // mientras la red trae datos frescos. Sin esto: accessLoading=false + accessRule=null
-      // → roleAllowed=false → se muestra FormClosedState brevemente.
       if (formsCache) {
         setAccessRule(resolveAccessRule(formsCache.data, formId));
       }
@@ -159,8 +141,6 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
 
     return () => { cancelled = true; };
   }, [formId]);
-
-  // Escuchar evento de forms precargados
   useEffect(() => {
     const handleFormsLoaded = (event: CustomEvent) => {
       const forms = event.detail?.forms ?? [];
@@ -175,9 +155,6 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
       window.removeEventListener('ut-forms-loaded', handleFormsLoaded as EventListener);
     };
   }, [formId]);
-
-  // Actualización en tiempo real cuando el admin guarda la configuración de formularios.
-  // El mensaje incluye los datos actualizados directamente, sin necesidad de llamada a la red.
   useEffect(() => {
     if (typeof BroadcastChannel === "undefined") return;
     const bc = new BroadcastChannel("form_config_changed");
@@ -186,7 +163,6 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
       if (msg.formId !== formId) return;
       const newDueAt: string | null = msg.dueAt ?? null;
       const newRoles: FormRole[] = msg.roles ?? [];
-      // Actualiza el caché compartido para que navegaciones futuras sean consistentes
       if (formsCache) {
         const backendCode = getBackendFormCode(formId);
         formsCache = {
@@ -296,8 +272,6 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
     setPreviewItem(null);
     setPreviewError(null);
   };
-
-  // Agrupación por lote
   const groupedHistory = React.useMemo(() => {
     const groups = new Map<string, typeof history>();
     for (const doc of history) {
@@ -313,21 +287,12 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
   const planLabelFor = (plan?: string) =>
     plan ? (String(plan).toLowerCase().includes("nuevo") ? "Plan Nuevo Modelo" : "Plan Normal") : undefined;
 
-  // IMPORTANTE: no renderizar una pantalla de carga aquí.
-  // Mientras la API responde, mostramos el formulario asumiendo acceso permitido
-  // (stale-while-revalidate). El backend igual valida permisos reales al enviar
-  // el formulario, así que esto es solo una capa de UX, no de seguridad.
-  // Si accessLoading muestra un loader, el usuario ve un "flash" en cada
-  // navegación — no lo reintroduzcas.
-
   if (accessLoading) {
     if (React.isValidElement(children)) {
       return React.cloneElement(children as React.ReactElement<any>, { deadlineInfo: null });
     }
     return <>{children}</>;
   }
-
-  // Error de red — distinto de "formulario cerrado"
   if (accessNetworkError) {
     return (
       <div className="mx-auto max-w-5xl space-y-4">
@@ -338,8 +303,6 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
       </div>
     );
   }
-
-  // Acceso concedido
   if (roleAllowed && !expired) {
     const deadlineDate = dueAt ? new Date(dueAt) : null;
     const msLeft = deadlineDate ? deadlineDate.getTime() - Date.now() : null;
@@ -358,9 +321,6 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
 
     return <>{children}</>;
   }
-
-  // Vista previa del tour: formulario cerrado pero el tour necesita mostrar los campos.
-  // El backdrop del tour (z-9997) bloquea todos los clics; inert bloquea teclado y foco.
   if (tourForceOpen) {
     const cloned = React.isValidElement(children)
       ? React.cloneElement(children as React.ReactElement<any>, { deadlineInfo: null })
@@ -373,7 +333,7 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
         >
           Vista previa del tutorial — formulario no disponible para envíos
         </div>
-        <div inert aria-hidden="true" className="pointer-events-none">
+        <div inert="true" aria-hidden="true" className="pointer-events-none">
           {cloned}
         </div>
       </div>

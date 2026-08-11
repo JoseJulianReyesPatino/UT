@@ -252,15 +252,14 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const [instrumento3040Open, setInstrumento3040Open] = useState(false);
   const [instrumento6070Open, setInstrumento6070Open] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
-  // Extraer path relativo (incluyendo ?bust=) para que useResolvedAvatarUrl
-  // use fetch autenticado con ngrok-skip-browser-warning y detecte cambios de URL.
+
   const sidebarAvatarPath = useMemo(() => {
     const src = user?.avatar;
     if (!src || src === "/api/default-avatar") return undefined;
     if (src.startsWith("data:") || src.startsWith("blob:") || src.startsWith("/")) return src;
     try {
       const parsed = new URL(src);
-      return parsed.pathname + parsed.search; // "/api/users/1/avatar" o "...?bust=123"
+      return parsed.pathname + parsed.search; 
     } catch {
       return src;
     }
@@ -268,7 +267,6 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const sidebarResolvedAvatar = useResolvedAvatarUrl(sidebarAvatarPath);
   const sidebarAvatarUrl = sidebarResolvedAvatar || defaultProfileAvatar;
 
-  // IDs de los hijos de instrumentos para saber si estamos en ellos
   const instrumento3040Children = useMemo(
     () => [
       { id: "instrumento-30-normal", label: "Instrumento 30%", description: "Plan Normal" },
@@ -285,7 +283,6 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     [],
   );
 
-  // Extraer los IDs en arrays para facilitar la comprobación
   const instrumento3040Ids = useMemo(() => instrumento3040Children.map(item => item.id), [instrumento3040Children]);
   const instrumento6070Ids = useMemo(() => instrumento6070Children.map(item => item.id), [instrumento6070Children]);
 
@@ -318,7 +315,6 @@ export function Sidebar(props: Readonly<SidebarProps>) {
     };
 
     const handleMessagesUpdated = () => {
-      // Omitir llamada a API si ya recibimos el total preciso hace menos de 500ms
       if (Date.now() - lastCountUpdateTime < 500) return;
       void loadUnreadMessagesCount();
     };
@@ -334,8 +330,6 @@ export function Sidebar(props: Readonly<SidebarProps>) {
       window.clearInterval(intervalId);
     };
   }, [user]);
-
-  // Solo abrir automáticamente si estamos en una vista hija de esos menús
   useEffect(() => {
     const isIn3040 = instrumento3040Children.some((item) => item.id === currentView);
     const isIn6070 = instrumento6070Children.some((item) => item.id === currentView);
@@ -356,7 +350,6 @@ export function Sidebar(props: Readonly<SidebarProps>) {
   const handleMenuItemClick = React.useCallback((itemId: string, isMobile = false) => {
     onNavigate(itemId);
     
-    // Si la vista a la que navegamos NO es un instrumento, cerramos los menús
     const isInstrumento = instrumento3040Ids.includes(itemId) || instrumento6070Ids.includes(itemId);
     if (!isInstrumento) {
       setInstrumento3040Open(false);

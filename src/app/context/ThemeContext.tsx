@@ -21,7 +21,6 @@ export function ThemeProvider(props: Readonly<{ children: ReactNode }>) {
     return savedTheme === "light" || savedTheme === "dark" ? savedTheme : "dark";
   });
 
-  // Cargar tema del localStorage al montar
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as Theme | null;
     if (savedTheme) {

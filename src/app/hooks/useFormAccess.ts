@@ -17,8 +17,6 @@ export function useFormAccess(formId: number): FormAccess {
     isExpired: false,
     canSubmit: true,
   });
-
-  // Reset synchronously before paint so no stale "closed" state flashes when formId changes
   useLayoutEffect(() => {
     setState({ isLoading: true, dueAt: null, isExpired: false, canSubmit: true });
   }, [formId]);
@@ -44,7 +42,6 @@ export function useFormAccess(formId: number): FormAccess {
     check();
     const intervalId = window.setInterval(check, 10_000);
 
-    // Instantly sync when admin saves form config in another tab
     let bc: BroadcastChannel | null = null;
     if (typeof BroadcastChannel !== "undefined") {
       bc = new BroadcastChannel(BC_CHANNEL);

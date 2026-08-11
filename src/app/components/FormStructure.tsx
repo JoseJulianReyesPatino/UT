@@ -31,10 +31,6 @@ export interface MateriaSelectProps {
   materia: string;
   onMateriaChange: (materia: string) => void;
 }
-
-/**
- * Plan selector with hamburger menu
- */
 export const PlanMenuSelector: React.FC<PlanSelectProps & { sheetOpen: boolean; onSheetOpenChange: (open: boolean) => void }> = ({
   plan,
   onPlanChange,
@@ -135,9 +131,6 @@ export const CarreraSelector: React.FC<CarreraSelectProps> = ({ plan, carrera, o
   );
 };
 
-/**
- * Cuatrimestre selector that updates based on carrera
- */
 export const CuatrimestreSelector: React.FC<CuatrimestreSelectProps> = ({
   plan,
   carrera,
@@ -173,9 +166,6 @@ export const CuatrimestreSelector: React.FC<CuatrimestreSelectProps> = ({
   );
 };
 
-/**
- * Materia selector that updates based on carrera and cuatrimestre
- */
 export const MateriaSelector: React.FC<MateriaSelectProps> = ({
   plan,
   carrera,
