@@ -122,7 +122,6 @@ const mapApiDocumentToTutorDocument = (doc: any): TutorDocument => ({
   batch_id: doc.batch_id ?? null,
 });
 
-const emptyStateLegend = "Aún no hay documentos de tutores para mostrar en esta sección. Cuando un tutor suba uno, aparecerá aquí automáticamente.";
 
 const EmptyState = ({ text }: { text: string }) => (
   <div className="rounded-2xl border border-border bg-muted/40 p-8 text-center text-muted-foreground shadow-sm">
@@ -656,7 +655,7 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
     </div>
   );
 
-  const renderFormalDocRow = (doc: TutorDocumentItem, isFirstRow?: boolean) => {
+  const renderFormalDocRow = (doc: TutorDocumentItem, isFirstRow?: boolean, allowReturn = true) => {
     const isReviewed = Boolean(doc.reviewedAt);
     const isReturned = Boolean(doc.returned);
     const isReenviado = doc.status === "reenviado";
@@ -741,7 +740,7 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
               <Check className="h-3.5 w-3.5" /><span className="hidden sm:inline">Revisar</span>
             </Button>
           )}
-          {doc.returned ? (
+          {allowReturn && (doc.returned ? (
             <Button variant="outline" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }} aria-label="Cancelar devolución">
               <Undo2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Cancelar</span>
             </Button>
@@ -749,14 +748,14 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
             <Button variant="destructive" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "return", document: doc }); }} aria-label="Devolver">
               <Undo2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Devolver</span>
             </Button>
-          )}
+          ))}
         </div>
       </div>
     );
   };
 
-  const renderFormalBatch = (group: TutorDocumentItem[], isFirstGroup: boolean) => {
-    if (group.length === 1) return renderFormalDocRow(group[0], isFirstGroup);
+  const renderFormalBatch = (group: TutorDocumentItem[], isFirstGroup: boolean, allowReturn = true) => {
+    if (group.length === 1) return renderFormalDocRow(group[0], isFirstGroup, allowReturn);
     return (
       <div key={group[0].batch_id ?? group[0].id}>
         <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 border-b border-border dark:bg-slate-900/50">
@@ -768,13 +767,13 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
           </span>
         </div>
         <div className="divide-y divide-border">
-          {group.map((doc, i) => renderFormalDocRow(doc, isFirstGroup && i === 0))}
+          {group.map((doc, i) => renderFormalDocRow(doc, isFirstGroup && i === 0, allowReturn))}
         </div>
       </div>
     );
   };
 
-  const renderFormalList = (docs: TutorDocumentItem[]) => {
+  const renderFormalList = (docs: TutorDocumentItem[], allowReturn = true) => {
     const groups = groupDocsByBatch(docs);
     return (
       <div className="overflow-hidden rounded-sm border border-border">
@@ -783,7 +782,7 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
             {group.length > 1 && i > 0 && groups[i - 1].length === 1 && (
               <div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
             )}
-            {renderFormalBatch(group, i === 0)}
+            {renderFormalBatch(group, i === 0, allowReturn)}
             {group.length > 1 && i < groups.length - 1 && (
               <div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
             )}
@@ -906,7 +905,7 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
                   )
                 )}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
-                {!isAdminTourActive && !isLoading && filteredAll.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && filteredAll.length === 0 && <EmptyState text="Sin documentos." />}
                 {!isAdminTourActive && !isLoading && filteredAll.length > 0 && isFormal && renderFormalList(filteredAll)}
                 {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredAll).map((group, groupIdx) => {
                   const renderRow = (doc: TutorDocumentItem, isFirstRow?: boolean) => {
@@ -1034,7 +1033,7 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
               <div className="space-y-3">
                 {isAdminTourActive && (isFormal ? <TourFormalTutorSection /> : <><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
-                {!isAdminTourActive && !isLoading && filteredPending.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && filteredPending.length === 0 && <EmptyState text="No hay documentos pendientes." />}
                 {!isAdminTourActive && !isLoading && filteredPending.length > 0 && isFormal && renderFormalList(filteredPending)}
                 {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredPending).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => {
@@ -1159,7 +1158,7 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
               <div className="space-y-3">
                 {isAdminTourActive && (isFormal ? <TourFormalTutorSection /> : <><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
-                {!isAdminTourActive && !isLoading && filteredDevueltos.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && filteredDevueltos.length === 0 && <EmptyState text="No hay documentos devueltos." />}
                 {!isAdminTourActive && !isLoading && filteredDevueltos.length > 0 && isFormal && renderFormalList(filteredDevueltos)}
                 {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredDevueltos).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => (
@@ -1250,7 +1249,7 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
               <div className="space-y-3">
                 {isAdminTourActive && (isFormal ? <TourFormalTutorSection /> : <><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
-                {!isAdminTourActive && !isLoading && filteredReenviados.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && filteredReenviados.length === 0 && <EmptyState text="No hay documentos reenviados." />}
                 {!isAdminTourActive && !isLoading && filteredReenviados.length > 0 && isFormal && renderFormalList(filteredReenviados)}
                 {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(filteredReenviados).map((group) => {
                   const renderRow = (doc: TutorDocumentItem) => (
@@ -1349,9 +1348,9 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
               {isAdminTourActive ? (
                 isFormal ? <TourFormalTutorSection /> : <div className="space-y-3"><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></div>
               ) : isLoading ? <DocumentCardSkeleton /> : Object.keys(reviewedByDate).filter(Boolean).length === 0 ? (
-                <EmptyState text={emptyStateLegend} />
+                <EmptyState text="No hay documentos revisados." />
               ) : isFormal ? (
-                renderFormalList(filteredReviewed)
+                renderFormalList(filteredReviewed, false)
               ) : (
                 <div className="space-y-6">
                   {Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => (
@@ -1441,8 +1440,8 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
               <div className="space-y-3">
                 {isAdminTourActive && (isFormal ? <TourFormalTutorSection /> : <><TourFakeTutorRow isFirst={true} /><TourFakeTutorRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
-                {!isAdminTourActive && !isLoading && reviewedToday.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && reviewedToday.length > 0 && isFormal && renderFormalList(reviewedToday)}
+                {!isAdminTourActive && !isLoading && reviewedToday.length === 0 && <EmptyState text="No hay documentos revisados hoy." />}
+                {!isAdminTourActive && !isLoading && reviewedToday.length > 0 && isFormal && renderFormalList(reviewedToday, false)}
                 {!isAdminTourActive && !isLoading && !isFormal && groupDocsByBatch(reviewedToday).map((group) => {
                     const renderTodayRow = (doc: TutorDocumentItem) => {
                     const isReturned = Boolean(doc.returned);

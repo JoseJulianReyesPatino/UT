@@ -615,8 +615,6 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 				if (failedStatuses.length > 0) {
 					setLoadError(`No fue posible cargar: ${failedStatuses.join(", ")}. Se muestran los documentos disponibles.`);
 					console.warn("DocumentReview: fallaron consultas de estado", { failedStatuses });
-				} else if (visiblePendingItems.length === 0 && visibleReviewedItems.length === 0) {
-					setLoadError("No se encontraron documentos para el ciclo visible actual.");
 				}
 			} catch {
 				if (!isMounted) return;
@@ -997,7 +995,7 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 		</div>
 	);
 
-	const renderFormalDocRow = (doc: DocumentItem, isFirstRow?: boolean) => {
+	const renderFormalDocRow = (doc: DocumentItem, isFirstRow?: boolean, allowReturn = true) => {
 		const isReviewed = "reviewedAt" in doc;
 		const isReturned = Boolean(doc.returned);
 		const isReenviado = "status" in doc && (doc as PendingDocument).status === "reenviado";
@@ -1094,7 +1092,7 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 							<Check className="h-3.5 w-3.5" /><span className="hidden sm:inline">Revisar</span>
 						</Button>
 					)}
-					{doc.returned ? (
+					{allowReturn && (doc.returned ? (
 						<Button variant="outline" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "cancel-return", document: doc }); }} aria-label="Cancelar devolución">
 							<Undo2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Cancelar</span>
 						</Button>
@@ -1102,14 +1100,14 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 						<Button variant="destructive" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} aria-label="Devolver">
 							<Undo2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Devolver</span>
 						</Button>
-					)}
+					))}
 				</div>
 			</div>
 		);
 	};
 
-	const renderFormalBatch = (group: DocumentItem[], isFirstGroup: boolean) => {
-		if (group.length === 1) return renderFormalDocRow(group[0], isFirstGroup);
+	const renderFormalBatch = (group: DocumentItem[], isFirstGroup: boolean, allowReturn = true) => {
+		if (group.length === 1) return renderFormalDocRow(group[0], isFirstGroup, allowReturn);
 		return (
 			<div key={group[0].batch_id ?? group[0].id}>
 				<div data-tour={isFirstGroup ? "admin-docreview-batch" : undefined} className="flex items-center gap-2 px-4 py-1.5 border-b border-border bg-slate-50 dark:bg-slate-900/50">
@@ -1120,13 +1118,13 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 					</span>
 				</div>
 				<div className="divide-y divide-border">
-					{group.map((doc, i) => renderFormalDocRow(doc, isFirstGroup && i === 0))}
+					{group.map((doc, i) => renderFormalDocRow(doc, isFirstGroup && i === 0, allowReturn))}
 				</div>
 			</div>
 		);
 	};
 
-	const renderFormalList = (docs: DocumentItem[]) => {
+	const renderFormalList = (docs: DocumentItem[], allowReturn = true) => {
 		const groups = groupDocsByBatch(docs);
 		return (
 			<div className="overflow-hidden rounded-sm border border-border">
@@ -1135,7 +1133,7 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 						{group.length > 1 && i > 0 && groups[i - 1].length === 1 && (
 							<div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
 						)}
-						{renderFormalBatch(group, i === 0)}
+						{renderFormalBatch(group, i === 0, allowReturn)}
 						{group.length > 1 && i < groups.length - 1 && (
 							<div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
 						)}
@@ -1369,7 +1367,7 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 								{isAdminTourActive ? (
 									isFormal ? <TourFormalDocSection /> : <div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
 								) :!isLoading && filteredRevisadosDocuments.length > 0 && isFormal ? (
-									renderFormalList(filteredRevisadosDocuments)
+									renderFormalList(filteredRevisadosDocuments, false)
 								) : renderListState(
 									Object.entries(reviewedByDate).length === 0
 										? <EmptyState text="No hay documentos revisados." />
@@ -1396,7 +1394,7 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 								{isAdminTourActive ? (
 									isFormal ? <TourFormalDocSection /> : <div className="space-y-3"><TourFakeDocReviewRow isFirst={true} /><TourFakeDocReviewRow isFirst={false} /></div>
 								) :!isLoading && reviewedTodayDocuments.length > 0 && isFormal ? (
-									renderFormalList(reviewedTodayDocuments)
+									renderFormalList(reviewedTodayDocuments, false)
 								) : renderListState(<div className="space-y-3">{reviewedTodayDocuments.length === 0 ? <EmptyState text="No hay documentos revisados hoy." /> : groupDocsByBatch(reviewedTodayDocuments).map((group) => renderBatchGroup(group, { allowReturn: false }))}</div>)}
 							</CardContent>
 						</Card>

@@ -388,7 +388,7 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
     return base;
   };
 
-  const emptyStateLegend = "Aún no hay documentos de estadías para mostrar en esta sección. Cuando un docente suba uno, aparecerá aquí automáticamente.";
+  const emptyStateLegend = "Sin documentos";
 
   const EmptyState = ({ text }: { text: string }) => (
     <div className="rounded-2xl border border-border bg-muted/40 p-8 text-center text-muted-foreground shadow-sm">
@@ -419,7 +419,7 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
 
   const isFormal = layoutStyle === "formal";
 
-  const renderFormalDocRow = (doc: EstadiaDocumentItem, isFirstRow?: boolean) => {
+  const renderFormalDocRow = (doc: EstadiaDocumentItem, isFirstRow?: boolean, allowReturn = true) => {
     const isReviewed = "reviewedAt" in doc && Boolean(doc.reviewedAt);
     const isReturned = Boolean(doc.returned);
     const isReenviado = "resubmittedAt" in doc && Boolean(doc.resubmittedAt);
@@ -541,7 +541,7 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
               <span className="hidden sm:inline">Revisar</span>
             </Button>
           )}
-          {doc.returned ? (
+          {allowReturn && (doc.returned ? (
             <Button
               variant="outline"
               size="icon"
@@ -563,14 +563,14 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
               <Undo2 className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Devolver</span>
             </Button>
-          )}
+          ))}
         </div>
       </div>
     );
   };
 
-  const renderFormalBatch = (group: EstadiaDocumentItem[], isFirstGroup: boolean) => {
-    if (group.length === 1) return renderFormalDocRow(group[0], isFirstGroup);
+  const renderFormalBatch = (group: EstadiaDocumentItem[], isFirstGroup: boolean, allowReturn = true) => {
+    if (group.length === 1) return renderFormalDocRow(group[0], isFirstGroup, allowReturn);
     return (
       <div key={group[0].batch_id ?? group[0].id}>
         <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 border-b border-border dark:bg-slate-900/50">
@@ -582,13 +582,13 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
           </span>
         </div>
         <div className="divide-y divide-border">
-          {group.map((doc, i) => renderFormalDocRow(doc, isFirstGroup && i === 0))}
+          {group.map((doc, i) => renderFormalDocRow(doc, isFirstGroup && i === 0, allowReturn))}
         </div>
       </div>
     );
   };
 
-  const renderFormalList = (docs: EstadiaDocumentItem[]) => {
+  const renderFormalList = (docs: EstadiaDocumentItem[], allowReturn = true) => {
     const groups = groupDocsByBatch(docs);
     return (
       <div className="overflow-hidden rounded-sm border border-border">
@@ -597,7 +597,7 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
             {group.length > 1 && i > 0 && groups[i - 1].length === 1 && (
               <div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
             )}
-            {renderFormalBatch(group, i === 0)}
+            {renderFormalBatch(group, i === 0, allowReturn)}
             {group.length > 1 && i < groups.length - 1 && (
               <div className="my-1.5 mx-4 border-t-2 border-solid border-emerald-400 dark:border-emerald-600" />
             )}
@@ -1493,7 +1493,7 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
               ) : Object.entries(reviewedByDate).filter(([date]) => date).length === 0 ? (
                 <EmptyState text={emptyStateLegend} />
               ) : isFormal ? (
-                renderFormalList(filteredReviewed.filter(d => !d.returned))
+                renderFormalList(filteredReviewed.filter(d => !d.returned), false)
               ) : (
                 <div className="min-w-0 space-y-6">
                   {Object.entries(reviewedByDate).filter(([date]) => date).map(([date, docs]) => (
@@ -1595,7 +1595,7 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
                 {isAdminTourActive && (isFormal ? <TourFormalEstadiaSection /> : <><TourFakeEstadiasRow isFirst={true} /><TourFakeEstadiasRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && reviewedToday.length === 0 && <EmptyState text={emptyStateLegend} />}
-                {!isAdminTourActive && !isLoading && reviewedToday.length > 0 && isFormal && renderFormalList(reviewedToday)}
+                {!isAdminTourActive && !isLoading && reviewedToday.length > 0 && isFormal && renderFormalList(reviewedToday, false)}
                 {!isAdminTourActive && !isLoading && reviewedToday.length > 0 && !isFormal && groupDocsByBatch(reviewedToday).map((group) => {
                     const renderTodayRow = (doc: EstadiaDocumentItem) => {
                     const isReturned = Boolean(doc.returned);
