@@ -20,9 +20,9 @@ import { TourContext } from "./context/TourContext";
 import { Login } from "./pages/Login";
 import { Sidebar } from "./components/Sidebar";
 import { FormAccessGuard } from "./components/FormAccessGuard";
-import LogoUTSLRC from "../assets/elementos/LogotipoUTSLRC.webp";
-import LogoUTSLRCWhite from "../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
-import SuperiorFormImg from "../assets/elementos/superior_form.webp";
+const LogoUTSLRC = "/assets/LogotipoUTSLRC.webp";
+const LogoUTSLRCWhite = "/assets/LogotipoUTSLRC-BLANCO.webp";
+const SuperiorFormImg = "/assets/superior_form.webp";
 import BgDefault from "../assets/Fondos/ut_imagen14.webp";
 
 

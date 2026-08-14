@@ -238,8 +238,8 @@ function SidebarInstrumentSection({
   );
 }
 
-const LOGO_LIGHT = "/src/assets/elementos/LogotipoUTSLRC.webp";
-const LOGO_DARK = "/src/assets/elementos/LogotipoUTSLRC-BLANCO.webp";
+const LOGO_LIGHT = "/assets/LogotipoUTSLRC.webp";
+const LOGO_DARK = "/assets/LogotipoUTSLRC-BLANCO.webp";
 
 export function Sidebar(props: Readonly<SidebarProps>) {
   const { currentView, onNavigate, mobileOpen, onMobileOpenChange, onLogoutRequest, layoutStyle } = props;
