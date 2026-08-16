@@ -6,9 +6,22 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent } from "../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
-import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon, KeyRound, RotateCcw } from "lucide-react";
+import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon, KeyRound, RotateCcw, Check } from "lucide-react";
 import apiFetch from "../lib/api";
 import { toast } from "sonner";
+
+const getPasswordStrength = (password: string) => {
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[a-z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+  if (score <= 2) return { score, label: "Débil", color: "bg-red-500" };
+  if (score === 3) return { score, label: "Media", color: "bg-yellow-500" };
+  if (score === 4) return { score, label: "Fuerte", color: "bg-emerald-500" };
+  return { score, label: "Muy fuerte", color: "bg-emerald-600" };
+};
 
 export function Login() {
   const THEME_TOGGLE_COOLDOWN_MS = 700;
@@ -123,8 +136,9 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
       setForgotError("Las contraseñas no coinciden.");
       return;
     }
-    if (forgotNewPassword.length < 8) {
-      setForgotError("La contraseña debe tener al menos 8 caracteres.");
+    const strength = getPasswordStrength(forgotNewPassword);
+    if (strength.score < 5) {
+      setForgotError("La contraseña debe incluir mayúsculas, minúsculas, números y un carácter especial.");
       return;
     }
     setForgotLoading(true);
@@ -489,7 +503,7 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
                   autoComplete="new-password"
                   value={forgotNewPassword}
                   onChange={(e) => setForgotNewPassword(e.target.value)}
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder="Crea una contraseña segura"
                   className={`${inputClasses} pl-12 pr-12`}
                   required
                   disabled={forgotLoading}
@@ -499,6 +513,35 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
                   {showForgotNew ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
+              {forgotNewPassword.length > 0 && (() => {
+                const strength = getPasswordStrength(forgotNewPassword);
+                return (
+                  <div className="space-y-2">
+                    <div className="flex gap-1">
+                      {[1,2,3,4,5].map((s) => (
+                        <div key={s} className={`h-1.5 flex-1 rounded-full transition-colors ${s <= strength.score ? strength.color : "bg-slate-200 dark:bg-slate-700"}`} />
+                      ))}
+                    </div>
+                    <p className={`text-xs font-medium ${strength.score < 5 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>{strength.label}</p>
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-2.5 space-y-1">
+                      {[
+                        { label: "Mínimo 8 caracteres", met: forgotNewPassword.length >= 8 },
+                        { label: "Letra mayúscula (A-Z)", met: /[A-Z]/.test(forgotNewPassword) },
+                        { label: "Letra minúscula (a-z)", met: /[a-z]/.test(forgotNewPassword) },
+                        { label: "Número (0-9)", met: /[0-9]/.test(forgotNewPassword) },
+                        { label: "Carácter especial (!@#$%...)", met: /[^A-Za-z0-9]/.test(forgotNewPassword) },
+                      ].map((criterion) => (
+                        <div key={criterion.label} className="flex items-center gap-2">
+                          <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors ${criterion.met ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700"}`}>
+                            {criterion.met && <Check className="h-2.5 w-2.5 text-white" />}
+                          </div>
+                          <span className={`text-xs transition-colors ${criterion.met ? "text-slate-900 dark:text-white font-medium" : "text-slate-400 dark:text-slate-500"}`}>{criterion.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Confirmar contraseña */}
