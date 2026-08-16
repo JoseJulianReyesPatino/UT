@@ -51,12 +51,6 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
     ...(options.headers as Record<string, string>),
   };
 
-  // ✅ SOLO agregar ngrok-skip-browser-warning si estamos en ngrok
-  const isNgrok = typeof window !== 'undefined' && window.location.hostname.includes('ngrok');
-  if (isNgrok) {
-    headers["ngrok-skip-browser-warning"] = "true";
-  }
-
   // Solo agregar Content-Type si NO es FormData (el navegador lo setea automáticamente para FormData)
   if (!isFormData) {
     headers["Content-Type"] = "application/json";
@@ -71,6 +65,13 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
     : API_BASE_URL_CANDIDATES.length > 0
       ? API_BASE_URL_CANDIDATES
       : [API_BASE_URL];
+
+  // ✅ Agregar ngrok-skip-browser-warning si la API apunta a ngrok
+  const isNgrok = candidateBases.some((b) => b.includes("ngrok")) ||
+    (path.startsWith("http") && path.includes("ngrok"));
+  if (isNgrok) {
+    headers["ngrok-skip-browser-warning"] = "true";
+  }
 
   let lastError: any = null;
 

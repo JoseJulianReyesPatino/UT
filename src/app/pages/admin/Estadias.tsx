@@ -388,7 +388,6 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
     return base;
   };
 
-  const emptyStateLegend = "Sin documentos";
 
   const EmptyState = ({ text }: { text: string }) => (
     <div className="rounded-2xl border border-border bg-muted/40 p-8 text-center text-muted-foreground shadow-sm">
@@ -541,7 +540,7 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
               <span className="hidden sm:inline">Revisar</span>
             </Button>
           )}
-          {allowReturn && (doc.returned ? (
+          {allowReturn && (doc.returned || !isReviewed) && (doc.returned ? (
             <Button
               variant="outline"
               size="icon"
@@ -1163,7 +1162,7 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
                 {!isAdminTourActive && !isLoading && !loadError && filteredAll.length === 0 && (
-                  <EmptyState text={emptyStateLegend} />
+                  <EmptyState text="Sin documentos." />
                 )}
                 {!isAdminTourActive && !isLoading && !loadError && filteredAll.length > 0 && isFormal && renderFormalList(filteredAll)}
                 {!isAdminTourActive && !isLoading && !loadError && !isFormal && groupDocsByBatch(filteredAll).map((group, groupIdx) => {
@@ -1272,7 +1271,7 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
                 {isAdminTourActive && (isFormal ? <TourFormalEstadiaSection /> : <><TourFakeEstadiasRow isFirst={true} /><TourFakeEstadiasRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
                 {!isAdminTourActive && !isLoading && loadError && <p className="text-sm text-destructive">{loadError}</p>}
-                {!isAdminTourActive && !isLoading && !loadError && filteredPendienteOnly.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && !loadError && filteredPendienteOnly.length === 0 && <EmptyState text="No hay documentos pendientes." />}
                 {!isAdminTourActive && !isLoading && !loadError && filteredPendienteOnly.length > 0 && isFormal && renderFormalList(filteredPendienteOnly)}
                 {!isAdminTourActive && !isLoading && !loadError && !isFormal && groupDocsByBatch(filteredPendienteOnly).map((group) => {
                   const renderRow = (doc: EstadiaPendingDocument) => {
@@ -1491,7 +1490,7 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
               {isAdminTourActive ? (
                 isFormal ? <TourFormalEstadiaSection /> : <div className="min-w-0 space-y-3"><TourFakeEstadiasRow isFirst={true} /><TourFakeEstadiasRow isFirst={false} /></div>
               ) : Object.entries(reviewedByDate).filter(([date]) => date).length === 0 ? (
-                <EmptyState text={emptyStateLegend} />
+                <EmptyState text="No hay documentos revisados." />
               ) : isFormal ? (
                 renderFormalList(filteredReviewed.filter(d => !d.returned), false)
               ) : (
@@ -1594,7 +1593,7 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
               <div className="min-w-0 space-y-3">
                 {isAdminTourActive && (isFormal ? <TourFormalEstadiaSection /> : <><TourFakeEstadiasRow isFirst={true} /><TourFakeEstadiasRow isFirst={false} /></>)}
                 {!isAdminTourActive && isLoading && <DocumentCardSkeleton />}
-                {!isAdminTourActive && !isLoading && reviewedToday.length === 0 && <EmptyState text={emptyStateLegend} />}
+                {!isAdminTourActive && !isLoading && reviewedToday.length === 0 && <EmptyState text="No hay documentos revisados hoy." />}
                 {!isAdminTourActive && !isLoading && reviewedToday.length > 0 && isFormal && renderFormalList(reviewedToday, false)}
                 {!isAdminTourActive && !isLoading && reviewedToday.length > 0 && !isFormal && groupDocsByBatch(reviewedToday).map((group) => {
                     const renderTodayRow = (doc: EstadiaDocumentItem) => {

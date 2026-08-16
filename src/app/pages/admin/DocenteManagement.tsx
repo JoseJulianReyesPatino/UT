@@ -778,15 +778,14 @@ export function DocenteManagement({ layoutStyle }: { layoutStyle?: string } = {}
     const toastId = toast.loading("Generando contraseña temporal...");
 
     try {
-      await apiFetch(`/users/${selectedDocente.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: DEFAULT_PASSWORD }),
+      const data = await apiFetch(`/users/${selectedDocente.id}/reset-password`, {
+        method: "POST",
       });
 
       toast.success("Contraseña restablecida", {
         id: toastId,
-        description: `Se asignó una contraseña temporal a ${selectedDocente.nombre}.`,
+        description: `Se envió la contraseña temporal a ${selectedDocente.email}. Contraseña: ${data.temp_password}`,
+        duration: 10000,
       });
       setShowResetDialog(false);
       resetEditForm();
@@ -1173,13 +1172,16 @@ export function DocenteManagement({ layoutStyle }: { layoutStyle?: string } = {}
           <DialogHeader>
             <DialogTitle>Restablecer Contraseña</DialogTitle>
             <DialogDescription>
-              Se restablecerá la contraseña del usuario.
+              Se generará una contraseña temporal y se enviará por correo al usuario.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
             {selectedDocente ? (
               <>
-                El docente <span className="font-medium text-foreground">{selectedDocente.nombre}</span> recibirá una contraseña temporal.
+                Se enviará la contraseña temporal al correo de{" "}
+                <span className="font-medium text-foreground">{selectedDocente.nombre}</span>
+                {" "}(<span className="font-medium text-foreground">{selectedDocente.email}</span>).
+                El usuario deberá cambiarla al iniciar sesión.
               </>
             ) : null}
           </div>

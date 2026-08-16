@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import FormNotFoundImg from "../../../assets/elementos/Form_Not_Found.webp";
 import { DocumentCardSkeleton } from "./skeletons";
 import { SearchableSelect } from "../../components/SearchableSelect";
@@ -317,7 +317,12 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
   }, [isAuthenticated, isReady]);
 
   // reload when filters change (section y paginación son client-side)
+  const isInitialFilterMount = useRef(true);
   useEffect(() => {
+    if (isInitialFilterMount.current) {
+      isInitialFilterMount.current = false;
+      return;
+    }
     const to = setTimeout(() => { void loadDocuments(); }, 150);
     return () => clearTimeout(to);
   }, [filterTutor, filterApartado, filterReturned]);
@@ -740,7 +745,7 @@ export default function Tutores({ layoutStyle }: { layoutStyle?: string } = {}) 
               <Check className="h-3.5 w-3.5" /><span className="hidden sm:inline">Revisar</span>
             </Button>
           )}
-          {allowReturn && (doc.returned ? (
+          {allowReturn && (doc.returned || !isReviewed) && (doc.returned ? (
             <Button variant="outline" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setReturnConfirmation({ type: "cancel-return", document: doc }); }} aria-label="Cancelar devolución">
               <Undo2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Cancelar</span>
             </Button>
