@@ -461,7 +461,7 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
           <DialogHeader>
             <DialogTitle className="text-center text-xl dark:text-white">Ingresa tu código</DialogTitle>
             <DialogDescription className="text-center dark:text-slate-400">
-              Revisa tu correo <span className="font-semibold text-foreground dark:text-slate-200">{forgotEmail}</span> · El código expira en <span className="font-semibold text-amber-500">30 min</span>
+              Revisa tu correo <span className="font-semibold text-foreground dark:text-slate-200">{forgotEmail}</span> · El código expira en <span className="font-semibold text-amber-500">15 min</span>
             </DialogDescription>
           </DialogHeader>
 
