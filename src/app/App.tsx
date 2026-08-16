@@ -1,5 +1,6 @@
 import React, { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from 'react-router-dom'; // ✅ AGREGADO
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { Alert, AlertDescription } from "./components/ui/alert";
@@ -20,11 +21,11 @@ import { TourContext } from "./context/TourContext";
 import { Login } from "./pages/Login";
 import { Sidebar } from "./components/Sidebar";
 import { FormAccessGuard } from "./components/FormAccessGuard";
+
 const LogoUTSLRC = "/assets/LogotipoUTSLRC.webp";
 const LogoUTSLRCWhite = "/assets/LogotipoUTSLRC-BLANCO.webp";
 const SuperiorFormImg = "/assets/superior_form.webp";
 import BgDefault from "../assets/Fondos/ut_imagen14.webp";
-
 
 // Páginas cargadas bajo demanda
 const DocenteDashboard = React.lazy(() => import("./pages/docente/DocenteDashboard"));
@@ -57,20 +58,22 @@ const TutoriasPage = React.lazy(() => import("./pages/docente/Tutorias"));
 const TourOverlay = React.lazy(() => import("./components/tour/TourOverlay").then(m => ({ default: m.TourOverlay })));
 
 const BG_OPTIONS = [
-  { key: "default",        label: "Universidad",    src: BgDefault },
+  { key: "default", label: "Universidad", src: BgDefault },
 ] as const;
 
-const BG_STORAGE_KEY       = "utslrc-bg-key";
-const BG_OVERLAY_KEY       = "utslrc-bg-overlay";
-const CONTAINER_ALPHA_KEY  = "utslrc-container-alpha";
-const CONTAINER_BLUR_KEY   = "utslrc-container-blur";
-const BG_CUSTOM_URL_KEY    = "utslrc-bg-custom-url";
-const APP_THEME_KEY        = "utslrc-app-theme";
-const LAYOUT_STYLE_KEY     = "utslrc-layout-style";
+const BG_STORAGE_KEY = "utslrc-bg-key";
+const BG_OVERLAY_KEY = "utslrc-bg-overlay";
+const CONTAINER_ALPHA_KEY = "utslrc-container-alpha";
+const CONTAINER_BLUR_KEY = "utslrc-container-blur";
+const BG_CUSTOM_URL_KEY = "utslrc-bg-custom-url";
+const APP_THEME_KEY = "utslrc-app-theme";
+const LAYOUT_STYLE_KEY = "utslrc-layout-style";
 
 function AppContent() {
   const { isAuthenticated, isReady, user, notice, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate(); // ✅ AGREGADO
+
   const logoSrc = theme === "dark" ? LogoUTSLRCWhite : LogoUTSLRC;
   const splashLogoSrc = theme === "dark" ? LogoUTSLRCWhite : LogoUTSLRC;
   const currentViewStorageKey = "utslrc-current-view";
@@ -122,12 +125,12 @@ function AppContent() {
   const pendingPrefs = useRef<{ bgKey?: string; bgOverlay?: number; containerAlpha?: number; containerBlur?: number; appTheme?: AppThemeId; layoutStyle?: LayoutStyleId }>({});
   const savePrefs = useCallback((patch: { bgKey?: string; bgOverlay?: number; containerAlpha?: number; containerBlur?: number; appTheme?: AppThemeId; layoutStyle?: LayoutStyleId }) => {
     if (!user?.id) return;
-    if (patch.bgKey          !== undefined) localStorage.setItem(prefKey(BG_STORAGE_KEY),      patch.bgKey);
-    if (patch.bgOverlay      !== undefined) localStorage.setItem(prefKey(BG_OVERLAY_KEY),      String(patch.bgOverlay));
+    if (patch.bgKey !== undefined) localStorage.setItem(prefKey(BG_STORAGE_KEY), patch.bgKey);
+    if (patch.bgOverlay !== undefined) localStorage.setItem(prefKey(BG_OVERLAY_KEY), String(patch.bgOverlay));
     if (patch.containerAlpha !== undefined) localStorage.setItem(prefKey(CONTAINER_ALPHA_KEY), String(patch.containerAlpha));
-    if (patch.containerBlur  !== undefined) localStorage.setItem(prefKey(CONTAINER_BLUR_KEY),  String(patch.containerBlur));
-    if (patch.appTheme       !== undefined) localStorage.setItem(prefKey(APP_THEME_KEY),       patch.appTheme);
-    if (patch.layoutStyle    !== undefined) localStorage.setItem(prefKey(LAYOUT_STYLE_KEY),    patch.layoutStyle);
+    if (patch.containerBlur !== undefined) localStorage.setItem(prefKey(CONTAINER_BLUR_KEY), String(patch.containerBlur));
+    if (patch.appTheme !== undefined) localStorage.setItem(prefKey(APP_THEME_KEY), patch.appTheme);
+    if (patch.layoutStyle !== undefined) localStorage.setItem(prefKey(LAYOUT_STYLE_KEY), patch.layoutStyle);
     pendingPrefs.current = { ...pendingPrefs.current, ...patch };
     if (savePrefsTimer.current) clearTimeout(savePrefsTimer.current);
     savePrefsTimer.current = setTimeout(() => {
@@ -187,10 +190,10 @@ function AppContent() {
       applyLayoutStyle("default");
       return;
     }
-    setSelectedBgKey(localStorage.getItem(prefKey(BG_STORAGE_KEY))      ?? "default");
-    setBgOverlay(    Number(localStorage.getItem(prefKey(BG_OVERLAY_KEY))      ?? "30"));
+    setSelectedBgKey(localStorage.getItem(prefKey(BG_STORAGE_KEY)) ?? "default");
+    setBgOverlay(Number(localStorage.getItem(prefKey(BG_OVERLAY_KEY)) ?? "30"));
     setContainerAlpha(Number(localStorage.getItem(prefKey(CONTAINER_ALPHA_KEY)) ?? "100"));
-    setContainerBlur( Number(localStorage.getItem(prefKey(CONTAINER_BLUR_KEY))  ?? "0"));
+    setContainerBlur(Number(localStorage.getItem(prefKey(CONTAINER_BLUR_KEY)) ?? "0"));
     setBgCustomUrl(resolveApiAssetUrl(localStorage.getItem(prefKey(BG_CUSTOM_URL_KEY))) ?? null);
     const storedTheme = (localStorage.getItem(prefKey(APP_THEME_KEY)) as AppThemeId) ?? "emerald";
     setAppTheme(storedTheme);
@@ -202,13 +205,13 @@ function AppContent() {
       .then(data => {
         const p = data?.preferences;
         if (!p || typeof p !== 'object') return;
-        if (p.bgKey          !== undefined) { setSelectedBgKey(p.bgKey);          localStorage.setItem(prefKey(BG_STORAGE_KEY),      p.bgKey); }
-        if (p.bgOverlay      !== undefined) { setBgOverlay(p.bgOverlay);           localStorage.setItem(prefKey(BG_OVERLAY_KEY),      String(p.bgOverlay)); }
+        if (p.bgKey !== undefined) { setSelectedBgKey(p.bgKey); localStorage.setItem(prefKey(BG_STORAGE_KEY), p.bgKey); }
+        if (p.bgOverlay !== undefined) { setBgOverlay(p.bgOverlay); localStorage.setItem(prefKey(BG_OVERLAY_KEY), String(p.bgOverlay)); }
         if (p.containerAlpha !== undefined) { setContainerAlpha(p.containerAlpha); localStorage.setItem(prefKey(CONTAINER_ALPHA_KEY), String(p.containerAlpha)); }
-        if (p.containerBlur  !== undefined) { setContainerBlur(p.containerBlur);   localStorage.setItem(prefKey(CONTAINER_BLUR_KEY),  String(p.containerBlur)); }
-        if (p.bgCustomUrl    !== undefined) { setBgCustomUrl(resolveApiAssetUrl(p.bgCustomUrl) ?? null); localStorage.setItem(prefKey(BG_CUSTOM_URL_KEY), p.bgCustomUrl); }
-        if (p.appTheme       !== undefined) { setAppTheme(p.appTheme); applyAppTheme(p.appTheme); localStorage.setItem(prefKey(APP_THEME_KEY), p.appTheme); }
-        if (p.layoutStyle    !== undefined) { setLayoutStyle(p.layoutStyle); applyLayoutStyle(p.layoutStyle); localStorage.setItem(prefKey(LAYOUT_STYLE_KEY), p.layoutStyle); }
+        if (p.containerBlur !== undefined) { setContainerBlur(p.containerBlur); localStorage.setItem(prefKey(CONTAINER_BLUR_KEY), String(p.containerBlur)); }
+        if (p.bgCustomUrl !== undefined) { setBgCustomUrl(resolveApiAssetUrl(p.bgCustomUrl) ?? null); localStorage.setItem(prefKey(BG_CUSTOM_URL_KEY), p.bgCustomUrl); }
+        if (p.appTheme !== undefined) { setAppTheme(p.appTheme); applyAppTheme(p.appTheme); localStorage.setItem(prefKey(APP_THEME_KEY), p.appTheme); }
+        if (p.layoutStyle !== undefined) { setLayoutStyle(p.layoutStyle); applyLayoutStyle(p.layoutStyle); localStorage.setItem(prefKey(LAYOUT_STYLE_KEY), p.layoutStyle); }
       })
       .catch(() => {});
   }, [user?.id, prefKey]);
@@ -216,7 +219,7 @@ function AppContent() {
   useEffect(() => { applyAppTheme(appTheme); }, [appTheme]);
   useEffect(() => { applyLayoutStyle(layoutStyle); }, [layoutStyle]);
 
-useEffect(() => {
+  useEffect(() => {
     document.documentElement.style.setProperty("--ui-card-alpha", String(containerAlpha));
     const pct = containerAlpha;
     const blur = containerBlur;
@@ -224,9 +227,6 @@ useEffect(() => {
     let el = document.getElementById(styleId) as HTMLStyleElement | null;
     if (!el) { el = document.createElement("style"); el.id = styleId; document.head.appendChild(el); }
 
-    // Si el usuario no ha tocado ningún slider (valores por defecto), no se
-    // inyecta ninguna regla — se respeta el diseño original tal cual, incluyendo
-    // las opacidades ya incorporadas en clases como bg-slate-950/60.
     if (pct === 100 && blur === 0) {
       el.textContent = "";
       return;
@@ -244,8 +244,6 @@ useEffect(() => {
         background-image: none !important;
         background-color: oklch(1 0 0 / calc(${pct} / 100)) !important;
       }
-      /* slate-900 y slate-950 llevan su propio tono azul (hue≈265) en Tailwind —
-         se preserva ese tono, solo se ajusta la opacidad al valor del slider */
       .dark [class*="dark:bg-slate-900"],
       .dark [class*="bg-slate-900"] {
         background-image: none !important;
@@ -559,6 +557,9 @@ useEffect(() => {
 
   const cancelLeave = () => setLeaveDialogOpen(false);
 
+  // ============================================================
+  // ✅ NAVEGACIÓN CON REACT ROUTER - VERSIÓN CORREGIDA
+  // ============================================================
   const safeNavigate = (view: string) => {
     if (formEditingRef.current) {
       setPendingView(view);
@@ -566,6 +567,59 @@ useEffect(() => {
     } else {
       setCurrentView(view);
       setMobileSidebarOpen(false);
+
+      // ✅ ACTUALIZAR LA URL CON REACT ROUTER
+      const routeMap: Record<string, string> = {
+        // Docente
+        'dashboard': '/',
+        'historial': '/docente/historial',
+        'mensajes': '/mensajes',
+        'perfil': '/docente/perfil',
+        'planeacion': '/docente/planeacion',
+        'instrumento-30-normal': '/docente/instrumento-30-normal',
+        'instrumento-40-nuevo': '/docente/instrumento-40-nuevo',
+        'instrumento-60-nuevo': '/docente/instrumento-60-nuevo',
+        'instrumento-70-normal': '/docente/instrumento-70-normal',
+        'remedial': '/docente/remedial',
+        'lista-concentrada': '/docente/lista-concentrada',
+        'asesoria': '/docente/asesoria',
+        'portafolio': '/docente/portafolio',
+        'acta-final': '/docente/acta-final',
+        'estadias': '/docente/estadias',
+        'tutorias': '/docente/tutorias',
+        'tutorias-carga-academica': '/docente/tutorias-carga-academica',
+        'tutorias-reporte-bajas': '/docente/tutorias-reporte-bajas',
+        'tutorias-concentrado-asesorias': '/docente/tutorias-concentrado-asesorias',
+        'tutorias-acta-asistencia-grupal': '/docente/tutorias-acta-asistencia-grupal',
+        'tutorias-ficha-tecnica': '/docente/tutorias-ficha-tecnica',
+
+        // Admin
+        'docentes': '/admin/docentes',
+        'tutores': '/admin/tutores',
+        'ciclos': '/admin/ciclos',
+        'documentos': '/admin/documentos',
+        'remediales': '/admin/remediales',
+        'documentos-revisados': '/admin/documentos-revisados',
+        'documentos-revisados-hoy': '/admin/documentos-revisados-hoy',
+        'estadias-admin': '/admin/estadias',
+        'calendario': '/admin/calendario',
+        'configuracion': '/admin/configuracion',
+        'configuracion-cuenta': '/admin/configuracion-cuenta',
+
+        // Supervisor
+        'supervisor-planeacion': '/supervisor/planeacion',
+        'supervisor-instrumentos': '/supervisor/instrumentos',
+        'supervisor-remedial': '/supervisor/remedial',
+        'supervisor-lista-concentrada': '/supervisor/lista-concentrada',
+        'supervisor-asesoria': '/supervisor/asesoria',
+        'supervisor-portafolio': '/supervisor/portafolio',
+        'supervisor-acta-final': '/supervisor/acta-final',
+        'supervisor-estadias': '/supervisor/estadias',
+        'supervisor-tutorias': '/supervisor/tutorias',
+      };
+
+      const route = routeMap[view] || '/';
+      navigate(route);
     }
   };
 
@@ -683,18 +737,18 @@ useEffect(() => {
           return <SupervisorDocPage title="Acta Final" formCode="acta-final" hideColumns={['parcial']} layoutStyle={layoutStyle} />;
         case "supervisor-estadias":
           return <SupervisorDocPage title="Estadías" hideColumns={['materia', 'parcial']} layoutStyle={layoutStyle} formCodes={[
-            { code: "estadias",           label: "Estadías" },
+            { code: "estadias", label: "Estadías" },
             { code: "carta-presentacion", label: "Carta de Presentación" },
-            { code: "carta-aceptacion",   label: "Carta de Aceptación" },
-            { code: "carta-terminacion",  label: "Carta de Terminación" },
+            { code: "carta-aceptacion", label: "Carta de Aceptación" },
+            { code: "carta-terminacion", label: "Carta de Terminación" },
           ]} />;
         case "supervisor-tutorias":
           return <SupervisorDocPage title="Tutorías" hideColumns={['materia', 'carrera', 'grupo', 'parcial']} layoutStyle={layoutStyle} formCodes={[
-            { code: "carga-academica",        label: "Carga Académica" },
-            { code: "reporte-bajas",          label: "Reporte de Bajas" },
-            { code: "concentrado-asesorias",  label: "Concentrado de Asesorías" },
+            { code: "carga-academica", label: "Carga Académica" },
+            { code: "reporte-bajas", label: "Reporte de Bajas" },
+            { code: "concentrado-asesorias", label: "Concentrado de Asesorías" },
             { code: "acta-asistencia-grupal", label: "Acta de Asistencia Grupal" },
-            { code: "ficha-tecnica",          label: "Ficha Técnica" },
+            { code: "ficha-tecnica", label: "Ficha Técnica" },
           ]} />;
         case "perfil":
           return <Profile onDirtyChange={(dirty) => { formEditingRef.current = dirty; }} layoutStyle={layoutStyle} />;
@@ -932,10 +986,9 @@ useEffect(() => {
                     {/* Clásico */}
                     <button
                       onClick={() => { setLayoutStyle("default"); savePrefs({ layoutStyle: "default" }); }}
-                      className={`flex flex-col items-center gap-2 rounded-xl border-2 p-2 transition-all ${
-                        layoutStyle === "default"
-                          ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/30"
-                          : "border-transparent bg-slate-50 dark:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700"
+                      className={`flex flex-col items-center gap-2 rounded-xl border-2 p-2 transition-all ${layoutStyle === "default"
+                        ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/30"
+                        : "border-transparent bg-slate-50 dark:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700"
                       }`}
                     >
                       <div className="w-full overflow-hidden rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
@@ -966,10 +1019,9 @@ useEffect(() => {
                     {/* Empresarial */}
                     <button
                       onClick={() => { setLayoutStyle("formal"); savePrefs({ layoutStyle: "formal" }); }}
-                      className={`flex flex-col items-center gap-2 rounded-xl border-2 p-2 transition-all ${
-                        layoutStyle === "formal"
-                          ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/30"
-                          : "border-transparent bg-slate-50 dark:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700"
+                      className={`flex flex-col items-center gap-2 rounded-xl border-2 p-2 transition-all ${layoutStyle === "formal"
+                        ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/30"
+                        : "border-transparent bg-slate-50 dark:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700"
                       }`}
                     >
                       <div className="w-full overflow-hidden rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
@@ -1082,10 +1134,9 @@ useEffect(() => {
                       <button
                         key={t.id}
                         onClick={() => { setAppTheme(t.id); savePrefs({ appTheme: t.id }); }}
-                        className={`flex flex-col items-center gap-1.5 rounded-xl border-2 px-2 py-3 transition-all ${
-                          appTheme === t.id
-                            ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/30"
-                            : "border-transparent bg-slate-50 dark:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700"
+                        className={`flex flex-col items-center gap-1.5 rounded-xl border-2 px-2 py-3 transition-all ${appTheme === t.id
+                          ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/30"
+                          : "border-transparent bg-slate-50 dark:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700"
                         }`}
                       >
                         <div
@@ -1125,10 +1176,9 @@ useEffect(() => {
                       <button
                         key={opt.key}
                         onClick={() => { setSelectedBgKey(opt.key); savePrefs({ bgKey: opt.key }); }}
-                        className={`relative aspect-video overflow-hidden rounded-xl border-2 transition-all ${
-                          selectedBgKey === opt.key
-                            ? "border-emerald-500 ring-2 ring-emerald-500/30"
-                            : "border-transparent hover:border-slate-300 dark:hover:border-slate-600"
+                        className={`relative aspect-video overflow-hidden rounded-xl border-2 transition-all ${selectedBgKey === opt.key
+                          ? "border-emerald-500 ring-2 ring-emerald-500/30"
+                          : "border-transparent hover:border-slate-300 dark:hover:border-slate-600"
                         }`}
                       >
                         <img src={opt.src} alt={opt.label} className="h-full w-full object-cover" />
@@ -1147,10 +1197,9 @@ useEffect(() => {
                       <div className="relative">
                         <button
                           onClick={() => { setSelectedBgKey("custom"); savePrefs({ bgKey: "custom" }); }}
-                          className={`relative aspect-video w-full overflow-hidden rounded-xl border-2 transition-all ${
-                            selectedBgKey === "custom"
-                              ? "border-emerald-500 ring-2 ring-emerald-500/30"
-                              : "border-transparent hover:border-slate-300 dark:hover:border-slate-600"
+                          className={`relative aspect-video w-full overflow-hidden rounded-xl border-2 transition-all ${selectedBgKey === "custom"
+                            ? "border-emerald-500 ring-2 ring-emerald-500/30"
+                            : "border-transparent hover:border-slate-300 dark:hover:border-slate-600"
                           }`}
                         >
                           <img src={bgCustomUrl ?? undefined} alt="Mi fondo" className="h-full w-full object-cover" />

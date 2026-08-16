@@ -38,26 +38,33 @@ export default defineConfig({
         }
       : {}),
   },
+  // ✅ DESACTIVAR MODULE PRELOAD PARA EVITAR WARNINGS
+  build: {
+    modulePreload: false,
+    rollupOptions: {
+      output: {
+        assetFileNames: 'assets/[name]-[hash][extname]',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+      },
+    },
+  },
   plugins: [
     figmaAssetResolver(),
-    // The React and Tailwind plugins are both required for Make, even if
-    // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      // Usa el manifest ya existente en public/favicon_io/
       manifest: false,
       workbox: {
-        // Solo cachea archivos estáticos del build
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        // Algunos fondos/carruseles superan el límite default de 2 MB
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        // Excluye TODAS las rutas de la API para evitar errores de conexión
+        globPatterns: [
+          "**/*.{js,css,html,ico,png,svg,woff2}",
+          "**/*.pdf"
+        ],
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
-            // Archivos estáticos propios (JS, CSS, imágenes del build)
             urlPattern: /^https?:\/\/[^/]+\/assets\//,
             handler: "CacheFirst",
             options: {
@@ -66,7 +73,6 @@ export default defineConfig({
             },
           },
           {
-            // Imágenes y favicons
             urlPattern: /^https?:\/\/[^/]+\/favicon_io\//,
             handler: "CacheFirst",
             options: {
@@ -74,22 +80,26 @@ export default defineConfig({
               expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
+          {
+            urlPattern: /^https?:\/\/[^/]+\.pdf$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "pdf-cache",
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 90 },
+            },
+          },
         ],
-        // No cachear rutas de API ni devtunnels/ngrok
         navigateFallback: "index.html",
       },
       devOptions: {
-        enabled: false, // No activar SW en desarrollo para evitar conflictos
+        enabled: false,
       },
     }),
   ],
   resolve: {
     alias: {
-      // Alias @ to the src directory
       "@": toFsPath(new URL("./src", import.meta.url)),
     },
   },
-
-  // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
-  assetsInclude: ["**/*.svg", "**/*.csv"],
+  assetsInclude: ["**/*.svg", "**/*.csv", "**/*.pdf"],
 });

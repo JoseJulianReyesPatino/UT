@@ -426,8 +426,8 @@ const FAKE_RECENT_DOCS: DocumentItem[] = [
 export function DocenteDashboard(props: Readonly<DocenteDashboardProps> = {}) {
   const { onNavigate, layoutStyle } = props;
   const isFormal = layoutStyle === "formal";
-  const manualDocenteUrl = new URL("../../../assets/manuales/Manual de Usuario del Docente.pdf", import.meta.url).href;
-  const nomenclaturaUrl = new URL("../../../assets/manuales/Nomenclatura.pdf", import.meta.url).href;
+  const manualDocenteUrl = "/Manual de Usuario del Docente.pdf";
+  const nomenclaturaUrl = "/Nomenclatura.pdf";
 
   const bannerLinks: (string | undefined)[] = [manualDocenteUrl, nomenclaturaUrl];
 

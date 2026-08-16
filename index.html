@@ -1,50 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestión Académica Digital</title>
+    
+    <!-- ✅ FAVICON OPTIMIZADO - priorizar PNG sobre ICO -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io/favicon-32x32.png?v=2" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io/favicon-16x16.png?v=2" />
+    <link rel="shortcut icon" href="/favicon_io/favicon.ico?v=2" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon_io/apple-touch-icon.png" />
+    <link rel="manifest" href="/favicon_io/site.webmanifest" />
+    
+    <meta name="description" content="Plataforma de gestión académica digital para docentes, supervisores y administradores de la UTSLRC." />
+    <meta name="theme-color" content="#0f766e" />
+    <link rel="preconnect" href="https://tutorias.utslrc.edu.mx" />
+    
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var savedTheme = 'light';
+        try {
+          savedTheme = localStorage.getItem('theme') || 'light';
+        } catch (error) {
+          console.debug(error);
+        }
+        if (savedTheme === 'light') {
+          root.classList.remove('dark');
+          root.dataset.theme = 'light';
+        } else {
+          root.classList.add('dark');
+          root.dataset.theme = 'dark';
+        }
+      })();
+    </script>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      #root { height: 100%; }
+      body.splashing { background-image: none !important; background-color: #f8fafc !important; }
+      html.dark body.splashing { background-color: #000000 !important; }
+    </style>
+  </head>
 
-  <!DOCTYPE html>
-  <html lang="es">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Gestión Académica Digital</title>
-      <!-- Primary favicon: prefer a high-res PNG so browsers can pick the best size -> reduces compression artifacts -->
-      <link rel="icon" href="/favicon_io/favicon.ico" />
-      <link rel="icon" type="image/png" sizes="192x192" href="/favicon_io/android-chrome-192x192.png" />
-      <link rel="icon" type="image/png" sizes="512x512" href="/favicon_io/android-chrome-512x512.png" />
-      <link rel="shortcut icon" href="/favicon_io/favicon-32x32.png" />
-      <link rel="apple-touch-icon" sizes="180x180" href="/favicon_io/apple-touch-icon.png" />
-      <link rel="manifest" href="/favicon_io/site.webmanifest" />
-      <meta name="description" content="Plataforma de gestión académica digital para docentes, supervisores y administradores de la UTSLRC." />
-      <meta name="theme-color" content="#0f766e" />
-      <link rel="preload" as="image" href="/src/assets/elementos/LogotipoUTSLRC-BLANCO.webp" />
-      <script>
-        (function () {
-          var root = document.documentElement;
-          var savedTheme = 'light';
-          try {
-            savedTheme = localStorage.getItem('theme') || 'light';
-          } catch (error) {
-            console.debug(error);
-          }
-
-          if (savedTheme === 'light') {
-            root.classList.remove('dark');
-            root.dataset.theme = 'light';
-          } else {
-            root.classList.add('dark');
-            root.dataset.theme = 'dark';
-          }
-        })();
-      </script>
-      <style>
-        html, body { height: 100%; margin: 0; }
-        #root { height: 100%; }
-        body.splashing { background-image: none !important; background-color: #f8fafc !important; }
-        html.dark body.splashing { background-color: #000000 !important; }
-      </style>
-    </head>
-
-    <body class="splashing">
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-    </body>
-  </html>
-  
+  <body class="splashing">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
