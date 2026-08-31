@@ -229,7 +229,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
   const [avatarCacheBust, setAvatarCacheBust] = useState(0);
 
-  // Extract relative path so useResolvedAvatarUrl fetches with auth+ngrok headers.
+  // Extract relative path so useResolvedAvatarUrl fetches with auth headers.
   // avatarCacheBust appended as query param forces a re-fetch after a new avatar is saved.
   const userAvatarPath = useMemo(() => {
     const src = user?.avatar;
@@ -939,9 +939,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     reader.readAsDataURL(file);
   };
 
-  // Un avatar real del servidor siempre llega como URL absoluta https://... desde la API.
-  // Los paths locales de Vite (defaultPerfilImg) no son avatares del servidor.
-  const hasServerAvatar = !!(user?.avatar && user.avatar.startsWith("http"));
+  const hasServerAvatar = !!(user?.avatar && user.avatar !== "/api/default-avatar");
 
   const handleRemoveAvatar = useCallback(async () => {
     if (isRemovingAvatar) return;
@@ -960,10 +958,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
         body: JSON.stringify({ avatar_url: null }),
       });
       clearAvatarCache();
-      const refreshedUser = await refreshUser();
-      if (refreshedUser) {
-        updateProfile({ name: refreshedUser.name, firstNames: refreshedUser.firstNames, lastNames: refreshedUser.lastNames });
-      }
+      updateProfile({ avatar: undefined });
       window.dispatchEvent(new CustomEvent("ut-avatar-updated", { detail: { userId: user?.id, avatarUrl: undefined } }));
       toast.success("Foto de perfil eliminada");
     } catch (error: unknown) {

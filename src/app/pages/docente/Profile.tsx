@@ -110,7 +110,7 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
 
   const handleRemoveAvatar = useCallback(async () => {
     if (isRemovingAvatar) return;
-    const hadServerAvatar = !!(user?.avatar && user.avatar.startsWith("http"));
+    const hadServerAvatar = !!(user?.avatar && user.avatar !== "/api/default-avatar");
     setSelectedAvatarFile(null);
     setAvatarPreview(undefined);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -123,10 +123,7 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
         body: JSON.stringify({ avatar_url: null }),
       });
       clearAvatarCache();
-      const refreshedUser = await refreshUser();
-      if (refreshedUser) {
-        updateProfile({ name: refreshedUser.name, firstNames: refreshedUser.firstNames, lastNames: refreshedUser.lastNames });
-      }
+      updateProfile({ avatar: undefined });
       window.dispatchEvent(new CustomEvent('ut-avatar-updated', { detail: { userId: user?.id, avatarUrl: undefined } }));
       toast.success("Foto de perfil eliminada");
     } catch (error: unknown) {
@@ -276,7 +273,7 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
             <DialogDescription className="dark:text-slate-400">Vista previa de tu imagen de perfil</DialogDescription>
           </DialogHeader>
           <div className="mt-4 flex justify-center">
-            <img src={visibleAvatar} alt={`Foto de perfil de ${user?.name}`} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
+            <img src={visibleAvatar} alt={`Foto de perfil de ${user?.name}`} className="max-h-[70vh] max-w-full rounded-lg object-contain" onError={(e) => { (e.target as HTMLImageElement).src = defaultProfileAvatar; }} />
           </div>
         </DialogContent>
       </Dialog>
