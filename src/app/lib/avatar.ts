@@ -41,7 +41,7 @@ export const getAvatarUrlWithTimestamp = (
     return urlWithTimestamp;
   }
 
-  // Si es una URL relativa — usar resolveApiAssetUrl para obtener el origen correcto (ngrok/local)
+  // Si es una URL relativa — usar resolveApiAssetUrl para obtener el origen correcto
   if (url.startsWith("/")) {
     const fullUrl = resolveApiAssetUrl(url) ?? url;
 
@@ -107,7 +107,7 @@ export const isImageUrl = (value?: string | null): boolean => {
 };
 
 const isProtectedAvatarRoute = (value: string) =>
-  value.startsWith("/api/users/") || value.startsWith("/uploads/");
+  value.startsWith("/api/users/") || value.startsWith("/uploads/") || value.startsWith("/storage/avatars/");
 
 const isRenderableAvatarSource = (value: string) => {
   return (
@@ -145,7 +145,6 @@ const fetchAvatarBlob = (
         cache: "no-store",
         headers: {
           ...toFetchHeaders(),
-          "ngrok-skip-browser-warning": "true",
         },
       });
 

@@ -54,7 +54,6 @@ export const fetchDocumentBlob = async (
   const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
   const headers: Record<string, string> = {
     Accept: "application/pdf",
-    "ngrok-skip-browser-warning": "true",
   };
 
   if (token) {

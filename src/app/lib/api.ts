@@ -66,13 +66,6 @@ export async function apiFetch(path: string, options: FetchOptions = {}) {
       ? API_BASE_URL_CANDIDATES
       : [API_BASE_URL];
 
-  // ✅ Agregar ngrok-skip-browser-warning si la API apunta a ngrok
-  const isNgrok = candidateBases.some((b) => b.includes("ngrok")) ||
-    (path.startsWith("http") && path.includes("ngrok"));
-  if (isNgrok) {
-    headers["ngrok-skip-browser-warning"] = "true";
-  }
-
   let lastError: any = null;
 
   for (let index = 0; index < candidateBases.length; index += 1) {
