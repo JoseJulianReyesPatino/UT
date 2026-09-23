@@ -321,7 +321,6 @@ const TUTOR_TYPES: TutorDocumentType[] = [
   "carga-academica", "reporte-bajas", "concentrado-asesorias", "acta-asistencia", "ficha-tecnica",
 ];
 
-
 function TourFakeCicloCard({ isFirst }: { isFirst: boolean }) {
   const fake = isFirst
     ? { nombre: "Ciclo Enero–Junio 2026", anio: 2026, periodo: "Ene–Jun", fechaInicio: "13/ene/2026", fechaFin: "30/jun/2026", status: "activo" as const, docs: 48 }
@@ -510,7 +509,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
 
     const normalized = normalizeTipo(row.tipo ?? row.form_code ?? row.apartado_label);
 
-    // Canonicalize historical variants so counters and filters remain consistent.
     const aliasMap: Record<string, string> = {
       "portafolio-digital": "portafolio",
       "acta-asistencia-grupal": "acta-asistencia",
@@ -546,9 +544,7 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
     const isNuevoModeloByCatalog = nuevoModeloCareers.some(careerItem => careerMatchesCatalog(careerItem));
     const isPlanNormalByCatalog = planNormalCareers.some(careerItem => careerMatchesCatalog(careerItem));
 
-    // PN in career → Plan Normal
     const hasPnInCareer = /(^|[^a-z0-9])pn([^a-z0-9]|$)/.test(normalizedCareer);
-    // NM in career or career starts with TSU → Plan Nuevo Modelo
     const hasNmOrTsuInCareer =
       /(^|[^a-z0-9])nm([^a-z0-9]|$)/.test(normalizedCareer) ||
       normalizedCareer.startsWith("tsu ") ||
@@ -650,7 +646,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
     if (isNuevo && isTSU) return ["1", "2", "3", "4", "5", "6"];
     if (isNuevo && !isTSU) return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
     if (isNormal) return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"];
-    // All if no plan/carrera selected
     return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"];
   };
 
@@ -679,7 +674,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
 
     const rawTitle = (row.title ?? row.nombre ?? "").trim();
     if (rawTitle && !/^doc_/i.test(rawTitle)) {
-      // Si el título viene con metadata separada por " - ", tomar solo el último segmento
       const lastSep = rawTitle.lastIndexOf(" - ");
       const fileName = lastSep !== -1 ? rawTitle.substring(lastSep + 3).trim() : rawTitle;
       if (fileName) {
@@ -853,12 +847,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
           pdfUrl: row.downloadUrl ?? row.fileUrl ?? `/documents/${row.id}/file`,
         }));
 
-      const classifiedIds = new Set([
-        ...docentes.map((d) => d.id),
-        ...estadiasDocs.map((d) => d.id),
-        ...tutores.map((d) => d.id),
-        ...remediales.map((d) => d.id),
-      ]);
       const classifiedTotal = docentes.length + estadiasDocs.length + tutores.length + remediales.length;
       setDocumentCountByCycleId((current) => ({ ...current, [cycle.id]: classifiedTotal }));
 
@@ -1040,6 +1028,9 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
     if (isSubmittingCycle) return;
     setIsSubmittingCycle(true);
     try {
+      // ✅ FIX: auto-activar el ciclo si no hay ningún ciclo activo actualmente
+      const hasActiveCycle = ciclos.some((c) => c.status === "activo");
+
       const response = await apiFetch("/cycles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1049,14 +1040,18 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
           period_name: periodLabel,
           start_date: newCycleForm.fechaInicio,
           end_date: newCycleForm.fechaFin,
-          status: "cerrado",
+          status: hasActiveCycle ? "cerrado" : "activo",
         }),
       });
 
       const nextCycle: ApiCycle = response.data;
       setCiclos((current) => [mapApiCycle(nextCycle), ...current]);
       setDocumentCountByCycleId((current) => ({ ...current, [nextCycle.id]: 0 }));
-      toast.success("Ciclo escolar creado correctamente");
+      toast.success(
+        nextCycle.status === "activo"
+          ? "Ciclo escolar creado y activado correctamente"
+          : "Ciclo escolar creado correctamente"
+      );
       setNewCycleForm({
         nombre: "",
         anio: String(currentYear),
@@ -1092,13 +1087,13 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
     const updatedName = editCycleForm.nombre.trim();
     const requestedStatus: CycleStatus = editCycleForm.status;
 
-      if (requestedStatus === "activo") {
-        const activeCycle = getActiveCycle();
-        if (activeCycle && activeCycle.id !== selectedCycle.id) {
-          toast.error(`Solo puede haber un ciclo activo. Primero cierra ${activeCycle.nombre}.`);
-          return;
-        }
+    if (requestedStatus === "activo") {
+      const activeCycle = getActiveCycle();
+      if (activeCycle && activeCycle.id !== selectedCycle.id) {
+        toast.error(`Solo puede haber un ciclo activo. Primero cierra ${activeCycle.nombre}.`);
+        return;
       }
+    }
 
     if (isSubmittingCycle) return;
     setIsSubmittingCycle(true);
@@ -1361,7 +1356,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
     [documents]
   );
 
-  // Carreras depend on the selected plan, same pattern as DocumentReview
   const carrerasAvailable = useMemo(
     () => getCareerFilterOptions(filterPlan),
     [filterPlan]
@@ -1376,7 +1370,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
           && (filterCarrera === "all" || document.carrera === filterCarrera))
         .map((document) => document.cuatrimestre)))
         .filter((value) => value !== "-");
-      // Merge catalog (all possible) with what's actually uploaded, keeping catalog order
       const merged = [...fromCatalog];
       for (const c of fromDocs) {
         if (!merged.includes(c)) merged.push(c);
@@ -1411,10 +1404,8 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
 
   const parcialesAvailable = PARCIAL_FILTER_OPTIONS;
 
-  // Tutor plans also static
   const tutorPlansAvailable = ["Plan Nuevo Modelo", "Plan Normal"];
 
-  // Tutor carreras depend on selected tutor plan
   const tutorCarrerasAvailable = useMemo(
     () => getCareerFilterOptions(filterTutorPlan),
     [filterTutorPlan]
@@ -1614,7 +1605,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
 
   const documentsModalTitle = getDocumentsModalTitle(selectedDocumentType, selectedDocumentCategory, selectedEstadiasCategory, selectedTutorCategory);
 
-  // Abre automáticamente el selector de documentos del primer ciclo disponible cuando el tour lo solicita
   React.useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
@@ -1632,7 +1622,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
     <>
       {isFormal ? (
         <div className="flex h-[calc(100vh-64px)] flex-col overflow-hidden bg-card text-foreground dark:bg-slate-950">
-        {/* Encabezado plano */}
         <div className="shrink-0 flex flex-col gap-3 border-b border-border bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-slate-800 dark:bg-slate-950">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Ciclos Escolares</h1>
@@ -1643,7 +1632,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
           </Button>
         </div>
 
-        {/* Contenido: tabla de ciclos */}
         <div className="flex-1 min-h-0 overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
           {isAdminTourActive && <TourFormalCicloSection />}
           {!isAdminTourActive && isLoadingCycles && <CycleCardSkeleton />}
@@ -1659,7 +1647,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
 
           {(!isAdminTourActive && !isLoadingCycles && !cyclesLoadError && ciclos.length > 0) && (
             <>
-              {/* Vista móvil — cards compactos */}
               <div data-tour="admin-ciclos-list" className="sm:hidden divide-y divide-border/40 border border-border/70 dark:divide-slate-800/60 dark:border-slate-800">
                 {ciclos.map((ciclo) => {
                   const documentsCount = cycleDocumentCount(ciclo);
@@ -1733,7 +1720,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
                 })}
               </div>
 
-              {/* Vista desktop — tabla completa */}
               <div className="hidden sm:block border border-border/70 dark:border-slate-800">
                 <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center border-b border-border/60 bg-muted/40 px-4 py-2 dark:border-slate-800 dark:bg-slate-900/50">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Ciclo</span>
@@ -1959,7 +1945,6 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
         </div>
       )}
 
-      {/* ── Dialogs compartidos entre ambos modos ── */}
       <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
         <DialogContent className="border-emerald-200/70 bg-white dark:border-emerald-900/50 dark:bg-slate-950">
           <DialogHeader>

@@ -26,7 +26,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   updateProfile: (updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => void;
-  refreshUser: () => Promise<User | null>;
+  refreshUser: (options?: { forceDefaultAvatar?: boolean }) => Promise<User | null>;
   isAuthenticated: boolean;
   isReady: boolean;
   notice: { type: "success" | "error"; message: string } | null;
@@ -142,7 +142,29 @@ const removeCachedProfile = (userId: string) => {
   localStorage.removeItem(profileCacheKey(userId));
 };
 
-const mapApiUser = (apiUser: ApiLoginResponse["user"]): User => {
+// ✅ NUEVA: Solo limpia el avatar del cache, conserva nombres.
+// Se usa cuando el backend confirma que el avatar fue eliminado,
+// para que mapApiUser NO lo recupere del cache.
+const clearCachedAvatar = (userId: string) => {
+  try {
+    const raw = localStorage.getItem(profileCacheKey(userId));
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    parsed.avatar = "";
+    localStorage.setItem(profileCacheKey(userId), JSON.stringify(parsed));
+  } catch {
+    localStorage.removeItem(profileCacheKey(userId));
+  }
+};
+
+// ✅ Ahora acepta `options.forceDefaultAvatar` para ignorar el cache local
+// cuando el backend confirma que el avatar fue eliminado.
+const mapApiUser = (
+  apiUser: ApiLoginResponse["user"],
+  options: { forceDefaultAvatar?: boolean } = {}
+): User => {
+  const { forceDefaultAvatar = false } = options;
+
   const roles = normalizeRoles(apiUser.roles);
   const primaryRole = roles.includes("administrador")
     ? "administrador"
@@ -156,12 +178,17 @@ const mapApiUser = (apiUser: ApiLoginResponse["user"]): User => {
     lastNames: apiUser.last_names?.trim() ?? "",
   };
   const fallbackNames = splitNameParts(apiUser.full_name);
-  const cachedProfile = loadCachedProfile(String(apiUser.id));
 
-  const avatarUrl = apiUser.avatar_url && apiUser.avatar_url !== "/api/default-avatar"
-    ? resolveApiAssetUrl(apiUser.avatar_url)
-    : cachedProfile?.avatar && cachedProfile.avatar !== "/api/default-avatar"
-      ? resolveApiAssetUrl(cachedProfile.avatar)
+  // ✅ Si forceDefaultAvatar=true, NO consultamos el cache de avatar
+  const cachedProfile = forceDefaultAvatar ? null : loadCachedProfile(String(apiUser.id));
+
+  const hasBackendAvatar = apiUser.avatar_url && apiUser.avatar_url !== "/api/default-avatar";
+  const hasCachedAvatar = !forceDefaultAvatar && cachedProfile?.avatar && cachedProfile.avatar !== "/api/default-avatar";
+
+  const avatarUrl = hasBackendAvatar
+    ? resolveApiAssetUrl(apiUser.avatar_url!)
+    : hasCachedAvatar
+      ? resolveApiAssetUrl(cachedProfile!.avatar!)
       : defaultProfileAvatar;
 
   return {
@@ -254,7 +281,9 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     }
   };
 
-  const refreshUser = useCallback(async (): Promise<User | null> => {
+  // ✅ Ahora acepta options.forceDefaultAvatar para forzar el default
+  // cuando se acaba de eliminar el avatar en el backend.
+  const refreshUser = useCallback(async (options: { forceDefaultAvatar?: boolean } = {}): Promise<User | null> => {
     const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
     if (!token) {
       return null;
@@ -262,7 +291,16 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
 
     try {
       const payload = (await apiFetch('/auth/me', { method: 'GET' })) as { user: ApiLoginResponse['user'] };
-      const apiUser = mapApiUser(payload.user);
+
+      // ✅ Si vamos a forzar el default, limpiamos el cache del avatar
+      // ANTES de mapear, para que mapApiUser no lo recupere.
+      if (options.forceDefaultAvatar) {
+        clearCachedAvatar(String(payload.user.id));
+      }
+
+      const apiUser = mapApiUser(payload.user, {
+        forceDefaultAvatar: options.forceDefaultAvatar,
+      });
       setUser(apiUser);
       saveCachedProfile(apiUser);
       

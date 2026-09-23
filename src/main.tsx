@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { AppRouter } from "./app/RouterConfig";
 import { ErrorBoundary } from "./app/components/ErrorBoundary";
+import { registerSW } from "virtual:pwa-register";
 import "./styles/index.css";
 
 // Parche: Google Translate envuelve nodos de texto en <font>, lo que rompe
@@ -21,6 +22,16 @@ if (typeof Node === "function" && Node.prototype) {
     return _insertBefore.call(this, newNode, ref) as T;
   };
 }
+
+registerSW({
+  onRegisteredSW(_swUrl, registration) {
+    if (registration) {
+      setInterval(() => {
+        registration.update();
+      }, 60 * 60 * 1000); // revisa si hay versión nueva cada hora
+    }
+  },
+});
 
 createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>

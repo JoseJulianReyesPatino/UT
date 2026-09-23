@@ -1,6 +1,6 @@
 import React, { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from 'react-router-dom'; // ✅ AGREGADO
+import { useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { Alert, AlertDescription } from "./components/ui/alert";
@@ -22,9 +22,10 @@ import { Login } from "./pages/Login";
 import { Sidebar } from "./components/Sidebar";
 import { FormAccessGuard } from "./components/FormAccessGuard";
 
-const LogoUTSLRC = "/assets/LogotipoUTSLRC.webp";
-const LogoUTSLRCWhite = "/assets/LogotipoUTSLRC-BLANCO.webp";
-const SuperiorFormImg = "/assets/superior_form.webp";
+// ✅ IMPORTS CORREGIDOS — Vite los procesa y les pone hash, nunca desaparecen
+import LogoUTSLRC from "../assets/elementos/LogotipoUTSLRC.webp";
+import LogoUTSLRCWhite from "../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
+import SuperiorFormImg from "../assets/elementos/superior_form.webp";
 import BgDefault from "../assets/Fondos/ut_imagen14.webp";
 
 // Páginas cargadas bajo demanda
@@ -72,7 +73,7 @@ const LAYOUT_STYLE_KEY = "utslrc-layout-style";
 function AppContent() {
   const { isAuthenticated, isReady, user, notice, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const navigate = useNavigate(); // ✅ AGREGADO
+  const navigate = useNavigate();
 
   const logoSrc = theme === "dark" ? LogoUTSLRCWhite : LogoUTSLRC;
   const splashLogoSrc = theme === "dark" ? LogoUTSLRCWhite : LogoUTSLRC;
@@ -340,55 +341,22 @@ function AppContent() {
 
     const allowedViews = user?.role === "administrador"
       ? new Set([
-          "dashboard",
-          "docentes",
-          "tutores",
-          "mensajes",
-          "documentos",
-          "remediales",
-          "documentos-revisados",
-          "documentos-revisados-hoy",
-          "ciclos",
-          "estadias-admin",
-          "calendario",
-          "configuracion",
-          "configuracion-cuenta",
+          "dashboard", "docentes", "tutores", "mensajes", "documentos", "remediales",
+          "documentos-revisados", "documentos-revisados-hoy", "ciclos", "estadias-admin",
+          "calendario", "configuracion", "configuracion-cuenta",
         ])
       : (user?.role === "supervisor" || user?.roles?.includes("supervisor"))
       ? new Set([
-          "supervisor-planeacion",
-          "supervisor-instrumentos",
-          "supervisor-remedial",
-          "supervisor-lista-concentrada",
-          "supervisor-asesoria",
-          "supervisor-portafolio",
-          "supervisor-acta-final",
-          "supervisor-estadias",
-          "supervisor-tutorias",
-          "perfil",
+          "supervisor-planeacion", "supervisor-instrumentos", "supervisor-remedial",
+          "supervisor-lista-concentrada", "supervisor-asesoria", "supervisor-portafolio",
+          "supervisor-acta-final", "supervisor-estadias", "supervisor-tutorias", "perfil",
         ])
       : new Set([
-          "dashboard",
-          "planeacion",
-          "instrumento-30-normal",
-          "instrumento-40-nuevo",
-          "instrumento-60-nuevo",
-          "instrumento-70-normal",
-          "remedial",
-          "lista-concentrada",
-          "asesoria",
-          "portafolio",
-          "acta-final",
-          "estadias",
-          "tutorias",
-          "tutorias-carga-academica",
-          "tutorias-reporte-bajas",
-          "tutorias-concentrado-asesorias",
-          "tutorias-acta-asistencia-grupal",
-          "tutorias-ficha-tecnica",
-          "historial",
-          "mensajes",
-          "perfil",
+          "dashboard", "planeacion", "instrumento-30-normal", "instrumento-40-nuevo",
+          "instrumento-60-nuevo", "instrumento-70-normal", "remedial", "lista-concentrada",
+          "asesoria", "portafolio", "acta-final", "estadias", "tutorias",
+          "tutorias-carga-academica", "tutorias-reporte-bajas", "tutorias-concentrado-asesorias",
+          "tutorias-acta-asistencia-grupal", "tutorias-ficha-tecnica", "historial", "mensajes", "perfil",
         ]);
 
     if (!allowedViews.has(currentView)) {
@@ -488,17 +456,13 @@ function AppContent() {
 
   useEffect(() => {
     const handleOnline = () => {
-      if (!navigator.onLine || !isOffline) {
-        return;
-      }
+      if (!navigator.onLine || !isOffline) return;
       setIsOffline(false);
       toast.success("Conexión restaurada.");
     };
 
     const handleOffline = () => {
-      if (navigator.onLine || isOffline) {
-        return;
-      }
+      if (navigator.onLine || isOffline) return;
       setIsOffline(true);
       toast.error("Sin conexión a internet. Algunas funciones estarán limitadas.");
     };
@@ -557,9 +521,6 @@ function AppContent() {
 
   const cancelLeave = () => setLeaveDialogOpen(false);
 
-  // ============================================================
-  // ✅ NAVEGACIÓN CON REACT ROUTER - VERSIÓN CORREGIDA
-  // ============================================================
   const safeNavigate = (view: string) => {
     if (formEditingRef.current) {
       setPendingView(view);
@@ -568,9 +529,7 @@ function AppContent() {
       setCurrentView(view);
       setMobileSidebarOpen(false);
 
-      // ✅ ACTUALIZAR LA URL CON REACT ROUTER
       const routeMap: Record<string, string> = {
-        // Docente
         'dashboard': '/',
         'historial': '/docente/historial',
         'mensajes': '/mensajes',
@@ -592,8 +551,6 @@ function AppContent() {
         'tutorias-concentrado-asesorias': '/docente/tutorias-concentrado-asesorias',
         'tutorias-acta-asistencia-grupal': '/docente/tutorias-acta-asistencia-grupal',
         'tutorias-ficha-tecnica': '/docente/tutorias-ficha-tecnica',
-
-        // Admin
         'docentes': '/admin/docentes',
         'tutores': '/admin/tutores',
         'ciclos': '/admin/ciclos',
@@ -605,8 +562,6 @@ function AppContent() {
         'calendario': '/admin/calendario',
         'configuracion': '/admin/configuracion',
         'configuracion-cuenta': '/admin/configuracion-cuenta',
-
-        // Supervisor
         'supervisor-planeacion': '/supervisor/planeacion',
         'supervisor-instrumentos': '/supervisor/instrumentos',
         'supervisor-remedial': '/supervisor/remedial',
@@ -983,7 +938,6 @@ function AppContent() {
                     </button>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    {/* Clásico */}
                     <button
                       onClick={() => { setLayoutStyle("default"); savePrefs({ layoutStyle: "default" }); }}
                       className={`flex flex-col items-center gap-2 rounded-xl border-2 p-2 transition-all ${layoutStyle === "default"
@@ -1016,7 +970,6 @@ function AppContent() {
                       )}
                     </button>
 
-                    {/* Empresarial */}
                     <button
                       onClick={() => { setLayoutStyle("formal"); savePrefs({ layoutStyle: "formal" }); }}
                       className={`flex flex-col items-center gap-2 rounded-xl border-2 p-2 transition-all ${layoutStyle === "formal"
@@ -1192,7 +1145,6 @@ function AppContent() {
                       </button>
                     ))}
 
-                    {/* Slot de imagen personalizada */}
                     {bgCustomUrl ? (
                       <div className="relative">
                         <button
@@ -1234,7 +1186,6 @@ function AppContent() {
                     )}
                   </div>
 
-                  {/* Input oculto para seleccionar archivo */}
                   <input
                     ref={bgFileInputRef}
                     type="file"
@@ -1243,7 +1194,6 @@ function AppContent() {
                     onChange={handleBgFileChange}
                   />
 
-                  {/* Botón para cambiar imagen si ya existe una personalizada */}
                   {bgCustomUrl && (
                     <button
                       onClick={() => bgFileInputRef.current?.click()}
@@ -1287,7 +1237,6 @@ function AppContent() {
                     </div>
                   </div>
 
-                  {/* Slider 3: Desenfoque */}
                   <div className="border-t border-border/40 pt-3">
                     <div className="mb-1.5 flex items-center justify-between">
                       <span className="text-xs text-slate-500 dark:text-slate-400">Desenfoque de paneles</span>
@@ -1304,10 +1253,9 @@ function AppContent() {
                     </div>
                   </div>
 
-                  {/* ✅ Botón restablecer valores predeterminados con 100% de opacidad */}
                   <div className="border-t border-border/40 pt-3">
                     <button
-                    onClick={() => {
+                      onClick={() => {
                         setSelectedBgKey("default");
                         setBgOverlay(30);
                         setContainerAlpha(100);
@@ -1327,7 +1275,6 @@ function AppContent() {
 
             {/* ── BARRA FLOTANTE DE HERRAMIENTAS ── */}
             <div className="fixed bottom-4 right-4 z-50 flex flex-col-reverse items-center gap-3">
-              {/* Botón de expandir/colapsar toolbar */}
               <button
                 data-tour="toolbar-toggle"
                 onClick={toggleToolbar}
@@ -1340,7 +1287,6 @@ function AppContent() {
 
               {isToolbarExpanded && (
                 <>
-                  {/* Botón de modo oscuro/claro */}
                   <Button
                     type="button"
                     variant="outline"
@@ -1354,7 +1300,6 @@ function AppContent() {
                     {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                   </Button>
 
-                  {/* Botón de Diseño del sistema */}
                   <Button
                     type="button"
                     variant="outline"
@@ -1368,7 +1313,6 @@ function AppContent() {
                     <LayoutGrid className="h-4 w-4" />
                   </Button>
 
-                  {/* Botón de Tema de color */}
                   <Button
                     type="button"
                     variant="outline"
@@ -1382,7 +1326,6 @@ function AppContent() {
                     <Palette className="h-4 w-4" />
                   </Button>
 
-                  {/* Botón de Fondo de pantalla */}
                   <Button
                     type="button"
                     variant="outline"
@@ -1396,8 +1339,6 @@ function AppContent() {
                     <ImageIcon className="h-4 w-4" />
                   </Button>
 
-                  {/* ── BOTONES DEL TOUR ── */}
-                  {/* Tour para Administrador */}
                   {isAdmin && !isAdminTourOpen && (
                     <Button
                       type="button"
@@ -1411,8 +1352,7 @@ function AppContent() {
                       <HelpCircle className="h-4 w-4" />
                     </Button>
                   )}
-                  
-                  {/* Tour para Docente */}
+
                   {isDocente && !isDocenteTourOpen && (
                     <Button
                       type="button"
@@ -1452,33 +1392,32 @@ function AppContent() {
                 />
               )}
 
-         {/* ── TOUR PARA DOCENTE ── */}
-{isDocente && (
-  <TourOverlay
-    steps={getDocenteTourSteps(
-      (user?.role === "docente" || (user?.roles?.includes("docente") ?? false)) && canAccessTutorias
-    )}
-    isOpen={isDocenteTourOpen}
-    onClose={() => setIsDocenteTourOpen(false)}
-    onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
-    onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
-    onNavigate={(view) => {
-      const [mainView, subParam] = view.split(":");
-      setCurrentView(mainView);
-      if (subParam) {
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent("tour-sub-nav", { detail: subParam }));
-        }, 200);
-      }
-    }}
-    onStepChange={(step) => {
-      const toolbarTargets = ['toolbar-toggle', 'toolbar-theme-toggle', 'toolbar-themes', 'toolbar-layout', 'toolbar-background'];
-      if (step && toolbarTargets.includes(step.target)) {
-        setIsToolbarExpanded(true);
-      }
-    }}
-  />
-)}
+              {isDocente && (
+                <TourOverlay
+                  steps={getDocenteTourSteps(
+                    (user?.role === "docente" || (user?.roles?.includes("docente") ?? false)) && canAccessTutorias
+                  )}
+                  isOpen={isDocenteTourOpen}
+                  onClose={() => setIsDocenteTourOpen(false)}
+                  onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+                  onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
+                  onNavigate={(view) => {
+                    const [mainView, subParam] = view.split(":");
+                    setCurrentView(mainView);
+                    if (subParam) {
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent("tour-sub-nav", { detail: subParam }));
+                      }, 200);
+                    }
+                  }}
+                  onStepChange={(step) => {
+                    const toolbarTargets = ['toolbar-toggle', 'toolbar-theme-toggle', 'toolbar-themes', 'toolbar-layout', 'toolbar-background'];
+                    if (step && toolbarTargets.includes(step.target)) {
+                      setIsToolbarExpanded(true);
+                    }
+                  }}
+                />
+              )}
             </Suspense>
 
             <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>

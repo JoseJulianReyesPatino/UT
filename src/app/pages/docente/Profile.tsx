@@ -111,10 +111,14 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
   const handleRemoveAvatar = useCallback(async () => {
     if (isRemovingAvatar) return;
     const hadServerAvatar = !!(user?.avatar && user.avatar.startsWith("http"));
+
+    // ✅ Limpiar estado local INMEDIATAMENTE y forzar el default
     setSelectedAvatarFile(null);
-    setAvatarPreview(undefined);
+    setAvatarPreview(defaultProfileAvatar);
     if (fileInputRef.current) fileInputRef.current.value = "";
+
     if (!hadServerAvatar) return;
+
     setIsRemovingAvatar(true);
     try {
       await apiFetch("/auth/profile", {
@@ -123,14 +127,24 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
         body: JSON.stringify({ avatar_url: null }),
       });
       clearAvatarCache();
-      const refreshedUser = await refreshUser();
+
+      // ✅ CLAVE: forzar el default para que mapApiUser NO recupere
+      // el avatar viejo desde el cache local
+      const refreshedUser = await refreshUser({ forceDefaultAvatar: true });
+
       if (refreshedUser) {
-        updateProfile({ name: refreshedUser.name, firstNames: refreshedUser.firstNames, lastNames: refreshedUser.lastNames });
+        updateProfile({
+          name: refreshedUser.name,
+          firstNames: refreshedUser.firstNames,
+          lastNames: refreshedUser.lastNames,
+        });
       }
       window.dispatchEvent(new CustomEvent('ut-avatar-updated', { detail: { userId: user?.id, avatarUrl: undefined } }));
       toast.success("Foto de perfil eliminada");
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "No fue posible quitar la foto");
+      // Revertir al avatar del servidor si falla
+      setAvatarPreview(user?.avatar && user.avatar !== "/api/default-avatar" ? user.avatar : defaultProfileAvatar);
     } finally {
       setIsRemovingAvatar(false);
     }
@@ -242,9 +256,14 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
 
   const hasServerAvatar = user?.avatar && user.avatar !== "/api/default-avatar";
   const resolvedServerAvatar = useResolvedAvatarUrl(hasServerAvatar ? user.avatar : null);
+
+  // ✅ Lógica simplificada:
+  // 1. Si hay archivo recién seleccionado → preview local (data URL)
+  // 2. Si hay avatarPreview (default o del server) → usarlo
+  // 3. Fallback final → defaultProfileAvatar
   const visibleAvatar = (selectedAvatarFile && avatarPreview?.startsWith("data:"))
     ? avatarPreview
-    : (resolvedServerAvatar ?? defaultProfileAvatar);
+    : (avatarPreview ?? resolvedServerAvatar ?? defaultProfileAvatar);
 
   const memberSinceLabel = useMemo(() => {
     if (!user?.createdAt) return "Sin datos";
@@ -396,15 +415,12 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
     return (
       <>
         <div className="flex h-[calc(100vh-64px)] flex-col overflow-hidden bg-card text-foreground dark:bg-slate-950">
-          {/* Flat header */}
           <div className="shrink-0 border-b border-border bg-card px-6 py-4 dark:border-slate-800 dark:bg-slate-950/80">
             <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Mi Perfil</h1>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Gestiona tu información personal y preferencias.</p>
           </div>
-          {/* Scrollable content */}
           <div className="flex flex-col min-h-0 flex-1 overflow-hidden p-4 sm:p-5">
             <div className="flex flex-col gap-4 min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent pb-2">
-              {/* Profile banner */}
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 rounded-sm border border-border bg-card px-6 py-5 dark:border-slate-800/70 dark:bg-slate-950/60">
                 <div className="h-20 w-20 shrink-0 rounded-sm overflow-hidden cursor-pointer" onClick={() => setIsAvatarOpen(true)}>
                   <img src={visibleAvatar} alt={user?.name ?? "Foto de perfil"} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = defaultProfileAvatar; }} />
@@ -431,9 +447,7 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
                 </div>
                 <Input ref={fileInputRef} id="avatar-formal-prf" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} className="hidden" />
               </div>
-              {/* Two columns */}
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
-                {/* Left: datos personales */}
                 <div className="rounded-sm border border-border bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
                   <div className="border-b border-border px-5 py-3 dark:border-slate-800">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Datos personales</p>
@@ -463,7 +477,6 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
                     </div>
                   </div>
                 </div>
-                {/* Right: apariencia + seguridad */}
                 <div className="space-y-4">
                   <div className="rounded-sm border border-border bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
                     <div className="border-b border-border px-5 py-3 dark:border-slate-800">
@@ -515,9 +528,7 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
           </div>
         )}
 
-        {/* Tres columnas */}
         <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_340px] gap-6">
-          {/* Columna 1: Foto */}
           <Card data-tour="perfil-info-card" className="w-full overflow-hidden border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
             <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
               <div className="h-40 w-40 shrink-0 rounded-full overflow-hidden ring-2 ring-emerald-200/60 dark:ring-emerald-900/40 cursor-pointer" onClick={() => setIsAvatarOpen(true)}>
@@ -538,7 +549,6 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
             </div>
           </Card>
 
-          {/* Columna 2: Datos personales */}
           <Card className="w-full overflow-hidden border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
             <div className="p-8 space-y-5">
               <div>
@@ -570,7 +580,6 @@ export function Profile({ onDirtyChange, layoutStyle }: Readonly<{ onDirtyChange
             </div>
           </Card>
 
-          {/* Columna 3: Cuenta, estadísticas, seguridad */}
           <Card className="w-full overflow-hidden border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
             <div className="flex h-full flex-col p-8 space-y-8">
               <div data-tour="perfil-account-card">

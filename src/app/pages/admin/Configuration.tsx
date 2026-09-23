@@ -960,7 +960,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
         body: JSON.stringify({ avatar_url: null }),
       });
       clearAvatarCache();
-      const refreshedUser = await refreshUser();
+      const refreshedUser = await refreshUser({ forceDefaultAvatar: true });
       if (refreshedUser) {
         updateProfile({ name: refreshedUser.name, firstNames: refreshedUser.firstNames, lastNames: refreshedUser.lastNames });
       }

@@ -10,6 +10,13 @@ import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon, KeyRound, RotateCcw, Check
 import apiFetch from "../lib/api";
 import { toast } from "sonner";
 
+// ✅ IMPORTS CORREGIDOS — Vite los procesa y les pone hash, nunca desaparecen
+import LogoUTSLRC from "../../assets/elementos/LogotipoUTSLRC.webp";
+import LogoUTSLRCWhite from "../../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
+import SuperiorImage from "../../assets/elementos/superior.webp";
+import InferiorImage from "../../assets/elementos/inferior.webp";
+import MascotaImage from "../../assets/elementos/mascota3.webp";
+
 const getPasswordStrength = (password: string) => {
   let score = 0;
   if (password.length >= 8) score++;
@@ -44,9 +51,9 @@ export function Login() {
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
-const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/LogotipoUTSLRC.webp";
-  const superiorImage = new URL("../../assets/elementos/superior.webp", import.meta.url).href;
-  const inferiorImage = new URL("../../assets/elementos/inferior.webp", import.meta.url).href;
+
+  // ✅ Logos desde imports (con hash) — nunca desaparecen
+  const logoSrc = isDark ? LogoUTSLRCWhite : LogoUTSLRC;
 
   const pageBackground = isDark
     ? "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950"
@@ -152,7 +159,6 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
           password_confirmation: forgotConfirmPassword,
         }),
       });
-      // Cerrar dialog y volver al login
       setForgotStep("email");
       setForgotCode("");
       setForgotNewPassword("");
@@ -177,38 +183,29 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
 
   return (
     <div className={`login-page ${pageBackground} min-h-screen overflow-hidden relative`}>
-      {/* BACKGROUND - Gradientes y decoraciones mejoradas */}
       <div className="absolute inset-0">
         <img
-          src={superiorImage}
+          src={SuperiorImage}
           alt="Decoración superior"
           className="absolute top-0 right-0 w-24 sm:w-32 lg:w-40 pointer-events-none select-none z-0"
         />
         <img
-          src={inferiorImage}
+          src={InferiorImage}
           alt="Decoración inferior"
           className="absolute bottom-0 left-0 w-24 sm:w-32 lg:w-40 pointer-events-none select-none z-0"
         />
 
-        {/* Manchas de gradiente principales */}
         <div className="absolute top-0 left-0 w-[700px] h-[700px] bg-slate-700/10 blur-3xl rounded-full -translate-x-1/3 -translate-y-1/3 dark:bg-slate-600/20" />
         <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-slate-700/10 blur-3xl rounded-full translate-x-1/4 translate-y-1/4 dark:bg-slate-600/20" />
         <div className="hidden lg:block absolute bottom-8 right-8 w-48 h-48 bg-slate-700/10 blur-2xl rounded-full pointer-events-none dark:bg-slate-600/20" />
         
-        {/* Manchas adicionales de color sutil */}
         <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-blue-300/3 blur-3xl rounded-full pointer-events-none dark:bg-blue-400/10" />
         <div className="absolute top-2/3 right-1/3 w-80 h-80 bg-slate-700/8 blur-3xl rounded-full pointer-events-none dark:bg-slate-600/15" />
-        
       </div>
 
       <div className="relative z-10 min-h-screen grid lg:grid-cols-2">
-        {/* ===================================================== */}
-        {/* COLUMNA IZQUIERDA - CONTENIDO VISUAL */}
-        {/* ===================================================== */}
         <div className="hidden lg:flex items-center justify-center px-8 xl:px-12 relative">
-          {/* CONTENIDO PRINCIPAL */}
           <div className="max-w-2xl relative z-10 min-h-[560px] w-full">
-            {/* LOGO - Bloque independiente */}
             <div className="absolute left-0 top-[-56px]">
               <img
                 src={logoSrc}
@@ -217,7 +214,6 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
               />
             </div>
 
-            {/* TÍTULO - Bloque independiente */}
             <div className="absolute left-0 top-16 max-w-[38rem]">
               <h1 className="text-[58px] lg:text-[64px] leading-[0.98] font-black tracking-tight text-slate-900 dark:text-slate-50 drop-shadow-sm">
                 <span className="whitespace-nowrap">Sistema de Gestión</span>
@@ -225,7 +221,6 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
               </h1>
             </div>
 
-            {/* TEXTO - Bloque independiente */}
             <div className="absolute left-0 top-[210px] max-w-[38rem]">
               <p className={`${isDark ? "text-slate-300" : "text-slate-600"} text-lg lg:text-xl leading-relaxed font-medium text-justify`}>
                 Esta plataforma digital facilita la transición hacia el uso eficiente de documentos
@@ -234,51 +229,38 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
               </p>
             </div>
 
-            {/* MASCOTA - Bloque independiente con efecto flotante */}
             <div className="absolute right-[-180px] top-[300px] z-20">
               <div className="relative w-80 h-80 xl:w-[24rem] xl:h-[24rem] flex items-center justify-center">
-                {/* Efecto de glow detrás del gallo */}
                 <div className="absolute inset-0 bg-gradient-to-br from-[#3BBF82]/10 to-[#3BBF82]/5 rounded-full blur-3xl" />
                 
-                {/* Aro decorativo */}
                 <div className="absolute inset-0 border-2 border-[#3BBF82]/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 " />
                 
-                {/* Imagen del gallo */}
                 <img
-                  src="/assets/mascota3.webp" alt="Mascota institucional"
+                  src={MascotaImage}
+                  alt="Mascota institucional"
                   className="relative z-10 h-full w-full object-contain drop-shadow-2xl transition-transform duration-300 hover:scale-110 origin-center -translate-y-12"
                 />
-                
               </div>
             </div>
-
-            {/* Elementos visuales (círculo + tarjetas) eliminados según solicitud */}
           </div>
         </div>
 
-        {/* ===================================================== */}
-        {/* COLUMNA DERECHA - FORMULARIO DE LOGIN */}
-        {/* ===================================================== */}
         <div className="flex items-center justify-center p-6 lg:p-10 relative">
-          {/* DECORACIONES DE FONDO - Círculos, líneas y textura */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute -top-14 -right-16 w-64 h-64 rounded-full bg-slate-700/10 blur-3xl opacity-60" />
             <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-slate-700/8 blur-3xl opacity-55" />
           </div>
 
-          {/* TARJETA DE LOGIN CON DECORACIONES */}
           <Card className={`w-full max-w-md rounded-3xl backdrop-blur-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(59,191,130,0.18)] hover:border-[#3BBF82]/20 group will-change-transform animate-in fade-in slide-in-from-bottom-1 ${cardSurface}`}>
             <div className="absolute -top-20 -right-12 w-56 h-56 rounded-full bg-slate-700/10 blur-3xl pointer-events-none" />
             <div className="absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-slate-700/10 blur-3xl pointer-events-none" />
 
             <CardContent className="p-8 lg:p-10 relative">
 
-              {/* Versión Mobile */}
               <div className="lg:hidden text-center mb-8">
                 <img src={logoSrc} alt="Logo Institucional" className="mx-auto h-12 w-auto" />
               </div>
 
-              {/* Versión Desktop */}
               <div className="text-center mb-8">
                 <div className="mb-6">
                   <div className="w-16 h-1 bg-gradient-to-r from-[#3BBF82] to-[#2da06a] rounded-full mx-auto mb-4" />
@@ -383,8 +365,6 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
                   </div>
 
                   <div className="absolute inset-0 w-full [backface-visibility:hidden] [transform:rotateY(180deg)]">
-
-                    {/* ── PASO 1: Ingresar correo ── */}
                     {forgotStep === "email" && (
                       <form onSubmit={handleForgotEmailSubmit} className="space-y-5">
                         <div className="text-center">
@@ -434,7 +414,6 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
                         </button>
                       </form>
                     )}
-
                   </div>
                 </div>
               </div>
@@ -455,7 +434,6 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
         {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
       </Button>
 
-      {/* ── MODAL PASO 2: Código + nueva contraseña ── */}
       <Dialog open={forgotStep === "code"} onOpenChange={(open) => { if (!open) { setForgotStep("email"); setForgotError(""); setForgotCode(""); setForgotNewPassword(""); setForgotConfirmPassword(""); } }}>
         <DialogContent className="sm:max-w-md dark:bg-slate-950 dark:border-slate-800">
           <DialogHeader>
@@ -466,7 +444,6 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
           </DialogHeader>
 
           <form onSubmit={handleResetPasswordSubmit} className="space-y-4 pt-2">
-            {/* Campo código */}
             <div className="space-y-2 group/modal-code">
               <Label htmlFor="modal-code" className="font-medium text-sm dark:text-white">
                 Código de verificación
@@ -490,7 +467,6 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
               </div>
             </div>
 
-            {/* Nueva contraseña */}
             <div className="space-y-2 group/modal-new">
               <Label htmlFor="modal-new-password" className="font-medium text-sm dark:text-white">
                 Nueva contraseña
@@ -544,7 +520,6 @@ const logoSrc = isDark ? "/assets/LogotipoUTSLRC-BLANCO.webp" : "/assets/Logotip
               })()}
             </div>
 
-            {/* Confirmar contraseña */}
             <div className="space-y-2 group/modal-confirm">
               <Label htmlFor="modal-confirm-password" className="font-medium text-sm dark:text-white">
                 Confirmar contraseña

@@ -9,6 +9,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import apiFetch from "../lib/api";
 import { getInitials, useResolvedAvatarUrl } from "../lib/avatar";
 import defaultPerfilImg from "../../assets/elementos/perfil2.webp";
+
+// ✅ IMPORTS DE LOGOS — Vite los procesa con hash, nunca desaparecen
+import LogoUTSLRC from "../../assets/elementos/LogotipoUTSLRC.webp";
+import LogoUTSLRCWhite from "../../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
+
 import {
   FileText,
   BarChart3,
@@ -238,9 +243,6 @@ function SidebarInstrumentSection({
   );
 }
 
-const LOGO_LIGHT = "/assets/LogotipoUTSLRC.webp";
-const LOGO_DARK = "/assets/LogotipoUTSLRC-BLANCO.webp";
-
 export function Sidebar(props: Readonly<SidebarProps>) {
   const { currentView, onNavigate, mobileOpen, onMobileOpenChange, onLogoutRequest, layoutStyle } = props;
   const { user, logout } = useAuth();
@@ -330,6 +332,7 @@ export function Sidebar(props: Readonly<SidebarProps>) {
       window.clearInterval(intervalId);
     };
   }, [user]);
+
   useEffect(() => {
     const isIn3040 = instrumento3040Children.some((item) => item.id === currentView);
     const isIn6070 = instrumento6070Children.some((item) => item.id === currentView);
@@ -527,13 +530,14 @@ export function Sidebar(props: Readonly<SidebarProps>) {
           <div className="relative flex items-center justify-end">
             {!isCollapsedLocal && (
               <div className="absolute left-1/2 -translate-x-1/2">
+                {/* ✅ LOGOS DESDE IMPORTS — nunca 404, con hash de Vite */}
                 <img
-                  src={LOGO_LIGHT}
+                  src={LogoUTSLRC}
                   alt="Logo"
                   className={theme === "dark" ? "absolute w-0 h-0 opacity-0 pointer-events-none" : "h-10 w-auto object-contain"}
                 />
                 <img
-                  src={LOGO_DARK}
+                  src={LogoUTSLRCWhite}
                   alt="Logo"
                   aria-hidden
                   className={theme === "dark" ? "h-10 w-auto object-contain" : "absolute w-0 h-0 opacity-0 pointer-events-none"}
