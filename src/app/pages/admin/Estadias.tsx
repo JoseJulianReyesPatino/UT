@@ -356,11 +356,18 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
     return allowed.has(tipo) || allowed.has(label);
   };
 
+  // ✅ ACTUALIZADO: reconoce plan_despresurizada / plan-despresurizada
   const mapApiDocument = (doc: ApiDocument, kind: "pending" | "reviewed"): EstadiaPendingDocument | EstadiaReviewedDocument => {
     const base = {
       id: Number(doc.id),
       ciclo: doc.cycle_name?.trim() || "Sin ciclo",
-      plan: (() => { const v = doc.plan?.trim() ?? ""; return v === "plan_normal" ? "Plan normal" : v === "nuevo_modelo" ? "Nuevo modelo" : v || "Nuevo modelo"; })(),
+      plan: (() => {
+        const v = (doc.plan ?? "").trim();
+        if (v === "plan_normal" || v === "plan-normal") return "Plan Normal";
+        if (v === "nuevo_modelo" || v === "nuevo-modelo") return "Nuevo Modelo";
+        if (v === "plan_despresurizada" || v === "plan-despresurizada") return "Plan Despresurizada";
+        return v || "Nuevo Modelo";
+      })(),
       cuatrimestre: doc.parcial ?? "-",
       docente: doc.uploaded_by_name?.trim() || "Docente",
       documento: doc.title ?? doc.nombre ?? "Documento sin título",

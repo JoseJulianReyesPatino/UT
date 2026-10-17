@@ -522,12 +522,17 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
     return aliasMap[normalized] ?? normalized;
   };
 
+  // ✅ ACTUALIZADO: soporte para Plan Despresurizada
   const formatPlanLabel = (plan?: string | null, carrera?: string | null): string => {
     const normalizedPlan = normalizeText(plan);
     const normalizedCareer = normalizeText(carrera);
 
     const nuevoModeloCareers = [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria];
     const planNormalCareers = [...carrieras["plan-normal"].ingenieria];
+    const planDespresurizadaCareers = [
+      ...carrieras["plan-despresurizada"].tsu,
+      ...carrieras["plan-despresurizada"].ingenieria,
+    ];
 
     const careerMatchesCatalog = (catalogCareer: { codigo: string; nombre: string }) => {
       const code = normalizeText(catalogCareer.codigo);
@@ -543,6 +548,7 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
 
     const isNuevoModeloByCatalog = nuevoModeloCareers.some(careerItem => careerMatchesCatalog(careerItem));
     const isPlanNormalByCatalog = planNormalCareers.some(careerItem => careerMatchesCatalog(careerItem));
+    const isDespresurizadaByCatalog = planDespresurizadaCareers.some(careerItem => careerMatchesCatalog(careerItem));
 
     const hasPnInCareer = /(^|[^a-z0-9])pn([^a-z0-9]|$)/.test(normalizedCareer);
     const hasNmOrTsuInCareer =
@@ -550,6 +556,8 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
       normalizedCareer.startsWith("tsu ") ||
       normalizedCareer.includes(" tsu ") ||
       normalizedCareer.includes("(tsu)");
+
+    if (normalizedPlan.includes("despresurizada") || normalizedCareer.includes("despresurizada") || isDespresurizadaByCatalog) return "Plan Despresurizada";
     if (normalizedPlan.includes("nuevo") || normalizedCareer.includes("nuevo") || hasNmOrTsuInCareer || isNuevoModeloByCatalog) return "Plan Nuevo Modelo";
     if (normalizedPlan.includes("plan normal") || normalizedPlan.includes("normal") || normalizedPlan === "plan" || hasPnInCareer || isPlanNormalByCatalog) return "Plan Normal";
     return plan && plan.trim() ? plan : "Plan";
@@ -637,12 +645,16 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
     }
   };
 
+  // ✅ ACTUALIZADO: soporte para Plan Despresurizada
   const getCuatrimestresForPlanCarrera = (plan: string, carrera: string): string[] => {
     const isNuevo = plan === "Plan Nuevo Modelo";
     const isNormal = plan === "Plan Normal";
+    const isDespresurizada = plan === "Plan Despresurizada";
     const carreraNorm = carrera.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const isTSU = carreraNorm.includes("tsu") || (isNuevo && !carreraNorm.includes("ingenieria") && !carreraNorm.includes("ing."));
 
+    if (isDespresurizada && isTSU) return ["1", "2", "3", "4", "5", "6", "7", "8"];
+    if (isDespresurizada && !isTSU) return ["10", "11", "12"];
     if (isNuevo && isTSU) return ["1", "2", "3", "4", "5", "6"];
     if (isNuevo && !isTSU) return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
     if (isNormal) return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"];
@@ -694,6 +706,7 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
     return apartadoLabel;
   };
 
+  // ✅ ACTUALIZADO: soporte para Plan Despresurizada
   const getCareerFilterOptions = (plan: string) => {
     const nuevoModelo = [
       ...carrieras["nuevo-modelo"].tsu,
@@ -703,10 +716,17 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
       value: career.nombre,
       label: career.nombre,
     }));
+    const planDespresurizada = [
+      ...carrieras["plan-despresurizada"].tsu,
+      ...carrieras["plan-despresurizada"].ingenieria,
+    ].map((career) => ({ value: career.nombre, label: career.nombre }));
+
+    if (plan === "Plan Despresurizada") return planDespresurizada;
     if (plan === "Plan Nuevo Modelo") return nuevoModelo;
     if (plan === "Plan Normal") return planNormal;
+
     const seen = new Set<string>();
-    return [...nuevoModelo, ...planNormal].filter(({ value }) => {
+    return [...nuevoModelo, ...planNormal, ...planDespresurizada].filter(({ value }) => {
       if (seen.has(value)) return false;
       seen.add(value);
       return true;
@@ -1348,10 +1368,11 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
     };
   }, [previewDocument]);
 
+  // ✅ ACTUALIZADO: fallback incluye Plan Despresurizada
   const plansAvailable = useMemo(
     () => {
       const plans = Array.from(new Set(documents.map((document) => document.plan).filter((value): value is string => Boolean(value))));
-      return plans.length > 0 ? plans : ["Plan Nuevo Modelo", "Plan Normal", "Plan"];
+      return plans.length > 0 ? plans : ["Plan Nuevo Modelo", "Plan Normal", "Plan Despresurizada", "Plan"];
     },
     [documents]
   );
@@ -1404,7 +1425,8 @@ export function CiclosEscolares({ layoutStyle }: CiclosEscolaresProps = {}) {
 
   const parcialesAvailable = PARCIAL_FILTER_OPTIONS;
 
-  const tutorPlansAvailable = ["Plan Nuevo Modelo", "Plan Normal"];
+  // ✅ ACTUALIZADO: incluye Plan Despresurizada
+  const tutorPlansAvailable = ["Plan Nuevo Modelo", "Plan Normal", "Plan Despresurizada"];
 
   const tutorCarrerasAvailable = useMemo(
     () => getCareerFilterOptions(filterTutorPlan),

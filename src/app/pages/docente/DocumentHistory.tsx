@@ -69,12 +69,13 @@ const normalizeStatusFilter = (value: string) => {
 };
 
 const formatPlanLabel = (value?: string | null): string => {
-  const normalized = (value ?? "").toString().toLowerCase();
+  const normalized = (value ?? "").toString().trim().toLowerCase();
+  if (!normalized) return ""; // Sin plan explícito: no mostrar nada
+  if (normalized.includes("despresurizada")) return "Plan Despresurizada";
   if (normalized.includes("nuevo")) return "Nuevo Modelo";
-  if (normalized.includes("normal")) return "Plan Normal";
+  if (normalized.includes("plan normal") || normalized === "plan_normal" || normalized.includes("normal")) return "Plan Normal";
   return "";
 };
-
 const formatParcialLabel = (value?: string | null): string => {
   const raw = (value ?? "").toString().trim();
   if (!raw || raw === "N/A" || raw === "-") return "";

@@ -28,6 +28,9 @@ import defaultAvatar from "../../../assets/elementos/perfil2.webp";
 
 type ConfigTab = "formularios" | "grupos" | "cuenta" | "supervisores";
 
+// ✅ ACTUALIZADO: alias de plan reutilizable con 3 opciones
+type PlanId = "nuevo-modelo" | "plan-normal" | "plan-despresurizada";
+
 interface ConfigurationProps {
   initialTab?: ConfigTab;
   onDirtyChange?: (dirty: boolean) => void;
@@ -72,7 +75,8 @@ type CareerOption = {
   tipo: "TSU" | "Ingeniería";
 };
 
-const getCareerOptions = (selectedPlan: "nuevo-modelo" | "plan-normal"): CareerOption[] => {
+// ✅ ACTUALIZADO: soporte para Plan Despresurizada
+const getCareerOptions = (selectedPlan: PlanId): CareerOption[] => {
   if (selectedPlan === "nuevo-modelo") {
     return [
       ...carrieras["nuevo-modelo"].tsu.map((career) => ({ ...career, tipo: "TSU" as const })),
@@ -80,14 +84,28 @@ const getCareerOptions = (selectedPlan: "nuevo-modelo" | "plan-normal"): CareerO
     ];
   }
 
+  if (selectedPlan === "plan-despresurizada") {
+    return [
+      ...carrieras["plan-despresurizada"].tsu.map((career) => ({ ...career, tipo: "TSU" as const })),
+      ...carrieras["plan-despresurizada"].ingenieria.map((career) => ({ ...career, tipo: "Ingeniería" as const })),
+    ];
+  }
+
   return carrieras["plan-normal"].ingenieria.map((career) => ({ ...career, tipo: "Ingeniería" as const }));
 };
 
-const getCuatrimestresForCareer = (selectedPlan: "nuevo-modelo" | "plan-normal", careerType: "TSU" | "Ingeniería") => {
+// ✅ ACTUALIZADO: cuatrimestres específicos por plan y tipo de carrera
+const getCuatrimestresForCareer = (selectedPlan: PlanId, careerType: "TSU" | "Ingeniería") => {
   if (selectedPlan === "nuevo-modelo") {
     return careerType === "TSU"
       ? [0, 1, 2, 3, 4, 5, 6]
       : [7, 8, 9, 10]; // cuatrimestre 10 = Estadías en nuevo modelo
+  }
+
+  if (selectedPlan === "plan-despresurizada") {
+    return careerType === "TSU"
+      ? [1, 2, 3, 4, 5, 6, 7, 8] // OLCE
+      : [10, 11, 12];             // ILI
   }
 
   return careerType === "TSU" ? [] : [7, 8, 9, 10, 11];
@@ -96,6 +114,13 @@ const getCuatrimestresForCareer = (selectedPlan: "nuevo-modelo" | "plan-normal",
 const cuatrimestresLabel = (n: number): string => {
   if (n === 0) return "Propedéutico";
   return `Cuatrimestre ${n}`;
+};
+
+// ✅ NUEVO: etiqueta legible para cada plan
+const planLabel = (planId: PlanId): string => {
+  if (planId === "nuevo-modelo") return "Plan Nuevo Modelo";
+  if (planId === "plan-despresurizada") return "Plan Despresurizada";
+  return "Plan Normal";
 };
 
 type FormSectionId = "docentes" | "tutorias" | "estadias";
@@ -203,18 +228,19 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   type FormUIMode = "sinLimite" | "fechaLimite" | "cerrado";
   const [formUIModes, setFormUIModes] = useState<Partial<Record<FormId, FormUIMode>>>({});
 
-  const [plan, setPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
+  // ✅ ACTUALIZADO: tipo PlanId en lugar de la unión de 2 valores
+  const [plan, setPlan] = useState<PlanId>("nuevo-modelo");
   const [careerCode, setCareerCode] = useState("");
   const [cuatrimestre, setCuatrimestre] = useState("");
   const [groupNumber, setGroupNumber] = useState(1);
 
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
-  const [editingGroupPlan, setEditingGroupPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
+  const [editingGroupPlan, setEditingGroupPlan] = useState<PlanId>("nuevo-modelo");
   const [editingGroupCareerCode, setEditingGroupCareerCode] = useState("");
   const [editingGroupCuatrimestre, setEditingGroupCuatrimestre] = useState("");
   const [editingGroupNumber, setEditingGroupNumber] = useState(1);
   const [editingGroupOriginal, setEditingGroupOriginal] = useState<null | {
-    plan: "nuevo-modelo" | "plan-normal";
+    plan: PlanId;
     careerCode: string;
     cuatrimestre: string;
     groupNumber: number;
@@ -260,7 +286,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isBulkCreateOpen, setIsBulkCreateOpen] = useState(false);
-  const [bulkPlan, setBulkPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
+  // ✅ ACTUALIZADO: tipo PlanId
+  const [bulkPlan, setBulkPlan] = useState<PlanId>("nuevo-modelo");
   const [bulkCareerCode, setBulkCareerCode] = useState("");
   const [bulkCuatQuantities, setBulkCuatQuantities] = useState<Record<number, number>>({});
   const [bulkExcludedCuats, setBulkExcludedCuats] = useState<Set<number>>(new Set());
@@ -268,7 +295,8 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
   const [isBulkCreating, setIsBulkCreating] = useState(false);
   const [groupSearch, setGroupSearch] = useState("");
   const [groupSearchPlaceholderIdx, setGroupSearchPlaceholderIdx] = useState(0);
-  const [groupViewPlan, setGroupViewPlan] = useState<"nuevo-modelo" | "plan-normal">("nuevo-modelo");
+  // ✅ ACTUALIZADO: tipo PlanId
+  const [groupViewPlan, setGroupViewPlan] = useState<PlanId>("nuevo-modelo");
   const [openFormSection, setOpenFormSection] = useState<FormSectionId | null>(null);
   const [openFormItems, setOpenFormItems] = useState<Record<FormId, boolean>>({} as Record<FormId, boolean>);
   const [formalFormSection, setFormalFormSection] = useState<FormSectionId>("docentes");
@@ -420,10 +448,11 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     "Buscar por código: AUT, MI, DSM...",
   ];
 
+  // ✅ ACTUALIZADO: incluye el tercer plan en el mapa de nombres
   const careerNameByCode = useMemo(() => {
     const map: Record<string, string> = {};
-    for (const plan of ["nuevo-modelo", "plan-normal"] as const) {
-      for (const career of getCareerOptions(plan)) {
+    for (const planId of ["nuevo-modelo", "plan-normal", "plan-despresurizada"] as const) {
+      for (const career of getCareerOptions(planId)) {
         map[career.codigo] = career.nombre;
       }
     }
@@ -769,14 +798,20 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
     }
   };
 
+  // ✅ ACTUALIZADO: reconoce el plan despresurizada
   const handleStartEditGroup = (group: Group) => {
+    const groupPlan: PlanId =
+      group.plan === "plan-despresurizada" ? "plan-despresurizada"
+      : group.plan === "plan-normal" ? "plan-normal"
+      : "nuevo-modelo";
+
     setEditingGroupId(group.id);
-    setEditingGroupPlan(group.plan === "plan-normal" ? "plan-normal" : "nuevo-modelo");
+    setEditingGroupPlan(groupPlan);
     setEditingGroupCareerCode(group.careerCode);
     setEditingGroupCuatrimestre(String(group.cuatrimestre));
     setEditingGroupNumber(group.groupNumber);
     setEditingGroupOriginal({
-      plan: group.plan === "plan-normal" ? "plan-normal" : "nuevo-modelo",
+      plan: groupPlan,
       careerCode: group.careerCode,
       cuatrimestre: String(group.cuatrimestre),
       groupNumber: group.groupNumber,
@@ -2070,6 +2105,10 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
             </Card>
           )}
 
+          {/* ═══════════════════════════════════════════════════════════════════
+              GRUPOS — modo empresarial (isFormal)
+              ✅ ACTUALIZADO: incluye Plan Despresurizada en tabs y textos
+             ═══════════════════════════════════════════════════════════════════ */}
           {activeTab === "grupos" && isFormal && (
             <div className="flex flex-col flex-1 min-h-0 overflow-hidden border border-border/70 bg-card dark:border-slate-800 dark:bg-slate-950/60">
               {/* Encabezado */}
@@ -2109,6 +2148,14 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                       className={`px-2.5 py-1.5 text-xs font-semibold border-t border-b border-r transition-colors ${groupViewPlan === "plan-normal" ? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-600" : "border-border text-slate-600 hover:bg-muted/50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/40"}`}
                     >
                       <span className="hidden sm:inline">Plan </span>Normal
+                    </button>
+                    {/* ✅ NUEVO: tercer botón para Plan Despresurizada */}
+                    <button
+                      type="button"
+                      onClick={() => setGroupViewPlan("plan-despresurizada")}
+                      className={`px-2.5 py-1.5 text-xs font-semibold border-t border-b border-r transition-colors ${groupViewPlan === "plan-despresurizada" ? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-600" : "border-border text-slate-600 hover:bg-muted/50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/40"}`}
+                    >
+                      <span className="hidden sm:inline">Plan </span>Despresurizada
                     </button>
                   </div>
                   <span className="ml-auto text-[11px] text-muted-foreground sm:hidden">
@@ -2187,11 +2234,13 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                                                 <div key={g.id} className="flex flex-wrap items-center gap-2 rounded-sm border border-emerald-300 bg-emerald-50/50 p-2 dark:border-emerald-800/50 dark:bg-emerald-950/20 w-full">
                                                   <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Editando: {editingCurrentGroupName}</span>
                                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <Select value={editingGroupPlan} onValueChange={(v) => setEditingGroupPlan(v as "nuevo-modelo" | "plan-normal")}>
-                                                      <SelectTrigger className="h-7 w-32 text-xs rounded-sm"><SelectValue /></SelectTrigger>
+                                                    {/* ✅ ACTUALIZADO: Select con los 3 planes */}
+                                                    <Select value={editingGroupPlan} onValueChange={(v) => setEditingGroupPlan(v as PlanId)}>
+                                                      <SelectTrigger className="h-7 w-40 text-xs rounded-sm"><SelectValue /></SelectTrigger>
                                                       <SelectContent>
                                                         <SelectItem value="nuevo-modelo">Nuevo Modelo</SelectItem>
                                                         <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                                                        <SelectItem value="plan-despresurizada">Plan Despresurizada</SelectItem>
                                                       </SelectContent>
                                                     </Select>
                                                     <Select value={editingGroupCareerCode} onValueChange={setEditingGroupCareerCode}>
@@ -2247,6 +2296,10 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
             </div>
           )}
 
+          {/* ═══════════════════════════════════════════════════════════════════
+              GRUPOS — modo clásico (!isFormal)
+              ✅ ACTUALIZADO: incluye Plan Despresurizada en el <Select>
+             ═══════════════════════════════════════════════════════════════════ */}
           {activeTab === "grupos" && !isFormal && (
             <Card className={`${sectionCardClass} flex flex-col min-h-0 flex-1`}>
               <CardHeader className={`${sectionHeaderClass} shrink-0 p-4 sm:p-6`}>
@@ -2278,7 +2331,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                     <div>
                       <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm sm:text-base">Grupos creados</h3>
                       <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                        {selectedPlanGroups.length} {selectedPlanGroups.length === 1 ? "grupo" : "grupos"} en {selectedPlanCareerGroups.length} {selectedPlanCareerGroups.length === 1 ? "carrera" : "carreras"} · {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
+                        {selectedPlanGroups.length} {selectedPlanGroups.length === 1 ? "grupo" : "grupos"} en {selectedPlanCareerGroups.length} {selectedPlanCareerGroups.length === 1 ? "carrera" : "carreras"} · {planLabel(groupViewPlan)}
                       </p>
                     </div>
                     <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:items-center">
@@ -2291,13 +2344,15 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                           className="pl-8 text-sm h-9 transition-all duration-300"
                         />
                       </div>
-                      <Select value={groupViewPlan} onValueChange={(value) => setGroupViewPlan(value as "nuevo-modelo" | "plan-normal")}>
+                      {/* ✅ ACTUALIZADO: Select con los 3 planes */}
+                      <Select value={groupViewPlan} onValueChange={(value) => setGroupViewPlan(value as PlanId)}>
                         <SelectTrigger className="w-full sm:w-52 text-sm h-9">
                           <SelectValue placeholder="Ver plan" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
                           <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                          <SelectItem value="plan-despresurizada">Plan Despresurizada</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2325,7 +2380,7 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
                               <Grid2x2 className="h-3 w-3 text-emerald-700 dark:text-emerald-400" />
                             </div>
                             <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
-                              {groupViewPlan === "nuevo-modelo" ? "Plan Nuevo Modelo" : "Plan Normal"}
+                              {planLabel(groupViewPlan)}
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -2730,13 +2785,15 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Select value={editingGroupPlan} onValueChange={(value) => setEditingGroupPlan(value as "nuevo-modelo" | "plan-normal")}>
+              {/* ✅ ACTUALIZADO: Select con los 3 planes */}
+              <Select value={editingGroupPlan} onValueChange={(value) => setEditingGroupPlan(value as PlanId)}>
                 <SelectTrigger className="min-w-0 text-sm">
                   <SelectValue placeholder="Plan" className="min-w-0 flex-1 truncate" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
                   <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                  <SelectItem value="plan-despresurizada">Plan Despresurizada</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={editingGroupCareerCode} onValueChange={setEditingGroupCareerCode} disabled={!editingGroupPlan}>
@@ -2811,13 +2868,15 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Select value={bulkPlan} onValueChange={(v: any) => { setBulkPlan(v); setBulkCareerCode(""); setBulkCuatQuantities({}); setBulkExcludedCuats(new Set()); }}>
+              {/* ✅ ACTUALIZADO: Select con los 3 planes */}
+              <Select value={bulkPlan} onValueChange={(v) => { setBulkPlan(v as PlanId); setBulkCareerCode(""); setBulkCuatQuantities({}); setBulkExcludedCuats(new Set()); }}>
                 <SelectTrigger className="text-sm">
                   <SelectValue placeholder="Plan" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
                   <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                  <SelectItem value="plan-despresurizada">Plan Despresurizada</SelectItem>
                 </SelectContent>
               </Select>
               <Popover open={bulkCareerPopoverOpen} onOpenChange={setBulkCareerPopoverOpen}>
@@ -2991,13 +3050,15 @@ export function Configuration(props: Readonly<ConfigurationProps>) {
 
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Select value={plan} onValueChange={(v: any) => setPlan(v)}>
+              {/* ✅ ACTUALIZADO: Select con los 3 planes */}
+              <Select value={plan} onValueChange={(v) => setPlan(v as PlanId)}>
                 <SelectTrigger className="text-sm">
                   <SelectValue placeholder="Plan" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="nuevo-modelo">Plan Nuevo Modelo</SelectItem>
                   <SelectItem value="plan-normal">Plan Normal</SelectItem>
+                  <SelectItem value="plan-despresurizada">Plan Despresurizada</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={careerCode} onValueChange={(value) => setCareerCode(value)} disabled={!plan}>

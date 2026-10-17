@@ -13,7 +13,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { DocumentHistoryCard } from "../../components/DocumentHistoryCard";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { planNuevoModelo, planNormal, carrieras, cuatrimestres, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
+import { planNuevoModelo, planNormal, planDespresurizada, carrieras, cuatrimestres, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { useFormAccess } from "../../hooks/useFormAccess";
@@ -139,8 +139,6 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
     return () => onDirtyChange(false);
   }, [onDirtyChange, editingDocumentId, editingBatchDocIds, formData]);
 
-  // Calcula el status agregado de un grupo: si alguno está devuelto → devuelto;
-  // si todos están revisados → revisado; en cualquier otro caso → pendiente.
   const getBatchStatus = (group: any[]): string => {
     const statuses = group.map((d: any) => String(d.status ?? '').toLowerCase());
     if (statuses.every((s) => s === 'revisado')) return 'revisado';
@@ -149,7 +147,6 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
     return 'pendiente';
   };
 
-  // Agrupar documentos por batch_id
   const groupedHistory = useMemo(() => {
     const groups = new Map<string, any[]>();
     for (const doc of history) {
@@ -174,6 +171,11 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
     if (formData.plan === "nuevo-modelo") {
       const tsu = carrieras["nuevo-modelo"].tsu.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
       const ing = carrieras["nuevo-modelo"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
+      return [...tsu, ...ing];
+    }
+    if (formData.plan === "plan-despresurizada") {
+      const tsu = carrieras["plan-despresurizada"].tsu.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
+      const ing = carrieras["plan-despresurizada"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
       return [...tsu, ...ing];
     }
     return carrieras["plan-normal"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
@@ -233,7 +235,10 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
 
   const cuatrimestresDisponibles = useMemo(() => {
     if (!formData.carrera || !formData.plan) return [];
-    const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
+    const plan =
+      formData.plan === "nuevo-modelo" ? planNuevoModelo :
+      formData.plan === "plan-despresurizada" ? planDespresurizada :
+      planNormal;
     const carrera = plan[formData.carrera];
     if (!carrera) return [];
     return cuatrimestres.filter((c) => c in carrera.cuatrimestres);
@@ -241,11 +246,20 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
 
   const materiasDisponibles = useMemo(() => {
     if (!formData.carrera || !formData.cuatrimestre || !formData.plan) return [];
-    const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
+    const plan =
+      formData.plan === "nuevo-modelo" ? planNuevoModelo :
+      formData.plan === "plan-despresurizada" ? planDespresurizada :
+      planNormal;
     const carrera = plan[formData.carrera];
     if (!carrera) return [];
-    return carrera.cuatrimestres[formData.cuatrimestre] || [];
+    const materias = carrera.cuatrimestres[formData.cuatrimestre];
+    if (!materias) return [];
+    if (materias.length === 0) return [{ nombre: "Estadía" }];
+    return materias;
   }, [formData.carrera, formData.cuatrimestre, formData.plan]);
+
+  const esEstadia = materiasDisponibles.length === 1 && materiasDisponibles[0].nombre === "Estadía";
+  const parcialesDisponibles = esEstadia ? ["Estadía"] : parciales;
 
   const isValid = useMemo(() => {
     const grupoValido = groupsOptions.length > 0
@@ -353,6 +367,8 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
     if (!label || !planType) return "";
     const candidates = planType === "nuevo-modelo"
       ? [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria]
+      : planType === "plan-despresurizada"
+      ? [...carrieras["plan-despresurizada"].tsu, ...carrieras["plan-despresurizada"].ingenieria]
       : carrieras["plan-normal"].ingenieria;
 
     const searchLabel = label.toLowerCase();
@@ -380,7 +396,6 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
     return 'Documento.pdf';
   };
 
-  // Función para editar un lote completo (múltiples archivos) optimizada
   const populateFormForEditBatch = async (documents: any[]) => {
     const main = documents[0];
 
@@ -388,6 +403,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
       if (!p) return "plan-normal";
       const s = String(p).toLowerCase();
       if (s.includes("nuevo")) return "nuevo-modelo";
+      if (s.includes("despresurizada")) return "plan-despresurizada";
       return "plan-normal";
     };
 
@@ -403,11 +419,11 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
 
     const normalizeParcialForForm = (value: unknown): string => {
       const raw = String(value ?? "").trim();
+      if (raw.toLowerCase().includes("estad")) return "Estadía";
       const match = raw.match(/\b([123])\b/);
       return match ? `Parcial ${match[1]}` : "";
     };
 
-    // Detectar si algún documento ya fue procesado por el admin
     const anyProcessed = documents.some((d) => {
       const s = String(d.status ?? "").trim().toLowerCase();
       return s && s !== "pendiente";
@@ -435,7 +451,6 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
 
-    // En modo solo metadatos no se descargan los archivos
     if (anyProcessed) return;
 
     setIsLoadingPdf(true);
@@ -603,7 +618,6 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
         ? groupsOptions.find(g => formatGroupCode(g.group_code) === formData.grupo)
         : null;
 
-      // Modo solo metadatos: PATCH a cada documento del lote sin tocar los archivos
       if (isMetadataOnlyEdit && editingBatchDocIds.length > 0) {
         const metadataPayload: Record<string, unknown> = {
           plan: formData.plan ? String(formData.plan).replace(/-/g, "_") : undefined,
@@ -630,7 +644,6 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
         return;
       }
 
-      // Modo normal: crear nuevos registros con los archivos
       const batchId = crypto.randomUUID();
       const basePayload: any = {
         form_id: 1,
@@ -651,7 +664,6 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
 
       await uploadMultipleFiles(formData.archivos, basePayload);
 
-      // Eliminar documentos pendientes anteriores del lote (re-edición)
       if (editingBatchDocIds.length > 0) {
         await Promise.allSettled(
           editingBatchDocIds.map((id) => apiFetch(`/documents/${id}`, { method: "DELETE" }))
@@ -839,7 +851,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
           <div className="flex flex-col sm:w-80 sm:shrink-0 sm:overflow-y-auto divide-y divide-border dark:divide-slate-800">
             <div className="p-5 space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Plan *</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => setFormData((c) => ({ ...c, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
@@ -855,6 +867,14 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
                 >
                   <span className="block">Plan Normal</span>
                   <span className="block text-[10px] font-normal text-muted-foreground dark:text-slate-500">Ingenierías</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData((c) => ({ ...c, plan: "plan-despresurizada", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
+                  className={`rounded-lg border-2 px-3 py-2.5 text-left text-xs font-semibold transition-all ${formData.plan === "plan-despresurizada" ? "border-emerald-500 bg-emerald-50 dark:border-emerald-400 dark:bg-emerald-950/30 dark:text-white" : "border-border bg-background hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-emerald-500/30"}`}
+                >
+                  <span className="block">Despresurizada</span>
+                  <span className="block text-[10px] font-normal text-muted-foreground dark:text-slate-500">TSU e Ing.</span>
                 </button>
               </div>
             </div>
@@ -890,7 +910,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
               <Select value={formData.parcial} onValueChange={(value) => setFormData((current) => ({ ...current, parcial: value }))} disabled={!formData.materia}>
                 <SelectTrigger className="rounded-lg text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"><SelectValue placeholder={formData.materia ? "Selecciona" : "Elige materia primero"} /></SelectTrigger>
                 <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
-                  {parciales.map((parcial) => (<SelectItem key={parcial} value={parcial} className="dark:text-white dark:hover:bg-slate-800">{parcial}</SelectItem>))}
+                  {parcialesDisponibles.map((parcial) => (<SelectItem key={parcial} value={parcial} className="dark:text-white dark:hover:bg-slate-800">{parcial}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
@@ -1168,7 +1188,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
               {/* Selector de Plan */}
               <div data-tour="docente-form-plan" className="space-y-2 md:col-span-2">
                 <Label className="text-sm font-medium dark:text-white">Plan *</Label>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-3">
                   <button
                     type="button"
                     onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
@@ -1195,6 +1215,20 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
                     <div className="flex-1">
                       <span className="block text-base font-semibold dark:text-white">Plan Normal</span>
                       <span className="block text-xs text-muted-foreground dark:text-slate-400">Ingenierías</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData((current) => ({ ...current, plan: "plan-despresurizada", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
+                    className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
+                      formData.plan === "plan-despresurizada"
+                        ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
+                        : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <span className="block text-base font-semibold dark:text-white">Plan Despresurizada</span>
+                      <span className="block text-xs text-muted-foreground dark:text-slate-400">TSU e Ingeniería</span>
                     </div>
                   </button>
                 </div>
@@ -1268,7 +1302,7 @@ export default function PlaneacionPage({ deadlineInfo, onDirtyChange, isTourActi
                         <SelectValue placeholder="Selecciona el parcial" />
                       </SelectTrigger>
                       <SelectContent className="dark:border-slate-700 dark:bg-slate-900">
-                        {parciales.map((parcial) => (
+                        {parcialesDisponibles.map((parcial) => (
                           <SelectItem key={parcial} value={parcial} className="dark:text-white dark:hover:bg-slate-800">{parcial}</SelectItem>
                         ))}
                       </SelectContent>

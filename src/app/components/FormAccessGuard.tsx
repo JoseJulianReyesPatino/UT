@@ -284,8 +284,15 @@ export function FormAccessGuard(props: Readonly<FormAccessGuardProps>) {
     );
   }, [history]);
 
+  // ✅ ACTUALIZADO: soporte para Plan Despresurizada
   const planLabelFor = (plan?: string) =>
-    plan ? (String(plan).toLowerCase().includes("nuevo") ? "Plan Nuevo Modelo" : "Plan Normal") : undefined;
+    plan
+      ? String(plan).toLowerCase().includes("nuevo")
+        ? "Plan Nuevo Modelo"
+        : String(plan).toLowerCase().includes("despresurizada")
+        ? "Plan Despresurizada"
+        : "Plan Normal"
+      : undefined;
 
   if (accessLoading) {
     if (React.isValidElement(children)) {

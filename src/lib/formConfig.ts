@@ -1,7 +1,7 @@
 export type Group = {
   id: number;
   careerCode: string; // e.g., IDGS
-  plan: string; // 'nuevo-modelo' | 'plan-normal'
+  plan: string; // 'nuevo-modelo' | 'plan-normal' | 'plan-despresurizada'
   cuatrimestre: number; // e.g., 10
   groupNumber: number; // e.g., 1
   name: string; // computed, e.g., IDGS10-1
@@ -110,7 +110,6 @@ const cloneDefaultFormAccess = (): FormAccessConfig => ({
   tutorias: { ...DEFAULT_FORM_ACCESS.tutorias },
 });
 
-// NUEVA FUNCIÓN: Obtener configuración por defecto sin localStorage
 export function getDefaultFormConfig(): FormConfig {
   return {
     docenteFields: [...DEFAULT_FORM_CONFIG.docenteFields],

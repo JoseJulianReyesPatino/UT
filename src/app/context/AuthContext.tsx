@@ -23,7 +23,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, recaptcha?: string) => Promise<void>;
   logout: () => void;
   updateProfile: (updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => void;
   refreshUser: (options?: { forceDefaultAvatar?: boolean }) => Promise<User | null>;
@@ -142,9 +142,6 @@ const removeCachedProfile = (userId: string) => {
   localStorage.removeItem(profileCacheKey(userId));
 };
 
-// ✅ NUEVA: Solo limpia el avatar del cache, conserva nombres.
-// Se usa cuando el backend confirma que el avatar fue eliminado,
-// para que mapApiUser NO lo recupere del cache.
 const clearCachedAvatar = (userId: string) => {
   try {
     const raw = localStorage.getItem(profileCacheKey(userId));
@@ -157,8 +154,6 @@ const clearCachedAvatar = (userId: string) => {
   }
 };
 
-// ✅ Ahora acepta `options.forceDefaultAvatar` para ignorar el cache local
-// cuando el backend confirma que el avatar fue eliminado.
 const mapApiUser = (
   apiUser: ApiLoginResponse["user"],
   options: { forceDefaultAvatar?: boolean } = {}
@@ -179,7 +174,6 @@ const mapApiUser = (
   };
   const fallbackNames = splitNameParts(apiUser.full_name);
 
-  // ✅ Si forceDefaultAvatar=true, NO consultamos el cache de avatar
   const cachedProfile = forceDefaultAvatar ? null : loadCachedProfile(String(apiUser.id));
 
   const hasBackendAvatar = apiUser.avatar_url && apiUser.avatar_url !== "/api/default-avatar";
@@ -231,14 +225,14 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     try {
       const response = await apiFetch("/forms");
       const forms = response?.data ?? [];
-      
+
       (window as any).__formsCache = {
         data: forms,
         timestamp: Date.now()
       };
-      
+
       window.dispatchEvent(new CustomEvent('ut-forms-loaded', { detail: { forms } }));
-      
+
       formsPreloadedRef.current = true;
       return forms;
     } catch (error) {
@@ -247,13 +241,13 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     }
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, recaptcha?: string) => {
     try {
       localStorage.removeItem("utslrc-user-profiles");
       const payload = (await apiFetch('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, recaptcha }),
       })) as ApiLoginResponse;
 
       if (!payload?.token) {
@@ -264,12 +258,19 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       const apiUser = mapApiUser(payload.user);
       saveCachedProfile(apiUser);
       flashNotice('success', `¡Bienvenido(a) ${apiUser.name.split(' ')[0]}!`);
-      
+
       setUser(apiUser);
 
       await preloadForms();
-      
+
     } catch (err: any) {
+      // Si el backend devolvió un error de reCAPTCHA, mostramos ese mensaje
+      const recaptchaMsg = err?.errors?.recaptcha?.[0];
+      if (recaptchaMsg) {
+        flashNotice('error', recaptchaMsg);
+        throw err;
+      }
+
       if (err && err.status === 422) {
         flashNotice('error', 'Correo o contraseña inválidos');
         const e = new Error('Correo o contraseña inválidos');
@@ -281,8 +282,6 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     }
   };
 
-  // ✅ Ahora acepta options.forceDefaultAvatar para forzar el default
-  // cuando se acaba de eliminar el avatar en el backend.
   const refreshUser = useCallback(async (options: { forceDefaultAvatar?: boolean } = {}): Promise<User | null> => {
     const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
     if (!token) {
@@ -292,8 +291,6 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
     try {
       const payload = (await apiFetch('/auth/me', { method: 'GET' })) as { user: ApiLoginResponse['user'] };
 
-      // ✅ Si vamos a forzar el default, limpiamos el cache del avatar
-      // ANTES de mapear, para que mapApiUser no lo recupere.
       if (options.forceDefaultAvatar) {
         clearCachedAvatar(String(payload.user.id));
       }
@@ -303,13 +300,13 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
       });
       setUser(apiUser);
       saveCachedProfile(apiUser);
-      
+
       window.dispatchEvent(new CustomEvent('ut-user-updated', { detail: { user: apiUser } }));
 
       if (!formsPreloadedRef.current) {
         await preloadForms();
       }
-      
+
       return apiUser;
     } catch (error) {
       console.error('Error refreshing user:', error);
@@ -332,7 +329,7 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
         const apiUser = mapApiUser(payload.user);
         setUser(apiUser);
         saveCachedProfile(apiUser);
-        
+
         if (!formsPreloadedRef.current) {
           await preloadForms();
         }
@@ -360,7 +357,7 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
   const updateProfile = useCallback((updates: Partial<Pick<User, "name" | "firstNames" | "lastNames" | "avatar" | "phone" | "area">>) => {
     setUser((currentUser) => {
       if (!currentUser) return currentUser;
-      
+
       const nextUser = { ...currentUser, ...updates };
       saveCachedProfile(nextUser);
       return nextUser;
@@ -368,14 +365,14 @@ export function AuthProvider(props: Readonly<{ children: ReactNode }>) {
   }, []);
 
   const value = useMemo(
-    () => ({ 
-      user, 
-      login, 
-      logout, 
-      updateProfile, 
+    () => ({
+      user,
+      login,
+      logout,
+      updateProfile,
       refreshUser,
-      isAuthenticated: !!user, 
-      isReady, 
+      isAuthenticated: !!user,
+      isReady,
       notice,
       preloadForms
     }),

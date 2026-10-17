@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Loader2, Mail, Lock, Eye, EyeOff, Sun, Moon, KeyRound, RotateCcw, Check } from "lucide-react";
 import apiFetch from "../lib/api";
 import { toast } from "sonner";
+import { Recaptcha } from "../components/Recaptcha";
 
 // ✅ IMPORTS CORREGIDOS — Vite los procesa y les pone hash, nunca desaparecen
 import LogoUTSLRC from "../../assets/elementos/LogotipoUTSLRC.webp";
@@ -16,6 +17,8 @@ import LogoUTSLRCWhite from "../../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
 import SuperiorImage from "../../assets/elementos/superior.webp";
 import InferiorImage from "../../assets/elementos/inferior.webp";
 import MascotaImage from "../../assets/elementos/mascota3.webp";
+
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
 
 const getPasswordStrength = (password: string) => {
   let score = 0;
@@ -48,11 +51,15 @@ export function Login() {
   const [forgotError, setForgotError] = useState("");
   const [forgotSuccess, setForgotSuccess] = useState("");
   const lastThemeToggleRef = useRef(0);
+
+  // 🛡️ reCAPTCHA
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+const recaptchaRef = useRef<any>(null);
+
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
 
-  // ✅ Logos desde imports (con hash) — nunca desaparecen
   const logoSrc = isDark ? LogoUTSLRCWhite : LogoUTSLRC;
 
   const pageBackground = isDark
@@ -68,11 +75,22 @@ export function Login() {
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // 🛡️ BLOQUEO si no se marcó el captcha
+    if (RECAPTCHA_SITE_KEY && !recaptchaToken) {
+      toast.error("Por favor marca la casilla 'No soy un robot'.");
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, recaptchaToken ?? undefined);
+      recaptchaRef.current?.reset();
+      setRecaptchaToken(null);
     } catch {
-      // Mensaje visible se maneja globalmente desde AuthContext/App.
+      // Reset del captcha en error para forzar volver a marcar
+      recaptchaRef.current?.reset();
+      setRecaptchaToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -198,7 +216,7 @@ export function Login() {
         <div className="absolute top-0 left-0 w-[700px] h-[700px] bg-slate-700/10 blur-3xl rounded-full -translate-x-1/3 -translate-y-1/3 dark:bg-slate-600/20" />
         <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-slate-700/10 blur-3xl rounded-full translate-x-1/4 translate-y-1/4 dark:bg-slate-600/20" />
         <div className="hidden lg:block absolute bottom-8 right-8 w-48 h-48 bg-slate-700/10 blur-2xl rounded-full pointer-events-none dark:bg-slate-600/20" />
-        
+
         <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-blue-300/3 blur-3xl rounded-full pointer-events-none dark:bg-blue-400/10" />
         <div className="absolute top-2/3 right-1/3 w-80 h-80 bg-slate-700/8 blur-3xl rounded-full pointer-events-none dark:bg-slate-600/15" />
       </div>
@@ -232,9 +250,9 @@ export function Login() {
             <div className="absolute right-[-180px] top-[300px] z-20">
               <div className="relative w-80 h-80 xl:w-[24rem] xl:h-[24rem] flex items-center justify-center">
                 <div className="absolute inset-0 bg-gradient-to-br from-[#3BBF82]/10 to-[#3BBF82]/5 rounded-full blur-3xl" />
-                
+
                 <div className="absolute inset-0 border-2 border-[#3BBF82]/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 " />
-                
+
                 <img
                   src={MascotaImage}
                   alt="Mascota institucional"
@@ -338,10 +356,22 @@ export function Login() {
                         </div>
                       </div>
 
+                      {/* 🛡️ reCAPTCHA — obligatorio para iniciar sesión */}
+                      {RECAPTCHA_SITE_KEY && (
+  <div className="flex justify-center my-2">
+    <Recaptcha
+      ref={recaptchaRef}
+      sitekey={RECAPTCHA_SITE_KEY}
+      onChange={(token) => setRecaptchaToken(token)}
+      theme={isDark ? "dark" : "light"}
+    />
+  </div>
+)}
+
                       <Button
                         type="submit"
-                        disabled={isLoading}
-                        className="w-full h-12 rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white font-semibold text-base shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+                        disabled={isLoading || (!!RECAPTCHA_SITE_KEY && !recaptchaToken)}
+                        className="w-full h-12 rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white font-semibold text-base shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isLoading ? (
                           <>

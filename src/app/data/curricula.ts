@@ -1,5 +1,10 @@
-export type Plan = "nuevo-modelo" | "plan-normal";
-export type Cuatrimestre = "propedeutico" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11";
+export type Plan = "nuevo-modelo" | "plan-normal" | "plan-despresurizada";
+
+export type Cuatrimestre =
+  | "propedeutico"
+  | "1" | "2" | "3" | "4" | "5" | "6"
+  | "7" | "8" | "9" | "10" | "11"
+  | "12" | "13";
 
 export interface Materia {
   nombre: string;
@@ -24,9 +29,10 @@ const propedeuticoComun: Materia[] = [
   { nombre: "TUTORÍAS BIS" },
 ];
 
+// ═══════════════════════════════════════════════════════════════════
 // PLAN NUEVO MODELO
+// ═══════════════════════════════════════════════════════════════════
 export const planNuevoModelo: PlanData = {
-  // TSU EN TECNOLOGÍA DE ALIMENTOS
   "TA": {
     codigo: "TA",
     nombre: "TSU EN TECNOLOGÍA DE ALIMENTOS",
@@ -79,7 +85,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // TSU EN AUTOMATIZACIÓN
   "AUT": {
     codigo: "AUT",
     nombre: "TSU EN AUTOMATIZACIÓN",
@@ -132,7 +137,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // TSU EN MANTENIMIENTO INDUSTRIAL
   "MI": {
     codigo: "MI",
     nombre: "TSU EN MANTENIMIENTO INDUSTRIAL",
@@ -185,7 +189,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // TSU EN DESARROLLO DE SOFTWARE MULTIPLATAFORMA
   "DSM": {
     codigo: "DSM",
     nombre: "TSU EN DESARROLLO DE SOFTWARE MULTIPLATAFORMA",
@@ -238,7 +241,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // TSU EN MERCADOTECNIA
   "MCD": {
     codigo: "MCD",
     nombre: "TSU EN MERCADOTECNIA",
@@ -290,7 +292,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // TSU EN OPERACIONES LOGÍSTICAS Y COMERCIO EXTERIOR
   "OLCE": {
     codigo: "OLCE",
     nombre: "TSU EN OPERACIONES LOGÍSTICAS Y COMERCIO EXTERIOR",
@@ -343,7 +344,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // TSU EN ENERGÍA SOLAR
   "ES": {
     codigo: "ES",
     nombre: "TSU EN ENERGÍA SOLAR",
@@ -396,7 +396,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // INGENIERÍA EN ALIMENTOS
   "IA": {
     codigo: "IA",
     nombre: "INGENIERÍA EN ALIMENTOS",
@@ -429,7 +428,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // INGENIERÍA EN MECATRÓNICA
   "IM": {
     codigo: "IM",
     nombre: "INGENIERÍA EN MECATRÓNICA",
@@ -463,7 +461,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // INGENIERÍA EN MANTENIMIENTO INDUSTRIAL
   "IMI": {
     codigo: "IMI",
     nombre: "INGENIERÍA EN MANTENIMIENTO INDUSTRIAL",
@@ -497,7 +494,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // INGENIERÍA EN TECNOLOGÍAS DE LA INFORMACIÓN E INNOVACIÓN DIGITAL
   "ITIID": {
     codigo: "ITIID",
     nombre: "INGENIERÍA EN TECNOLOGÍAS DE LA INFORMACIÓN E INNOVACIÓN DIGITAL",
@@ -531,7 +527,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // LICENCIATURA EN NEGOCIOS Y MERCADOTECNIA
   "LNM": {
     codigo: "LNM",
     nombre: "LICENCIATURA EN NEGOCIOS Y MERCADOTECNIA",
@@ -565,7 +560,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // INGENIERÍA EN LOGÍSTICA INTERNACIONAL
   "ILI": {
     codigo: "ILI",
     nombre: "INGENIERÍA EN LOGÍSTICA INTERNACIONAL",
@@ -599,7 +593,6 @@ export const planNuevoModelo: PlanData = {
       ],
     },
   },
-  // INGENIERÍA EN ENERGÍA Y DESARROLLO SOSTENIBLE
   "IEDS": {
     codigo: "IEDS",
     nombre: "INGENIERÍA EN ENERGÍA Y DESARROLLO SOSTENIBLE",
@@ -635,9 +628,10 @@ export const planNuevoModelo: PlanData = {
   },
 };
 
+// ═══════════════════════════════════════════════════════════════════
 // PLAN NORMAL
+// ═══════════════════════════════════════════════════════════════════
 export const planNormal: PlanData = {
-  // Ing. en Procesos Bioalimentarios PN
   "IPB": {
     codigo: "IPB",
     nombre: "Ing. en Procesos Bioalimentarios PN",
@@ -677,7 +671,6 @@ export const planNormal: PlanData = {
       ],
     },
   },
-  // Ing. en Mecatrónica PN
   "IME": {
     codigo: "IME",
     nombre: "Ing. en Mecatrónica PN",
@@ -716,7 +709,6 @@ export const planNormal: PlanData = {
       ],
     },
   },
-  // Lic. en Innovación de Negocios y Mercadotecnia PN
   "LIMN": {
     codigo: "LIMN",
     nombre: "Lic. en Innovación de Negocios y Mercadotecnia PN",
@@ -754,7 +746,6 @@ export const planNormal: PlanData = {
       ],
     },
   },
-  // Ing. en Electromecánica Industrial PN
   "IEMI": {
     codigo: "IEMI",
     nombre: "Ing. en Electromecánica Industrial PN",
@@ -794,7 +785,6 @@ export const planNormal: PlanData = {
       ],
     },
   },
-  // Ing. en Logística Internacional PN
   "ILI": {
     codigo: "ILI",
     nombre: "Ing. en Logística Internacional PN",
@@ -835,7 +825,6 @@ export const planNormal: PlanData = {
       ],
     },
   },
-  // Ing. en Desarrollo y Gestión de Software PN
   "IDGS": {
     codigo: "IDGS",
     nombre: "Ing. en Desarrollo y Gestión de Software PN",
@@ -877,6 +866,291 @@ export const planNormal: PlanData = {
   },
 };
 
+// ═══════════════════════════════════════════════════════════════════
+// PLAN DESPRESURIZADA
+// ═══════════════════════════════════════════════════════════════════
+export const planDespresurizada: PlanData = {
+  "OLCE": {
+    codigo: "OLCE",
+    nombre: "TSU EN OPERACIONES LOGÍSTICAS Y COMERCIO EXTERIOR (DESPRESURIZADA)",
+    cuatrimestres: {
+      "1": [
+        { nombre: "FUNDAMENTOS MATEMÁTICOS" },
+        { nombre: "ESTRUCTURA ORGANIZACIONAL" },
+        { nombre: "ECONOMÍA INTERNACIONAL" },
+        { nombre: "COMUNICACIÓN Y HABILIDADES DIGITALES" },
+      ],
+      "2": [
+        { nombre: "DESARROLLO HUMANO Y VALORES" },
+        { nombre: "CÁLCULO DIFERENCIAL" },
+        { nombre: "MERCADOTECNIA INTERNACIONAL" },
+        { nombre: "FUNDAMENTOS DE LOGÍSTICA" },
+      ],
+      "3": [
+        { nombre: "INGLÉS I" },
+        { nombre: "HABILIDADES SOCIOEMOCIONALES Y MANEJO DE CONFLICTOS" },
+        { nombre: "CÁLCULO INTEGRAL" },
+        { nombre: "FÍSICA" },
+        { nombre: "ADMINISTRACIÓN DE VENTAS" },
+      ],
+      "4": [
+        { nombre: "INGLÉS II" },
+        { nombre: "DESARROLLO DEL PENSAMIENTO Y TOMA DE DECISIONES" },
+        { nombre: "PROBABILIDAD Y ESTADÍSTICA" },
+        { nombre: "CLASIFICACIÓN ARANCELARIA I" },
+        { nombre: "NORMATIVIDAD APLICADA AL COMERCIO EXTERIOR I" },
+      ],
+      "5": [
+        { nombre: "INGLÉS III" },
+        { nombre: "CLASIFICACIÓN ARANCELARIA II" },
+        { nombre: "NORMATIVIDAD APLICADA AL COMERCIO EXTERIOR II" },
+        { nombre: "PROYECTO INTEGRADOR I" },
+      ],
+      "6": [
+        { nombre: "INGLÉS IV" },
+        { nombre: "CÁLCULO DE VARIAS VARIABLES" },
+        { nombre: "CLASIFICACIÓN ARANCELARIA III" },
+        { nombre: "PRESUPUESTOS LOGÍSTICOS" },
+      ],
+      "7": [
+        { nombre: "INGLÉS V" },
+        { nombre: "ÉTICA PROFESIONAL" },
+        { nombre: "ECUACIONES DIFERENCIALES" },
+        { nombre: "TRÁMITES LEGALES APLICADOS" },
+        { nombre: "SEGUIMIENTO LOGÍSTICO" },
+      ],
+      "8": [
+        { nombre: "LIDERAZGO DE EQUIPOS DE ALTO DESEMPEÑO" },
+        { nombre: "CONTRIBUCIONES AL COMERCIO EXTERIOR" },
+        { nombre: "PEDIMENTO Y SU LEGISLACIÓN" },
+        { nombre: "PROYECTO INTEGRADOR II" },
+      ],
+      // Cuatrimestre 9 (Estadía TSU) se omite: se gestiona desde el formulario de Estadías
+    },
+  },
+  "ILI": {
+    codigo: "ILI",
+    nombre: "INGENIERÍA EN LOGÍSTICA INTERNACIONAL (DESPRESURIZADA)",
+    cuatrimestres: {
+      "10": [
+        { nombre: "INGLÉS VI" },
+        { nombre: "HABILIDADES GERENCIALES" },
+        { nombre: "ENVASE, EMPAQUE Y EMBALAJE" },
+        { nombre: "GESTIÓN DE OPERACIÓN ADUANERA" },
+        { nombre: "SEGURIDAD EN LA CADENA DE SUMINISTRO" },
+        { nombre: "CONTABILIDAD BÁSICA" },
+        { nombre: "GESTIÓN DE CADENA DE SUMINISTRO" },
+      ],
+      "11": [
+        { nombre: "INGLÉS VII" },
+        { nombre: "ADMINISTRACIÓN DE OPERACIONES DE TRÁFICO I" },
+        { nombre: "INVESTIGACIÓN DE OPERACIONES" },
+        { nombre: "CUMPLIMIENTO NORMATIVO" },
+        { nombre: "ADMINISTRACIÓN DE SISTEMAS LOGÍSTICOS" },
+        { nombre: "FINANZAS INTERNACIONALES" },
+        { nombre: "METODOLOGÍA DE LA INVESTIGACIÓN" },
+      ],
+      "12": [
+        { nombre: "INGLÉS VIII" },
+        { nombre: "ADMINISTRACIÓN DE OPERACIONES DE TRÁFICO II" },
+        { nombre: "LOGÍSTICA DE TRANSPORTE" },
+        { nombre: "INFRACCIONES, SANCIONES Y MEDIOS DE DEFENSA" },
+        { nombre: "ADMINISTRACIÓN DE PROYECTOS CON ENFOQUE SOSTENIBLE" },
+        { nombre: "GESTIÓN DE LA CALIDAD EN LA LOGÍSTICA" },
+        { nombre: "PROYECTO INTEGRADOR III" },
+      ],
+      // Cuatrimestre 13 (Estadía Ing.) se omite: se gestiona desde el formulario de Estadías
+    },
+  },
+  "MCD": {
+    codigo: "MCD",
+    nombre: "TSU EN MERCADOTECNIA (DESPRESURIZADA)",
+    cuatrimestres: {
+      "1": [
+        { nombre: "MERCADOTECNIA" },
+        { nombre: "INFORMÁTICA" },
+        { nombre: "FUNDAMENTOS DE ADMINISTRACIÓN Y ENTORNO EMPRESARIAL" },
+        { nombre: "COMUNICACIÓN Y HABILIDADES DIGITALES" },
+      ],
+      "2": [
+        { nombre: "INGLÉS I" },
+        { nombre: "DESARROLLO HUMANO Y VALORES" },
+        { nombre: "MATEMÁTICAS" },
+        { nombre: "PLANEACIÓN ESTRATÉGICA" },
+        { nombre: "COMPORTAMIENTO DEL CONSUMIDOR" },
+      ],
+      "3": [
+        { nombre: "INGLÉS II" },
+        { nombre: "HABILIDADES SOCIOEMOCIONALES Y MANEJO DE CONFLICTOS" },
+        { nombre: "ESTADÍSTICA I" },
+        { nombre: "ECONOMÍA" },
+      ],
+      "4": [
+        { nombre: "INGLÉS III" },
+        { nombre: "DESARROLLO DEL PENSAMIENTO Y TOMA DE DECISIONES" },
+        { nombre: "ESTADÍSTICA II" },
+        { nombre: "SISTEMA DE INVESTIGACIÓN DE MERCADOS I" },
+      ],
+      "5": [
+        { nombre: "ÉTICA PROFESIONAL" },
+        { nombre: "LEGISLACIÓN COMERCIAL" },
+        { nombre: "CONTABILIDAD PARA NEGOCIOS" },
+        { nombre: "ESTRATEGIAS DE PRODUCTO Y PRECIO" },
+        { nombre: "PROYECTO INTEGRADOR I" },
+      ],
+      "6": [
+        { nombre: "INGLÉS IV" },
+        { nombre: "MEZCLA PROMOCIONAL" },
+        { nombre: "SISTEMA DE INVESTIGACIÓN DE MERCADOS II" },
+        { nombre: "GESTIÓN DE VENTAS" },
+      ],
+      "7": [
+        { nombre: "LOGÍSTICA Y DISTRIBUCIÓN" },
+        { nombre: "MERCADOTECNIA ESTRATÉGICA" },
+        { nombre: "DISEÑO DIGITAL Y MULTIMEDIA" },
+        { nombre: "ADMINISTRACIÓN DEL TIEMPO" },
+      ],
+      "8": [
+        { nombre: "INGLÉS V" },
+        { nombre: "LIDERAZGO Y EQUIPOS DE ALTO DESEMPEÑO" },
+        { nombre: "MERCADOTECNIA DE SERVICIOS" },
+        { nombre: "MERCADOTECNIA DIGITAL I" },
+        { nombre: "PROYECTO INTEGRADOR II" },
+      ],
+      // Cuatrimestre 9 (Estadía TSU) se omite: se gestiona desde el formulario de Estadías
+    },
+  },
+  "LNM": {
+    codigo: "LNM",
+    nombre: "LICENCIATURA EN NEGOCIOS Y MERCADOTECNIA (DESPRESURIZADA)",
+    cuatrimestres: {
+      "10": [
+        { nombre: "INGLÉS VI" },
+        { nombre: "HABILIDADES GERENCIALES" },
+        { nombre: "ESTADÍSTICA APLICADA A LOS NEGOCIOS" },
+        { nombre: "MERCADOTECNIA INTERNACIONAL" },
+        { nombre: "DESARROLLO DE NUEVOS PRODUCTOS" },
+        { nombre: "TENDENCIAS DEL MERCADO Y CONSUMIDOR GLOBAL" },
+        { nombre: "PLANEACIÓN Y ORGANIZACIÓN DEL TRABAJO" },
+      ],
+      "11": [
+        { nombre: "INGLÉS VII" },
+        { nombre: "MERCADOTECNIA DIGITAL II" },
+        { nombre: "INTELIGENCIA DE MERCADOS" },
+        { nombre: "GESTIÓN DE LA CALIDAD" },
+        { nombre: "INTELIGENCIA FINANCIERA" },
+        { nombre: "ADMINISTRACIÓN DE LA PRODUCCIÓN" },
+        { nombre: "GESTIÓN DEL TALENTO HUMANO" },
+      ],
+      "12": [
+        { nombre: "INGLÉS VIII" },
+        { nombre: "CULTURA EMPRENDEDORA" },
+        { nombre: "CADENA DE SUMINISTRO" },
+        { nombre: "PLAN DE NEGOCIOS" },
+        { nombre: "COMUNICACIÓN INTEGRAL DE LA MERCADOTECNIA" },
+        { nombre: "DERECHO CORPORATIVO" },
+        { nombre: "PROYECTO INTEGRADOR III" },
+      ],
+      // Cuatrimestre 13 (Estadía Lic.) se omite: se gestiona desde el formulario de Estadías
+    },
+  },
+  "AUT": {
+    codigo: "AUT",
+    nombre: "TSU EN AUTOMATIZACIÓN (DESPRESURIZADA)",
+    cuatrimestres: {
+      "1": [
+        { nombre: "FUNDAMENTOS MATEMÁTICOS" },
+        { nombre: "PROCESOS INDUSTRIALES" },
+        { nombre: "METROLOGÍA" },
+        { nombre: "COMUNICACIÓN Y HABILIDADES DIGITALES" },
+      ],
+      "2": [
+        { nombre: "INGLÉS I" },
+        { nombre: "CÁLCULO DIFERENCIAL" },
+        { nombre: "FÍSICA" },
+        { nombre: "CIRCUITOS ELÉCTRICOS" },
+      ],
+      "3": [
+        { nombre: "INGLÉS II" },
+        { nombre: "DESARROLLO HUMANO Y VALORES" },
+        { nombre: "CÁLCULO INTEGRAL" },
+        { nombre: "PROBABILIDAD Y ESTADÍSTICA" },
+        { nombre: "METODOLOGÍA DE LA PROGRAMACIÓN" },
+      ],
+      "4": [
+        { nombre: "INGLÉS III" },
+        { nombre: "HABILIDADES SOCIOEMOCIONALES Y MANEJO DE CONFLICTOS" },
+        { nombre: "ELEMENTOS MECÁNICOS" },
+        { nombre: "ELECTRÓNICA ANALÓGICA Y DE POTENCIA" },
+        { nombre: "DIBUJO PARA INGENIERÍA" },
+      ],
+      "5": [
+        { nombre: "INGLÉS IV" },
+        { nombre: "DESARROLLO DEL PENSAMIENTO Y TOMA DE DECISIONES" },
+        { nombre: "ELECTRÓNICA DIGITAL" },
+        { nombre: "PROYECTO INTEGRADOR I" },
+      ],
+      "6": [
+        { nombre: "INGLÉS V" },
+        { nombre: "CONTROL DE MOTORES ELÉCTRICOS" },
+        { nombre: "SISTEMAS NEUMÁTICOS E HIDRÁULICOS" },
+        { nombre: "CÁLCULO DE VARIAS VARIABLES" },
+      ],
+      "7": [
+        { nombre: "ÉTICA PROFESIONAL" },
+        { nombre: "CONTROLADORES LÓGICOS PROGRAMABLES" },
+        { nombre: "INSTRUMENTACIÓN INDUSTRIAL" },
+        { nombre: "ECUACIONES DIFERENCIALES" },
+      ],
+      "8": [
+        { nombre: "LIDERAZGO DE EQUIPOS DE ALTO DESEMPEÑO" },
+        { nombre: "ESTRUCTURA Y PROPIEDADES DE LOS MATERIALES" },
+        { nombre: "IMPLEMENTACIÓN DE SISTEMAS AUTOMÁTICOS" },
+        { nombre: "PROCESOS DE MANUFACTURA" },
+        { nombre: "PROYECTO INTEGRADOR II" },
+      ],
+      // Cuatrimestre 9 (Estadía TSU) se omite: se gestiona desde el formulario de Estadías
+    },
+  },
+  "IM": {
+    codigo: "IM",
+    nombre: "INGENIERÍA EN MECATRÓNICA (DESPRESURIZADA)",
+    cuatrimestres: {
+      "10": [
+        { nombre: "INGLÉS VI" },
+        { nombre: "HABILIDADES GERENCIALES" },
+        { nombre: "MODELADO Y SIMULACIÓN DE SISTEMAS" },
+        { nombre: "CINEMÁTICA Y DINÁMICA DE ROBOTS" },
+        { nombre: "ANÁLISIS DE MECANISMOS" },
+        { nombre: "INSTRUMENTACIÓN VIRTUAL" },
+        { nombre: "SISTEMAS EMBEBIDOS" },
+      ],
+      "11": [
+        { nombre: "INGLÉS VII" },
+        { nombre: "DISEÑO ASISTIDO POR COMPUTADORA" },
+        { nombre: "INGENIERÍA DE CONTROL" },
+        { nombre: "PROGRAMACIÓN DE ROBOTS INDUSTRIALES" },
+        { nombre: "DISEÑO MECÁNICO" },
+        { nombre: "SISTEMAS CAM CNC" },
+        { nombre: "DISEÑO DE SISTEMAS MECATRÓNICOS" },
+      ],
+      "12": [
+        { nombre: "INGLÉS VIII" },
+        { nombre: "SISTEMAS ELÉCTRICOS INDUSTRIALES" },
+        { nombre: "CONTROL AVANZADO" },
+        { nombre: "ADMINISTRACIÓN DE MANTENIMIENTO" },
+        { nombre: "INGENIERÍA ASISTIDA POR COMPUTADORA" },
+        { nombre: "SISTEMAS DE MANUFACTURA FLEXIBLE" },
+        { nombre: "PROYECTO INTEGRADOR III" },
+      ],
+      // Cuatrimestre 13 (Estadía Ing.) se omite: se gestiona desde el formulario de Estadías
+    },
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// CARRERAS DISPONIBLES POR PLAN
+// ═══════════════════════════════════════════════════════════════════
 export const carrieras = {
   "nuevo-modelo": {
     tsu: [
@@ -908,21 +1182,28 @@ export const carrieras = {
       { codigo: "IPB", nombre: "INGENIERÍA EN PROCESOS BIOALIMENTARIOS (IPB)" },
     ],
   },
+  "plan-despresurizada": {
+    tsu: [
+      { codigo: "OLCE", nombre: "TSU EN OPERACIONES LOGÍSTICAS Y COMERCIO EXTERIOR (OLCE)" },
+      { codigo: "MCD", nombre: "TSU EN MERCADOTECNIA (MCD)" },
+      { codigo: "AUT", nombre: "TSU EN AUTOMATIZACIÓN (AUT)" },
+    ],
+    ingenieria: [
+      { codigo: "ILI", nombre: "INGENIERÍA EN LOGÍSTICA INTERNACIONAL (ILI)" },
+      { codigo: "LNM", nombre: "LICENCIATURA EN NEGOCIOS Y MERCADOTECNIA (LNM)" },
+      { codigo: "IM", nombre: "INGENIERÍA EN MECATRÓNICA (IM)" },
+    ],
+  },
 };
 
+// ═══════════════════════════════════════════════════════════════════
+// CATÁLOGOS
+// ═══════════════════════════════════════════════════════════════════
 export const cuatrimestres: Cuatrimestre[] = [
   "propedeutico",
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10",
-  "11",
+  "1", "2", "3", "4", "5", "6",
+  "7", "8", "9", "10", "11",
+  "12", "13",
 ];
 
 export const cuatrimestresLabels = {
@@ -932,12 +1213,14 @@ export const cuatrimestresLabels = {
   "3": "Tercer",
   "4": "Cuarto",
   "5": "Quinto",
-  "6": "Sexto (Estadías)",
+  "6": "Sexto",
   "7": "Séptimo",
   "8": "Octavo",
   "9": "Noveno",
   "10": "Décimo",
-  "11": "Undécimo (Estadías)",
+  "11": "Décimo Primero",
+  "12": "Décimo Segundo",
+  "13": "Décimo Tercero",
 };
 
 export const parciales = ["Parcial 1", "Parcial 2", "Parcial 3"];

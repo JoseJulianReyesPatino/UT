@@ -13,7 +13,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { DocumentHistoryCard } from "../../components/DocumentHistoryCard";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { planNuevoModelo, planNormal, carrieras, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
+import { planNuevoModelo, planNormal, planDespresurizada, carrieras, cuatrimestresLabels, parciales, Plan, Cuatrimestre } from "../../data/curricula";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import { useFormAccess } from "../../hooks/useFormAccess";
@@ -91,11 +91,17 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
     }
   }, [user]);
 
+  // ✅ ACTUALIZADO: incluye plan despresurizada
   const carrerasDisponibles = useMemo(() => {
     if (!formData.plan) return [];
     if (formData.plan === "nuevo-modelo") {
       const tsu = carrieras["nuevo-modelo"].tsu.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
       const ing = carrieras["nuevo-modelo"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
+      return [...tsu, ...ing];
+    }
+    if (formData.plan === "plan-despresurizada") {
+      const tsu = carrieras["plan-despresurizada"].tsu.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
+      const ing = carrieras["plan-despresurizada"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
       return [...tsu, ...ing];
     }
     return carrieras["plan-normal"].ingenieria.map((c) => ({ codigo: c.codigo, nombre: c.nombre }));
@@ -148,17 +154,25 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
     };
   }, [user]);
 
+  // ✅ ACTUALIZADO: incluye plan despresurizada
   const cuatrimestresDisponibles = useMemo(() => {
     if (!formData.carrera || !formData.plan) return [];
-    const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
+    const plan =
+      formData.plan === "nuevo-modelo" ? planNuevoModelo :
+      formData.plan === "plan-despresurizada" ? planDespresurizada :
+      planNormal;
     const carrera = plan[formData.carrera];
     if (!carrera) return [];
     return Object.keys(carrera.cuatrimestres);
   }, [formData.carrera, formData.plan]);
 
+  // ✅ ACTUALIZADO: incluye plan despresurizada
   const materiasDisponibles = useMemo(() => {
     if (!formData.carrera || !formData.cuatrimestre || !formData.plan) return [];
-    const plan = formData.plan === "nuevo-modelo" ? planNuevoModelo : planNormal;
+    const plan =
+      formData.plan === "nuevo-modelo" ? planNuevoModelo :
+      formData.plan === "plan-despresurizada" ? planDespresurizada :
+      planNormal;
     const carrera = plan[formData.carrera];
     if (!carrera) return [];
     return carrera.cuatrimestres[formData.cuatrimestre] || [];
@@ -333,11 +347,15 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
     return `${espacios} espacio${plural} disponible${plural}`;
   };
 
+  // ✅ ACTUALIZADO: incluye plan despresurizada
   const findCareerCodeByLabel = (label: string, planType: Plan | "") => {
     if (!label || !planType) return "";
-    const candidates = planType === "nuevo-modelo"
-      ? [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria]
-      : carrieras["plan-normal"].ingenieria;
+    const candidates =
+      planType === "nuevo-modelo"
+        ? [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria]
+        : planType === "plan-despresurizada"
+        ? [...carrieras["plan-despresurizada"].tsu, ...carrieras["plan-despresurizada"].ingenieria]
+        : carrieras["plan-normal"].ingenieria;
 
     const searchLabel = label.toLowerCase();
     let found = candidates.find((c) => c.nombre.toLowerCase() === searchLabel);
@@ -350,9 +368,11 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
   const populateFormForEditBatch = async (documents: any[]) => {
     const main = documents[0];
 
+    // ✅ ACTUALIZADO: reconoce plan despresurizada
     const normalizePlanKey = (p: any) => {
       if (!p) return "plan-normal";
       const s = String(p).toLowerCase();
+      if (s.includes("despresurizada")) return "plan-despresurizada";
       if (s.includes("nuevo")) return "nuevo-modelo";
       return "plan-normal";
     };
@@ -543,7 +563,6 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
         selectedGroup = groupsOptions.find(g => formatGroupCode(g.group_code) === formData.grupo);
       }
 
-      // Modo solo metadatos: PATCH a cada documento del lote sin tocar los archivos
       if (isMetadataOnlyEdit && editingBatchDocIds.length > 0) {
         const metadataPayload: Record<string, unknown> = {
           plan: formData.plan ? String(formData.plan).replace(/-/g, "_") : undefined,
@@ -570,7 +589,6 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
         return;
       }
 
-      // Modo normal: crear nuevos registros con los archivos
       const batchId = crypto.randomUUID();
       const basePayload: any = {
         form_id: 4,
@@ -593,7 +611,6 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
 
       await uploadMultipleFiles(formData.archivos, basePayload);
 
-      // Eliminar documentos pendientes anteriores del lote (re-edición)
       if (editingBatchDocIds.length > 0) {
         await Promise.allSettled(
           editingBatchDocIds.map((id) => apiFetch(`/documents/${id}`, { method: "DELETE" }))
@@ -765,7 +782,8 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
           <div className="flex flex-col sm:w-80 sm:shrink-0 sm:overflow-y-auto divide-y divide-border dark:divide-slate-800">
             <div className="p-5 space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Plan *</p>
-              <div className="grid grid-cols-2 gap-2">
+              {/* ✅ ACTUALIZADO: 3 botones */}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => setFormData((c) => ({ ...c, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
@@ -787,6 +805,17 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
                   }`}
                 >
                   Plan Normal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData((c) => ({ ...c, plan: "plan-despresurizada", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                    formData.plan === "plan-despresurizada"
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-400 dark:bg-emerald-950/30 dark:text-emerald-300"
+                      : "border-border bg-background text-slate-600 hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-emerald-600"
+                  }`}
+                >
+                  Despresurizada
                 </button>
               </div>
             </div>
@@ -1033,7 +1062,7 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
         </p>
       </div>
 
-      <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-border/70 dark:bg-card dark:border-slate-800/70 dark:bg-slate-950/60">
+      <Card className="overflow-hidden border-border/70 bg-card shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
         <CardContent className="relative space-y-6 p-6 pt-5 sm:p-8 sm:pt-6">
           <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Los campos marcados con * son obligatorios.</p>
           {editingDocumentId && !isMetadataOnlyEdit && (
@@ -1055,10 +1084,10 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
-            {/* Selector de Plan - con estilos de Planeación */}
+            {/* ✅ ACTUALIZADO: 3 botones */}
             <div className="space-y-2 md:col-span-2">
               <Label className="text-sm font-medium dark:text-white">Plan *</Label>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => setFormData((current) => ({ ...current, plan: "nuevo-modelo", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
@@ -1085,6 +1114,20 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
                   <div className="flex-1">
                     <span className="block text-base font-semibold dark:text-white">Plan Normal</span>
                     <span className="block text-xs text-muted-foreground dark:text-slate-400">Ingenierías</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData((current) => ({ ...current, plan: "plan-despresurizada", carrera: "", cuatrimestre: "", materia: "", parcial: "", grupo: "" }))}
+                  className={`group relative flex items-start gap-3 rounded-2xl border-2 px-4 py-4 text-left transition-all ${
+                    formData.plan === "plan-despresurizada"
+                      ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/40 dark:border-emerald-400 dark:bg-emerald-950/30"
+                      : "border-border bg-background hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/30 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <div className="flex-1">
+                    <span className="block text-base font-semibold dark:text-white">Plan Despresurizada</span>
+                    <span className="block text-xs text-muted-foreground dark:text-slate-400">TSU e Ingeniería</span>
                   </div>
                 </button>
               </div>
@@ -1319,7 +1362,7 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
               <Label className="dark:text-white">Nota para administración (opcional)</Label>
               <Textarea
                 value={formData.nota}
-                onChange={(e) => setFormData((current) => ({ ...current, nota: e.target.value }))}
+                onChange={(e) => setFormData((c) => ({ ...c, nota: e.target.value }))}
                 placeholder="Agrega una nota para revisión"
                 className="min-h-[9rem] rounded-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
               />
@@ -1329,7 +1372,7 @@ export default function ListaConcentradaPage({ deadlineInfo, onDirtyChange, layo
           {/* Footer con acciones */}
           {formAccess.isExpired && (
             <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 mb-2 text-sm font-medium text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-              <span>Formulario cerrado &mdash; el plazo de env&iacute;o ha vencido. Solo puedes consultar tu historial.</span>
+              <span>Formulario cerrado &mdash; el plazo de envío ha vencido. Solo puedes consultar tu historial.</span>
             </div>
           )}
           <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end dark:border-slate-700">

@@ -121,9 +121,17 @@ export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
 
   const canPermanentDelete = canEdit;
 
-  const planLabel = plan
-    ? (String(plan).toLowerCase().includes("nuevo") ? "Plan Nuevo Modelo" : "Plan Normal")
-    : undefined;
+  // ✅ FIX: Reconoce despresurizada, nuevo modelo y plan normal (en ese orden)
+  const planLabel = plan && String(plan).trim()
+  ? (() => {
+      const s = String(plan).trim().toLowerCase();
+      if (!s) return undefined;
+      if (s.includes("despresurizada")) return "Plan Despresurizada";
+      if (s.includes("nuevo")) return "Plan Nuevo Modelo";
+      if (s.includes("normal")) return "Plan Normal";
+      return undefined;
+    })()
+  : undefined;
 
   const handleDelete = async () => {
     if (isDeletingLocal || isDeleting) return;
@@ -326,7 +334,6 @@ export const DocumentHistoryCard = React.memo(function DocumentHistoryCard({
                 ? `¿Eliminar ${documents.length > 1 ? `${documents.length} documentos` : "el documento"}?`
                 : "¿Ocultar del historial?"}
             </AlertDialogTitle>
-            {/* ✅ FIX: Mensaje más claro sin redundancia */}
             <AlertDialogDescription className="dark:text-slate-400">
              {canPermanentDelete
                 ? (documents.length > 1

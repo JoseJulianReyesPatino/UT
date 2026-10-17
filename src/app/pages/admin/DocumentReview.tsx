@@ -112,20 +112,7 @@ type ApiDocument = {
 	fileUrl?: string | null;
 	nota?: string | null;
 	batch_id?: string | null;
-};
-
-const getCareerFilterOptions = (plan: string): CareerFilterOption[] => {
-	const nuevoModelo = [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria].map((career) => ({ value: career.nombre, label: career.nombre }));
-	const planNormal = carrieras["plan-normal"].ingenieria.map((career) => ({ value: career.nombre, label: career.nombre }));
-	const normalizedPlan = normalizeText(plan);
-	if (normalizedPlan.includes("nuevo")) return nuevoModelo;
-	if (normalizedPlan.includes("plan normal") || normalizedPlan.includes("normal")) return planNormal;
-	const seen = new Set<string>();
-	return [...nuevoModelo, ...planNormal].filter(({ value }) => {
-		if (seen.has(value)) return false;
-		seen.add(value);
-		return true;
-	});
+	has_file?: boolean;
 };
 
 const normalizeText = (value?: string | null) =>
@@ -135,6 +122,26 @@ const normalizeText = (value?: string | null) =>
 		.replace(/[\u0300-\u036f]/g, "")
 		.toLowerCase()
 		.trim();
+
+// ✅ ACTUALIZADO: incluye carreras de plan-despresurizada
+const getCareerFilterOptions = (plan: string): CareerFilterOption[] => {
+	const nuevoModelo = [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria].map((career) => ({ value: career.nombre, label: career.nombre }));
+	const planNormal = carrieras["plan-normal"].ingenieria.map((career) => ({ value: career.nombre, label: career.nombre }));
+	const planDespresurizada = [
+		...carrieras["plan-despresurizada"].tsu,
+		...carrieras["plan-despresurizada"].ingenieria,
+	].map((career) => ({ value: career.nombre, label: career.nombre }));
+	const normalizedPlan = normalizeText(plan);
+	if (normalizedPlan.includes("despresurizada")) return planDespresurizada;
+	if (normalizedPlan.includes("nuevo")) return nuevoModelo;
+	if (normalizedPlan.includes("plan normal") || normalizedPlan.includes("normal")) return planNormal;
+	const seen = new Set<string>();
+	return [...nuevoModelo, ...planNormal, ...planDespresurizada].filter(({ value }) => {
+		if (seen.has(value)) return false;
+		seen.add(value);
+		return true;
+	});
+};
 
 const normalizeApartadoKey = (value?: string | null) =>
 	normalizeText(value)
@@ -247,31 +254,18 @@ const friendlyApartado = (value?: string | null) => {
 	}
 };
 
-const formatPlanLabel = (value?: string | null, career?: string | null) => {
+// ✅ FIX DEFINITIVO: El plan del backend SIEMPRE gana. NO se infiere por carrera.
+// Razón: hay carreras compartidas entre planes (MCD, OLCE, AUT, ILI, LNM, IM),
+// y la inferencia por carrera causaba que documentos con plan "nuevo_modelo"
+// se mostraran como "Plan Despresurizada" solo porque su carrera también
+// existe en el catálogo de despresurizada.
+const formatPlanLabel = (value?: string | null, _career?: string | null): string => {
 	const normalized = normalizeText(value);
-	const normalizedCareer = normalizeText(career);
-
-	const nuevoModeloCareers = [...carrieras["nuevo-modelo"].tsu, ...carrieras["nuevo-modelo"].ingenieria];
-	const planNormalCareers = [...carrieras["plan-normal"].ingenieria];
-
-	const careerMatchesCatalog = (catalogCareer: { codigo: string; nombre: string }) => {
-		const code = normalizeText(catalogCareer.codigo);
-		const name = normalizeText(catalogCareer.nombre);
-		return (
-			normalizedCareer === code
-			|| normalizedCareer.includes(`(${code})`)
-			|| normalizedCareer.includes(` ${code}`)
-			|| normalizedCareer === name
-			|| normalizedCareer.includes(name)
-		);
-	};
-
-	const isNuevoModeloByCatalog = nuevoModeloCareers.some(careerItem => careerMatchesCatalog(careerItem));
-	const isPlanNormalByCatalog = planNormalCareers.some(careerItem => careerMatchesCatalog(careerItem));
-
-	if (normalized.includes("nuevo") || normalizedCareer.includes("nuevo") || isNuevoModeloByCatalog) return "Nuevo Modelo";
-	if (normalized.includes("plan normal") || normalized.includes("normal") || normalized === "plan" || normalizedCareer.includes("pn") || isPlanNormalByCatalog) return "Plan Normal";
-	return value ? value : "Plan";
+	if (!normalized) return ""; // Sin plan explícito: no mostrar nada
+	if (normalized.includes("despresurizada")) return "Plan Despresurizada";
+	if (normalized.includes("nuevo")) return "Nuevo Modelo";
+	if (normalized.includes("plan normal") || normalized === "plan_normal" || normalized.includes("normal")) return "Plan Normal";
+	return "";
 };
 
 const getDocumentFileName = (doc: ApiDocument) => {
@@ -766,7 +760,6 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 		setFilterParcial("all");
 	}, [filterDocente]);
 
-	// Reset filterApartado solo si la opción seleccionada ya no existe en las disponibles
 	useEffect(() => {
 		if (filterApartado !== "all" && filterApartado !== defaultApartadoFilter && !apartadosDisponibles.includes(filterApartado)) {
 			setFilterApartado(defaultApartadoFilter);
@@ -792,7 +785,6 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 	const filteredReviewedDocuments = useMemo(() => reviewedDocuments.filter(matchesFilters), [reviewedDocuments, matchesFilters]);
 	const filteredAllDocuments = useMemo(() => allDocuments.filter(matchesFilters), [allDocuments, matchesFilters]);
 
-	// Separar por estado para tabs dedicados
 	const filteredPendienteOnlyDocuments = useMemo(() => filteredPendingDocuments.filter((doc) => !("status" in doc && doc.status === "reenviado")), [filteredPendingDocuments]);
 	const filteredReenviadosDocuments = useMemo(() => filteredPendingDocuments.filter((doc) => "status" in doc && doc.status === "reenviado"), [filteredPendingDocuments]);
 	const filteredRevisadosDocuments = useMemo(() => filteredReviewedDocuments.filter((doc) => !doc.returned), [filteredReviewedDocuments]);
@@ -1192,7 +1184,7 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 						<p className="font-semibold tracking-wide text-foreground">{forcedApartado ? fileName : `${apartadoTitle} - ${fileName}`}</p>
 						<p className="text-xs text-muted-foreground">{doc.docente} • {doc.carrera}</p>
 						<div className="mt-2 flex flex-wrap gap-2">
-								{doc.plan && doc.plan !== "-" && <Badge variant="outline" className="text-xs">{doc.plan}</Badge>}
+							{doc.plan && doc.plan !== "-" && <Badge variant="outline" className="text-xs">{doc.plan}</Badge>}
 							{!forcedApartado && doc.apartado && doc.apartado !== "-" && <Badge variant="outline" className="text-xs">{doc.apartado}</Badge>}
 							{doc.cuatrimestre !== "-" && <Badge variant="outline" className="text-xs">{cuatrimestreLabel}</Badge>}
 							{doc.grupo && doc.grupo !== "-" && <Badge variant="outline" className="text-xs">{`Grupo ${doc.grupo}`}</Badge>}
@@ -1225,7 +1217,6 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 		);
 	};
 
-	// Agrupar documentos por batch_id para mostrar envíos múltiples juntos
 	const groupDocsByBatch = (docs: DocumentItem[]): DocumentItem[][] => {
 		const groups = new Map<string, DocumentItem[]>();
 		for (const doc of docs) {
