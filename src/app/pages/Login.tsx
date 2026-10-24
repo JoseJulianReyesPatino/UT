@@ -14,9 +14,12 @@ import { Recaptcha } from "../components/Recaptcha";
 // ✅ IMPORTS CORREGIDOS — Vite los procesa y les pone hash, nunca desaparecen
 import LogoUTSLRC from "../../assets/elementos/LogotipoUTSLRC.webp";
 import LogoUTSLRCWhite from "../../assets/elementos/LogotipoUTSLRC-BLANCO.webp";
-import SuperiorImage from "../../assets/elementos/superior.webp";
-import InferiorImage from "../../assets/elementos/inferior.webp";
-import MascotaImage from "../../assets/elementos/mascota3.webp";
+import SuperiorImage from "../../assets/elementos/telarana_superior.png";
+import InferiorImage from "../../assets/elementos/telarana_baja.png";
+import MascotaImage from "../../assets/elementos/prueba.png";
+import MurcielagosImage from "../../assets/elementos/murcielagos.png";
+import CalabazasImage from "../../assets/elementos/calabacitas.png";
+import FondoHalloween from "../../assets/elementos/fondo_login_halloween.png";
 
 const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
 
@@ -54,7 +57,7 @@ export function Login() {
 
   // 🛡️ reCAPTCHA
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
-const recaptchaRef = useRef<any>(null);
+  const recaptchaRef = useRef<any>(null);
 
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -201,17 +204,31 @@ const recaptchaRef = useRef<any>(null);
 
   return (
     <div className={`login-page ${pageBackground} min-h-screen overflow-hidden relative`}>
+      
+      {/* 🔥 ESTILOS DE LA ANIMACIÓN DEL FUEGO */}
+    <style>
+  {`
+    @keyframes fireGlow {
+      0%, 100% { opacity: 0.7; transform: scale(1) translateY(0); }
+      50% { opacity: 1; transform: scale(1.1) translateY(-2px); }
+    }
+    .animate-fire {
+      animation: fireGlow 1s ease-in-out infinite alternate;
+    }
+  `}
+</style>
+
       <div className="absolute inset-0">
         <img
           src={SuperiorImage}
           alt="Decoración superior"
-          className="absolute top-0 right-0 w-24 sm:w-32 lg:w-40 pointer-events-none select-none z-0"
+          className="absolute top-0 right-0 w-24 sm:w-32 lg:w-85 pointer-events-none select-none z-0"
         />
-        <img
-          src={InferiorImage}
-          alt="Decoración inferior"
-          className="absolute bottom-0 left-0 w-24 sm:w-32 lg:w-40 pointer-events-none select-none z-0"
-        />
+       <img
+        src={InferiorImage}
+        alt="Decoración inferior"
+        className="absolute bottom-0 left-0 w-40 sm:w-64 lg:w-[290px] pointer-events-none select-none z-0"
+      />
 
         <div className="absolute top-0 left-0 w-[700px] h-[700px] bg-slate-700/10 blur-3xl rounded-full -translate-x-1/3 -translate-y-1/3 dark:bg-slate-600/20" />
         <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-slate-700/10 blur-3xl rounded-full translate-x-1/4 translate-y-1/4 dark:bg-slate-600/20" />
@@ -253,6 +270,13 @@ const recaptchaRef = useRef<any>(null);
 
                 <div className="absolute inset-0 border-2 border-[#3BBF82]/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 " />
 
+                {/* 🦇 MURCIÉLAGOS AGREGADOS AQUÍ */}
+                <img
+                  src={MurcielagosImage}
+                  alt="Murciélagos decorativos"
+                  className="absolute z-20 w-30 xl:w-38 -top-50 -right-10 object-contain pointer-events-none select-none drop-shadow-md"
+                />
+
                 <img
                   src={MascotaImage}
                   alt="Mascota institucional"
@@ -269,36 +293,46 @@ const recaptchaRef = useRef<any>(null);
             <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-slate-700/8 blur-3xl opacity-55" />
           </div>
 
-          <Card className={`w-full max-w-md rounded-3xl backdrop-blur-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(59,191,130,0.18)] hover:border-[#3BBF82]/20 group will-change-transform animate-in fade-in slide-in-from-bottom-1 ${cardSurface}`}>
+        <Card 
+          className={`w-full max-w-md rounded-3xl relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(59,191,130,0.18)] group will-change-transform animate-in fade-in slide-in-from-bottom-1 border-none`}
+          style={{
+            backgroundImage: `url(${FondoHalloween})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          }}
+        >
             <div className="absolute -top-20 -right-12 w-56 h-56 rounded-full bg-slate-700/10 blur-3xl pointer-events-none" />
             <div className="absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-slate-700/10 blur-3xl pointer-events-none" />
 
-            <CardContent className="p-8 lg:p-10 relative">
+            <CardContent className="p-6 lg:p-10 relative">
 
               <div className="lg:hidden text-center mb-8">
                 <img src={logoSrc} alt="Logo Institucional" className="mx-auto h-12 w-auto" />
               </div>
 
-              <div className="text-center mb-8">
-                <div className="mb-6">
-                  <div className="w-16 h-1 bg-gradient-to-r from-[#3BBF82] to-[#2da06a] rounded-full mx-auto mb-4" />
-                  <p className="text-sm font-semibold text-[#3BBF82] uppercase tracking-wider">
+              <div className="text-center mb-4">
+                <div className="mb-3">
+                  {/* Línea cambiada a color café sólido */}
+                  <div className="w-12 h-1 bg-[#8B4513] rounded-full mx-auto mb-2" />
+                  
+                  {/* Texto cambiado a color café */}
+                  <p className="text-xs font-bold text-[#8B4513] uppercase tracking-wider drop-shadow-sm">
                     Bienvenido
                   </p>
                 </div>
                 {isForgotFlipped ? (
-                  <p className={`${helperText} mt-2 text-center`}>
+                  <p className={`${helperText} text-xs text-center`}>
                     Recupera el acceso a tu cuenta institucional
                   </p>
                 ) : (
-                  <p className={`${helperText} mt-2 text-center`}>
+                  <p className={`${helperText} text-xs text-center`}>
                     <span className="lg:hidden">Accede al sistema de gestión académica digital</span>
                     <span className="hidden lg:inline">Accede a tu plataforma académica institucional</span>
                   </p>
                 )}
               </div>
-
-              <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-8 dark:via-slate-700" />
+              <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-4 dark:via-slate-700" />
 
               <div className="relative [perspective:1800px]">
                 <div
@@ -307,7 +341,7 @@ const recaptchaRef = useRef<any>(null);
                   }`}
                 >
                   <div className="w-full [backface-visibility:hidden]">
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-4">
                       <div className="space-y-2 group/email">
                         <Label htmlFor="email" className={`${labelText} font-medium text-sm`}>
                           Correo Electrónico
@@ -358,30 +392,45 @@ const recaptchaRef = useRef<any>(null);
 
                       {/* 🛡️ reCAPTCHA — obligatorio para iniciar sesión */}
                       {RECAPTCHA_SITE_KEY && (
-  <div className="flex justify-center my-2">
-    <Recaptcha
-      ref={recaptchaRef}
-      sitekey={RECAPTCHA_SITE_KEY}
-      onChange={(token) => setRecaptchaToken(token)}
-      theme={isDark ? "dark" : "light"}
-    />
-  </div>
-)}
+                        <div className="flex justify-center">
+                          <Recaptcha
+                            ref={recaptchaRef}
+                            sitekey={RECAPTCHA_SITE_KEY}
+                            onChange={(token) => setRecaptchaToken(token)}
+                            theme={isDark ? "dark" : "light"}
+                          />
+                        </div>
+                      )}
 
-                      <Button
-                        type="submit"
-                        disabled={isLoading || (!!RECAPTCHA_SITE_KEY && !recaptchaToken)}
-                        className="w-full h-12 rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white font-semibold text-base shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isLoading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Ingresando...
-                          </>
-                        ) : (
-                          "Iniciar sesión"
-                        )}
-                      </Button>
+                   {/* 🔥 CONTENEDOR DEL BOTÓN CON FUEGO ANIMADO */}
+<div className="relative w-full mt-4">
+  
+  {/* Fuego Izquierda (Usando Emoji) */}
+  <div className="absolute -left-4 -bottom-12 text-3xl animate-fire z-0 pointer-events-none drop-shadow-[0_0_8px_rgba(255,100,0,0.8)]" style={{ animationDelay: '0.2s' }}>
+    🔥
+  </div>
+  
+  {/* Fuego Derecha (Usando Emoji) */}
+  <div className="absolute -right-4 -bottom-12 text-3xl animate-fire z-0 pointer-events-none drop-shadow-[0_0_8px_rgba(255,100,0,0.8)]" style={{ animationDelay: '0.6s' }}>
+    🔥
+  </div>
+
+  {/* Botón Original */}
+  <Button
+    type="submit"
+    disabled={isLoading || (!!RECAPTCHA_SITE_KEY && !recaptchaToken)}
+    className="relative z-10 w-full h-12 rounded-xl bg-gradient-to-r from-[#3BBF82] to-[#2da06a] hover:from-[#2da06a] hover:to-[#1f7a54] text-white font-semibold text-base shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-transparent hover:border-orange-400/50"
+  >
+    {isLoading ? (
+      <>
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        Ingresando...
+      </>
+    ) : (
+      "Iniciar sesión"
+    )}
+  </Button>
+</div>
 
                       <button
                         type="button"
@@ -449,6 +498,12 @@ const recaptchaRef = useRef<any>(null);
               </div>
             </CardContent>
           </Card>
+         {/* 🎃 CALABAZAS AGREGADAS AQUÍ */}
+          <img
+            src={CalabazasImage}
+            alt="Calabazas decorativas"
+            className="absolute -bottom-4 w-full max-w-[28rem] object-contain pointer-events-none select-none z-0 drop-shadow-lg"
+          />
         </div>
       </div>
 

@@ -21,6 +21,77 @@ import { fetchDocumentBlob } from "../../lib/documents";
 import { useAuth } from "../../context/AuthContext";
 import { useTourActive } from "../../context/TourContext";
 
+// ============================================================
+// NUEVO: fetchAllPages — pagina automáticamente cualquier endpoint
+// que use el formato { data: [...], last_page: n }.
+// Se usa en loadDocuments para bajar TODOS los pendientes.
+// ============================================================
+async function fetchAllPages(path: string, query: Record<string, string | number | boolean> = {}) {
+	const first: any = await apiFetch(path, { query: { ...query, page: 1 } });
+	const items: any[] = Array.isArray(first?.data) ? [...first.data] : [];
+	const lastPage = Number(first?.last_page ?? 1);
+
+	if (lastPage > 1) {
+		const rest = await Promise.all(
+			Array.from({ length: lastPage - 1 }, (_, i) =>
+				apiFetch(path, { query: { ...query, page: i + 2 } })
+			)
+		);
+		rest.forEach((r: any) => {
+			if (Array.isArray(r?.data)) items.push(...r.data);
+		});
+	}
+
+	// Evita duplicados si llegan envíos nuevos mientras se cargan las páginas
+	return { data: Array.from(new Map(items.map((d) => [d.id, d])).values()) };
+}
+
+// ============================================================
+// NUEVO: useDocentesRegistrados — trae los docentes dados de alta
+// en /users (incluye los que aún no han subido documentos).
+// ============================================================
+function useDocentesRegistrados(enabled: boolean) {
+	const [nombres, setNombres] = useState<string[]>([]);
+
+	useEffect(() => {
+		if (!enabled) return;
+		let isMounted = true;
+
+		(async () => {
+			try {
+				const payload: any = await apiFetch("/users", { method: "GET" });
+				const lista: any[] = Array.isArray(payload?.data)
+					? payload.data
+					: Array.isArray(payload)
+					? payload
+					: [];
+
+				const result = lista
+					.filter((u) => {
+						const tokens = (u.roles ?? []).map((r: any) =>
+							normalizeText(typeof r === "string" ? r : r?.code ?? r?.name ?? "")
+						);
+						const esDocente = tokens.some((t: string) => t.includes("docente") || t.includes("teacher"));
+						const eliminado = String(u.full_name ?? "").startsWith("Usuario eliminado");
+						return esDocente && !eliminado;
+					})
+					.map((u) => String(u.full_name ?? "").trim())
+					.filter(Boolean);
+
+				if (isMounted) setNombres(result);
+			} catch {
+				// Si /users falla, el filtro sigue con los docentes que tienen documentos.
+			}
+		})();
+
+		return () => {
+			isMounted = false;
+		};
+	}, [enabled]);
+
+	return nombres;
+}
+
 type ReviewSection = "all" | "pendientes" | "revisados" | "hoy" | "devueltos" | "reenviados";
 
 type PendingDocument = {
@@ -521,6 +592,10 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 		return null;
 	});
 
+	// NUEVO: docentes dados de alta en /users (para que el filtro de Docentes
+	// muestre también a quienes aún no han subido documentos).
+	const docentesRegistrados = useDocentesRegistrados(isReady && isAuthenticated);
+
 	useEffect(() => {
 		if (!isLoading && highlightDocumentId !== null) {
 			const scrollTimer = setTimeout(() => {
@@ -565,13 +640,13 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 
 			try {
 				const statuses = ["pendiente", "revisado", "devuelto", "reenviado"] as const;
+				// ✅ ACTUALIZADO: fetchAllPages en lugar de apiFetch directo,
+				// para bajar TODAS las páginas de cada estado.
 				const responses = await Promise.allSettled(
-					statuses.map((status) => apiFetch("/documents", {
-						query: {
-							status,
-							per_page: 500,
-							...(forcedApartado ? { apartado_label: forcedApartado } : {}),
-						},
+					statuses.map((status) => fetchAllPages("/documents", {
+						status,
+						per_page: 500,
+						...(forcedApartado ? { apartado_label: forcedApartado } : {}),
 					}))
 				);
 
@@ -705,10 +780,12 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 		() => Array.from(new Set(docsByMateria.map((doc) => doc.grupo).filter((value): value is string => Boolean(value) && normalizeText(value) !== "grupo -" && normalizeText(value) !== "-"))),
 		[docsByMateria]
 	);
-	const docentesDisponibles = useMemo(
-		() => Array.from(new Set(docsByGrupo.map((doc) => doc.docente).filter((value): value is string => Boolean(value)))),
-		[docsByGrupo]
-	);
+	// ✅ ACTUALIZADO: combina los docentes que tienen documentos con los
+	// docentes dados de alta en /users (useDocentesRegistrados).
+	const docentesDisponibles = useMemo(() => {
+		const fromDocs = docsByGrupo.map((doc) => doc.docente);
+		return Array.from(new Set([...fromDocs, ...docentesRegistrados].filter((value): value is string => Boolean(value) && value.trim() !== ""))).sort();
+	}, [docsByGrupo, docentesRegistrados]);
 	const parcialesDisponibles = PARCIAL_FILTER_OPTIONS;
 	const apartadosDisponibles = forcedApartado
 		? Array.from(new Set(docsByParcial.map((doc) => friendlyApartado(doc.apartado)).filter((value): value is string => Boolean(value))))

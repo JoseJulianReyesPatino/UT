@@ -19,6 +19,31 @@ import { useAuth } from "../../context/AuthContext";
 import { SearchableSelect } from "../../components/SearchableSelect";
 import { useTourActive } from "../../context/TourContext";
 
+// ============================================================
+// NUEVO: fetchAllPages — pagina automáticamente cualquier endpoint
+// que use el formato { data: [...], last_page: n }.
+// Se usa en loadDocuments para bajar TODOS los pendientes.
+// ============================================================
+async function fetchAllPages(path: string, query: Record<string, string | number | boolean> = {}) {
+  const first: any = await apiFetch(path, { query: { ...query, page: 1 } });
+  const items: any[] = Array.isArray(first?.data) ? [...first.data] : [];
+  const lastPage = Number(first?.last_page ?? 1);
+
+  if (lastPage > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: lastPage - 1 }, (_, i) =>
+        apiFetch(path, { query: { ...query, page: i + 2 } })
+      )
+    );
+    rest.forEach((r: any) => {
+      if (Array.isArray(r?.data)) items.push(...r.data);
+    });
+  }
+
+  // Evita duplicados si llegan envíos nuevos mientras se cargan las páginas
+  return { data: Array.from(new Map(items.map((d) => [d.id, d])).values()) };
+}
+
 type ReviewSection = "all" | "pendientes" | "devueltos" | "reenviados" | "revisados" | "hoy";
 
 type EstadiaPendingDocument = {
@@ -657,11 +682,13 @@ export default function Estadias({ layoutStyle }: { layoutStyle?: string }) {
       setLoadError(null);
 
       try {
+        // ✅ ACTUALIZADO: fetchAllPages en lugar de apiFetch directo,
+        // para bajar TODAS las páginas de cada estado.
         const [pendingResponse, reviewedResponse, returnedResponse, reenviadoResponse] = await Promise.all([
-          apiFetch("/documents", { query: { status: "pendiente", per_page: "500" } }),
-          apiFetch("/documents", { query: { status: "revisado", per_page: "500" } }),
-          apiFetch("/documents", { query: { status: "devuelto", per_page: "500" } }),
-          apiFetch("/documents", { query: { status: "reenviado", per_page: "500" } }),
+          fetchAllPages("/documents", { status: "pendiente", per_page: 500 }),
+          fetchAllPages("/documents", { status: "revisado", per_page: 500 }),
+          fetchAllPages("/documents", { status: "devuelto", per_page: 500 }),
+          fetchAllPages("/documents", { status: "reenviado", per_page: 500 }),
         ]);
 
         const pendingItems = [
