@@ -1,7 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import FormNotFoundImg from "../../../assets/elementos/Form_Not_Found.webp";
 import { DocumentCardSkeleton } from "./skeletons";
-import { Check, Eye, FileText, MessageCircleMore, MessageSquare, RefreshCw, Undo2, Info } from "lucide-react";
+import { Check, Download, Eye, FileText, MessageCircleMore, MessageSquare, Printer, RefreshCw, Trash2, Undo2, Info } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "../../components/ui/badge";
@@ -325,14 +325,9 @@ const friendlyApartado = (value?: string | null) => {
 	}
 };
 
-// ✅ FIX DEFINITIVO: El plan del backend SIEMPRE gana. NO se infiere por carrera.
-// Razón: hay carreras compartidas entre planes (MCD, OLCE, AUT, ILI, LNM, IM),
-// y la inferencia por carrera causaba que documentos con plan "nuevo_modelo"
-// se mostraran como "Plan Despresurizada" solo porque su carrera también
-// existe en el catálogo de despresurizada.
 const formatPlanLabel = (value?: string | null, _career?: string | null): string => {
 	const normalized = normalizeText(value);
-	if (!normalized) return ""; // Sin plan explícito: no mostrar nada
+	if (!normalized) return ""; 
 	if (normalized.includes("despresurizada")) return "Plan Despresurizada";
 	if (normalized.includes("nuevo")) return "Nuevo Modelo";
 	if (normalized.includes("plan normal") || normalized === "plan_normal" || normalized.includes("normal")) return "Plan Normal";
@@ -425,7 +420,6 @@ const formatDateTimeFromIso = (value?: string) => {
 		return value;
 	}
 };
-
 
 const normalizeInitialApartadoFilter = (value?: string) => {
 	if (!value) return "all";
@@ -583,8 +577,9 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 	const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState<string | null>(null);
-	const [pendingAction, setPendingAction] = useState<{ type: "review" | "send" | "return" | "cancel-return"; document: DocumentItem } | null>(null);
+	const [pendingAction, setPendingAction] = useState<{ type: "review" | "send" | "return" | "cancel-return" | "delete"; document: DocumentItem } | null>(null);
 	const [returnComment, setReturnComment] = useState("");
+	const [deleteConfirmText, setDeleteConfirmText] = useState("");
 	const [noteDialog, setNoteDialog] = useState<{ nota: string; docente: string } | null>(null);
 	const [highlightDocumentId, setHighlightDocumentId] = useState<number | null>(() => {
 		const stored = sessionStorage.getItem("adminHighlightDocumentId");
@@ -592,8 +587,6 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 		return null;
 	});
 
-	// NUEVO: docentes dados de alta en /users (para que el filtro de Docentes
-	// muestre también a quienes aún no han subido documentos).
 	const docentesRegistrados = useDocentesRegistrados(isReady && isAuthenticated);
 
 	useEffect(() => {
@@ -640,8 +633,6 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 
 			try {
 				const statuses = ["pendiente", "revisado", "devuelto", "reenviado"] as const;
-				// ✅ ACTUALIZADO: fetchAllPages en lugar de apiFetch directo,
-				// para bajar TODAS las páginas de cada estado.
 				const responses = await Promise.allSettled(
 					statuses.map((status) => fetchAllPages("/documents", {
 						status,
@@ -742,13 +733,14 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 		};
 	}, [previewBlobUrl]);
 
+	// ============================================================
+	// CONSTANTES DE ESTILOS (AQUÍ ESTABA EL ERROR, FALTABAN)
+	// ============================================================
 	const filtersGridClassName = "grid grid-cols-2 gap-2 sm:grid-cols-3";
 	const filterSelectTriggerClassName = "w-full min-w-0 max-w-full rounded-full bg-background text-[13px] leading-tight shadow-sm sm:text-sm";
 	const filterSelectValueClassName = "truncate";
 	const sectionCardClassName = "overflow-hidden border-border/70 bg-card shadow-sm dark:border-emerald-900/30 dark:bg-slate-950/60 dark:backdrop-blur-md";
-	const documentRowClassName = "relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-white p-4 transition-colors hover:bg-slate-50 dark:bg-slate-900/90 dark:hover:bg-slate-800/90 lg:flex-row lg:items-center lg:justify-between";
-	const previewCardOverlayClassName = "absolute inset-0 z-10 rounded-xl cursor-pointer";
-	const previewChipClassName = "h-8 rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground shadow-sm hover:bg-muted/50";
+	const documentRowClassName = "relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border/70 bg-white p-4 transition-colors dark:bg-slate-900/90 lg:flex-row lg:items-center lg:justify-between";
 
 	const docsByPlan = useMemo(() => allDocuments.filter((doc) => matchesNormalized(doc.plan, filterPlan)), [allDocuments, filterPlan]);
 	const docsByCarrera = useMemo(() => docsByPlan.filter((doc) => matchesNormalized(doc.carrera, filterCarrera)), [docsByPlan, filterCarrera]);
@@ -780,8 +772,6 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 		() => Array.from(new Set(docsByMateria.map((doc) => doc.grupo).filter((value): value is string => Boolean(value) && normalizeText(value) !== "grupo -" && normalizeText(value) !== "-"))),
 		[docsByMateria]
 	);
-	// ✅ ACTUALIZADO: combina los docentes que tienen documentos con los
-	// docentes dados de alta en /users (useDocentesRegistrados).
 	const docentesDisponibles = useMemo(() => {
 		const fromDocs = docsByGrupo.map((doc) => doc.docente);
 		return Array.from(new Set([...fromDocs, ...docentesRegistrados].filter((value): value is string => Boolean(value) && value.trim() !== ""))).sort();
@@ -917,6 +907,17 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 		}
 	};
 
+	const handleDeleteDocument = async (documentId: number) => {
+		try {
+			await apiFetch(`/documents/${documentId}`, { method: "DELETE" });
+			setPendingDocuments((current) => current.filter((d) => d.id !== documentId));
+			setReviewedDocuments((current) => current.filter((d) => d.id !== documentId));
+			toast.success("Documento eliminado");
+		} catch (error: any) {
+			toast.error(error?.message ?? "No se pudo eliminar el documento");
+		}
+	};
+
 	const handleShareToMessages = (doc: DocumentItem) => {
 		const lastSep = doc.documento.lastIndexOf(" - ");
 		const cleanTitle = lastSep !== -1 && doc.documento.substring(lastSep + 3).trim()
@@ -928,6 +929,17 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 	const confirmPendingAction = () => {
 		if (!pendingAction) return;
 		const { type, document } = pendingAction;
+
+		if (type === "delete" && deleteConfirmText.trim().toUpperCase() !== "ELIMINAR") return;
+
+		setPreviewDocument(null);
+
+		if (type === "delete") {
+			setPendingAction(null);
+			setDeleteConfirmText("");
+			void handleDeleteDocument(document.id);
+			return;
+		}
 
 		if (type === "review") {
 			setPendingAction(null);
@@ -970,6 +982,7 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 
 	const pendingActionDescription = (() => {
 		if (!pendingAction) return "";
+		if (pendingAction.type === "delete") return `Vas a eliminar permanentemente: ${pendingAction.document.documento}. Se borrará también el archivo PDF y no se podrá recuperar.`;
 		if (pendingAction.type === "review") return `Vas a marcar como revisado: ${pendingAction.document.documento}`;
 		if (pendingAction.type === "send") {
 			const doc = pendingAction.document;
@@ -1106,8 +1119,9 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 				key={doc.id}
 				id={`doc-row-${doc.id}`}
 				data-tour={isFirstRow ? "admin-docreview-doc-row" : undefined}
+				onClick={() => { if (doc.has_file !== false) setPreviewDocument(doc); }}
 				className={cn(
-					"relative flex flex-col gap-2 border-l-4 px-3 py-2.5 transition-colors",
+					"relative flex flex-col gap-2 border-l-4 px-3 py-2.5 transition-all cursor-pointer",
 					"sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3",
 					"bg-white hover:bg-slate-50 dark:bg-slate-950 dark:hover:bg-slate-900/60",
 					borderColor,
@@ -1125,27 +1139,6 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 					data-tour={isFirstRow ? "admin-docreview-actions" : undefined}
 					className="flex items-center gap-1 shrink-0"
 				>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300" aria-label="Ver detalles">
-								<Info className="h-3.5 w-3.5" />
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent side="left" className="p-0">
-							<div className="px-3 py-2 space-y-1 min-w-[180px]">
-								{infoFields.map(({ label, value }) => (
-									<div key={label} className="flex items-baseline gap-2 text-xs">
-										<span className="text-muted-foreground shrink-0 w-[72px]">{label}:</span>
-										<span className="font-medium break-words">{value}</span>
-									</div>
-								))}
-							</div>
-						</TooltipContent>
-					</Tooltip>
-					<Badge variant={getStatusVariant(doc)} className="text-[11px] px-2">{getStatusLabel(doc)}</Badge>
-					<Button variant="outline" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs" onClick={(e) => { e.stopPropagation(); if (doc.has_file !== false) setPreviewDocument(doc); }} disabled={doc.has_file === false} aria-label="Ver PDF">
-						<Eye className="h-3.5 w-3.5" /><span className="hidden sm:inline">Ver</span>
-					</Button>
 					{doc.nota && (
 						<Tooltip>
 							<TooltipTrigger asChild>
@@ -1156,20 +1149,7 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 							<TooltipContent>Nota del docente</TooltipContent>
 						</Tooltip>
 					)}
-					{!isReviewed && (
-						<Button variant="outline" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "review", document: doc }); }} aria-label="Revisar">
-							<Check className="h-3.5 w-3.5" /><span className="hidden sm:inline">Revisar</span>
-						</Button>
-					)}
-					{allowReturn && (doc.returned || !isReviewed) && (doc.returned ? (
-						<Button variant="outline" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "cancel-return", document: doc }); }} aria-label="Cancelar devolución">
-							<Undo2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Cancelar</span>
-						</Button>
-					) : (
-						<Button variant="destructive" size="icon" className="h-7 w-7 sm:w-auto sm:px-2 sm:gap-1 text-xs" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} aria-label="Devolver">
-							<Undo2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Devolver</span>
-						</Button>
-					))}
+					<Badge variant={getStatusVariant(doc)} className="text-[11px] px-2">{getStatusLabel(doc)}</Badge>
 				</div>
 			</div>
 		);
@@ -1254,7 +1234,12 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 
 		const isHighlighted = highlightDocumentId === doc.id;
 		return (
-			<div key={doc.id} id={`doc-row-${doc.id}`} className={`${documentRowClassName}${isHighlighted ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""}`}>
+			<div 
+				key={doc.id} 
+				id={`doc-row-${doc.id}`} 
+				onClick={() => { if (doc.has_file !== false) setPreviewDocument(doc); }}
+				className={`${documentRowClassName}${isHighlighted ? " ring-2 ring-emerald-400/60 bg-emerald-50/20 dark:bg-emerald-950/25" : ""} cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700`}
+			>
 				<div className="flex items-start gap-3 flex-1">
 					<div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0"><FileText className="h-6 w-6 text-muted-foreground" /></div>
 					<div className="flex-1 min-w-0">
@@ -1274,21 +1259,24 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 						{"reviewedAt" in doc && doc.reviewedAt && <p className="mt-1 text-xs text-muted-foreground">Revisado: {formatDateTimeFromIso(doc.reviewedAt)}</p>}
 					</div>
 				</div>
-				<div data-tour="admin-docreview-actions" className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
-					<ResponsiveActionButton variant="outline" size="sm" label="Ver" title={doc.has_file === false ? "El archivo no está disponible en el servidor" : "Ver PDF"} onClick={(e) => { e.stopPropagation(); if (doc.has_file !== false) setPreviewDocument(doc); }} disabled={doc.has_file === false} icon={<Eye className="h-4 w-4" />} />
-
-					{isReviewed ? null : <ResponsiveActionButton variant="outline" size="sm" label="Revisar" title="Revisar documento" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "review", document: doc }); }} icon={<Check className="h-4 w-4" />} />}
-
+				
+				<div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto sm:justify-end justify-between w-full sm:w-auto mt-2 sm:mt-0">
+					{doc.nota && (
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota!, docente: doc.docente }); }} aria-label="Ver nota del docente">
+									<MessageCircleMore className="h-4 w-4" />
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent>Nota del docente</TooltipContent>
+						</Tooltip>
+					)}
 					<Badge
 						variant={statusVariant}
 						className={"status" in doc && doc.status === "reenviado" ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" : undefined}
 					>
 						{statusLabel}
 					</Badge>
-
-					{doc.nota && <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40" onClick={(e) => { e.stopPropagation(); setNoteDialog({ nota: doc.nota, docente: doc.docente }); }} aria-label="Ver nota del docente"><MessageCircleMore className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Nota del docente</TooltipContent></Tooltip>}
-					<ResponsiveActionButton variant="ghost" size="sm" label="Enviar" title={`Enviar a mensajes ${doc.docente}`} onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "send", document: doc }); }} icon={<MessageSquare className="h-4 w-4" />} />
-					{allowReturn && (doc.returned || !isReviewed) && (doc.returned ? <Tooltip><TooltipTrigger asChild><ResponsiveActionButton variant="outline" size="sm" label="Cancelar" title="Cancelar devolución" className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "cancel-return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} /></TooltipTrigger><TooltipContent>Cancelar devolución</TooltipContent></Tooltip> : <Tooltip><TooltipTrigger asChild><ResponsiveActionButton variant="destructive" size="sm" label="Devolver" title="Devolver documento" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: "return", document: doc }); }} icon={<Undo2 className="h-4 w-4" />} /></TooltipTrigger><TooltipContent>Devolver</TooltipContent></Tooltip>)}
 				</div>
 			</div>
 		);
@@ -1322,6 +1310,51 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 				</div>
 			</div>
 		);
+	};
+
+	const getInitials = (name: string) =>
+		name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
+
+	const previewDoc = previewDocument;
+	const previewIsReviewed = previewDoc ? "reviewedAt" in previewDoc : false;
+	const previewFileName = previewDoc ? extractPreviewFileName(previewDoc.documento) : "";
+
+	const previewInfoFields: { label: string; value: string }[] = previewDoc
+		? [
+				previewDoc.plan ? { label: "Plan", value: previewDoc.plan } : null,
+				previewDoc.ciclo ? { label: "Ciclo", value: previewDoc.ciclo } : null,
+				previewDoc.carrera ? { label: "Carrera", value: previewDoc.carrera } : null,
+				getDocumentCuatrimestre(previewDoc as ApiDocument) !== "-" ? { label: "Cuatrimestre", value: getDocumentCuatrimestre(previewDoc as ApiDocument) } : null,
+				previewDoc.materia && normalizeText(previewDoc.materia) !== "sin materia" ? { label: "Materia", value: previewDoc.materia } : null,
+				previewDoc.grupo && previewDoc.grupo !== "-" ? { label: "Grupo", value: previewDoc.grupo } : null,
+				getDocumentParcial(previewDoc as ApiDocument) !== "-" ? { label: "Parcial", value: getDocumentParcial(previewDoc as ApiDocument) } : null,
+				"reviewedAt" in previewDoc && previewDoc.reviewedAt ? { label: "Revisado", value: formatDateTimeFromIso(previewDoc.reviewedAt) } : null,
+				previewDoc.returnedAt ? { label: "Devuelto", value: formatDateTimeFromIso(previewDoc.returnedAt) } : null,
+				"resubmittedAt" in previewDoc && previewDoc.resubmittedAt ? { label: "Reenviado", value: formatDateTimeFromIso(previewDoc.resubmittedAt) } : null,
+			].filter((f): f is { label: string; value: string } => f !== null)
+		: [];
+
+	const handleDownloadPreview = () => {
+		if (!previewBlobUrl) return;
+		const a = window.document.createElement("a");
+		a.href = previewBlobUrl;
+		a.download = previewFileName || "documento.pdf";
+		window.document.body.appendChild(a);
+		a.click();
+		a.remove();
+	};
+
+	const handlePrintPreview = () => {
+		if (!previewBlobUrl) return;
+		const iframe = window.document.createElement("iframe");
+		iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+		iframe.src = previewBlobUrl;
+		iframe.onload = () => {
+			iframe.contentWindow?.focus();
+			iframe.contentWindow?.print();
+			setTimeout(() => iframe.remove(), 60000);
+		};
+		window.document.body.appendChild(iframe);
 	};
 
 	return (
@@ -1470,36 +1503,122 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 				</Tabs>
 
 			<Dialog open={previewDocument !== null} onOpenChange={(open) => { if (!open) setPreviewDocument(null); }}>
-				<DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] flex flex-col">
-					<DialogHeader>
-						<DialogTitle>{previewDocument ? extractPreviewFileName(previewDocument.documento) : ""}</DialogTitle>
-						{previewDocument && <DialogDescription>{previewDocument.docente} · {previewDocument.carrera}</DialogDescription>}
+				<DialogContent className="flex h-[92vh] w-[95vw] max-w-[95vw] flex-col gap-0 overflow-hidden p-0">
+					<DialogHeader className="sr-only">
+						<DialogTitle>{previewFileName || "Documento"}</DialogTitle>
+						<DialogDescription>Vista previa del documento y acciones de revisión</DialogDescription>
 					</DialogHeader>
-					{previewDocument && (
-						<div className="flex-1 min-h-0">
-							{previewLoading ? (
-								<div className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-muted-foreground">
-									<p>Cargando...</p>
+
+					{previewDoc && (
+						<>
+							<div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-4 py-2.5 pr-12">
+								<FileText className="mr-1.5 h-4 w-4 text-muted-foreground" />
+								<span className="mr-3 max-w-[40%] truncate text-sm font-semibold">{previewFileName}</span>
+								<Button variant="ghost" size="sm" onClick={handleDownloadPreview} disabled={!previewBlobUrl}>
+									<Download className="mr-1.5 h-4 w-4" />Descargar
+								</Button>
+								<Button variant="ghost" size="sm" onClick={handlePrintPreview} disabled={!previewBlobUrl}>
+									<Printer className="mr-1.5 h-4 w-4" />Imprimir
+								</Button>
+							</div>
+
+							<div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+								<div className="min-h-[45vh] flex-1 bg-slate-100 dark:bg-slate-900/60">
+									{previewLoading ? (
+										<div className="flex h-full items-center justify-center text-sm text-muted-foreground">Cargando...</div>
+									) : previewError ? (
+										<div className="m-4 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{previewError}</div>
+									) : previewBlobUrl ? (
+										<object data={previewBlobUrl} type="application/pdf" className="h-full min-h-[45vh] w-full">
+											<a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-full items-center justify-center text-sm text-primary underline">
+												Abrir documento en nueva pestaña
+											</a>
+										</object>
+									) : null}
 								</div>
-							) : previewError ? (
-								<div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-									{previewError}
-								</div>
-							) : previewBlobUrl ? (
-								<object data={previewBlobUrl} type="application/pdf" className="h-[82vh] w-full rounded-lg border border-border">
-									<a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="flex h-[82vh] items-center justify-center rounded-lg border border-dashed border-border bg-background text-sm text-primary underline">
-										Abrir documento en nueva pestaña
-									</a>
-								</object>
-							) : null}
-						</div>
+
+								<aside className="w-full shrink-0 overflow-y-auto border-t border-border bg-background lg:w-[380px] lg:border-l lg:border-t-0">
+									<div className="space-y-4 p-5">
+										<h2 className="break-words text-xl font-semibold leading-snug">{previewFileName}</h2>
+
+										<div className="flex flex-wrap gap-1.5">
+											<Badge variant={getStatusVariant(previewDoc)}>{getStatusLabel(previewDoc)}</Badge>
+											{previewDoc.apartado && previewDoc.apartado !== "-" && <Badge variant="outline">{previewDoc.apartado}</Badge>}
+										</div>
+
+										<div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+											<div className="flex items-start gap-3">
+												<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+													{getInitials(previewDoc.docente)}
+												</div>
+												<div className="min-w-0 flex-1">
+													<p className="truncate text-sm font-semibold">{previewDoc.docente}</p>
+													{typeof previewDoc.fecha === "string" && previewDoc.fecha && (
+														<p className="text-xs text-muted-foreground">Enviado: {formatSentFecha(previewDoc.fecha)}</p>
+													)}
+												</div>
+											</div>
+
+											<div className="mt-4 flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
+												<FileText className="h-5 w-5 shrink-0 text-rose-500" />
+												<div className="min-w-0">
+													<p className="truncate text-sm font-medium">{previewFileName}</p>
+													<p className="text-xs text-muted-foreground">Documento PDF</p>
+												</div>
+											</div>
+
+											<div className="mt-4 whitespace-pre-wrap text-sm">
+												{previewDoc.nota ? previewDoc.nota : <span className="italic text-muted-foreground">El docente no incluyó ninguna nota.</span>}
+											</div>
+
+											<div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
+												{!previewIsReviewed && (
+													<Button variant="outline" size="sm" onClick={() => setPendingAction({ type: "review", document: previewDoc })}>
+														<Check className="mr-1.5 h-4 w-4" />Revisar
+													</Button>
+												)}
+												{(previewDoc.returned || !previewIsReviewed) && (previewDoc.returned ? (
+													<Button variant="outline" size="sm" className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950" onClick={() => setPendingAction({ type: "cancel-return", document: previewDoc })}>
+														<Undo2 className="mr-1.5 h-4 w-4" />Cancelar devolución
+													</Button>
+												) : (
+													<Button variant="destructive" size="sm" onClick={() => setPendingAction({ type: "return", document: previewDoc })}>
+														<Undo2 className="mr-1.5 h-4 w-4" />Devolver
+													</Button>
+												))}
+												<Button variant="ghost" size="sm" onClick={() => setPendingAction({ type: "send", document: previewDoc })}>
+													<MessageSquare className="mr-1.5 h-4 w-4" />Enviar
+												</Button>
+												<Button variant="outline" size="sm" className="border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/40" onClick={() => setPendingAction({ type: "delete", document: previewDoc })}>
+													<Trash2 className="mr-1.5 h-4 w-4" />Eliminar
+												</Button>
+											</div>
+										</div>
+
+										{previewInfoFields.length > 0 && (
+											<dl className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1.5 text-xs">
+												{previewInfoFields.map(({ label, value }) => (
+													<React.Fragment key={label}>
+														<dt className="text-muted-foreground">{label}</dt>
+														<dd className="break-words font-medium">{value}</dd>
+													</React.Fragment>
+												))}
+											</dl>
+										)}
+									</div>
+								</aside>
+							</div>
+						</>
 					)}
 				</DialogContent>
 			</Dialog>
 
-			<Dialog open={pendingAction !== null} onOpenChange={(open) => { if (!open) { setPendingAction(null); setReturnComment(""); } }}>
+			<Dialog open={pendingAction !== null} onOpenChange={(open) => { if (!open) { setPendingAction(null); setReturnComment(""); setDeleteConfirmText(""); } }}>
 				<DialogContent>
-					  <DialogHeader><DialogTitle>¿Estás seguro?</DialogTitle><DialogDescription>{pendingActionDescription}</DialogDescription></DialogHeader>
+					<DialogHeader>
+						<DialogTitle>{pendingAction?.type === "delete" ? "Eliminar documento" : "¿Estás seguro?"}</DialogTitle>
+						<DialogDescription>{pendingActionDescription}</DialogDescription>
+					</DialogHeader>
 					{pendingAction?.type === "return" && (
 						<div className="space-y-2">
 							<p className="text-sm font-medium">Comentario para el docente</p>
@@ -1510,7 +1629,28 @@ export default function DocumentReview({ initialSection = "all", initialForm, la
 							/>
 						</div>
 					)}
-					<DialogFooter><Button variant="outline" onClick={() => { setPendingAction(null); setReturnComment(""); }}>Cancelar</Button><Button variant={pendingAction?.type === "return" ? "destructive" : "default"} onClick={confirmPendingAction} disabled={!pendingAction}>Confirmar</Button></DialogFooter>
+					{pendingAction?.type === "delete" && (
+						<div className="space-y-2">
+							<p className="text-sm font-medium">Escribe <span className="font-mono text-rose-600">ELIMINAR</span> para confirmar</p>
+							<input
+								value={deleteConfirmText}
+								onChange={(event) => setDeleteConfirmText(event.target.value)}
+								autoComplete="off"
+								spellCheck={false}
+								className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+							/>
+						</div>
+					)}
+					<DialogFooter>
+						<Button variant="outline" onClick={() => { setPendingAction(null); setReturnComment(""); setDeleteConfirmText(""); }}>Cancelar</Button>
+						<Button
+							variant={pendingAction?.type === "return" || pendingAction?.type === "delete" ? "destructive" : "default"}
+							onClick={confirmPendingAction}
+							disabled={!pendingAction || (pendingAction.type === "delete" && deleteConfirmText.trim().toUpperCase() !== "ELIMINAR")}
+						>
+							{pendingAction?.type === "delete" ? "Eliminar definitivamente" : "Confirmar"}
+						</Button>
+					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 
